@@ -116,7 +116,7 @@ function generate_github_release_notes()
         -X POST \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer $SECRET" \
-        https://api.github.com/repos/ifrit98/storage-subnet/releases/generate-notes \
+        https://github.com/eclipsevortex/SubVortex/releases/generate-notes \
         --data "$(generate_github_release_notes_post_data)"
 }
 
@@ -132,12 +132,14 @@ function generate_github_release_notes_for_changelog()
         echo_error "generate_github_release_notes_for_changelog needs SECRET"
         exit 1
     fi
+        # https://github.com/eclipsevortex/SubVortex/releases/generate-notes \
 
     curl --silent \
         -X POST \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer $SECRET" \
-        https://api.github.com/repos/ifrit98/storage-subnet/releases/generate-notes \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        https://api.github.com/repos/eclipsevortex/SubVortex/releases \ \
         --data "$(generate_github_release_notes_for_changelog_post_data)"
 }
 
@@ -164,6 +166,6 @@ function create_github_release()
         -X POST \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer $SECRET" \
-        https://api.github.com/repos/ifrit98/storage-subnet/releases \
+        https://github.com/eclipsevortex/SubVortex/releases/releases \
         --data "$(generate_github_release_post_data)" > /dev/null
 }

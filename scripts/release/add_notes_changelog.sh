@@ -78,6 +78,7 @@ PREV_TAG_NAME=v$PREV_TAG_VERSION
 if [[ $APPLY == "true" ]]; then
   echo_info "Generating Github release notes"
   RESPONSE=$(generate_github_release_notes_for_changelog $GITHUB_TOKEN)
+  echo $RESPONSE
   DESCRIPTION=$(echo $RESPONSE | jq '.body' | tail -1 | sed "s/\"//g")
 
   if [ $(echo $RESPONSE | jq '.body' | wc -l) -eq 1 ]; then
@@ -99,8 +100,8 @@ fi
 
 if [[ $APPLY == "true" ]]; then
   echo_info "Adding release notes to CHANGELOG.md"
-  sed -i "2 i\\\n## $RELEASE_NAME" CHANGELOG.md
-  sed -i "4 i\\\n$DESCRIPTION\n" CHANGELOG.md
+  awk "NR==2{print \"\\n## $RELEASE_NAME\"}1" CHANGELOG.md > temp.md && mv temp.md CHANGELOG.md
+  awk "NR==4{print \"\\n$DESCRIPTION\"}1" CHANGELOG.md > temp.md && mv temp.md CHANGELOG.md
 else
   echo_warning "Dry run execution. Not adding release notes to CHANGELOG.md"
 fi

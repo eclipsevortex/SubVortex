@@ -74,7 +74,8 @@ function generate_github_release_notes_for_changelog_post_data()
   "name":"$RELEASE_NAME",
   "draft":false,
   "prerelease":false,
-  "generate_release_notes":false
+  "generate_release_notes":false,
+  "configuration_file_path":".github/release.yml"
 }
 EOF
 }
@@ -132,14 +133,13 @@ function generate_github_release_notes_for_changelog()
         echo_error "generate_github_release_notes_for_changelog needs SECRET"
         exit 1
     fi
-        # https://github.com/eclipsevortex/SubVortex/releases/generate-notes \
-
+    
     curl --silent \
         -X POST \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer $SECRET" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
-        https://api.github.com/repos/eclipsevortex/SubVortex/releases \ \
+        https://api.github.com/repos/eclipsevortex/SubVortex/releases/generate-notes \
         --data "$(generate_github_release_notes_for_changelog_post_data)"
 }
 

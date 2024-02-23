@@ -24,6 +24,7 @@ async def compute_metrics(self):
         self.device
     )
 
+    keys=[]
     for idx, uid in enumerate(uids):
         axon = self.metagraph.axons[idx]
 
@@ -52,7 +53,7 @@ async def compute_metrics(self):
                 miners.append(key)
                 
         number_of_miners = len(miners)
-        metric2 = 1 * (metric2_rewards[number_of_miners] or 0)
+        metric2 = 1 * (metric2_rewards.get(number_of_miners) or 0)
         bt.logging.debug(f"[Metric 2] Unicity {metric2}")
 
         # Metric 3 - Diversity: Maximise subtensors's timezone owned by a coldkey
@@ -78,6 +79,9 @@ async def compute_metrics(self):
         # Apply reward for this challenge
         rewards[idx] = (metric1 + metric2 + metric3) / 3
         bt.logging.debug(f"Rewards {rewards[idx]}")
+
+    if len(keys) == 0:
+        return
 
     process_times = []
     for key in keys:

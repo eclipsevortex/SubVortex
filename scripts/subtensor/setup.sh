@@ -1,23 +1,64 @@
 #!/bin/bash
 
-# Install dependencies
-sudo apt-get update && sudo apt-get install -y curl build-essential protobuf-compiler clang git
+ROOT=${1:-$HOME}
 
-# Install rust
-curl https://sh.rustup.rs -sSf | sh -s -- -y
+install_dependencies() {
+    # Function to install packages on macOS
+    install_mac() {
+        which brew > /dev/null
+        if [ $? -ne 0 ]; then
+            echo "Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
+        echo "Updating Homebrew packages..."
+        brew update
+        echo "Installing required packages..."
+        brew install make llvm curl libssl protobuf tmux
+    }
 
-# Activate the rust environment and setup path
-source "$HOME/.cargo/env"
+    # Function to install packages on Ubuntu/Debian
+    install_ubuntu() {
+        echo "Updating system packages..."
+        sudo apt update
+        echo "Installing required packages..."
+        sudo apt install --assume-yes make build-essential clang libssl-dev llvm libudev-dev protobuf-compiler
+    }
 
-# Get the subtensor repo
-git clone https://github.com/opentensor/subtensor.git
-pushd subtensor
+    # Detect OS and call the appropriate function
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        install_mac
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        install_ubuntu
+    else
+        echo "Unsupported operating system."
+        exit 1
+    fi
 
-# Update to nightly rust/cargo 
-./scripts/init.sh
+    # Install rust and cargo
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Build subtensor. This may take 5-10 minutes.
-cargo build --release --features runtime-benchmarks --locked
+    # Update your shell's source to include Cargo's path
+    source "$HOME/.cargo/env"
+}
 
-# Return to storage-subnet directory
-popd
+setup_environment() {
+    # Clone subtensor and enter the directory
+    if [ ! -d "subtensor" ]; then
+        git clone https://github.com/opentensor/subtensor.git
+    fi
+
+    # Go the repository
+    cd $ROOT/subtensor
+
+    # Get the latest version
+    git pull
+
+    # Setup rust
+    ./scripts/init.sh
+
+    # Go back 
+    cd $ROOT
+}
+
+# Call setup_environment every time
+setup_environment 

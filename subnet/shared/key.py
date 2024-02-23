@@ -1,6 +1,21 @@
 import os
 import errno
+import paramiko
 import bittensor as bt
+
+
+def generate_key(name: str):
+    # Generate a new RSA key pair
+    private_key = paramiko.RSAKey.generate(bits=2048)
+
+    # Save the private key to a file
+    private_key_file = f'{name}.key'
+    private_key.write_private_key_file(private_key_file)
+
+    # Get the public key
+    public_key = f"{private_key.get_name()} {private_key.get_base64()}"
+
+    return public_key, private_key
 
 
 def generate_ssh_key(public_key):

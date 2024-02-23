@@ -1,7 +1,9 @@
 #!/bin/bash
 
+ROOT=${1:-$HOME}
+
 # Go to the repository
-cd $HOME/Subnet_S
+cd $ROOT/SubVortex
 
 # Install the dependencies
 python -m pip install -e .

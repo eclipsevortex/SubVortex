@@ -48,7 +48,6 @@ if [ ! -f ".dependencies_installed" ]; then
     touch .dependencies_installed
 fi
 
-
 # Section 2: Test/Run
 # This section is for running and testing the setup.
 
@@ -64,7 +63,8 @@ fund_wallet() {
         echo "Funding $wallet_name ($i/$count)"
         btcli wallet faucet \
             --wallet.name $wallet_name \
-            --subtensor.chain_endpoint ws://127.0.0.1:9946
+            --subtensor.chain_endpoint ws://127.0.0.1:9946 \
+            --no_prompt
         sleep 2  # Add a 2-second pause
     done
 }
@@ -126,38 +126,38 @@ echo ">> You can attach to this session with: tmux attach-session -t localnet"
 fund_wallet "owner" 4
 
 # Register a subnet (this needs to be run each time we start a new local chain)
-btcli subnet create --wallet.name $wallet --wallet.hotkey default --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
+btcli subnet create --wallet.name $wallet --wallet.hotkey default --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
 
 # Faucet miner/validator coldkey
 fund_wallet "miner" 1
 fund_wallet "validator" 4
 
 # Register wallet hotkeys to subnet
-btcli subnet register --wallet.name miner --netuid 1 --wallet.hotkey default --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
-btcli subnet register --wallet.name validator --netuid 1 --wallet.hotkey default --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
+btcli subnet register --wallet.name miner --netuid 1 --wallet.hotkey default --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
+btcli subnet register --wallet.name validator --netuid 1 --wallet.hotkey default --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
 
 # Add stake to the validator
-btcli stake add --wallet.name validator --wallet.hotkey default --subtensor.chain_endpoint ws://127.0.0.1:9946 --amount 10000 --no_prompt
+btcli stake add --wallet.name validator --wallet.hotkey default --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --amount 10000 --no_prompt
 
 # Ensure both the miner and validator keys are successfully registered.
-btcli subnet list --subtensor.chain_endpoint ws://127.0.0.1:9946
-btcli wallet overview --wallet.name validator --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
-btcli wallet overview --wallet.name miner --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
+btcli subnet list --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946
+btcli wallet overview --wallet.name validator --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
+btcli wallet overview --wallet.name miner --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --no_prompt
 
 cd ../SubVortex
 
 # Check if inside a tmux session
 if [ -z "$TMUX" ]; then
     # Start a new tmux session and run the miner in the first pane
-    tmux new-session -d -s bittensor -n 'miner' 'python neurons/miner.py --netuid 1 --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name miner --wallet.hotkey default --logging.debug'
+    tmux new-session -d -s bittensor -n 'miner' 'python neurons/miner.py --netuid 1 --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name miner --wallet.hotkey default --logging.debug'
     
     # Split the window and run the validator in the new pane
-    tmux split-window -h -t bittensor:miner 'python neurons/validator.py --netuid 1 --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name validator --wallet.hotkey default --logging.debug'
+    tmux split-window -h -t bittensor:miner 'python neurons/validator.py --netuid 1 --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name validator --wallet.hotkey default --logging.debug'
     
     # Attach to the new tmux session
     tmux attach-session -t bittensor
 else
     # If already in a tmux session, create two panes in the current window
-    tmux split-window -h 'python neurons/miner.py --netuid 1 --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name miner --wallet.hotkey default --logging.debug'
-    tmux split-window -v -t 0 'python neurons/validator.py --netuid 1 --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name3 validator --wallet.hotkey default --logging.debug'
+    tmux split-window -h 'python neurons/miner.py --netuid 1 --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name miner --wallet.hotkey default --logging.debug'
+    tmux split-window -v -t 0 'python neurons/validator.py --netuid 1 --subtensor.network local --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name3 validator --wallet.hotkey default --logging.debug'
 fi

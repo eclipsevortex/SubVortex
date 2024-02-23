@@ -62,7 +62,9 @@ fund_wallet() {
 
     for ((i=1; i<=$count; i++)); do
         echo "Funding $wallet_name ($i/$count)"
-        $COMMAND $wallet_name --subtensor.chain_endpoint $CHAIN_ENDPOINT
+        btcli wallet faucet \
+            --wallet.name $wallet_name \
+            --subtensor.chain_endpoint ws://127.0.0.1:9946
         sleep 2  # Add a 2-second pause
     done
 }

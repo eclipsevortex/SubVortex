@@ -74,8 +74,7 @@ function generate_github_release_notes_for_changelog_post_data()
   "name":"$RELEASE_NAME",
   "draft":false,
   "prerelease":false,
-  "generate_release_notes":false,
-  "configuration_file_path":".github/release.yml"
+  "generate_release_notes":false
 }
 EOF
 }

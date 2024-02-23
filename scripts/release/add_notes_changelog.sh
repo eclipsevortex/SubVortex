@@ -78,7 +78,6 @@ PREV_TAG_NAME=v$PREV_TAG_VERSION
 if [[ $APPLY == "true" ]]; then
   echo_info "Generating Github release notes"
   RESPONSE=$(generate_github_release_notes_for_changelog $GITHUB_TOKEN)
-  echo $RESPONSE
   DESCRIPTION=$(echo $RESPONSE | jq '.body' | tail -1 | sed "s/\"//g")
 
   if [ $(echo $RESPONSE | jq '.body' | wc -l) -eq 1 ]; then

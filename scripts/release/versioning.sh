@@ -39,7 +39,7 @@ if [[ $VERSION_TYPE != "major" && $VERSION_TYPE != "minor" && $VERSION_TYPE != "
 fi
 
 VERSION=$(cat VERSION)
-CODE_WITH_VERSION='storage/__init__.py'
+CODE_WITH_VERSION='subnet/__init__.py'
 
 MAJOR=$(awk -F. '{print $1}' <<< $VERSION)
 MINOR=$(awk -F. '{print $2}' <<< $VERSION)
@@ -85,11 +85,13 @@ echo_info "Current version: $CURRENT_VERSION"
 echo_info "New version: $NEW_VERSION"
 
 if [[ $APPLY == "true" ]]; then
-    echo_info "Updating version in code: sed -i "18,30s/$VERSION/$NEW_VERSION/g" $CODE_WITH_VERSION"
-    sed -i "18,30s/$VERSION/$NEW_VERSION/g" $CODE_WITH_VERSION
+    echo_info "Updating version in code: sed -i "53,57s/$VERSION/$NEW_VERSION/g" $CODE_WITH_VERSION"
+    awk 'NR>=53 && NR<=57 {gsub(/1.0.0/, "1.0.1")} {print}' subnet/__init__.py > temp && mv temp subnet/__init__.py
     echo_info "Updating version in file: echo -n $NEW_VERSION > VERSION"
     echo -n $NEW_VERSION > VERSION
 else
     echo_warning "Dry run execution. Version update not applied"
     echo_info "Use -A or --apply to apply changes"
 fi
+
+awk "NR==2{print \"\\n## $RELEASE_NAME\"}1" CHANGELOG.md > temp.md && mv temp.md CHANGELOG.md

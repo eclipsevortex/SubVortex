@@ -1,13 +1,27 @@
 import os
 import errno
+import paramiko
 import bittensor as bt
+
+
+def generate_key(name: str):
+    # Generate a new RSA key pair
+    private_key = paramiko.RSAKey.generate(bits=2048)
+
+    # Save the private key to a file
+    private_key_file = f'{name}.key'
+    private_key.write_private_key_file(private_key_file)
+
+    # Get the public key
+    public_key = f"{private_key.get_name()} {private_key.get_base64()}"
+
+    return public_key, private_key
 
 
 def generate_ssh_key(public_key):
     # Define the path to the .ssh directory and authorized_keys file
     ssh_dir = os.path.expanduser(os.path.join('~', '.ssh'))
     authorized_keys_file = os.path.join(ssh_dir, 'authorized_keys')
-    bt.logging.info(f"Authorized key files {authorized_keys_file}")
 
     # Ensure the .ssh directory exists
     if not os.path.exists(ssh_dir):
@@ -28,12 +42,13 @@ def generate_ssh_key(public_key):
     # Ensure the authorized_keys file has the correct permissions
     os.chmod(authorized_keys_file, 0o600)
 
+    bt.logging.info("Ssh key saved")
+
 
 def clean_ssh_key(public_key):
     # Define the path to the .ssh directory and authorized_keys file
     ssh_dir = os.path.expanduser(os.path.join('~', '.ssh'))
     authorized_keys_file = os.path.join(ssh_dir, 'authorized_keys')
-    bt.logging.info(f"Authorized key files {authorized_keys_file}")
 
     # Ensure the .ssh directory exists
     if not os.path.exists(ssh_dir):
@@ -59,3 +74,5 @@ def clean_ssh_key(public_key):
 
     # Ensure the authorized_keys file has the correct permissions
     os.chmod(authorized_keys_file, 0o600)
+
+    bt.logging.info("Ssh key removed")

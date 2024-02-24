@@ -17,23 +17,40 @@ def execute_speed_test(self, uid: int, private_key: paramiko.RSAKey):
     # Get the axon
     axon = self.metagraph.axons[uid]
 
+    # Initialize the SSH client
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(axon.ip, username="root", pkey=private_key)
 
-    # Execute a command on the remote server
-    command_to_execute = "speedtest-cli --json"
-    stdin, stdout, stderr = ssh.exec_command(command_to_execute)
+    try:
+        # Connect to the remote server
+        ssh.connect(axon.ip, username="root", pkey=private_key)
+        bt.logging.debug(f"Ssh connection with {axon.ip}")
 
-    # Get the command output
-    output = stdout.read().decode("utf-8")
-    error = stderr.read().decode("utf-8")
+        # Execute a command on the remote server
+        command_to_execute = "speedtest-cli --json"
+        stdin, stdout, stderr = ssh.exec_command(command_to_execute)
 
-    if error is not None and len(error) > 0:
-        bt.logging.error(f"'{error}'")
-        return None
+        # Get the command output
+        output = stdout.read().decode("utf-8")
+        error = stderr.read().decode("utf-8")
 
-    return json.loads(output)
+        bt.logging.debug(output or error)
+
+        # Check for errors in the stderr output
+        if error:
+            bt.logging.error(f"[Metrics] Error executing speed test: {error}")
+            return None
+
+        return json.loads(output)
+    except paramiko.AuthenticationException:
+        bt.logging.error("[Metrics] Authentication failed, please verify your credentials")
+    except paramiko.SSHException as e:
+        bt.logging.error(f"[Metrics] Ssh connection error: {e}")
+    except Exception as e:
+        bt.logging.error(f"[Metrics] An error occurred: {e}")
+    finally:
+        # Close the SSH connection
+        ssh.close()
 
 
 async def handle_generation_synapse(
@@ -56,9 +73,9 @@ async def handle_generation_synapse(
     # Check the ssh connection works
     verified = check_connection(axon.ip, private_key)
     if verified:
-        bt.logging.info("Ssh connection verified")
+        bt.logging.info("[Metrics] Ssh connection verified")
     else:
-        bt.logging.warning("Ssh connection is not verified")
+        bt.logging.warning("[Metrics] Ssh connection is not verified")
 
     return verified, response
 
@@ -87,17 +104,18 @@ async def handle_cleaning_synapse(
 
 async def metrics_data(self):
     start_time = time.time()
+    bt.logging.debug(f"[Metrics] Starting")
 
     # Select the miners
     uids = await get_available_query_miners(self, k=10)
-    bt.logging.debug(f"metric uids {uids}")
+    bt.logging.debug(f"[Metrics] Available uids {uids}")
 
     # Generate the ssh keys
     keys = []
     for uid in uids:
         public_key, private_key = generate_key(f"validator-{uid}")
         keys.append(( public_key, private_key ))
-    bt.logging.debug("Ssh keys generated")
+    bt.logging.debug("[Metrics] Ssh keys generated")
 
     # Generate and send the ssh keys
     tasks = []
@@ -122,7 +140,7 @@ async def metrics_data(self):
 
         result = execute_speed_test(self, uid, private_key)
         if result is None:
-            bt.logging.warning("Speed test failed")
+            bt.logging.warning("[Metrics] Speed test failed")
             continue
 
         # Bandwidth - measured in Mbps
@@ -136,7 +154,7 @@ async def metrics_data(self):
         server = result.get("server")
         name = str(server.get("name")).split(", ")
         country = server.get("country")
-        region = name[1]
+        region = name[1] if len(name) == 2 else None
         city = name[0]
 
         # Get the coldkey
@@ -162,7 +180,7 @@ async def metrics_data(self):
             avg_download = (float(legacy_download) + download) / 2
 
         await self.database.hset(subs_key, "download", avg_download)
-        bt.logging.info(f"Download {avg_download}")
+        bt.logging.info(f"[Metrics] Download {avg_download}")
 
         # Update upload
         avg_upload = upload
@@ -171,7 +189,7 @@ async def metrics_data(self):
             avg_upload = (float(legacy_upload) + avg_upload) / 2
 
         await self.database.hset(subs_key, "upload", avg_upload)
-        bt.logging.info(f"Upload {avg_upload}")
+        bt.logging.info(f"[Metrics] Upload {avg_upload}")
 
         # Update lantency
         avg_latency = ping
@@ -180,7 +198,7 @@ async def metrics_data(self):
             avg_latency = (float(legacy_latency) + ping) / 2
 
         await self.database.hset(subs_key, "latency", avg_latency)
-        bt.logging.info(f"Latency {avg_latency}")
+        bt.logging.info(f"[Metrics] Latency {avg_latency}")
 
     # Clean the ssh keys
     tasks = []
@@ -193,4 +211,4 @@ async def metrics_data(self):
 
     # Display step time
     forward_time = time.time() - start_time
-    bt.logging.info(f"metric step time: {forward_time:.2f}s")
+    bt.logging.debug(f"[Metrics] Step time {forward_time:.2f}s")

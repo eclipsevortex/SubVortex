@@ -86,12 +86,10 @@ echo_info "New version: $NEW_VERSION"
 
 if [[ $APPLY == "true" ]]; then
     echo_info "Updating version in code: sed -i "53,57s/$VERSION/$NEW_VERSION/g" $CODE_WITH_VERSION"
-    awk 'NR>=53 && NR<=57 {gsub(/1.0.0/, "1.0.1")} {print}' subnet/__init__.py > temp && mv temp subnet/__init__.py
+    awk "NR>=53 && NR<=57 {gsub(/$VERSION/, \"$NEW_VERSION\")} {print}" subnet/__init__.py > temp && mv temp subnet/__init__.py
     echo_info "Updating version in file: echo -n $NEW_VERSION > VERSION"
     echo -n $NEW_VERSION > VERSION
 else
     echo_warning "Dry run execution. Version update not applied"
     echo_info "Use -A or --apply to apply changes"
 fi
-
-awk "NR==2{print \"\\n## $RELEASE_NAME\"}1" CHANGELOG.md > temp.md && mv temp.md CHANGELOG.md

@@ -77,6 +77,7 @@ PREV_TAG_NAME=v$PREV_TAG_VERSION
 # 2.2. Generate release notes
 if [[ $APPLY == "true" ]]; then
   echo_info "Generating Github release notes"
+  echo_info "$TAG_NAME $RELEASE_BRANCH $RELEASE_NAME"
   RESPONSE=$(generate_github_release_notes_for_changelog $GITHUB_TOKEN)
   DESCRIPTION=$(echo $RESPONSE | jq '.body' | tail -1 | sed "s/\"//g")
 

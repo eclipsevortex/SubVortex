@@ -24,30 +24,29 @@ async def handle_synapse(self, uid: int, subtensor_ip: str) -> typing.Tuple[bool
     )
 
     # Get the current block by requesting the miner subtensor
-    # TODO: restore once we have reinstall the local subtensor correctly in our VPS test
-    # try:
-    #     # Create a subtensor with the ip return by the synapse
-    #     config = bt.subtensor.config()
-    #     config.subtensor.network = "local"
-    #     config.subtensor.chain_endpoint = f"ws://{subtensor_ip}:9944"
-    #     miner_subtensor = bt.subtensor(config)
+    try:
+        # Create a subtensor with the ip return by the synapse
+        config = bt.subtensor.config()
+        config.subtensor.network = "local"
+        config.subtensor.chain_endpoint = f"ws://{subtensor_ip}:9944"
+        miner_subtensor = bt.subtensor(config)
 
-    #     # Get the current block
-    #     current_block = miner_subtensor.get_current_block()
-    #     verified = current_block == response[0].answer
-    # except Exception:
-    #     verified = False
-    verified = True
+        # Get the current block
+        current_block = miner_subtensor.get_current_block()
+        verified = current_block == response[0].answer
+    except Exception:
+        verified = False
 
     return verified, response
 
 
 async def challenge_data(self):
     start_time = time.time()
+    bt.logging.debug(f"[Challenge] Starting")
 
     # Select the miners
     uids = await get_available_query_miners(self, k=10)
-    bt.logging.debug(f"challenge uids {uids}")
+    bt.logging.debug(f"[Challenge] Available uids {uids}")
 
     # Send the challenge
     tasks = []
@@ -94,9 +93,9 @@ async def challenge_data(self):
             process_time = (float(legacy_process_time) + process_time) / 2 
 
         await self.database.hset(subs_key, "process_time", process_time)
-        bt.logging.info(f"Download {process_time}")
+        bt.logging.info(f"[Challenge] Download {process_time}")
 
     # Display step time
     forward_time = time.time() - start_time
-    bt.logging.info(f"challenge step time: {forward_time:.2f}s")
+    bt.logging.debug(f"[Challenge] Step time {forward_time:.2f}s")
 

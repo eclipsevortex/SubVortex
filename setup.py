@@ -61,7 +61,7 @@ with codecs.open(
     version_string = version_match.group(1)
 
 setup(
-    name="SubVortext",
+    name="SubVortex",
     version=version_string,
     description="bittensor_subnet_template",
     long_description=long_description,

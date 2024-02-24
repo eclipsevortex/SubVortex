@@ -50,7 +50,6 @@ function generate_github_release_notes_post_data()
   cat <<EOF
 {
   "tag_name":"$TAG_NAME",
-  "previous_tag_name":"$PREV_TAG_NAME",
   "name":"$RELEASE_NAME",
   "draft":false,
   "prerelease":false,
@@ -167,6 +166,6 @@ function create_github_release()
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer $SECRET" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
-        https://api.github.com/repos/eclipsevortex/SubVortex/releases/releases \
+        https://api.github.com/repos/eclipsevortex/SubVortex/releases \
         --data "$(generate_github_release_post_data)" > /dev/null
 }

@@ -43,15 +43,13 @@ async def forward(self):
     # Record forward time
     start = time.time()
 
-    if self.step == 0:
-        # Send synapse to get Subtensor details
-        bt.logging.info("initiating subtensor")
-        await subtensor_data(self)
+    # Send synapse to get Subtensor details
+    bt.logging.info("initiating subtensor")
+    await subtensor_data(self)
     
-    if self.step % 100 == 0:
-        # Send synapse to get some metrics
-        bt.logging.info("initiating metrics")
-        await metrics_data(self)
+    # Send synapse to get some metrics
+    bt.logging.info("initiating metrics")
+    await metrics_data(self)
 
     # Send synapse to challenge the miner
     bt.logging.info("initiating challenge")

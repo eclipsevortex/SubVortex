@@ -1,6 +1,7 @@
 #!/bin/bash
 
-ROOT=${1:-$HOME}
+EXEC_TYPE=${1:-"binary"}
+ROOT=${2:-$HOME}
 
 install_dependencies() {
     # Function to install packages on macOS
@@ -13,16 +14,49 @@ install_dependencies() {
         echo "Updating Homebrew packages..."
         brew update
         echo "Installing required packages..."
-        brew install make llvm curl libssl protobuf tmux
+        brew install make llvm curl libssl protobuf
     }
 
     # Function to install packages on Ubuntu/Debian
     install_ubuntu() {
-        echo "Updating system packages..."
-        sudo apt update
-        echo "Installing required packages..."
-        sudo apt install --assume-yes make build-essential clang libssl-dev llvm libudev-dev protobuf-compiler
-    }
+        if [[ "$EXEC_TYPE" == "docker" ]]; then
+            # Install docker
+            ## Install Required Dependencies
+            sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+            
+            ## Add Docker's GPG Key:
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+            
+            ## Set up the Stable Docker Repository:
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            
+            ## Install Docker Engine
+            sudo apt-get update
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+            echo -e '\e[32m[docker] Docker installed\e[0m'
+            
+            ## Add the user to the docker group
+            sudo usermod -aG docker $USER
+            echo -e '\e[32m[docker] Docker user created\e[0m'
+            
+            # Install docker compose
+            sudo apt-get install -y docker-compose
+            echo -e '\e[32m[docker] Docker compose installed\e[0m'
+            
+            ## Apply changes
+            newgrp docker
+            echo -e '\e[32m[docker] Docker group created\e[0m'
+        fi
+        # echo "Updating system packages..."
+        # sudo apt update
+        # echo "Installing required packages..."
+        # sudo apt install --assume-yes make build-essential clang libssl-dev llvm libudev-dev protobuf-compiler
+
+        # Necessary libraries for Rust execution
+        apt-get update
+        apt-get install -y curl build-essential protobuf-compiler clang git
+        rm -rf /var/lib/apt/lists/*
+    }   
 
     # Detect OS and call the appropriate function
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -35,7 +69,8 @@ install_dependencies() {
     fi
 
     # Install rust and cargo
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    curl https://sh.rustup.rs -sSf | sh -s -- -y
 
     # Update your shell's source to include Cargo's path
     source "$HOME/.cargo/env"
@@ -60,5 +95,8 @@ setup_environment() {
     cd $ROOT
 }
 
-# Call setup_environment every time
+# Install dependencies
+install_dependencies
+
+# Setup environment
 setup_environment 

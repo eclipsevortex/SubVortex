@@ -28,39 +28,40 @@ Install the subnet
 $HOME/SubVortex/scripts/subnet/setup.sh
 ```
 
-Faucet the owner's wallet (need 4 round of faucet)
-```
-$HOME/SubVortex/scripts/wallet/faucet.sh owner 4 test
-```
+Faucet the owner's wallet
+Faucet is disabled on the testchain. Hence, if you don't have sufficient faucet tokens, ask the Bittensor Discord community for faucet tokens.
 
 Register the subnet
 ```
-$HOME/SubVortex/scripts/subnet/register.sh test
+$HOME/SubVortex/scripts/subnet/register.sh
 ```
 
 # Miner
+To run a miner, you have to run a local subtensor and linked it to your miner
+
 ## Install local subtensor
+The binary version of the subtensor does not work and still in investigation
+So we have to run it with docker
+
 Setup the local subtensor
 ```
-$HOME/SubVortex/scripts/subtensor/setup.sh
+$HOME/SubVortex/scripts/subtensor/setup.sh docker
 ```
 
-Start the local subtensor
+Start the local subtensor 
 ```
-$HOME/SubVortex/scripts/subtensor/start.sh
+$HOME/SubVortex/scripts/subtensor/start.sh testnet docker
 ```
 
 ## Register and start miner
 Faucet the miner's wallet
-```
-$HOME/SubVortex/scripts/wallet/faucet-wallet.sh miner 1 test
-```
+Faucet is disabled on the testchain. Hence, if you don't have sufficient faucet tokens, ask the Bittensor Discord community for faucet tokens.
 
 Register the miner
 ```
 btcli subnet register \
  --netuid 92 \
- --subtensor.network test \
+ --subtensor.network local \
  --wallet.name miner \
  --wallet.hotkey default
 ```
@@ -71,14 +72,15 @@ pm2 start neurons/miner.py \
  --name miner-1 \
  --interpreter python3 -- \
  --netuid 92 \
- --subtensor.network test \
- --subtensor.chain_endpoint ws://127.0.0.1:9946 \
+ --subtensor.network local \
  --wallet.name miner \
  --wallet.hotkey default \
- --logging.trace
+ --logging.debug
 ```
 
 # Validator
+To run a validator, you have to install redis in order to store the metrics to compute the rewards
+
 ## Install redis
 Install redis
 ```
@@ -102,15 +104,13 @@ $HOME/SubVortex/scripts/redis/disable_rdb.sh
 
 ## Register and start validator
 Faucet the validator's wallet
-```
-$HOME/SubVortex/scripts/wallet/faucet-wallet.sh validator 1 test
-```
+Faucet is disabled on the testchain. Hence, if you don't have sufficient faucet tokens, ask the Bittensor Discord community for faucet tokens.
 
 Register the validator
 ```
 btcli subnet register \
  --netuid 92 \
- --subtensor.network test \
+ --subtensor.chain_endpoint ws://<IP>:9944 \
  --wallet.name validator \
  --wallet.hotkey default
 ```
@@ -121,11 +121,13 @@ pm2 start neurons/validator.py \
  --name validator-1 \
  --interpreter python3 -- \
  --netuid 92 \
- --subtensor.network test \
+ --subtensor.chain_endpoint ws://<IP>:9944 \
  --wallet.name validator \
  --wallet.hotkey default \
- --logging.trace
+ --logging.debug
 ```
+
+<IP> will be the ip of the slocal subtensor targeting the network testnet. If it does not go against the use case you want to test you can use the local subtensor hosted by your miner
 
 
 

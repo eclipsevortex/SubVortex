@@ -15,6 +15,11 @@ ufw deny 6379
 # Allow all local traffic to port 6379
 ufw allow from 127.0.0.1 to any port 6379
 
+# Default behaviour 
+# TODO: rewrite that firewall in order to avoid the following as it can be different from everyone
+sudo ufw default allow incoming
+sudo ufw default allow outgoing
+
 # Reload UFW to apply changes
 ufw reload
 

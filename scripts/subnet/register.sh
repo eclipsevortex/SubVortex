@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NETWORK=${1:-"local"}
-CHAIN_ENDPOINT=${2:-"ws://127.0.0.1:9946"}
+CHAIN_ENDPOINT=${2:-"ws://127.0.0.1:9944"}
 
 if [[ $NETWORK != "local" ]]; then
     CHAIN_ENDPOINT=""

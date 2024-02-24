@@ -1,25 +1,42 @@
 #!/bin/bash
 
-ROOT=${1:-$HOME}
-
-# Create a coldkey for the owner role
-wallet=${1:-owner}
+NETWORK=${1:-"localnet"}
+EXEC_TYPE=${2:-binary}
+ROOT=${3:-$HOME}
 
 # Go the subtensor repository
 cd $ROOT/subtensor
 
-# Create the start script
-echo "FEATURES='pow-faucet runtime-benchmarks' BT_DEFAULT_TOKEN_WALLET=$(cat ~/.bittensor/wallets/$wallet/coldkeypub.txt | grep -oP '"ss58Address": "\K[^"]+') bash scripts/localnet.sh" >> setup_and_run.sh
-chmod +x setup_and_run.sh
+echo "Starting subtensor on $NETWORK..."
 
-# Start the local subtensor
-pm2 start setup_and_run.sh --name subtensor
-# tmux new-session -d -s localnet -n 'localnet'
-# tmux send-keys -t localnet "bash setup_and_run.sh" C-m
+run_local_subtensor() {
+    # Create the start script
+    echo "FEATURES='pow-faucet runtime-benchmarks' bash scripts/localnet.sh" >> setup_and_run.sh
+    chmod +x setup_and_run.sh
 
-# Notify the user
-# echo ">> localnet.sh is running in a detached tmux session named 'localnet'"
-# echo ">> You can attach to this session with: tmux attach-session -t localnet"
+    # Start the local subtensor
+    pm2 start setup_and_run.sh --name subtensor
+
+    echo "Subtensor on network localnet is up"
+}
+
+run_remote_subtensor() {
+    # Compiling
+    cargo build --release --features pow-faucet --features runtime-benchmarks --locked
+
+    # Run 
+    ./scripts/run/subtensor.sh -e $EXEC_TYPE --network $NETWORK --node-type lite
+
+    echo "Subtensor on network $NETWORK is up"
+}
+
+if [[ $NETWORK == "localnet" ]]; then
+    run_local_subtensor
+fi
+
+if [[ $NETWORK == "testnet" ]] || [[ $NETWORK == "mainnet" ]]; then
+    run_remote_subtensor
+fi
 
 # Go the root
 cd $ROOT

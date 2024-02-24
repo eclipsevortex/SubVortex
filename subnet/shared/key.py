@@ -22,7 +22,6 @@ def generate_ssh_key(public_key):
     # Define the path to the .ssh directory and authorized_keys file
     ssh_dir = os.path.expanduser(os.path.join('~', '.ssh'))
     authorized_keys_file = os.path.join(ssh_dir, 'authorized_keys')
-    bt.logging.info(f"Authorized key files {authorized_keys_file}")
 
     # Ensure the .ssh directory exists
     if not os.path.exists(ssh_dir):
@@ -43,12 +42,13 @@ def generate_ssh_key(public_key):
     # Ensure the authorized_keys file has the correct permissions
     os.chmod(authorized_keys_file, 0o600)
 
+    bt.logging.info("Ssh key saved")
+
 
 def clean_ssh_key(public_key):
     # Define the path to the .ssh directory and authorized_keys file
     ssh_dir = os.path.expanduser(os.path.join('~', '.ssh'))
     authorized_keys_file = os.path.join(ssh_dir, 'authorized_keys')
-    bt.logging.info(f"Authorized key files {authorized_keys_file}")
 
     # Ensure the .ssh directory exists
     if not os.path.exists(ssh_dir):
@@ -74,3 +74,5 @@ def clean_ssh_key(public_key):
 
     # Ensure the authorized_keys file has the correct permissions
     os.chmod(authorized_keys_file, 0o600)
+
+    bt.logging.info("Ssh key removed")

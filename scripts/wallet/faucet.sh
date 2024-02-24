@@ -3,7 +3,7 @@
 WALLET_NAME=$1
 COUNT=${2:-1}
 NETWORK=${3:-"local"}
-CHAIN_ENDPOINT=${4:-"ws://127.0.0.1:9946"}
+CHAIN_ENDPOINT=${4:-"ws://127.0.0.1:9944"}
 
 if [[ -z $WALLET_NAME ]]; then
     echo "The wallet name to faucet is missing"

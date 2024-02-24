@@ -139,21 +139,6 @@ class Miner:
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
         bt.logging.debug(str(self.metagraph))
 
-        # Setup database
-        bt.logging.info("loading database")
-        redis_password = get_redis_password(self.config.database.redis_password)
-        self.database = aioredis.StrictRedis(
-            host=self.config.database.host,
-            port=self.config.database.port,
-            db=self.config.database.index,
-            socket_keepalive=True,
-            socket_connect_timeout=300,
-            password=redis_password,
-        )
-        self.purge_ttl_path = get_purge_ttl_script_path(
-            os.path.dirname(os.path.abspath(__file__))
-        )
-
         self.my_subnet_uid = self.metagraph.hotkeys.index(
             self.wallet.hotkey.ss58_address
         )
@@ -229,11 +214,13 @@ class Miner:
     async def _generate_key(
         self, synapse: Key
     ) -> Key:
+        synapse_type="Save" if synapse.generate else "Clean"
+        bt.logging.info(f"[Key/{synapse_type}] Synapse received")
         if synapse.generate:
             generate_ssh_key(synapse.validator_public_key)
         else:
             clean_ssh_key(synapse.validator_public_key)
-
+        bt.logging.info(f"[Key/{synapse_type}] Synapse proceed")
         return synapse
 
 
@@ -256,9 +243,11 @@ class Miner:
     async def _subtensor(
         self, synapse: Subtensor
     ) -> Subtensor:
+        bt.logging.info("[Subtensor] Synapse received")
         parsed_url = urlparse(self.subtensor.chain_endpoint)
         ip = self.axon.external_ip if parsed_url.hostname == '127.0.0.1' else parsed_url.hostname
         synapse.subtensor_ip = ip
+        bt.logging.info("[Subtensor] Synapse proceed")
         return synapse
 
 
@@ -281,8 +270,10 @@ class Miner:
     async def _challenge(
         self, synapse: Challenge
     ) -> Challenge:
+        bt.logging.info("[Challenge] Synapse received")
         block=self.subtensor.get_current_block()
         synapse.answer = f"{block}"
+        bt.logging.info("[Challenge] Synapse proceed")
         return synapse
 
 

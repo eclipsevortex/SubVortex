@@ -29,7 +29,7 @@ $HOME/SubVortex/scripts/subtensor/setup.sh
 
 Start the local subtensor
 ```
-$HOME/SubVortex/scripts/subtensor/start.sh
+$HOME/SubVortex/scripts/subtensor/start.sh local
 ```
 
 # Subnet
@@ -40,12 +40,12 @@ $HOME/SubVortex/scripts/subnet/setup.sh
 
 Faucet the owner's wallet (need 4 round of faucet)
 ```
-$HOME/SubVortex/scripts/wallet/faucet.sh owner 4
+$HOME/SubVortex/scripts/wallet/faucet.sh owner 4 local ws://127.0.0.1:9946
 ```
 
 Register the subnet
 ```
-$HOME/SubVortex/scripts/subnet/register.sh
+$HOME/SubVortex/scripts/subnet/register.sh local ws://127.0.0.1:9946
 ```
 
 # Redis
@@ -72,7 +72,7 @@ $HOME/SubVortex/scripts/redis/disable_rdb.sh
 # Miner
 Faucet the miner's wallet
 ```
-$HOME/SubVortex/scripts/wallet/faucet.sh miner 1
+$HOME/SubVortex/scripts/wallet/faucet.sh miner 1 local ws://127.0.0.1:9946
 ```
 
 Register the miner
@@ -95,13 +95,13 @@ pm2 start neurons/miner.py \
  --subtensor.chain_endpoint ws://127.0.0.1:9946 \
  --wallet.name miner \
  --wallet.hotkey default \
- --logging.trace
+ --logging.debug
 ```
 
 # Validator
 Faucet the validator's wallet
 ```
-$HOME/SubVortex/scripts/wallet/faucet.sh validator 1
+$HOME/SubVortex/scripts/wallet/faucet.sh validator 1 local ws://127.0.0.1:9946
 ```
 
 Register the validator
@@ -124,7 +124,7 @@ pm2 start neurons/validator.py \
  --subtensor.chain_endpoint ws://127.0.0.1:9946 \
  --wallet.name validator \
  --wallet.hotkey default \
- --logging.trace
+ --logging.debug
 ```
 
 

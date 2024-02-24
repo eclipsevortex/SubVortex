@@ -116,7 +116,8 @@ function generate_github_release_notes()
         -X POST \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer $SECRET" \
-        https://github.com/eclipsevortex/SubVortex/releases/generate-notes \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        https://api.github.com/repos/eclipsevortex/SubVortex/releases/generate-notes \
         --data "$(generate_github_release_notes_post_data)"
 }
 
@@ -165,6 +166,7 @@ function create_github_release()
         -X POST \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer $SECRET" \
-        https://github.com/eclipsevortex/SubVortex/releases/releases \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        https://api.github.com/repos/eclipsevortex/SubVortex/releases/releases \
         --data "$(generate_github_release_post_data)" > /dev/null
 }

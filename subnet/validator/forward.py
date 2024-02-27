@@ -23,7 +23,7 @@ from pprint import pformat
 from .network import monitor
 
 from subnet.validator.rebalance import rebalance_data
-from subnet.validator.state import save_state, log_event
+from subnet.validator.state import save_state
 from subnet.validator.utils import get_current_epoch
 from subnet.validator.bonding import compute_all_tiers
 from subnet.validator.subtensor import subtensor_data

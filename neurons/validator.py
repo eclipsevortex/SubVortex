@@ -28,6 +28,7 @@ from copy import deepcopy
 from pprint import pformat
 from traceback import print_exception
 from substrateinterface.base import SubstrateInterface
+from dotenv import load_dotenv
 
 from subnet.shared.checks import check_environment
 from subnet.shared.utils import get_redis_password
@@ -86,12 +87,15 @@ class Validator:
         self.check_config(self.config)
         bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
 
-        try:
-            asyncio.run(check_environment(self.config.database.redis_conf_path))
-        except AssertionError as e:
-            bt.logging.warning(
-                f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
-            )
+        # Load env variables
+        load_dotenv()
+
+        # try:
+        #     asyncio.run(check_environment(self.config.database.redis_conf_path))
+        # except AssertionError as e:
+        #     bt.logging.warning(
+        #         f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
+        #     )
 
         # Init device.
         bt.logging.debug("loading device")

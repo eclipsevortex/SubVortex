@@ -7,6 +7,11 @@ Go to the home directory
 cd $HOME
 ```
 
+Install git
+```
+apt-get update && apt-get install git
+```
+
 Clone the SubVortex repository
 ```
 git clone https://github.com/eclipsevortex/SubVortex.git
@@ -23,6 +28,8 @@ $HOME/SubVortex/scripts/setup/setup.sh
 ```
 
 # Subnet
+This section is for owner who want to create a subnet if it has not been done yet
+
 Install the subnet
 ```
 $HOME/SubVortex/scripts/subnet/setup.sh

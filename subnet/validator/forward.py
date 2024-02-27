@@ -17,11 +17,13 @@
 # DEALINGS IN THE SOFTWARE.
 
 import time
+from pprint import pformat
+from dataclasses import asdict
 import bittensor as bt
 
-from pprint import pformat
 from .network import monitor
 
+from subnet.validator.event import EventSchema
 from subnet.validator.rebalance import rebalance_data
 from subnet.validator.state import save_state, log_event
 from subnet.validator.utils import get_current_epoch
@@ -37,23 +39,31 @@ from subnet.validator.database import (
 )
 
 
-async def forward(self):
+async def forward(self, current_block):
     bt.logging.info(f"forward step: {self.step}")
 
     # Record forward time
     start = time.time()
 
+    event = EventSchema()
+    event.block = current_block
+
     # Send synapse to get Subtensor details
-    bt.logging.info("initiating subtensor")
-    await subtensor_data(self)
-    
+    bt.logging.info("Initiating subtensor")
+    event = await subtensor_data(self, event)
+
     # Send synapse to get some metrics
-    bt.logging.info("initiating metrics")
-    await metrics_data(self)
+    bt.logging.info("Initiating metrics")
+    event = await metrics_data(self, event)
 
     # Send synapse to challenge the miner
-    bt.logging.info("initiating challenge")
-    await challenge_data(self)
+    bt.logging.info("Initiating challenge")
+    event = await challenge_data(self, event)
+
+    # Send the event to the SubVortex api
+    api_event = EventSchema.from_dict(event.__dict__)
+    await self.api.send(asdict(api_event))
+    bt.logging.info(f"Subtensors data sent to the api {api_event}")
 
     # Compute the metrics
     await compute_metrics(self)

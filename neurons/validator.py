@@ -27,12 +27,15 @@ from shlex import quote
 from copy import deepcopy
 from pprint import pformat
 from traceback import print_exception
+from dotenv import load_dotenv
 from substrateinterface.base import SubstrateInterface
 
 from subnet.shared.checks import check_environment
 from subnet.shared.utils import get_redis_password
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
+
+from subnet.api.subvortex_api import SubVortexApi
 
 from subnet.validator.config import config, check_config, add_args
 from subnet.validator.encryption import setup_encryption_wallet
@@ -86,12 +89,15 @@ class Validator:
         self.check_config(self.config)
         bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
 
-        try:
-            asyncio.run(check_environment(self.config.database.redis_conf_path))
-        except AssertionError as e:
-            bt.logging.warning(
-                f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
-            )
+        # Load env variables
+        load_dotenv()
+
+        # try:
+        #     asyncio.run(check_environment(self.config.database.redis_conf_path))
+        # except AssertionError as e:
+        #     bt.logging.warning(
+        #         f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
+        #     )
 
         # Init device.
         bt.logging.debug("loading device")
@@ -152,6 +158,9 @@ class Validator:
             password=redis_password,
         )
         self.db_semaphore = asyncio.Semaphore()
+
+        # Setup websocket to communicate with SubVortex api
+        self.api = SubVortexApi()
 
         # Init Weights.
         bt.logging.debug("loading moving_averaged_scores")
@@ -228,7 +237,7 @@ class Validator:
                 # Run multiple forwards.
                 async def run_forward():
                     coroutines = [
-                        forward(self)
+                        forward(self, current_block)
                         for _ in range(self.config.neuron.num_concurrent_forwards)
                     ]
                     await asyncio.gather(*coroutines)

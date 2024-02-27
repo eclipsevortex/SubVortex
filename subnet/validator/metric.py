@@ -24,7 +24,7 @@ async def compute_metrics(self):
         self.device
     )
 
-    keys=[]
+    process_times = []
     for idx, uid in enumerate(uids):
         axon = self.metagraph.axons[idx]
 
@@ -38,7 +38,7 @@ async def compute_metrics(self):
         subs_key = f"subs:{coldkey}:{hotkey}"
 
         # Get all the keys owned by the coldkey
-        keys = await self.database.keys(f"subs:{coldkey}:*")
+        keys_cached = await self.database.keys(f"subs:{coldkey}:*")
 
         # Metric 1 - Ownership: Subtensor and miner have to be on the same machine
         subtensor_ip = await self.database.hget(subs_key, "ip")
@@ -47,7 +47,7 @@ async def compute_metrics(self):
 
         # Metric 2 - Unicity: One subtensor linked to one miner
         miners = []
-        for key in keys:
+        for key in keys_cached:
             ip = await self.database.hget(subs_key, "ip")
             if subtensor_ip == ip:
                 miners.append(key)
@@ -58,7 +58,7 @@ async def compute_metrics(self):
 
         # Metric 3 - Diversity: Maximise subtensors's timezone owned by a coldkey
         timezones = []
-        for key in keys:
+        for key in keys_cached:
             timezone = await self.database.hget(key, "timezone")
             if timezone not in timezones:
                 timezones.append(key)
@@ -80,15 +80,14 @@ async def compute_metrics(self):
         rewards[idx] = (metric1 + metric2 + metric3) / 3
         bt.logging.debug(f"Rewards {rewards[idx]}")
 
-    if len(keys) == 0:
+        # Retrieve the process time of the challenge if exist
+        process_time = await self.database.hget(key, "process_time")
+        process_times.append(float(process_time) if process_time else 0)
+
+    if len(rewards) == 0:
         return
 
-    process_times = []
-    for key in keys:
-        process_time = await self.database.hget(key, "process_time")
-        process_times.append(float(process_time))
-
-    bt.logging.trace("Applying challenge rewards")
+    bt.logging.trace(f"Applying challenge rewards")
     apply_reward_scores(
         self,
         uids=uids,

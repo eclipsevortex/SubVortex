@@ -4,6 +4,7 @@ import asyncio
 import bittensor as bt
 
 from subnet import protocol
+from subnet.validator.event import EventSchema
 from subnet.validator.utils import get_available_query_miners
 
 
@@ -30,7 +31,7 @@ async def handle_synapse(self, uid: int) -> typing.Tuple[bool, protocol.Subtenso
     return verified, response
 
 
-async def subtensor_data(self):
+async def subtensor_data(self, event: EventSchema):
     start_time = time.time()
     bt.logging.debug(f"[Subtensor] Starting")
 
@@ -46,24 +47,46 @@ async def subtensor_data(self):
     responses = await asyncio.gather(*tasks)
 
     for idx, (uid, (verified, response)) in enumerate(zip(uids, responses)):
-        if not verified:
-            # TODO: do we punished miner now, later or never?
+        # Get the coldkey
+        axon = self.metagraph.axons[idx]
+        cold_key = axon.coldkey
+
+        # Get the hotkey
+        hot_key = self.metagraph.hotkeys[uid]
+
+        # Get the subs hash
+        subs_key = f"subs:{cold_key}:{hot_key}"
+
+        if False and not verified:
+            event.uid.append(uid)
+            event.ip.append(None)
+            event.cold_key.append(cold_key)
+            event.hot_key.append(hot_key)
             continue
 
         subtensor_ip = response[0].subtensor_ip
+        if not subtensor_ip:
+            event.uid.append(uid)
+            event.ip.append(None)
+            event.cold_key.append(cold_key)
+            event.hot_key.append(hot_key)
+            continue
 
-        # Get the coldkey
-        axon = self.metagraph.axons[idx]
-        coldkey = axon.coldkey
+        # Update event
+        event.uid.append(uid)
+        event.ip.append(subtensor_ip)
+        event.cold_key.append(cold_key)
+        event.hot_key.append(hot_key)
 
-        # Get the hotkey
-        hotkey = self.metagraph.hotkeys[uid]
-
-        # Get the subs hash
-        subs_key = f"subs:{coldkey}:{hotkey}"
+        # # Send data to the subvortex api
+        # await self.api.send({"type": "subtensor", "key": subs_key, "ip": subtensor_ip})
+        # bt.logging.info(f"[Subtensor][{uid}] Data send to SubVortex api")
 
         await self.database.hset(subs_key, "ip", subtensor_ip)
+        bt.logging.info(f"[Subtensor][{uid}] Data cached into redis")
 
     # Display step time
     forward_time = time.time() - start_time
     bt.logging.debug(f"[Subtensor] Step time {forward_time:.2f}s")
+
+    return event

@@ -112,10 +112,13 @@ def scale_rewards(
         for (uid, _), normalized_time in zip(sorted_axon_times, normalized_times)
     }
 
+    bt.logging.info(rewards)
+    bt.logging.info(uid_to_normalized_time)
+
     # Scale the rewards with normalized times
     time_scaled_rewards = torch.tensor(
         [
-            rewards.to(device) * uid_to_normalized_time[uid]
+            rewards[i].to(device) * uid_to_normalized_time[uid]
             for i, uid in enumerate(uids)
         ]
     )

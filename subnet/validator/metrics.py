@@ -9,6 +9,7 @@ from subnet import protocol
 
 from subnet.shared.key import generate_key
 
+from subnet.validator.event import EventSchema
 from subnet.validator.ssh import check_connection
 from subnet.validator.utils import get_available_query_miners
 
@@ -34,20 +35,19 @@ def execute_speed_test(self, uid: int, private_key: paramiko.RSAKey):
         output = stdout.read().decode("utf-8")
         error = stderr.read().decode("utf-8")
 
-        bt.logging.debug(output or error)
-
         # Check for errors in the stderr output
         if error:
-            bt.logging.error(f"[Metrics] Error executing speed test: {error}")
-            return None
+            raise error
 
         return json.loads(output)
     except paramiko.AuthenticationException:
-        bt.logging.error("[Metrics] Authentication failed, please verify your credentials")
+        bt.logging.error(
+            f"[Metrics][{uid}] Authentication failed, please verify your credentials"
+        )
     except paramiko.SSHException as e:
-        bt.logging.error(f"[Metrics] Ssh connection error: {e}")
+        bt.logging.error(f"[Metrics][{uid}] Ssh connection error: {e}")
     except Exception as e:
-        bt.logging.error(f"[Metrics] An error occurred: {e}")
+        bt.logging.error(f"[Metrics][{uid}] An error occurred: {e}")
     finally:
         # Close the SSH connection
         ssh.close()
@@ -73,9 +73,9 @@ async def handle_generation_synapse(
     # Check the ssh connection works
     verified = check_connection(axon.ip, private_key)
     if verified:
-        bt.logging.info("[Metrics] Ssh connection verified")
+        bt.logging.info(f"[Metrics][{uid}] Ssh connection with {axon.ip} verified")
     else:
-        bt.logging.warning("[Metrics] Ssh connection is not verified")
+        bt.logging.warning(f"[Metrics][{uid}] Ssh connection with {axon.ip} is not verified")
 
     return verified, response
 
@@ -102,7 +102,7 @@ async def handle_cleaning_synapse(
     return True, response
 
 
-async def metrics_data(self):
+async def metrics_data(self, event: EventSchema):
     start_time = time.time()
     bt.logging.debug(f"[Metrics] Starting")
 
@@ -114,7 +114,7 @@ async def metrics_data(self):
     keys = []
     for uid in uids:
         public_key, private_key = generate_key(f"validator-{uid}")
-        keys.append(( public_key, private_key ))
+        keys.append((public_key, private_key))
     bt.logging.debug("[Metrics] Ssh keys generated")
 
     # Generate and send the ssh keys
@@ -132,7 +132,12 @@ async def metrics_data(self):
     # Execute the speedtest-cli to get some metrics
     for idx, (uid, (verified, response)) in enumerate(zip(uids, responses)):
         if not verified:
-            # TODO: do we punished miner now, later or never?
+            event.country.append(None)
+            event.region.append(None)
+            event.city.append(None)
+            event.download.append(0)
+            event.upload.append(0)
+            event.latency.append(0)
             continue
 
         # Get the ssh keys
@@ -140,7 +145,13 @@ async def metrics_data(self):
 
         result = execute_speed_test(self, uid, private_key)
         if result is None:
-            bt.logging.warning("[Metrics] Speed test failed")
+            bt.logging.warning(f"[Metrics][{uid}] Speed test failed")
+            event.country.append(None)
+            event.region.append(None)
+            event.city.append(None)
+            event.download.append(0)
+            event.upload.append(0)
+            event.latency.append(0)
             continue
 
         # Bandwidth - measured in Mbps
@@ -167,6 +178,28 @@ async def metrics_data(self):
         # Get the subs hash
         subs_key = f"subs:{coldkey}:{hotkey}"
 
+        # # Send data to the subvortex api
+        # await self.api.send(
+        #     {
+        #         "type": "metric",
+        #         "key": subs_key,
+        #         "country": country,
+        #         "region": region,
+        #         "city": city,
+        #         "download": download,
+        #         "upload": upload,
+        #         "latency": ping,
+        #     }
+        # )
+
+        # Update event
+        event.country.append(country)
+        event.region.append(region)
+        event.city.append(city)
+        event.download.append(download)
+        event.upload.append(upload)
+        event.latency.append(ping)
+
         # Update geolocalisation
         await self.database.hset(subs_key, "country", str(country))
         await self.database.hset(subs_key, "region", str(region))
@@ -180,7 +213,7 @@ async def metrics_data(self):
             avg_download = (float(legacy_download) + download) / 2
 
         await self.database.hset(subs_key, "download", avg_download)
-        bt.logging.info(f"[Metrics] Download {avg_download}")
+        bt.logging.info(f"[Metrics][{uid}] Download {avg_download}")
 
         # Update upload
         avg_upload = upload
@@ -189,7 +222,7 @@ async def metrics_data(self):
             avg_upload = (float(legacy_upload) + avg_upload) / 2
 
         await self.database.hset(subs_key, "upload", avg_upload)
-        bt.logging.info(f"[Metrics] Upload {avg_upload}")
+        bt.logging.info(f"[Metrics][{uid}] Upload {avg_upload}")
 
         # Update lantency
         avg_latency = ping
@@ -198,7 +231,7 @@ async def metrics_data(self):
             avg_latency = (float(legacy_latency) + ping) / 2
 
         await self.database.hset(subs_key, "latency", avg_latency)
-        bt.logging.info(f"[Metrics] Latency {avg_latency}")
+        bt.logging.info(f"[Metrics][{uid}] Latency {avg_latency}")
 
     # Clean the ssh keys
     tasks = []
@@ -212,3 +245,5 @@ async def metrics_data(self):
     # Display step time
     forward_time = time.time() - start_time
     bt.logging.debug(f"[Metrics] Step time {forward_time:.2f}s")
+
+    return event

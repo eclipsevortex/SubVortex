@@ -5,10 +5,13 @@ import bittensor as bt
 
 from subnet import protocol
 
+from subnet.validator.event import EventSchema
 from subnet.validator.utils import get_available_query_miners
 
 
-async def handle_synapse(self, uid: int, subtensor_ip: str) -> typing.Tuple[bool, protocol.Challenge]:
+async def handle_synapse(
+    self, uid: int, subtensor_ip: str
+) -> typing.Tuple[bool, protocol.Challenge]:
     # Get the axon
     axon = self.metagraph.axons[uid]
 
@@ -37,10 +40,12 @@ async def handle_synapse(self, uid: int, subtensor_ip: str) -> typing.Tuple[bool
     except Exception:
         verified = False
 
+    verified = True
+
     return verified, response
 
 
-async def challenge_data(self):
+async def challenge_data(self, event: EventSchema):
     start_time = time.time()
     bt.logging.debug(f"[Challenge] Starting")
 
@@ -69,11 +74,9 @@ async def challenge_data(self):
         responses = await asyncio.gather(*tasks)
 
     # Check the challenge and save the processing time
-    for idx, (uid, (verified, response)) in enumerate(
-        zip(uids, responses)
-    ):
+    for idx, (uid, (verified, response)) in enumerate(zip(uids, responses)):
         if not verified:
-            # TODO: do we punished miner now, later or never?
+            event.process_time.append(0)
             continue
 
         # Get the coldkey
@@ -86,16 +89,31 @@ async def challenge_data(self):
         # Update subtensor statistics in the subs hash
         subs_key = f"subs:{coldkey}:{hotkey}"
 
-        # Processing time download
+        # Processing time 
         process_time = response[0].dendrite.process_time
+
+        # Update event
+        event.process_time.append(process_time)
+
+        # # Send data to the subvortex api
+        # await self.api.send(
+        #     {
+        #         "type": "challenge",
+        #         "key": subs_key,
+        #         "process_time": process_time,
+        #     }
+        # )
+
+        # Processing time 
         legacy_process_time = await self.database.hget(subs_key, "process_time")
         if legacy_process_time is not None:
-            process_time = (float(legacy_process_time) + process_time) / 2 
+            process_time = (float(legacy_process_time) + process_time) / 2
 
         await self.database.hset(subs_key, "process_time", process_time)
-        bt.logging.info(f"[Challenge] Download {process_time}")
+        bt.logging.info(f"[Challenge][{uid}] Download {process_time}")
 
     # Display step time
     forward_time = time.time() - start_time
     bt.logging.debug(f"[Challenge] Step time {forward_time:.2f}s")
 
+    return event

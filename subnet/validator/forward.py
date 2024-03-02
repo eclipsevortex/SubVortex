@@ -18,23 +18,15 @@
 
 import time
 import bittensor as bt
-
 from pprint import pformat
-from .network import monitor
 
-from subnet.validator.rebalance import rebalance_data
-from subnet.validator.state import save_state
-from subnet.validator.utils import get_current_epoch
 from subnet.validator.bonding import compute_all_tiers
-from subnet.validator.subtensor import subtensor_data
 from subnet.validator.challenge import challenge_data
-from subnet.validator.metrics import metrics_data
-from subnet.validator.metric import compute_metrics
-from subnet.validator.database import (
-    get_miner_statistics,
-    purge_expired_ttl_keys,
-    purge_challenges_for_all_hotkeys,
-)
+# from subnet.validator.subtensor import subtensor_data
+# from subnet.validator.challenge import challenge_data
+# from subnet.validator.metrics import metrics_data
+# from subnet.validator.metric import compute_metrics
+from subnet.validator.database import get_miner_statistics
 
 
 async def forward(self):
@@ -43,57 +35,29 @@ async def forward(self):
     # Record forward time
     start = time.time()
 
-    # Send synapse to get Subtensor details
-    bt.logging.info("initiating subtensor")
-    await subtensor_data(self)
-    
-    # Send synapse to get some metrics
-    bt.logging.info("initiating metrics")
-    await metrics_data(self)
-
-    # Send synapse to challenge the miner
+    # Send synapse to get challenge
     bt.logging.info("initiating challenge")
     await challenge_data(self)
+    
+    # Send synapse to get some metrics
+    # bt.logging.info("initiating metrics")
+    # await metrics_data(self)
+
+    # # Send synapse to challenge the miner
+    # bt.logging.info("initiating challenge")
+    # await challenge_data(self)
 
     # Compute the metrics
-    await compute_metrics(self)
-
-    # Monitor every step
-    down_uids = await monitor(self)
-    if len(down_uids) > 0:
-        bt.logging.info(f"Downed uids marked for rebalance: {down_uids}")
-        await rebalance_data(
-            self,
-            k=2,  # increase redundancy
-            dropped_hotkeys=[self.metagraph.hotkeys[uid] for uid in down_uids],
-            hotkey_replaced=False,  # Don't delete challenge data (only in subscription handler)
-        )
-
-    # Purge all challenge data to start fresh and avoid requerying hotkeys with stale challenge data
-    current_epoch = get_current_epoch(self.subtensor, self.config.netuid)
-    bt.logging.info(
-        f"Current epoch: {current_epoch} | Last purged epoch: {self.last_purged_epoch}"
-    )
-    if current_epoch % 10 == 0:
-        if self.last_purged_epoch < current_epoch:
-            bt.logging.info("initiating challenges purge")
-            await purge_challenges_for_all_hotkeys(self.database)
-            self.last_purged_epoch = current_epoch
-            save_state(self)
-
-    # Purge expired TTL keys
-    if self.step % 60 == 0:
-        bt.logging.info("initiating TTL purge for expired keys")
-        await purge_expired_ttl_keys(self.database)
+    # await compute_metrics(self)
 
     # Compute tiers and stats
-    if self.step % 360 == 0 and self.step > 0:
-        bt.logging.info("initiating compute stats")
-        await compute_all_tiers(self.database)
+    # if self.step % 360 == 0 and self.step > 0:
+    #     bt.logging.info("initiating compute stats")
+    #     await compute_all_tiers(self.database)
 
-        # Update miner statistics and usage data.
-        stats = await get_miner_statistics(self.database)
-        bt.logging.debug(f"miner stats: {pformat(stats)}")
+    #     # Update miner statistics and usage data.
+    #     stats = await get_miner_statistics(self.database)
+    #     bt.logging.debug(f"miner stats: {pformat(stats)}")
 
     # Display step time
     forward_time = time.time() - start

@@ -20,9 +20,6 @@
 import torch
 import copy
 
-from loguru import logger
-from dataclasses import asdict
-
 import subnet.validator as validator
 
 import bittensor as bt
@@ -139,9 +136,3 @@ def load_state(self):
         )
     except Exception as e:
         bt.logging.warning(f"Failed to load model with error: {e}")
-
-
-def log_event(self, event):
-    # Log event
-    if not self.config.neuron.dont_save_events:
-        logger.log("EVENTS", "events", **event.__dict__)

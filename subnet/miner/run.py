@@ -19,12 +19,11 @@
 import json
 import bittensor as bt
 
-from pprint import pformat
 from substrateinterface import SubstrateInterface
 from scalecodec import ScaleBytes
 from scalecodec.exceptions import RemainingScaleBytesNotEmptyException
 
-from .utils import update_storage_stats, run_async_in_sync_context
+from subnet.miner.utils import update_storage_stats
 
 
 tagged_tx_queue_registry = {

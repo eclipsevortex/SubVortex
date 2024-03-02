@@ -165,15 +165,12 @@ async def register_miner(ss58_address: str, database: aioredis.Redis):
     await database.hmset(
         f"stats:{ss58_address}",
         {
-            "store_attempts": 0,
-            "store_successes": 0,
-            "challenge_successes": 0,
-            "challenge_attempts": 0,
-            "retrieve_successes": 0,
-            "retrieve_attempts": 0,
+            "subtensor_successes": 0,
+            "subtensor_attempts": 0,
+            "metric_successes": 0,
+            "metric_attempts": 0,
             "total_successes": 0,
             "tier": "Bronze",
-            "storage_limit": STORAGE_LIMIT_BRONZE,
         },
     )
 
@@ -200,59 +197,37 @@ async def update_statistics(
     # Update statistics in the stats hash
     stats_key = f"stats:{ss58_address}"
 
-    if task_type in ["store", "challenge", "retrieve"]:
+    if task_type in ["challenge"]:
         await database.hincrby(stats_key, f"{task_type}_attempts", 1)
         if success:
             await database.hincrby(stats_key, f"{task_type}_successes", 1)
 
-    # Transition retireval -> retrieve successes (legacy)
-    legacy_retrieve_successes = await database.hget(stats_key, "retrieval_successes")
-    if legacy_retrieve_successes is not None:
-        await database.hset(
-            stats_key, "retrieve_successes", int(legacy_retrieve_successes)
-        )
-        await database.hdel(stats_key, "retrieval_successes")
-
-    # Transition retireval -> retrieve attempts (legacy)
-    legacy_retrieve_attempts = await database.hget(stats_key, "retrieval_attempts")
-    if legacy_retrieve_attempts is not None:
-        await database.hset(
-            stats_key, "retrieve_attempts", int(legacy_retrieve_attempts)
-        )
-        await database.hdel(stats_key, "retrieval_attempts")
-
     # Update the total successes that we rollover every epoch
     if await database.hget(stats_key, "total_successes") is None:
-        store_successes = int(await database.hget(stats_key, "store_successes"))
-        challenge_successes = int(await database.hget(stats_key, "challenge_successes"))
-        retrieval_successes = int(await database.hget(stats_key, "retrieve_successes"))
-        total_successes = store_successes + retrieval_successes + challenge_successes
+        subtensor_successes = int(await database.hget(stats_key, "subtensor_successes"))
+        metric_successes = int(await database.hget(stats_key, "metric_successes"))
+        total_successes = subtensor_successes + metric_successes
         await database.hset(stats_key, "total_successes", total_successes)
     if success:
         await database.hincrby(stats_key, "total_successes", 1)
 
 
-async def compute_tier(stats_key: str, database: aioredis.Redis, confidence=0.95):
+async def compute_tier(stats_key: str, database: aioredis.Redis):
     if not await database.exists(stats_key):
         bt.logging.warning(f"Miner key {stats_key} is not registered!")
         return
 
     # Retrieve statistics from the database
-    challenge_successes = int(
-        await database.hget(stats_key, "challenge_successes") or 0
+    subtensor_successes = int(
+        await database.hget(stats_key, "subtensor_successes") or 0
     )
-    challenge_attempts = int(await database.hget(stats_key, "challenge_attempts") or 0)
-    # retrieval_successes = int(await database.hget(stats_key, "retrieve_successes") or 0)
-    # retrieval_attempts = int(await database.hget(stats_key, "retrieve_attempts") or 0)
-    # store_successes = int(await database.hget(stats_key, "store_successes") or 0)
-    # store_attempts = int(await database.hget(stats_key, "store_attempts") or 0)
+    subtensor_attempts = int(await database.hget(stats_key, "subtensor_attempts") or 0)
+    metric_successes = int(await database.hget(stats_key, "metric_successes") or 0)
+    metric_attempts = int(await database.hget(stats_key, "metric_attempts") or 0)
     total_successes = int(await database.hget(stats_key, "total_successes") or 0)
 
-    total_current_attempts = challenge_attempts #+ retrieval_attempts + store_attempts
-    total_current_successes = challenge_successes
-    # (
-    #     challenge_successes + retrieval_successes + store_successes
-    # )
+    total_current_attempts = subtensor_attempts + metric_attempts
+    total_current_successes = subtensor_successes + metric_successes
 
     # Compute the overall success rate across all tasks
     current_wilson_score = wilson_score_interval(
@@ -262,27 +237,29 @@ async def compute_tier(stats_key: str, database: aioredis.Redis, confidence=0.95
         f"Miner {stats_key} current total success rate: {current_wilson_score}"
     )
 
+    # 
+
     # Use the lower bounds of the intervals to determine the tier
     if (
-        current_wilson_score >= SUPER_SAIYAN_SUCCESS_RATE
+        current_wilson_score >= SUPER_SAIYAN_WILSON_SCORE
         and total_successes >= SUPER_SAIYAN_TIER_TOTAL_SUCCESSES
     ):
         bt.logging.trace(f"Setting {stats_key} to Super Saiyan tier.")
         tier = "Super Saiyan"
     elif (
-        current_wilson_score >= DIAMOND_SUCCESS_RATE
+        current_wilson_score >= DIAMOND_WILSON_SCORE
         and total_successes >= DIAMOND_TIER_TOTAL_SUCCESSES
     ):
         bt.logging.trace(f"Setting {stats_key} to Diamond tier.")
         tier = "Diamond"
     elif (
-        current_wilson_score >= GOLD_SUCCESS_RATE
+        current_wilson_score >= GOLD_WILSON_SCORE
         and total_successes >= GOLD_TIER_TOTAL_SUCCESSES
     ):
         bt.logging.trace(f"Setting {stats_key} to Gold tier.")
         tier = "Gold"
     elif (
-        current_wilson_score >= SILVER_SUCCESS_RATE
+        current_wilson_score >= SILVER_WILSON_SCORE
         and total_successes >= SILVER_TIER_TOTAL_SUCCESSES
     ):
         bt.logging.trace(f"Setting {stats_key} to Silver tier.")
@@ -293,26 +270,6 @@ async def compute_tier(stats_key: str, database: aioredis.Redis, confidence=0.95
 
     # Update the tier in the database
     await database.hset(stats_key, "tier", tier)
-
-    # Update storage limit based on tier
-    if tier == "Super Saiyan":
-        storage_limit = STORAGE_LIMIT_SUPER_SAIYAN
-    elif tier == "Diamond":
-        storage_limit = STORAGE_LIMIT_DIAMOND
-    elif tier == "Gold":
-        storage_limit = STORAGE_LIMIT_GOLD
-    elif tier == "Silver":
-        storage_limit = STORAGE_LIMIT_SILVER
-    else:  # Bronze
-        storage_limit = STORAGE_LIMIT_BRONZE
-
-    current_limit = await database.hget(stats_key, "storage_limit")
-    bt.logging.trace(f"Current storage limit for {stats_key}: {current_limit}")
-    if current_limit.decode() != storage_limit:
-        await database.hset(stats_key, "storage_limit", storage_limit)
-        bt.logging.trace(
-            f"Storage limit for {stats_key} set from {current_limit} -> {storage_limit} bytes."
-        )
 
 
 async def compute_all_tiers(database: aioredis.Redis):

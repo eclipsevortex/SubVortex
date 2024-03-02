@@ -28,7 +28,7 @@ from copy import deepcopy
 from pprint import pformat
 from traceback import print_exception
 from substrateinterface.base import SubstrateInterface
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
 from subnet.shared.checks import check_environment
 from subnet.shared.utils import get_redis_password
@@ -36,7 +36,7 @@ from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
 
 from subnet.validator.config import config, check_config, add_args
-from subnet.validator.encryption import setup_encryption_wallet
+from subnet.validator.localisation import get_country, get_localisation
 from subnet.validator.forward import forward
 from subnet.validator.state import (
     checkpoint,
@@ -88,14 +88,14 @@ class Validator:
         bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
 
         # Load env variables
-        load_dotenv()
+        # load_dotenv()
 
-        # try:
-        #     asyncio.run(check_environment(self.config.database.redis_conf_path))
-        # except AssertionError as e:
-        #     bt.logging.warning(
-        #         f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
-        #     )
+        try:
+            asyncio.run(check_environment(self.config.database.redis_conf_path))
+        except AssertionError as e:
+            bt.logging.warning(
+                f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
+            )
 
         # Init device.
         bt.logging.debug("loading device")
@@ -125,15 +125,6 @@ class Validator:
                 )
 
         bt.logging.debug(f"wallet: {str(self.wallet)}")
-
-        # Setup dummy wallet for encryption purposes. No password needed.
-        self.encryption_wallet = setup_encryption_wallet(
-            wallet_name=self.config.encryption.wallet_name,
-            wallet_hotkey=self.config.encryption.hotkey,
-            password=self.config.encryption.password,
-        )
-        self.encryption_wallet.coldkey  # Unlock the coldkey.
-        bt.logging.info(f"loading encryption wallet {self.encryption_wallet}")
 
         # Init metagraph.
         bt.logging.debug("loading metagraph")
@@ -174,6 +165,12 @@ class Validator:
         else:
             self.dendrite = bt.dendrite(wallet=self.wallet)
         bt.logging.debug(str(self.dendrite))
+
+        # Get the validator country
+        self.country = get_country(self.dendrite.external_ip)
+        country_localisation = get_localisation(self.country)
+        country_name = country_localisation['country'] if country_localisation else 'None'
+        bt.logging.debug(F"Validator based in {country_name}")
 
         # Init the event loop.
         self.loop = asyncio.get_event_loop()

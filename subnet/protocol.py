@@ -34,9 +34,6 @@ class Key(bt.Synapse):
 
 
 class Subtensor(bt.Synapse):
-    # Parameters
-    task: int
-    
     # Returns
     subtensor_ip: typing.Optional[str] = None
 

@@ -1,6 +1,10 @@
 import paramiko
 
+
 def check_connection(ip, private_key):
+    '''
+    Check the ssh connection with <ip>/<private_key> is working
+    '''
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 

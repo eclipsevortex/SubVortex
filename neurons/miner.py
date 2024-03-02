@@ -17,7 +17,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import os
 import sys
 import typing
 import time
@@ -27,7 +26,6 @@ import bittensor as bt
 import threading
 import traceback
 from urllib.parse import urlparse
-from redis import asyncio as aioredis
 
 from subnet.protocol import IsAlive, Key, Subtensor, Challenge
 
@@ -40,14 +38,11 @@ from subnet.miner.config import (
     check_config,
     add_args,
 )
-from subnet.shared.utils import (
-    get_redis_password,
-)
 from subnet.miner.utils import (
     update_storage_stats,
     load_request_log,
-    get_purge_ttl_script_path,
 )
+
 
 class Miner:
     @classmethod
@@ -144,6 +139,12 @@ class Miner:
         )
         bt.logging.info(f"Running miner on uid: {self.my_subnet_uid}")
 
+        # parsed_url = urlparse(self.subtensor.chain_endpoint)
+        # ip = (
+        #     self.axon.external_ip
+        #     if parsed_url.hostname == "127.0.0.1"
+        #     else parsed_url.hostname
+        # )
 
         # The axon handles request processing, allowing validators to send this process requests.
         self.axon = bt.axon(wallet=self.wallet, config=self.config)
@@ -154,17 +155,22 @@ class Miner:
         self.axon.attach(
             forward_fn=self._is_alive,
             blacklist_fn=self.blacklist_isalive,
-        ).attach(
-            forward_fn=self._generate_key,
-            blacklist_fn=self.blacklist_generate_key,
-        ).attach(
-            forward_fn=self._subtensor,
-            blacklist_fn=self.blacklist_subtensor,
-        ).attach(
-            forward_fn=self._challenge,
-            blacklist_fn=self.blacklist_challenge,
         )
-      
+        # .attach(
+        #     forward_fn=self._subtensor,
+        #     blacklist_fn=self.blacklist_subtensor,
+        # )
+        # .attach(
+        #     forward_fn=self._generate_key,
+        #     blacklist_fn=self.blacklist_generate_key,
+        # ).attach(
+        #     forward_fn=self._subtensor,
+        #     blacklist_fn=self.blacklist_subtensor,
+        # ).attach(
+        #     forward_fn=self._challenge,
+        #     blacklist_fn=self.blacklist_challenge,
+        # )
+
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip have changed.
         bt.logging.info(
@@ -200,21 +206,16 @@ class Miner:
         self.rate_limiters = {}
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
-
     def _is_alive(self, synapse: IsAlive) -> IsAlive:
         bt.logging.info("I'm alive!")
         synapse.answer = "alive"
         return synapse
-    
-    
+
     def blacklist_isalive(self, synapse: IsAlive) -> typing.Tuple[bool, str]:
         return False, synapse.dendrite.hotkey
-    
 
-    async def _generate_key(
-        self, synapse: Key
-    ) -> Key:
-        synapse_type="Save" if synapse.generate else "Clean"
+    async def _generate_key(self, synapse: Key) -> Key:
+        synapse_type = "Save" if synapse.generate else "Clean"
         bt.logging.info(f"[Key/{synapse_type}] Synapse received")
         if synapse.generate:
             generate_ssh_key(synapse.validator_public_key)
@@ -223,10 +224,7 @@ class Miner:
         bt.logging.info(f"[Key/{synapse_type}] Synapse proceed")
         return synapse
 
-
-    async def blacklist_generate_key(
-        self, synapse: Key
-    ) -> typing.Tuple[bool, str]:
+    async def blacklist_generate_key(self, synapse: Key) -> typing.Tuple[bool, str]:
         if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
             # Ignore requests from unrecognized entities.
             bt.logging.trace(
@@ -239,21 +237,19 @@ class Miner:
         )
         return False, "Hotkey recognized!"
 
-
-    async def _subtensor(
-        self, synapse: Subtensor
-    ) -> Subtensor:
+    async def _subtensor(self, synapse: Subtensor) -> Subtensor:
         bt.logging.info("[Subtensor] Synapse received")
         parsed_url = urlparse(self.subtensor.chain_endpoint)
-        ip = self.axon.external_ip if parsed_url.hostname == '127.0.0.1' else parsed_url.hostname
+        ip = (
+            self.axon.external_ip
+            if parsed_url.hostname == "127.0.0.1"
+            else parsed_url.hostname
+        )
         synapse.subtensor_ip = ip
-        bt.logging.info("[Subtensor] Synapse proceed")
+        bt.logging.success("[Subtensor] Synapse proceed")
         return synapse
 
-
-    async def blacklist_subtensor(
-        self, synapse: Subtensor
-    ) -> typing.Tuple[bool, str]:
+    async def blacklist_subtensor(self, synapse: Subtensor) -> typing.Tuple[bool, str]:
         if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
             # Ignore requests from unrecognized entities.
             bt.logging.trace(
@@ -266,20 +262,14 @@ class Miner:
         )
         return False, "Hotkey recognized!"
 
-
-    async def _challenge(
-        self, synapse: Challenge
-    ) -> Challenge:
+    async def _challenge(self, synapse: Challenge) -> Challenge:
         bt.logging.info("[Challenge] Synapse received")
-        block=self.subtensor.get_current_block()
+        block = self.subtensor.get_current_block()
         synapse.answer = f"{block}"
         bt.logging.info("[Challenge] Synapse proceed")
         return synapse
 
-
-    async def blacklist_challenge(
-        self, synapse: Challenge
-    ) -> typing.Tuple[bool, str]:
+    async def blacklist_challenge(self, synapse: Challenge) -> typing.Tuple[bool, str]:
         if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
             # Ignore requests from unrecognized entities.
             bt.logging.trace(
@@ -291,7 +281,6 @@ class Miner:
             f"Not Blacklisting recognized hotkey {synapse.dendrite.hotkey}"
         )
         return False, "Hotkey recognized!"
-
 
     def start_request_count_timer(self):
         """
@@ -306,7 +295,6 @@ class Miner:
         """
         self.request_count_timer = threading.Timer(3600, self.reset_request_count)
         self.request_count_timer.start()
-
 
     def reset_request_count(self):
         """
@@ -331,10 +319,8 @@ class Miner:
         self.request_count = 0
         self.start_request_count_timer()
 
-
     def run(self):
         run(self)
-
 
     def run_in_background_thread(self):
         """
@@ -349,7 +335,6 @@ class Miner:
             self.is_running = True
             bt.logging.debug("Started")
 
-
     def stop_run_thread(self):
         """
         Stops the miner's operations that are running in the background thread.
@@ -361,14 +346,12 @@ class Miner:
             self.is_running = False
             bt.logging.debug("Stopped")
 
-
     def __enter__(self):
         """
         Starts the miner's operations in a background thread upon entering the context.
         This method facilitates the use of the miner in a 'with' statement.
         """
         self.run_in_background_thread()
-
 
     def __exit__(self, exc_type, exc_value, traceback):
         """

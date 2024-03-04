@@ -252,7 +252,7 @@ class Validator:
                 validator_should_set_weights = should_set_weights(
                     get_current_block(self.subtensor),
                     prev_set_weights_block,
-                    360,  # tempo
+                    1,#360,  # tempo
                     self.config.neuron.disable_set_weights,
                 )
                 bt.logging.debug(

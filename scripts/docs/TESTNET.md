@@ -117,7 +117,7 @@ Register the validator
 ```
 btcli subnet register \
  --netuid 92 \
- --subtensor.chain_endpoint ws://<IP>:9944 \
+ --subtensor.network test \
  --wallet.name validator \
  --wallet.hotkey default
 ```
@@ -128,7 +128,7 @@ pm2 start neurons/validator.py \
  --name validator-1 \
  --interpreter python3 -- \
  --netuid 92 \
- --subtensor.chain_endpoint ws://<IP>:9944 \
+ --subtensor.network test \
  --wallet.name validator \
  --wallet.hotkey default \
  --logging.debug

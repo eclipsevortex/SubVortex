@@ -20,6 +20,14 @@
 import typing
 import bittensor as bt
 
+
+class Score(bt.Synapse):
+    availability: float    
+    latency: float    
+    reliability: float    
+    distribution: float    
+    score: float    
+
 class IsAlive(bt.Synapse):
     # Returns
     answer: typing.Optional[str] = None

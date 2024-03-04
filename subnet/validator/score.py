@@ -28,21 +28,12 @@ async def compute_reliability_score(database, hotkey: str):
     return normalized_score
 
 
-def compute_latency_score(idx, validator_country, responses):
-    # Step 1: Baseline Latency Calculation
-    process_times = list(
-        set(
-            process_time if process_time else 5
-            for verified, country, process_time in responses
-        )
-    )
-    baseline_latency = np.mean(process_times)
-
-    # Step: Get the localisation
+def compute_latency_score(idx, uid, validator_country, responses):
+    # Step 1: Get the localisation of the validator
     validator_localisation = get_localisation(validator_country)
 
-    # Step 2: Relative Latency Score Calculation
-    relative_latency_scores = []
+    # Step 2: Compute the miners process times by adding a tolerance
+    process_times = []
     for response in responses:
         country = response[1]
         process_time = response[2]
@@ -59,18 +50,31 @@ def compute_latency_score(idx, validator_country, responses):
 
         scaled_distance = distance / MAX_DISTANCE
         tolerance = 1 - scaled_distance
-        bt.logging.trace(
-            f"[Score][Latency]Tolerance {tolerance} for a distance of {distance} ({validator_localisation['country']}-{location['country'] if location else 'None'})"
-        )
 
-        response_process_time = process_time * tolerance if process_time else 5
-        relative_latency_score = 1 - (response_process_time / baseline_latency)
+        process_time = process_time * tolerance if process_time else 5
+        process_times.append(process_time)
+    bt.logging.trace(f"[{uid}][Score][Latency] Process times {process_times}")
+    
+
+    # Step 3: Baseline Latency Calculation
+    baseline_latency = np.mean(process_times)
+    bt.logging.trace(f"[{uid}][Score][Latency] Base latency {baseline_latency}")
+
+    # Step 4: Relative Latency Score Calculation
+    relative_latency_scores = []
+    for process_time in process_times:
+        relative_latency_score = 1 - (process_time / baseline_latency)
         relative_latency_scores.append(relative_latency_score)
 
-    # Step 3: Normalization
-    max_score = max(relative_latency_scores)
+    # Step 5: Normalization
     min_score = min(relative_latency_scores)
-    normalized_scores = (relative_latency_scores[idx] - min_score) / (
+    bt.logging.trace(f"[{uid}][Score][Latency] Minimum relative score {min_score}")
+    max_score = max(relative_latency_scores)
+    bt.logging.trace(f"[{uid}][Score][Latency] Maximum relative score {max_score}")
+    score = relative_latency_scores[idx]
+    bt.logging.trace(f"[{uid}][Score][Latency] Relative score {score}")
+
+    normalized_scores = (score - min_score) / (
         max_score - min_score
     )
 

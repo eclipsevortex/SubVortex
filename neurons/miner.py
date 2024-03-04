@@ -20,6 +20,7 @@
 import sys
 import typing
 import time
+import json
 import torch
 import asyncio
 import bittensor as bt
@@ -27,7 +28,7 @@ import threading
 import traceback
 from urllib.parse import urlparse
 
-from subnet.protocol import IsAlive, Key, Subtensor, Challenge
+from subnet.protocol import IsAlive, Key, Subtensor, Challenge, Score
 
 from subnet.shared.key import generate_ssh_key, clean_ssh_key
 from subnet.shared.checks import check_environment, check_registration
@@ -139,9 +140,14 @@ class Miner:
             forward_fn=self._is_alive,
             blacklist_fn=self.blacklist_isalive,
         ).attach(
-            forward_fn=self._key,
-            blacklist_fn=self.blacklist_key,
+            forward_fn=self._score,
+            blacklist_fn=self.blacklist_score,
         )
+
+        # .attach(
+        #     forward_fn=self._key,
+        #     blacklist_fn=self.blacklist_key,
+        # )
         # .attach(
         #     forward_fn=self._subtensor,
         #     blacklist_fn=self.blacklist_subtensor,
@@ -195,6 +201,17 @@ class Miner:
         return synapse
 
     def blacklist_isalive(self, synapse: IsAlive) -> typing.Tuple[bool, str]:
+        return False, synapse.dendrite.hotkey
+    
+    def _score(self, synapse: Score) -> Score:
+        bt.logging.info(f"Availability score {synapse.availability}")
+        bt.logging.info(f"Latency score {synapse.latency}")
+        bt.logging.info(f"Reliability score {synapse.reliability}")
+        bt.logging.info(f"Distribution score {synapse.distribution}")
+        bt.logging.success(f"Score {synapse.score}")
+        return synapse
+
+    def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
         return False, synapse.dendrite.hotkey
 
     async def _key(self, synapse: Key) -> Key:

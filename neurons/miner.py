@@ -30,7 +30,7 @@ from urllib.parse import urlparse
 from subnet.protocol import IsAlive, Key, Subtensor, Challenge
 
 from subnet.shared.key import generate_ssh_key, clean_ssh_key
-from subnet.shared.checks import check_environment
+from subnet.shared.checks import check_environment, check_registration
 
 from subnet.miner import run
 from subnet.miner.config import (
@@ -38,10 +38,7 @@ from subnet.miner.config import (
     check_config,
     add_args,
 )
-from subnet.miner.utils import (
-    update_storage_stats,
-    load_request_log,
-)
+from subnet.miner.utils import load_request_log
 
 
 class Miner:
@@ -116,14 +113,7 @@ class Miner:
         bt.logging.debug("loading wallet")
         self.wallet = bt.wallet(config=self.config)
         self.wallet.create_if_non_existent()
-        if not self.config.wallet._mock:
-            if not self.subtensor.is_hotkey_registered_on_subnet(
-                hotkey_ss58=self.wallet.hotkey.ss58_address, netuid=self.config.netuid
-            ):
-                raise Exception(
-                    f"Wallet not currently registered on netuid {self.config.netuid}, please first register wallet before running"
-                )
-
+        check_registration(self.subtensor, self.wallet, self.config.netuid)
         bt.logging.debug(f"wallet: {str(self.wallet)}")
 
         # Init metagraph.
@@ -139,15 +129,8 @@ class Miner:
         )
         bt.logging.info(f"Running miner on uid: {self.my_subnet_uid}")
 
-        # parsed_url = urlparse(self.subtensor.chain_endpoint)
-        # ip = (
-        #     self.axon.external_ip
-        #     if parsed_url.hostname == "127.0.0.1"
-        #     else parsed_url.hostname
-        # )
-
         # The axon handles request processing, allowing validators to send this process requests.
-        self.axon = bt.axon(wallet=self.wallet, config=self.config)
+        self.axon = bt.axon(wallet=self.wallet, config=self.config, external_ip=bt.net.get_external_ip())
         bt.logging.info(f"Axon {self.axon}")
 
         # Attach determiners which functions are called when servicing a request.
@@ -155,15 +138,18 @@ class Miner:
         self.axon.attach(
             forward_fn=self._is_alive,
             blacklist_fn=self.blacklist_isalive,
+        ).attach(
+            forward_fn=self._key,
+            blacklist_fn=self.blacklist_key,
         )
         # .attach(
         #     forward_fn=self._subtensor,
         #     blacklist_fn=self.blacklist_subtensor,
+        # ).attach(
+        #     forward_fn=self._key,
+        #     blacklist_fn=self.blacklist_key,
         # )
         # .attach(
-        #     forward_fn=self._generate_key,
-        #     blacklist_fn=self.blacklist_generate_key,
-        # ).attach(
         #     forward_fn=self._subtensor,
         #     blacklist_fn=self.blacklist_subtensor,
         # ).attach(
@@ -200,9 +186,6 @@ class Miner:
         self.requests_per_hour = []
         self.average_requests_per_hour = 0
 
-        # Init the miner's storage usage tracker
-        update_storage_stats(self)
-
         self.rate_limiters = {}
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
@@ -214,17 +197,17 @@ class Miner:
     def blacklist_isalive(self, synapse: IsAlive) -> typing.Tuple[bool, str]:
         return False, synapse.dendrite.hotkey
 
-    async def _generate_key(self, synapse: Key) -> Key:
+    async def _key(self, synapse: Key) -> Key:
         synapse_type = "Save" if synapse.generate else "Clean"
         bt.logging.info(f"[Key/{synapse_type}] Synapse received")
         if synapse.generate:
             generate_ssh_key(synapse.validator_public_key)
         else:
             clean_ssh_key(synapse.validator_public_key)
-        bt.logging.info(f"[Key/{synapse_type}] Synapse proceed")
+        bt.logging.success(f"[Key/{synapse_type}] Synapse proceed")
         return synapse
 
-    async def blacklist_generate_key(self, synapse: Key) -> typing.Tuple[bool, str]:
+    async def blacklist_key(self, synapse: Key) -> typing.Tuple[bool, str]:
         if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
             # Ignore requests from unrecognized entities.
             bt.logging.trace(

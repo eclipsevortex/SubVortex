@@ -30,7 +30,7 @@ from traceback import print_exception
 from substrateinterface.base import SubstrateInterface
 # from dotenv import load_dotenv
 
-from subnet.shared.checks import check_environment
+from subnet.shared.checks import check_environment, check_registration
 from subnet.shared.utils import get_redis_password
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
@@ -116,13 +116,8 @@ class Validator:
         self.wallet = bt.wallet(config=self.config)
         self.wallet.create_if_non_existent()
 
-        if not self.config.wallet._mock:
-            if not self.subtensor.is_hotkey_registered_on_subnet(
-                hotkey_ss58=self.wallet.hotkey.ss58_address, netuid=self.config.netuid
-            ):
-                raise Exception(
-                    f"Wallet not currently registered on netuid {self.config.netuid}, please first register wallet before running"
-                )
+        # Check registration
+        check_registration(self.subtensor, self.wallet, self.config.netuid)
 
         bt.logging.debug(f"wallet: {str(self.wallet)}")
 

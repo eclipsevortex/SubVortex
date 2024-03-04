@@ -1,4 +1,5 @@
 import paramiko
+import bittensor as bt
 
 
 def check_connection(ip, private_key):
@@ -12,13 +13,13 @@ def check_connection(ip, private_key):
         ssh.connect(ip, username='root', pkey=private_key)
         return True
     except paramiko.AuthenticationException:
-        print("Authentication failed, please verify your credentials")
+        bt.logging.error("Authentication failed, please verify your credentials")
     except paramiko.SSHException as sshException:
-        print("Unable to establish SSH connection: %s" % sshException)
+        bt.logging.error("Unable to establish SSH connection: %s" % sshException)
     except paramiko.BadHostKeyException as badHostKeyException:
-        print("Unable to verify server's host key: %s" % badHostKeyException)
+        bt.logging.error("Unable to verify server's host key: %s" % badHostKeyException)
     except Exception as e:
-        print(e)
+        bt.logging.error(e)
     finally:
         # Close the SSH connection
         ssh.close()

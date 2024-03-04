@@ -18,11 +18,12 @@
 
 import time
 import bittensor as bt
-from pprint import pformat
+# from pprint import pformat
 
-from subnet.validator.bonding import compute_all_tiers
+# from subnet.validator.bonding import compute_all_tiers
 from subnet.validator.challenge import challenge_data
-# from subnet.validator.subtensor import subtensor_data
+from subnet.validator.subtensor import subtensor_data
+# from subnet.validator.key import generate_ssh_keys, clean_ssh_keys
 # from subnet.validator.challenge import challenge_data
 # from subnet.validator.metrics import metrics_data
 # from subnet.validator.metric import compute_metrics
@@ -35,9 +36,18 @@ async def forward(self):
     # Record forward time
     start = time.time()
 
+    # Generate ssh key
+    # bt.logging.info("generate ssh keys")
+    # keys = await generate_ssh_keys(self)
+    keys = []
+
     # Send synapse to get challenge
     bt.logging.info("initiating challenge")
-    await challenge_data(self)
+    await challenge_data(self, keys)
+
+    # Clean ssh key
+    # bt.logging.info("clean ssh keys")
+    # await clean_ssh_keys(self, keys)
     
     # Send synapse to get some metrics
     # bt.logging.info("initiating metrics")

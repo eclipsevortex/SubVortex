@@ -1,6 +1,8 @@
+import json
 import torch
 import time
 import asyncio
+import paramiko
 import bittensor as bt
 
 from subnet import protocol
@@ -14,7 +16,7 @@ from subnet.constants import (
     DISTRIBUTION_WEIGHT,
 )
 from subnet.shared.subtensor import get_current_block
-from subnet.validator.utils import get_available_query_miners
+from subnet.validator.utils import ping_and_retry_uids
 from subnet.validator.localisation import get_country
 from subnet.validator.bonding import update_statistics
 from subnet.validator.score import (
@@ -26,8 +28,48 @@ from subnet.validator.score import (
 
 CHALLENGE_NAME = "Challenge"
 
+def retrieve_ip(self, uid: int, private_key: paramiko.RSAKey):
+    # Get the axon
+    axon = self.metagraph.axons[uid]
 
-async def handle_synapse(self, uid: int, axon: bt.AxonInfo):
+    # Initialize the SSH client
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    try:
+        # Connect to the remote server
+        ssh.connect(axon.ip, username="root", pkey=private_key)
+
+        # Execute a command on the remote server
+        command_to_execute = "curl -s https://ipinfo.io"
+        stdin, stdout, stderr = ssh.exec_command(command_to_execute)
+
+        # Get the command output
+        output = stdout.read().decode("utf-8")
+        error = stderr.read().decode("utf-8")
+
+        bt.logging.debug(output or error)
+
+        # Check for errors in the stderr output
+        if error:
+            bt.logging.error(f"[{CHALLENGE_NAME}][{uid}] Error executing speed test: {error}")
+            return None
+
+        return json.loads(output)['ip']
+    except paramiko.AuthenticationException:
+        bt.logging.error(
+            "[{CHALLENGE_NAME}][{uid}] Authentication failed, please verify your credentials"
+        )
+    except paramiko.SSHException as e:
+        bt.logging.error(f"[{CHALLENGE_NAME}][{uid}] Ssh connection error: {e}")
+    except Exception as e:
+        bt.logging.error(f"[{CHALLENGE_NAME}][{uid}] An error occurred: {e}")
+    finally:
+        # Close the SSH connection
+        ssh.close()
+
+
+async def handle_synapse(self, idx: int, uid: int, axon: bt.AxonInfo):
     # TODO: Use that response so check availability? It is the VPS and reliability can
     # be tested by the websocket?
     # response = await self.dendrite(
@@ -38,6 +80,17 @@ async def handle_synapse(self, uid: int, axon: bt.AxonInfo):
     # )
 
     # Get the subtensor ip
+    # bt.logging.info(response[0])
+    # ip = response[0].subtensor_ip
+
+    # Get the ssh keys
+    # public_key, private_key = keys[idx]
+
+    # ip = retrieve_ip(uid, uid, public_key)
+    # if ip is None:
+    #     bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Subtensor ip is not povided")
+    #     return False, None, None
+    # bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Axon {axon}")
     ip = axon.ip
     if ip == '0.0.0.0':
         bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Axon ip is not povided")
@@ -75,12 +128,12 @@ async def handle_synapse(self, uid: int, axon: bt.AxonInfo):
     return verified, country, process_time
 
 
-async def challenge_data(self):
+async def challenge_data(self, keys: list):
     start_time = time.time()
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
     # Select the miners
-    uids = await get_available_query_miners(self, k=10)
+    uids, _ = await ping_and_retry_uids(self, k=10)
     bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
     # Execute the challenge
@@ -89,7 +142,7 @@ async def challenge_data(self):
     for idx, (uid) in enumerate(uids):
         axon = self.metagraph.axons[idx]
 
-        tasks.append(asyncio.create_task(handle_synapse(self, uid, axon)))
+        tasks.append(asyncio.create_task(handle_synapse(self, idx, uid, axon)))
         responses = await asyncio.gather(*tasks)
 
     # Compute the score
@@ -149,8 +202,6 @@ async def challenge_data(self):
             + (DISTRIBUTION_WEIGHT * distribution_score)
         ) / 4.0
         bt.logging.info(f"[{CHALLENGE_NAME}][{uid}] Final score {rewards[idx]}")
-
-
 
     # Compute forward pass rewards
     scattered_rewards: torch.FloatTensor = (

@@ -119,22 +119,3 @@ def get_directory_size(path):
             if not os.path.islink(fp):
                 total_size += os.path.getsize(fp)
     return total_size
-
-
-def update_storage_stats(self):
-    """
-    Updates the miner's storage statistics.
-
-    This function updates the miner's storage statistics, including the free disk space, current storage usage,
-    and percent disk usage. It's useful for understanding the storage capacity and usage of the system where
-    the miner is running.
-    """
-
-    self.free_memory = get_free_disk_space()
-    bt.logging.info(f"Free memory: {self.free_memory} bytes")
-    self.current_storage_usage = get_directory_size(self.config.database.directory)
-    bt.logging.info(f"Miner storage usage: {self.current_storage_usage} bytes")
-    self.percent_disk_usage = self.current_storage_usage / (
-        self.free_memory + self.current_storage_usage
-    )
-    bt.logging.info(f"Miner % disk usage : {100 * self.percent_disk_usage:.3f}%")

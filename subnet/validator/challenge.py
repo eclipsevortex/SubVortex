@@ -98,7 +98,7 @@ async def challenge_data(self, keys: list):
 
         # Compute score for availability
         availability_score = 1.0 if verified else AVAILABILITY_FAILURE_REWARD
-        bt.logging.trace(
+        bt.logging.debug(
             f"[{CHALLENGE_NAME}][{uid}] Availability score {availability_score}"
         )
 
@@ -108,11 +108,11 @@ async def challenge_data(self, keys: list):
             if verified
             else LATENCY_FAILURE_REWARD
         )
-        bt.logging.trace(f"[{CHALLENGE_NAME}][{uid}] Latency score {latency_score}")
+        bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Latency score {latency_score}")
 
         # Compute score for reliability
         reliability_score = await compute_reliability_score(self.database, hotkey)
-        bt.logging.trace(
+        bt.logging.debug(
             f"[{CHALLENGE_NAME}][{uid}] Reliability score {reliability_score}"
         )
 
@@ -122,7 +122,7 @@ async def challenge_data(self, keys: list):
             if responses[idx][2] is not None
             else DISTRIBUTION_FAILURE_REWARD
         )
-        bt.logging.trace(
+        bt.logging.debug(
             f"[{CHALLENGE_NAME}][{uid}] Distribution score {distribution_score}"
         )
 

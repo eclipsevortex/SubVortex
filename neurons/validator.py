@@ -175,7 +175,7 @@ class Validator:
 
         # Start with 0 monitor pings
         # TODO: load this from disk instead of reset on restart
-        self.monitor_lookup = {uid: 0 for uid in self.metagraph.uids.tolist()}
+        # self.monitor_lookup = {uid: 0 for uid in self.metagraph.uids.tolist()}
 
         # Instantiate runners
         self.should_exit: bool = False

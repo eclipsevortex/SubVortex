@@ -63,7 +63,7 @@ async def handle_synapse(self, uid: int):
     return verified, country, process_time
 
 
-async def challenge_data(self, keys: list):
+async def challenge_data(self):
     start_time = time.time()
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 

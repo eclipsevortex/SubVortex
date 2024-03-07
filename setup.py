@@ -63,10 +63,10 @@ with codecs.open(
 setup(
     name="SubVortex",
     version=version_string,
-    description="bittensor_subnet_template",
+    description="Decentralized network of subtensor nodes",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/opentensor/bittensor-subnet-template",
+    url="https://github.com/eclipsevortex/SubVortex.git",
     author="EclipseVortex,Ch3RNØbØG,tww9,HcL-CO",
     packages=find_packages(),
     include_package_data=True,

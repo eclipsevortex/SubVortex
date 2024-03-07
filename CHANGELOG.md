@@ -2,6 +2,10 @@
 
 ## 0.2.0 / 2024-03-07
 
+## What's Changed
+* fix: implement new incentive mechanism by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/7
+
+
 **Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v0.1.0...v0.2.0
 
 ## 0.1.0 / 2024-02-24

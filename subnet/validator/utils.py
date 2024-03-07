@@ -25,14 +25,6 @@ from Crypto.Random import random
 from subnet.validator.database import hotkey_at_capacity
 
 
-def remove_indices_from_tensor(tensor, indices_to_remove):
-    # Sort indices in descending order to avoid index out of range error
-    sorted_indices = sorted(indices_to_remove, reverse=True)
-    for index in sorted_indices:
-        tensor = torch.cat([tensor[:index], tensor[index + 1 :]])
-    return tensor
-
-
 def current_block_hash(self):
     """
     Get the current block hash with caching.

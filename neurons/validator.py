@@ -28,7 +28,6 @@ from copy import deepcopy
 from pprint import pformat
 from traceback import print_exception
 from substrateinterface.base import SubstrateInterface
-# from dotenv import load_dotenv
 
 from subnet.shared.checks import check_environment, check_registration
 from subnet.shared.utils import get_redis_password
@@ -86,9 +85,6 @@ class Validator:
         self.config = Validator.config()
         self.check_config(self.config)
         bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
-
-        # Load env variables
-        # load_dotenv()
 
         try:
             asyncio.run(check_environment(self.config.database.redis_conf_path))
@@ -172,10 +168,6 @@ class Validator:
 
         self.prev_step_block = get_current_block(self.subtensor)
         self.step = 0
-
-        # Start with 0 monitor pings
-        # TODO: load this from disk instead of reset on restart
-        # self.monitor_lookup = {uid: 0 for uid in self.metagraph.uids.tolist()}
 
         # Instantiate runners
         self.should_exit: bool = False

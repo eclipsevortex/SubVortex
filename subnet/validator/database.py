@@ -119,24 +119,3 @@ async def hotkey_at_capacity(
                 f"Hotkey {hotkey} has {(limit - total_storage) // 1024**3} GB free."
             )
         return False
-
-
-async def get_miner_statistics(database: aioredis.Redis) -> Dict[str, Dict[str, str]]:
-    """
-    Retrieves statistics for all miners in the database.
-    Parameters:
-        database (aioredis.Redis): The Redis client instance.
-    Returns:
-        A dictionary where keys are hotkeys and values are dictionaries containing the statistics for each hotkey.
-    """
-    stats = {}
-    async for key in database.scan_iter(b"stats:*"):
-        # Await the hgetall call and then process its result
-        key_stats = await database.hgetall(key)
-        # Process the key_stats as required
-        processed_stats = {
-            k.decode("utf-8"): v.decode("utf-8") for k, v in key_stats.items()
-        }
-        stats[key.decode("utf-8").split(":")[-1]] = processed_stats
-
-    return stats

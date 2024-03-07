@@ -20,7 +20,6 @@
 import sys
 import typing
 import time
-import json
 import torch
 import asyncio
 import bittensor as bt
@@ -143,25 +142,6 @@ class Miner:
             forward_fn=self._score,
             blacklist_fn=self.blacklist_score,
         )
-
-        # .attach(
-        #     forward_fn=self._key,
-        #     blacklist_fn=self.blacklist_key,
-        # )
-        # .attach(
-        #     forward_fn=self._subtensor,
-        #     blacklist_fn=self.blacklist_subtensor,
-        # ).attach(
-        #     forward_fn=self._key,
-        #     blacklist_fn=self.blacklist_key,
-        # )
-        # .attach(
-        #     forward_fn=self._subtensor,
-        #     blacklist_fn=self.blacklist_subtensor,
-        # ).attach(
-        #     forward_fn=self._challenge,
-        #     blacklist_fn=self.blacklist_challenge,
-        # )
 
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip have changed.

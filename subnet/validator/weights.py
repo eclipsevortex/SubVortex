@@ -48,6 +48,7 @@ def set_weights_for_validator(
         uids (torch.Tensor): miners UIDs on the network.
         metagraph (bt.metagraph): Bittensor metagraph.
         moving_averaged_scores (torch.Tensor): .
+        wandb_on (bool, optional): Flag to determine if logging to Weights & Biases is enabled. Defaults to False.
         tempo (int): Tempo for 'netuid' subnet.
         wait_for_inclusion (bool, optional): Wether to wait for the extrinsic to enter a block
         wait_for_finalization (bool, optional): Wether to wait for the extrinsic to be finalized on the chain
@@ -62,10 +63,49 @@ def set_weights_for_validator(
     """
     # Calculate the average reward for each uid across non-zero values.
     # Replace any NaN values with 0.
-    raw_weights = torch.nn.functional.normalize(moving_averaged_scores, p=1, dim=0)
+    nan_idxs = torch.where(torch.isnan(moving_averaged_scores))[0]
+    moving_averaged_scores_no_nan = torch.where(
+        torch.isnan(moving_averaged_scores),
+        torch.zeros_like(moving_averaged_scores),
+        moving_averaged_scores
+    )
+    # Gather negative indices
+    neg_idxs = torch.where(moving_averaged_scores_no_nan < 0)[0]
+
+    # Ensure positive
+    minimum = min(moving_averaged_scores_no_nan)
+
+    # Replace nan with min
+    moving_averaged_scores_no_nan[nan_idxs] = minimum.clone()
+
+    # Make all values positive
+    if minimum < 0:
+        positive_moving_averaged_scores = moving_averaged_scores_no_nan - minimum
+    else:
+        positive_moving_averaged_scores = moving_averaged_scores_no_nan
+    bt.logging.debug(f"Positive scores", positive_moving_averaged_scores)
+
+    # Push all orinally negative indices to zero
+    positive_moving_averaged_scores[neg_idxs] = 0
+
+    # Normalize, ensuring no division by zero or NaNs occur
+    sum_scores = positive_moving_averaged_scores.sum()
+    bt.logging.info(f"Score sum: {sum_scores}")
+    if sum_scores > 0:
+        raw_weights = torch.nn.functional.normalize(positive_moving_averaged_scores, p=1, dim=0)
+    else:
+        raw_weights = torch.zeros_like(positive_moving_averaged_scores)
+
+    # Doubly ensure raw_weights does not contain NaNs (this should not happen after normalization, but as an extra precaution)
+    raw_weights = torch.where(
+        torch.isnan(raw_weights),
+        torch.zeros_like(raw_weights),
+        raw_weights,
+    )
 
     bt.logging.debug("raw_weights", raw_weights)
     bt.logging.debug("raw_weight_uids", metagraph.uids.to("cpu"))
+
     # Process the raw weights to final_weights via subtensor limitations.
     (
         processed_weight_uids,
@@ -88,7 +128,7 @@ def set_weights_for_validator(
     bt.logging.debug("uint_uids", uint_uids)
 
     # Set the weights on chain via our subtensor connection.
-    success = set_weights(
+    success, message = set_weights(
         subtensor=subtensor,
         wallet=wallet,
         netuid=netuid,
@@ -100,6 +140,6 @@ def set_weights_for_validator(
     )
 
     if success is True:
-        bt.logging.info("set_weights on chain successfully!")
+        bt.logging.info("Set weights on chain successfully!")
     else:
-        bt.logging.error(f"set_weights failed.")
+        bt.logging.error(f"Set weights failed {message}.")

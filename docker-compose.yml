@@ -1,0 +1,19 @@
+version: "3"
+
+services:
+  redis:
+    build:
+      context: .
+      dockerfile: ./scripts/redis/docker/Dockerfile
+      args:
+        - REDIS_PASSWORD=${REDIS_PASSWORD}
+    container_name: redis
+    restart: always
+    ports:
+      - 6379:6379
+    volumes: 
+      - cache:/data
+
+volumes:
+  cache:
+    driver: local

@@ -19,6 +19,9 @@ install_dependencies() {
 
     # Function to install packages on Ubuntu/Debian
     install_ubuntu() {
+        # Update the list of packages
+        apt-get update
+
         if [[ "$EXEC_TYPE" == "docker" ]]; then
             # Install docker
             ## Install Required Dependencies
@@ -38,24 +41,20 @@ install_dependencies() {
             ## Add the user to the docker group
             sudo usermod -aG docker $USER
             echo -e '\e[32m[docker] Docker user created\e[0m'
+
+            ## Apply the group membership (you may need to log out and log back in for the group to be recognized):
+            newgrp docker
+            echo -e '\e[32m[docker] Group membership applied\e[0m'
             
             # Install docker compose
             sudo apt-get install -y docker-compose
             echo -e '\e[32m[docker] Docker compose installed\e[0m'
-            
-            ## Apply changes
-            newgrp docker
-            echo -e '\e[32m[docker] Docker group created\e[0m'
         fi
-        # echo "Updating system packages..."
-        # sudo apt update
-        # echo "Installing required packages..."
-        # sudo apt install --assume-yes make build-essential clang libssl-dev llvm libudev-dev protobuf-compiler
-
+       
         # Necessary libraries for Rust execution
-        apt-get update
         apt-get install -y curl build-essential protobuf-compiler clang git
         rm -rf /var/lib/apt/lists/*
+        echo -e '\e[32mRust dependencies installed\e[0m'
     }   
 
     # Detect OS and call the appropriate function
@@ -71,15 +70,21 @@ install_dependencies() {
     # Install rust and cargo
     # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
     curl https://sh.rustup.rs -sSf | sh -s -- -y
+    echo -e '\e[32mRust and Cargo installed\e[0m'
 
     # Update your shell's source to include Cargo's path
     source "$HOME/.cargo/env"
+    echo -e '\e[32mRust and Cargo added to the path\e[0m'
 }
 
 setup_environment() {
+    # Go to the root
+    cd $ROOT
+
     # Clone subtensor and enter the directory
     if [ ! -d "subtensor" ]; then
         git clone https://github.com/opentensor/subtensor.git
+        echo -e '\e[32m[Subtensor] Repository cloned\e[0m'
     fi
 
     # Go the repository
@@ -87,9 +92,11 @@ setup_environment() {
 
     # Get the latest version
     git pull
+    echo -e '\e[32m[Subtensor] Last version pulled\e[0m'
 
     # Setup rust
     ./scripts/init.sh
+    echo -e '\e[32m[Subtensor] Setup done\e[0m'
 
     # Go back 
     cd $ROOT
@@ -97,6 +104,9 @@ setup_environment() {
 
 # Install dependencies
 install_dependencies
+echo -e '\e[32m[Subtensor] Dependencies installed\e[0m'
+
 
 # Setup environment
 setup_environment 
+echo -e '\e[32m[Subtensor] Environment setup\e[0m'

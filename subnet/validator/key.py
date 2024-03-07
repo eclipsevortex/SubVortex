@@ -1,28 +1,28 @@
-import sys
 import time
-import torch
-import json
-import paramiko
 import typing
 import asyncio
+import paramiko
 import bittensor as bt
 
 from subnet import protocol
 from subnet.shared.key import generate_key
-from subnet.validator.utils import get_available_query_miners
 from subnet.validator.ssh import check_connection
+from subnet.validator.utils import get_available_query_miners
 
 
-async def handle_synapse(self, uid: int) -> typing.Tuple[bool, protocol.Challenge]:
-    # Generate the public key
-    public_key, private_key = generate_key('validator')
-    bt.logging.debug("keys generated")
+CHALLENGE_NAME = "Key"
 
+
+async def handle_generation_synapse(
+    self, uid: int, public_key: paramiko.RSAKey, private_key: paramiko.RSAKey
+) -> typing.Tuple[bool]:
     # Get the axon
     axon = self.metagraph.axons[uid]
 
-    # Generate SSH key
-    response = self.dendrite.query(
+    bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Generating Ssh keys")
+
+    # Send the public ssh key to the miner
+    self.dendrite.query(
         # Send the query to selected miner axons in the network.
         axons=[axon],
         # Construct a dummy query. This simply contains a single integer.
@@ -30,34 +30,27 @@ async def handle_synapse(self, uid: int) -> typing.Tuple[bool, protocol.Challeng
         # All responses have the deserialize function called on them before returning.
         # You are encouraged to define your own deserialization function.
         deserialize=True,
+        timeout=10,
     )
 
     # Check the ssh connection works
     verified = check_connection(axon.ip, private_key)
-    bt.logging.debug("Ssh connection verified")
+    if verified:
+        bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Ssh connexion is verified")
+    else:
+        bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}]  Ssh connexion is not verified")
 
-    # Execute something here
+    return verified
 
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(axon.ip, username='root', pkey=private_key)
 
-    # Execute a command on the remote server
-    command_to_execute = 'speedtest-cli --json'
-    stdin, stdout, stderr = ssh.exec_command(command_to_execute)
+async def handle_cleaning_synapse(self, uid: int, public_key: paramiko.RSAKey):
+    # Get the axon
+    axon = self.metagraph.axons[uid]
 
-    # Get the command output
-    output = stdout.read().decode('utf-8')
-    error = stderr.read().decode('utf-8')
+    bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Cleaning Ssh keys")
 
-    # Print the output or error
-    if error is None:
-        subtensor_details = json.loads(output)
-
-        
-
-    # Clean SSH key
-    response = self.dendrite.query(
+    # Send the public ssh key to the miner
+    self.dendrite.query(
         # Send the query to selected miner axons in the network.
         axons=[axon],
         # Construct a dummy query. This simply contains a single integer.
@@ -65,82 +58,64 @@ async def handle_synapse(self, uid: int) -> typing.Tuple[bool, protocol.Challeng
         # All responses have the deserialize function called on them before returning.
         # You are encouraged to define your own deserialization function.
         deserialize=True,
+        timeout=10,
     )
 
-    return verified, response
+    # TODO: check the connection is not possible anymore
 
 
-async def generate_key_data(self):
+async def generate_ssh_keys(self):
     start_time = time.time()
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
     # Select the miners
     uids = await get_available_query_miners(self, k=10)
-    bt.logging.debug(f"key uids {uids}")
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
-    # Generate SSH key
-    tasks = []
-    responses = []
+    # Generate the ssh keys
+    keys = []
     for uid in uids:
-        tasks.append(asyncio.create_task(handle_synapse(self, uid)))
-    responses = await asyncio.gather(*tasks)
+        public_key, private_key = generate_key(f"validator-{uid}")
+        keys.append((public_key, private_key))
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Ssh keys generated")
 
-    # # Compute the rewards for the responses given the prompt.
-    # rewards: torch.FloatTensor = torch.zeros(len(responses), dtype=torch.float32).to(
-    #     self.device
-    # )
+    # Request the miners to create the ssh key
+    tasks = []
+    for idx, (uid) in enumerate(uids):
+        (public_key, private_key) = keys[idx]
+        tasks.append(
+            asyncio.create_task(
+                handle_generation_synapse(self, uid, public_key, private_key)
+            )
+        )
+    await asyncio.gather(*tasks)
 
-    # remove_reward_idxs = []
-    # for idx, (uid, (verified, response)) in enumerate(zip(uids, responses)):
-    #     # TODO: Check the result from miner equal the one the validator will get by requesting the subtensor itself
-    #     success = True
+    # Display step time
+    forward_time = time.time() - start_time
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")
 
-    #     # Get the hotkey
-    #     hotkey = self.metagraph.hotkeys[uid]
-
-    #     # Update the challenge statistics
-    #     # await update_statistics(
-    #     #     ss58_address=hotkey,
-    #     #     success=success,
-    #     #     task_type="challenge",
-    #     #     database=self.database,
-    #     # )
-
-    #     # # Apply reward for this challenge
-    #     # tier_factor = await get_tier_factor(hotkey, self.database)
-    #     # rewards[idx] = 1.0 * tier_factor
-
-    # if len(responses) == 0:
-    #     bt.logging.debug("Received zero hashes from miners, returning event early.")
-    #     return
-
-    # uids, responses = _filter_verified_responses(uids, responses)
-    # bt.logging.debug(
-    #     f"challenge_data() full rewards: {rewards} | uids {uids} | uids to remove {remove_reward_idxs}"
-    # )
-
-    # # bt.logging.trace("Applying challenge rewards")
-    # # apply_reward_scores(
-    # #     self,
-    # #     uids=uids,
-    # #     responses=responses,
-    # #     rewards=rewards,
-    # #     timeout=30,
-    # # )
+    return keys
 
 
-def _filter_verified_responses(uids, responses):
-    not_none_responses = [
-        (uid, response[0])
-        for (uid, (verified, response)) in zip(uids, responses)
-        if verified is not None
-    ]
+async def clean_ssh_keys(self, keys: list):
+    start_time = time.time()
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
-    if len(not_none_responses) == 0:
-        return (), ()
+    # Select the miners
+    uids = await get_available_query_miners(self, k=10)
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
-    uids, responses = zip(*not_none_responses)
-    return uids, responses
+    # Request miners to remove the ssh key
+    tasks = []
+    for idx, (uid) in enumerate(uids):
+        (public_key, private_key) = keys[idx]
+        tasks.append(
+            asyncio.create_task(handle_cleaning_synapse(self, uid, public_key))
+        )
+    await asyncio.gather(*tasks)
 
+    # Display step time
+    forward_time = time.time() - start_time
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")
 
-
-
+    return keys

@@ -69,21 +69,8 @@ async def subtensor_data(self):
             message = f"[{CHALLENGE_NAME}][{uid}] The subtensor could not be verified"
             bt.logging.warning(message)
 
-        # Get the coldkey
-        axon = self.metagraph.axons[idx]
-        coldkey = axon.coldkey
-
-        # Get the hotkey
+        # Get the miner hotkey
         hotkey = self.metagraph.hotkeys[uid]
-
-        # Update subtensor
-        subs_key = f"subs:{coldkey}:{hotkey}"
-        await self.database.hset(subs_key, "ip", response[0].subtensor_ip)
-
-        # # Update statistics
-        # stats_key = f"stats:{hotkey}"
-        # await self.database.hset(stats_key, "available", verified)
-        # await self.database.hset(stats_key, "latency", response[0].dendrite.process_time)
 
         # Update statistics
         await update_statistics(
@@ -94,7 +81,8 @@ async def subtensor_data(self):
         )
 
         # Apply reward the challenge
-        rewards[idx] = 1.0 if verified else SUBTENSOR_FAILURE_REWARD
+        tier_factor = await get_tier_factor(hotkey, self.database)
+        rewards[idx] = 1.0 * tier_factor if verified else SUBTENSOR_FAILURE_REWARD
 
         # Get the process time for each uid to apply the rewards accordingly
         process_time = float(response.process_time) if verified else CHALLENGE_TIMEOUT

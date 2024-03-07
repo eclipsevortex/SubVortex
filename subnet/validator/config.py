@@ -130,24 +130,6 @@ def add_args(cls, parser):
         default="cuda" if torch.cuda.is_available() else "cpu",
     )
     parser.add_argument(
-        "--neuron.curve",
-        default="P-256",
-        help="Curve for elliptic curve cryptography.",
-        choices=["P-256"],  # TODO: expand this list
-    )
-    parser.add_argument(
-        "--neuron.maxsize",
-        default=None,  # Use lognormal random gaussian if None (2**16, # 64KB)
-        type=int,
-        help="Maximum size of random data to store.",
-    )
-    parser.add_argument(
-        "--neuron.min_chunk_size",
-        default=256,
-        type=int,
-        help="Minimum chunk size of random data to challenge (bytes).",
-    )
-    parser.add_argument(
         "--neuron.disable_log_rewards",
         action="store_true",
         help="Disable all reward logging, suppresses reward functions and their values from being logged to wandb.",
@@ -158,12 +140,6 @@ def add_args(cls, parser):
         type=str,
         help="The path to save subscription logs.",
         default="subscription_logs.txt",
-    )
-    parser.add_argument(
-        "--neuron.chunk_factor",
-        type=int,
-        help="The chunk factor to divide data.",
-        default=4,
     )
     parser.add_argument(
         "--neuron.num_concurrent_forwards",
@@ -220,12 +196,6 @@ def add_args(cls, parser):
         default=False,
     )
     parser.add_argument(
-        "--neuron.data_ttl",
-        type=int,
-        help="The number of blocks before data expires (seconds).",
-        default=60 * 60 * 24 * 30,  # 30 days
-    )
-    parser.add_argument(
         "--neuron.profile",
         action="store_true",
         help="If set, we will profile the neuron network and I/O actions.",
@@ -266,26 +236,6 @@ def add_args(cls, parser):
     # Mocks
     parser.add_argument(
         "--mock", action="store_true", help="Mock all items.", default=False
-    )
-
-    # Encryption wallet
-    parser.add_argument(
-        "--encryption.wallet_name",
-        type=str,
-        help="The name of the wallet to use for encryption.",
-        default="core_storage_coldkey",
-    )
-    parser.add_argument(
-        "--encryption.wallet_hotkey",
-        type=str,
-        help="The hotkey name of the wallet to use for encryption.",
-        default="core_storage_hotkey",
-    )
-    parser.add_argument(
-        "--encryption.password",
-        type=str,
-        help="The password of the wallet to use for encryption.",
-        default="dummy_password",
     )
 
 

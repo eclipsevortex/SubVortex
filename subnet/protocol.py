@@ -20,6 +20,14 @@
 import typing
 import bittensor as bt
 
+
+class Score(bt.Synapse):
+    availability: float    
+    latency: float    
+    reliability: float    
+    distribution: float    
+    score: float    
+
 class IsAlive(bt.Synapse):
     # Returns
     answer: typing.Optional[str] = None
@@ -34,9 +42,6 @@ class Key(bt.Synapse):
 
 
 class Subtensor(bt.Synapse):
-    # Parameters
-    task: int
-    
     # Returns
     subtensor_ip: typing.Optional[str] = None
 

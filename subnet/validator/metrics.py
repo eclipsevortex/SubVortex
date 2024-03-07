@@ -3,14 +3,20 @@ import json
 import typing
 import asyncio
 import paramiko
+import torch
 import bittensor as bt
 
 from subnet import protocol
-
+from subnet.constants import METRIC_FAILURE_REWARD
 from subnet.shared.key import generate_key
-
 from subnet.validator.ssh import check_connection
-from subnet.validator.utils import get_available_query_miners
+from subnet.validator.utils import get_available_query_miners, remove_indices_from_tensor
+from subnet.validator.reward import apply_reward_scores
+from subnet.validator.metric import compute_rewards
+from subnet.validator.bonding import update_statistics
+
+
+CHALLENGE_NAME = "Metric"
 
 
 def execute_speed_test(self, uid: int, private_key: paramiko.RSAKey):
@@ -24,7 +30,6 @@ def execute_speed_test(self, uid: int, private_key: paramiko.RSAKey):
     try:
         # Connect to the remote server
         ssh.connect(axon.ip, username="root", pkey=private_key)
-        bt.logging.debug(f"Ssh connection with {axon.ip}")
 
         # Execute a command on the remote server
         command_to_execute = "speedtest-cli --json"
@@ -38,16 +43,18 @@ def execute_speed_test(self, uid: int, private_key: paramiko.RSAKey):
 
         # Check for errors in the stderr output
         if error:
-            bt.logging.error(f"[Metrics] Error executing speed test: {error}")
+            bt.logging.error(f"[{CHALLENGE_NAME}][{uid}] Error executing speed test: {error}")
             return None
 
         return json.loads(output)
     except paramiko.AuthenticationException:
-        bt.logging.error("[Metrics] Authentication failed, please verify your credentials")
+        bt.logging.error(
+            "[{CHALLENGE_NAME}][{uid}] Authentication failed, please verify your credentials"
+        )
     except paramiko.SSHException as e:
-        bt.logging.error(f"[Metrics] Ssh connection error: {e}")
+        bt.logging.error(f"[{CHALLENGE_NAME}][{uid}] Ssh connection error: {e}")
     except Exception as e:
-        bt.logging.error(f"[Metrics] An error occurred: {e}")
+        bt.logging.error(f"[{CHALLENGE_NAME}][{uid}] An error occurred: {e}")
     finally:
         # Close the SSH connection
         ssh.close()
@@ -55,12 +62,12 @@ def execute_speed_test(self, uid: int, private_key: paramiko.RSAKey):
 
 async def handle_generation_synapse(
     self, uid: int, public_key: paramiko.RSAKey, private_key: paramiko.RSAKey
-) -> typing.Tuple[bool, protocol.Key]:
+) -> typing.Tuple[bool]:
     # Get the axon
     axon = self.metagraph.axons[uid]
 
     # Send the public ssh key to the miner
-    response = self.dendrite.query(
+    self.dendrite.query(
         # Send the query to selected miner axons in the network.
         axons=[axon],
         # Construct a dummy query. This simply contains a single integer.
@@ -72,22 +79,18 @@ async def handle_generation_synapse(
 
     # Check the ssh connection works
     verified = check_connection(axon.ip, private_key)
-    if verified:
-        bt.logging.info("[Metrics] Ssh connection verified")
-    else:
-        bt.logging.warning("[Metrics] Ssh connection is not verified")
 
-    return verified, response
+    return verified
 
 
 async def handle_cleaning_synapse(
     self, uid: int, public_key: paramiko.RSAKey
-) -> typing.Tuple[bool, protocol.Key]:
+):
     # Get the axon
     axon = self.metagraph.axons[uid]
 
     # Send the public ssh key to the miner
-    response = self.dendrite.query(
+    self.dendrite.query(
         # Send the query to selected miner axons in the network.
         axons=[axon],
         # Construct a dummy query. This simply contains a single integer.
@@ -99,25 +102,23 @@ async def handle_cleaning_synapse(
 
     # TODO: check the connection is not possible anymore
 
-    return True, response
-
 
 async def metrics_data(self):
     start_time = time.time()
-    bt.logging.debug(f"[Metrics] Starting")
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
     # Select the miners
     uids = await get_available_query_miners(self, k=10)
-    bt.logging.debug(f"[Metrics] Available uids {uids}")
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
     # Generate the ssh keys
     keys = []
     for uid in uids:
         public_key, private_key = generate_key(f"validator-{uid}")
-        keys.append(( public_key, private_key ))
-    bt.logging.debug("[Metrics] Ssh keys generated")
+        keys.append((public_key, private_key))
+    bt.logging.debug("[{CHALLENGE_NAME}] Ssh keys generated")
 
-    # Generate and send the ssh keys
+    # Request the miners to create the ssh key
     tasks = []
     responses = []
     for idx, (uid) in enumerate(uids):
@@ -129,18 +130,29 @@ async def metrics_data(self):
         )
     responses = await asyncio.gather(*tasks)
 
-    # Execute the speedtest-cli to get some metrics
-    for idx, (uid, (verified, response)) in enumerate(zip(uids, responses)):
+    rewards: torch.FloatTensor = torch.zeros(len(responses), dtype=torch.float32).to(
+        self.device
+    )
+    verification = [False] * len(uids)
+
+    for idx, (uid, (verified)) in enumerate(zip(uids, responses)):
+        verification[idx] = verified
+
         if not verified:
-            # TODO: do we punished miner now, later or never?
+            message = f"[{CHALLENGE_NAME}][{uid}] The ssh connection could not be established"
+            bt.logging.warning(message)
             continue
+
+        message = f"[{CHALLENGE_NAME}][{uid}] The ssh connection is established"
+        bt.logging.debug(message)
 
         # Get the ssh keys
         public_key, private_key = keys[idx]
 
+        # Execute speedtest-cli in a temporary ssh connection
         result = execute_speed_test(self, uid, private_key)
         if result is None:
-            bt.logging.warning("[Metrics] Speed test failed")
+            bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Speed test failed")
             continue
 
         # Bandwidth - measured in Mbps
@@ -164,6 +176,14 @@ async def metrics_data(self):
         # Get the hotkey
         hotkey = self.metagraph.hotkeys[uid]
 
+        # Update statistics
+        await update_statistics(
+            ss58_address=hotkey,
+            success=verified,
+            task_type="metric",
+            database=self.database,
+        )
+
         # Get the subs hash
         subs_key = f"subs:{coldkey}:{hotkey}"
 
@@ -180,7 +200,7 @@ async def metrics_data(self):
             avg_download = (float(legacy_download) + download) / 2
 
         await self.database.hset(subs_key, "download", avg_download)
-        bt.logging.info(f"[Metrics] Download {avg_download}")
+        bt.logging.info(f"[{CHALLENGE_NAME}][{uid}] Download {avg_download}")
 
         # Update upload
         avg_upload = upload
@@ -189,7 +209,7 @@ async def metrics_data(self):
             avg_upload = (float(legacy_upload) + avg_upload) / 2
 
         await self.database.hset(subs_key, "upload", avg_upload)
-        bt.logging.info(f"[Metrics] Upload {avg_upload}")
+        bt.logging.info(f"[{CHALLENGE_NAME}][{uid}] Upload {avg_upload}")
 
         # Update lantency
         avg_latency = ping
@@ -198,9 +218,9 @@ async def metrics_data(self):
             avg_latency = (float(legacy_latency) + ping) / 2
 
         await self.database.hset(subs_key, "latency", avg_latency)
-        bt.logging.info(f"[Metrics] Latency {avg_latency}")
+        bt.logging.info(f"[{CHALLENGE_NAME}][{uid}] Latency {avg_latency}")
 
-    # Clean the ssh keys
+    # Request miners to remove the ssh key
     tasks = []
     for uid in uids:
         (public_key, private_key) = keys[idx]
@@ -209,6 +229,19 @@ async def metrics_data(self):
         )
     await asyncio.gather(*tasks)
 
+    # Compute rewards
+    rewards = compute_rewards(verification)
+
+    # Apply rewards to the miners
+    bt.logging.trace(f"[{CHALLENGE_NAME}] Applying rewards")
+    apply_reward_scores(
+        self,
+        uids=uids,
+        rewards=rewards,
+        process_times=[None] * rewards,
+        timeout=5,
+    )
+
     # Display step time
     forward_time = time.time() - start_time
-    bt.logging.debug(f"[Metrics] Step time {forward_time:.2f}s")
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")

@@ -35,27 +35,3 @@ class IsAlive(bt.Synapse):
     def deserialize(self) -> typing.Optional[str]:
         return self.answer
     
-
-class Key(bt.Synapse):
-    generate: bool
-    validator_public_key: str
-
-
-class Subtensor(bt.Synapse):
-    # Returns
-    subtensor_ip: typing.Optional[str] = None
-
-    def __str__(self):
-        return (
-            f"subtensor_ip={self.subtensor_ip}, "
-        )
-
-
-class Challenge(bt.Synapse):
-    # Returns
-    answer: typing.Optional[str] = None
-
-    def __str__(self):
-        return (
-            f"answer={self.answer}, "
-        )

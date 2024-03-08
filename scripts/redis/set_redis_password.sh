@@ -24,13 +24,13 @@ else
 fi
 
 # Restart Redis server using systemctl
-sudo systemctl restart redis-server
+sudo systemctl restart redis-server.service
 
 # Export password for current session (optional)
 export REDIS_PASSWORD
 
 # Check the status of Redis
-sudo systemctl status redis-server
+sudo systemctl status redis-server.service
 
 # Verify that the password was set in the configuration file
 echo "Password set in Redis config:"

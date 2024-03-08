@@ -25,11 +25,9 @@ import asyncio
 import bittensor as bt
 import threading
 import traceback
-from urllib.parse import urlparse
 
-from subnet.protocol import IsAlive, Key, Subtensor, Challenge, Score
+from subnet.protocol import IsAlive, Score
 
-from subnet.shared.key import generate_ssh_key, clean_ssh_key
 from subnet.shared.checks import check_environment, check_registration
 
 from subnet.miner import run
@@ -105,7 +103,11 @@ class Miner:
 
         # Init subtensor
         bt.logging.debug("loading subtensor")
-        self.subtensor = bt.subtensor(config=self.config)
+        self.subtensor = (
+            bt.MockSubtensor()
+            if self.config.miner.mock_subtensor
+            else bt.subtensor(config=self.config)
+        )
         bt.logging.debug(str(self.subtensor))
         self.current_block = self.subtensor.get_current_block()
 
@@ -130,7 +132,9 @@ class Miner:
         bt.logging.info(f"Running miner on uid: {self.my_subnet_uid}")
 
         # The axon handles request processing, allowing validators to send this process requests.
-        self.axon = bt.axon(wallet=self.wallet, config=self.config, external_ip=bt.net.get_external_ip())
+        self.axon = bt.axon(
+            wallet=self.wallet, config=self.config, external_ip=bt.net.get_external_ip()
+        )
         bt.logging.info(f"Axon {self.axon}")
 
         # Attach determiners which functions are called when servicing a request.
@@ -166,13 +170,6 @@ class Miner:
 
         self.step = 0
 
-        # Init the miner's storage request tracker
-        self.request_count = 0
-        self.start_request_count_timer()
-        self.requests_per_hour = []
-        self.average_requests_per_hour = 0
-
-        self.rate_limiters = {}
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
     def _is_alive(self, synapse: IsAlive) -> IsAlive:
@@ -182,7 +179,7 @@ class Miner:
 
     def blacklist_isalive(self, synapse: IsAlive) -> typing.Tuple[bool, str]:
         return False, synapse.dendrite.hotkey
-    
+
     def _score(self, synapse: Score) -> Score:
         bt.logging.info(f"Availability score {synapse.availability}")
         bt.logging.info(f"Latency score {synapse.latency}")
@@ -193,111 +190,6 @@ class Miner:
 
     def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
         return False, synapse.dendrite.hotkey
-
-    async def _key(self, synapse: Key) -> Key:
-        synapse_type = "Save" if synapse.generate else "Clean"
-        bt.logging.info(f"[Key/{synapse_type}] Synapse received")
-        if synapse.generate:
-            generate_ssh_key(synapse.validator_public_key)
-        else:
-            clean_ssh_key(synapse.validator_public_key)
-        bt.logging.success(f"[Key/{synapse_type}] Synapse proceed")
-        return synapse
-
-    async def blacklist_key(self, synapse: Key) -> typing.Tuple[bool, str]:
-        if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
-            # Ignore requests from unrecognized entities.
-            bt.logging.trace(
-                f"Blacklisting unrecognized hotkey {synapse.dendrite.hotkey}"
-            )
-            return True, "Unrecognized hotkey"
-
-        bt.logging.trace(
-            f"Not Blacklisting recognized hotkey {synapse.dendrite.hotkey}"
-        )
-        return False, "Hotkey recognized!"
-
-    async def _subtensor(self, synapse: Subtensor) -> Subtensor:
-        bt.logging.info("[Subtensor] Synapse received")
-        parsed_url = urlparse(self.subtensor.chain_endpoint)
-        ip = (
-            self.axon.external_ip
-            if parsed_url.hostname == "127.0.0.1"
-            else parsed_url.hostname
-        )
-        synapse.subtensor_ip = ip
-        bt.logging.success("[Subtensor] Synapse proceed")
-        return synapse
-
-    async def blacklist_subtensor(self, synapse: Subtensor) -> typing.Tuple[bool, str]:
-        if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
-            # Ignore requests from unrecognized entities.
-            bt.logging.trace(
-                f"Blacklisting unrecognized hotkey {synapse.dendrite.hotkey}"
-            )
-            return True, "Unrecognized hotkey"
-
-        bt.logging.trace(
-            f"Not Blacklisting recognized hotkey {synapse.dendrite.hotkey}"
-        )
-        return False, "Hotkey recognized!"
-
-    async def _challenge(self, synapse: Challenge) -> Challenge:
-        bt.logging.info("[Challenge] Synapse received")
-        block = self.subtensor.get_current_block()
-        synapse.answer = f"{block}"
-        bt.logging.info("[Challenge] Synapse proceed")
-        return synapse
-
-    async def blacklist_challenge(self, synapse: Challenge) -> typing.Tuple[bool, str]:
-        if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
-            # Ignore requests from unrecognized entities.
-            bt.logging.trace(
-                f"Blacklisting unrecognized hotkey {synapse.dendrite.hotkey}"
-            )
-            return True, "Unrecognized hotkey"
-
-        bt.logging.trace(
-            f"Not Blacklisting recognized hotkey {synapse.dendrite.hotkey}"
-        )
-        return False, "Hotkey recognized!"
-
-    def start_request_count_timer(self):
-        """
-        Initializes and starts a timer for tracking the number of requests received by the miner in an hour.
-
-        This method sets up a one-hour timer that, upon expiration, calls the `reset_request_count` method to log
-        the number of requests received and reset the count for the next hour. The timer is set to run in a separate
-        thread to avoid blocking the main execution.
-
-        Usage:
-            Should be called during the initialization of the miner to start tracking requests per hour.
-        """
-        self.request_count_timer = threading.Timer(3600, self.reset_request_count)
-        self.request_count_timer.start()
-
-    def reset_request_count(self):
-        """
-        Logs the number of requests received in the last hour and resets the count.
-
-        This method is automatically called when the one-hour timer set by `start_request_count_timer` expires.
-        It logs the count of requests received in the last hour and then resets the count. Additionally, it
-        restarts the timer for the next hour.
-
-        Usage:
-            This method is intended to be called automatically by a timer and typically should not be called directly.
-        """
-        bt.logging.info(
-            f"Number of requests received in the last hour: {self.request_count}"
-        )
-        self.requests_per_hour.append(self.request_count)
-        bt.logging.info(f"Requests per hour: {self.requests_per_hour}")
-        self.average_requests_per_hour = sum(self.requests_per_hour) / len(
-            self.requests_per_hour
-        )
-        bt.logging.info(f"Average requests per hour: {self.average_requests_per_hour}")
-        self.request_count = 0
-        self.start_request_count_timer()
 
     def run(self):
         run(self)

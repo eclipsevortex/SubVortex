@@ -106,7 +106,6 @@ def check_config(cls, config: "bt.Config"):
 
 def add_args(cls, parser):
     parser.add_argument("--netuid", type=int, default=21, help="The chain subnet uid.")
-    parser.add_argument("--test", default=False, action="store_true")
     parser.add_argument(
         "--miner.name",
         type=str,
@@ -126,152 +125,6 @@ def add_args(cls, parser):
         help="Name of the request log file",
         default="requests_log.json",
     )
-    parser.add_argument(
-        "--miner.max_requests_per_window",
-        type=int,
-        help="Maximum number of requests per time window.",
-        default=50,
-    )
-    parser.add_argument(
-        "--miner.rate_limit_window",
-        type=int,
-        help="Time window in blocks for rate limiting.",
-        default=25,
-    )
-
-    parser.add_argument(
-        "--database.host", default="localhost", help="The host of the redis database."
-    )
-    parser.add_argument(
-        "--database.port",
-        type=int,
-        default=6379,
-        help="The port of the redis database.",
-    )
-    parser.add_argument(
-        "--database.index",
-        type=int,
-        default=0,
-        help="The index of the redis database.",
-    )
-    parser.add_argument(
-        "--database.directory",
-        default="~/.data",
-        help="The directory to store data in.",
-    )
-    parser.add_argument(
-        "--database.redis_password",
-        type=str,
-        default=None,
-        help="The redis password.",
-    )
-    parser.add_argument(
-        "--database.redis_conf_path",
-        type=str,
-        help="Redis configuration path.",
-        default="/etc/redis/redis.conf",
-    )
-
-    # Run config.
-    parser.add_argument(
-        "--miner.set_weights_wait_for_inclusion",
-        action="store_true",
-        help="Wether to wait for the set_weights extrinsic to enter a block",
-        default=False,
-    )
-    parser.add_argument(
-        "--miner.set_weights_wait_for_finalization",
-        action="store_true",
-        help="Wether to wait for the set_weights extrinsic to be finalized on the chain",
-        default=False,
-    )
-    parser.add_argument(
-        "--miner.seconds_to_wait_to_log_presence_message",
-        type=int,
-        help="How many seconds to wait before logging a presence message.",
-        default=4,
-    )
-
-    # Blacklist.
-    parser.add_argument(
-        "--blacklist.blacklist_hotkeys",
-        type=str,
-        required=False,
-        nargs="*",
-        help="Blacklist certain hotkeys",
-        default=[],
-    )
-    parser.add_argument(
-        "--blacklist.whitelist_hotkeys",
-        type=str,
-        required=False,
-        nargs="*",
-        help="Whitelist certain hotkeys",
-        default=[],
-    )
-    parser.add_argument(
-        "--blacklist.force_validator_permit",
-        action="store_true",
-        help="Only allow requests from validators",
-        default=False,
-    )
-    parser.add_argument(
-        "--blacklist.allow_non_registered",
-        action="store_true",
-        help="If True, the miner will allow non-registered hotkeys to mine.",
-        default=False,
-    )
-    parser.add_argument(
-        "--blacklist.minimum_stake_requirement",
-        type=float,
-        help="Minimum stake requirement",
-        default=0.0,
-    )
-    parser.add_argument(
-        "--blacklist.min_request_period",
-        type=int,
-        help="Time period (in minute) to serve a maximum of 50 requests for each hotkey",
-        default=5,
-    )
-
-    # Priority.
-    parser.add_argument(
-        "--miner.priority.default",
-        type=float,
-        help="Default priority of non-registered requests",
-        default=0.0,
-    )
-    parser.add_argument(
-        "--miner.priority.time_stake_multiplicate",
-        type=int,
-        help="Time (in minute) it takes to make the stake twice more important in the priority queue",
-        default=10,
-    )
-    parser.add_argument(
-        "--miner.priority.len_request_timestamps",
-        type=int,
-        help="Number of historic request timestamps to record",
-        default=50,
-    )
-    # Switches.
-    parser.add_argument(
-        "--miner.no_set_weights",
-        action="store_true",
-        help="If True, the miner does not set weights.",
-        default=False,
-    )
-    parser.add_argument(
-        "--miner.no_serve",
-        action="store_true",
-        help="If True, the miner doesnt serve the axon.",
-        default=False,
-    )
-    parser.add_argument(
-        "--miner.no_start_axon",
-        action="store_true",
-        help="If True, the miner doesnt start the axon.",
-        default=False,
-    )
 
     # Mocks.
     parser.add_argument(
@@ -279,47 +132,6 @@ def add_args(cls, parser):
         action="store_true",
         help="If True, the miner will allow non-registered hotkeys to mine.",
         default=False,
-    )
-
-    # Wandb args
-    parser.add_argument(
-        "--wandb.off", action="store_true", help="Turn off wandb.", default=False
-    )
-    parser.add_argument(
-        "--wandb.project_name",
-        type=str,
-        help="The name of the project where you are sending the new run.",
-        default="philanthropic-thunder",
-    )
-    parser.add_argument(
-        "--wandb.entity",
-        type=str,
-        help="An entity is a username or team name where youre sending runs.",
-        default="philanthrope",
-    )
-    parser.add_argument(
-        "--wandb.offline",
-        action="store_true",
-        help="Runs wandb in offline mode.",
-        default=False,
-    )
-    parser.add_argument(
-        "--wandb.weights_step_length",
-        type=int,
-        help="How many steps before we log the weights.",
-        default=10,
-    )
-    parser.add_argument(
-        "--wandb.run_step_length",
-        type=int,
-        help="How many steps before we rollover to a new run.",
-        default=1500,
-    )
-    parser.add_argument(
-        "--wandb.notes",
-        type=str,
-        help="Notes to add to the wandb run.",
-        default="",
     )
 
 

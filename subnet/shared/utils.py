@@ -21,7 +21,6 @@ import subprocess
 import bittensor as bt
 
 
-
 def get_redis_password(
     redis_password: str = None, redis_conf: str = "/etc/redis/redis.conf"
 ) -> str:

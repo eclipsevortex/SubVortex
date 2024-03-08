@@ -14,7 +14,7 @@ sudo sed -i 's/^appendonly no/appendonly yes/' $REDIS_CONF
 
 echo "RDB snapshots disabled, AOF persistence remains enabled."
 
-sudo systemctl restart redis-server
+sudo systemctl restart redis-server.service
 echo "Redis restarted."
 
-sudo systemctl status redis-server
+sudo systemctl status redis-server.service

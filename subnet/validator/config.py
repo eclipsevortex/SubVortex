@@ -154,28 +154,10 @@ def add_args(cls, parser):
         default=False,
     )
     parser.add_argument(
-        "--neuron.semaphore_size",
-        type=int,
-        help="How many async calls to limit concurrently.",
-        default=256,
-    )
-    parser.add_argument(
         "--neuron.checkpoint_block_length",
         type=int,
         help="Blocks before a checkpoint is saved.",
         default=100,
-    )
-    parser.add_argument(
-        "--neuron.events_retention_size",
-        type=str,
-        help="Events retention size.",
-        default="2 GB",
-    )
-    parser.add_argument(
-        "--neuron.dont_save_events",
-        action="store_true",
-        help="If set, we dont save events to a log file.",
-        default=False,
     )
     parser.add_argument(
         "--neuron.vpermit_tao_limit",

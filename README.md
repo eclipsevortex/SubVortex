@@ -131,7 +131,7 @@ Team responsabilities
 - **EclipseVortex** - Development and technology
 - **Ch3RNØbØG** - Operations and business development
 - **tww9** - Strategy and public relations
-- **HcL-CO** - Technical support
+- **HcL-CO** - QA Lead and Support
 
 Team timezone
 
@@ -168,16 +168,6 @@ In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittens
 
 ## Installation
 
-### Before you proceed
-
-Before you proceed with the installation of the subnet, note the following:
-
-- Use these instructions to run your subnet locally for your development and testing, or on Bittensor testnet or on Bittensor mainnet.
-- **IMPORTANT**: We **strongly recommend** that you first run your subnet locally and complete your development and testing before running the subnet on Bittensor testnet. Furthermore, make sure that you next run your subnet on Bittensor testnet before running it on the Bittensor mainnet.
-- You can run your subnet either as a subnet owner, or as a subnet validator or as a subnet miner.
-- **IMPORTANT:** Make sure you are aware of the minimum compute requirements for your subnet. See the [Minimum compute YAML configuration](./min_compute.yml).
-- Note that installation instructions differ based on your situation: For example, installing for local development and testing will require a few additional steps compared to installing for testnet. Similarly, installation instructions differ for a subnet owner vs a validator or a miner.
-
 ### Install SubVortex
 
 In order to run miner, validator or use some scripts that make your experience easier, you have to install the subnet SubVortex by following the steps.
@@ -205,6 +195,30 @@ pip install -r requirements.txt
 As pre-requisite, a local subtensor have to be up and running on the machine the miner will be installed. For the instruction to install a local subtensor, refer to the section [Install Subnet](#install-subnet)
 
 Then, install the subnet SubVortex (if not already done) by following the instructions in the section [Install SubVortex](#install-subvortex)
+
+Then, if you are not already register you can follow the [bittensor documentation](https://docs.bittensor.com/btcli#register)
+
+> If you have to generate coldkey and/or hotkey before registration, see [bittensor documentation](https://docs.bittensor.com/btcli#new-coldkey)
+
+or you can do it via your local subtensor
+```
+btcli subnet register \
+  --netuid <SUBNET_UID> \
+  --subtensor.chain_endpoint "ws://<LOCAL_SUBTENSOR_IP>:9944" \
+  --wallet.name <COLDKEY_NAME>> \
+  --wallet.hotkey <HOTKEY_NAME> \
+  --no_prompt
+```
+
+or via finney
+
+```
+btcli subnet register \
+  --netuid <SUBNET_UID> \
+  --wallet.name <COLDKEY_NAME>> \
+  --wallet.hotkey <HOTKEY_NAME> \
+  --no_prompt
+```
 
 Finally, run the miner
 
@@ -257,6 +271,30 @@ These options allow you to configure the miner's behavior, database connections,
 As pre-requisite, a redis instance have to be up and running on the machine the validator will be installed. For the instruction to install a redis instance, refer to the section [Install Redis](#install-redis)
 
 Then, install the subnet SubVortex (if not already done) by following the instructions in the section [Install SubVortex](#install-subvortex)
+
+Then, if you are not already register you can follow the [bittensor documentation](https://docs.bittensor.com/btcli#register)
+
+> If you have to generate coldkey and/or hotkey before registration, see [bittensor documentation](https://docs.bittensor.com/btcli#new-coldkey)
+
+or you can do it via your local subtensor
+```
+btcli subnet register \
+  --netuid <SUBNET_UID> \
+  --subtensor.chain_endpoint "ws://<LOCAL_SUBTENSOR_IP>:9944" \
+  --wallet.name <COLDKEY_NAME>> \
+  --wallet.hotkey <HOTKEY_NAME> \
+  --no_prompt
+```
+
+or via finney
+
+```
+btcli subnet register \
+  --netuid <SUBNET_UID> \
+  --wallet.name <COLDKEY_NAME>> \
+  --wallet.hotkey <HOTKEY_NAME> \
+  --no_prompt
+```
 
 Finally, run the validator
 

@@ -106,7 +106,7 @@ class Miner:
         self.subtensor = (
             bt.MockSubtensor()
             if self.config.miner.mock_subtensor
-            else bt.subtensor(config=self.config)
+            else bt.subtensor(config=self.config, network="local")
         )
         bt.logging.debug(str(self.subtensor))
         self.current_block = self.subtensor.get_current_block()

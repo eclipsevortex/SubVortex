@@ -17,7 +17,6 @@
 # DEALINGS IN THE SOFTWARE.
 
 import os
-import time
 import torch
 import argparse
 import datetime

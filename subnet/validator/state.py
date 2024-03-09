@@ -19,10 +19,9 @@
 # Utils for checkpointing and saving the model.
 import torch
 import copy
+import bittensor as bt
 
 import subnet.validator as validator
-
-import bittensor as bt
 
 
 def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):

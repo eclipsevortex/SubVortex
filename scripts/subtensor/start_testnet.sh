@@ -1,7 +1,7 @@
 cd ~/subtensor/
 pm2 start ./target/release/node-subtensor \
     --name test_subtensor -- \
-    --base-path /tmp/blockchain \
+    --base-path /tmp/blockchain_test \
     --chain ./raw_testspec.json \
     --rpc-external --rpc-cors all \
     --ws-external --no-mdns \

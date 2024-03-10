@@ -168,9 +168,21 @@ In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittens
 
 ## Installation
 
+### Pre-requisite
+- Local Subtensor is mandatory for all miners, and highly recommended for validators.
+- Validators will need to install and configure Redis
+
+To simplify the installation process, scripts have been provided as part of this repository to ease those set up.
+
 ### Install SubVortex
 
-In order to run miner, validator or use some scripts that make your experience easier, you have to install the subnet SubVortex by following the steps.
+Updating your base environment
+
+```
+apt update && apt upgrade -y
+apt install nodejs npm -y
+npm i -g pm2
+```
 
 Clone the subnet Subvortex
 
@@ -190,184 +202,34 @@ Install the dependencies
 pip install -r requirements.txt
 ```
 
-### Install Miner
-
-As pre-requisite, a local subtensor have to be up and running on the machine the miner will be installed. For the instruction to install a local subtensor, refer to the section [Install Subnet](#install-subnet)
-
-Then, install the subnet SubVortex (if not already done) by following the instructions in the section [Install SubVortex](#install-subvortex)
-
-Then, if you are not already register you can follow the [bittensor documentation](https://docs.bittensor.com/btcli#register)
-
-> If you have to generate coldkey and/or hotkey before registration, see [bittensor documentation](https://docs.bittensor.com/btcli#new-coldkey)
-
-or you can do it via your local subtensor
-```
-btcli subnet register \
-  --netuid <SUBNET_UID> \
-  --subtensor.chain_endpoint "ws://<LOCAL_SUBTENSOR_IP>:9944" \
-  --wallet.name <COLDKEY_NAME>> \
-  --wallet.hotkey <HOTKEY_NAME> \
-  --no_prompt
-```
-
-or via finney
+Install the base software
 
 ```
-btcli subnet register \
-  --netuid <SUBNET_UID> \
-  --wallet.name <COLDKEY_NAME>> \
-  --wallet.hotkey <HOTKEY_NAME> \
-  --no_prompt
+pip install -e .
 ```
 
-Finally, run the miner
+### Install Local Subtensor
+A local subtensor can be installed via docker or binary.  The steps below are one of many methods.  Please reference the official Subtensor GitHub for other ways to set up local subtensor.
 
-> Be sure you are in the SubVortex directory
-
-> NOTE: When registering a miner, it is highly recommended to not reuse hotkeys. Best practice is to always use a new hotkey when registering on the subnet.
-
-You can run the miner in your base environment
+Navigate to the base subtensor directory and execute
 
 ```
-python3 neurons/miner.py \
-  --netuid <SUBNET_UID> \
-  --subtensor.network local \
-  --wallet.name <COLDKEY_NAME> \
-  --wallet.hotkey <HOTKEY_NAME> \
-  --logging.debug
+./scripts/subtensor/install_subtensor.sh
 ```
 
-But it is highly recommanded to run it via a process manager
+To run the subtensor in Mainnet, execute
 
 ```
-pm2 start neurons/miner.py \
-  --name <UNIQUE_NAME> \
-  --interpreter <PATH_TO_PYTHON_LIBRARY> -- \
-  --netuid <SUBNET_UID> \
-  --subtensor.network local \
-  --wallet.name <COLDKEY_NAME> \
-  --wallet.hotkey <HOTKEY_NAME> \
-  --logging.debug
+cd ~/SubVortex/
+./scripts/subtensor/start_mainnet.sh
 ```
 
-> Do not change the argument `--subtensor.network` as you have to use the local subtensor running on the same machine as the miner.
-
-Options
-
-`--netuid`: Specifies the chain subnet uid. Default: 21.
-
-`--miner.name`: Name of the miner, used for organizing logs and data. Default: "core_storage_miner".
-
-`--miner.device`: Device to run the miner on, e.g., "cuda" for GPUs or "cpu" for CPU. Default depends on CUDA availability.
-
-`--miner.verbose`: Enables verbose logging. Default: False.
-
-`--miner.mock_subtensor`: If True, uses a mock subtensor for testing. Default: False.
-
-These options allow you to configure the miner's behavior, database connections, blacklist/whitelist settings, priority handling, and integration with monitoring tools like WandB. Adjust these settings based on your mining setup and requirements.
-
-### Install Validator
-
-As pre-requisite, a redis instance have to be up and running on the machine the validator will be installed. For the instruction to install a redis instance, refer to the section [Install Redis](#install-redis)
-
-Then, install the subnet SubVortex (if not already done) by following the instructions in the section [Install SubVortex](#install-subvortex)
-
-Then, if you are not already register you can follow the [bittensor documentation](https://docs.bittensor.com/btcli#register)
-
-> If you have to generate coldkey and/or hotkey before registration, see [bittensor documentation](https://docs.bittensor.com/btcli#new-coldkey)
-
-or you can do it via your local subtensor
-```
-btcli subnet register \
-  --netuid <SUBNET_UID> \
-  --subtensor.chain_endpoint "ws://<LOCAL_SUBTENSOR_IP>:9944" \
-  --wallet.name <COLDKEY_NAME>> \
-  --wallet.hotkey <HOTKEY_NAME> \
-  --no_prompt
-```
-
-or via finney
+Alternatively if testing in testnet, execute
 
 ```
-btcli subnet register \
-  --netuid <SUBNET_UID> \
-  --wallet.name <COLDKEY_NAME>> \
-  --wallet.hotkey <HOTKEY_NAME> \
-  --no_prompt
+cd ~/SubVortex/
+./scripts/subtensor/start_testnet.sh
 ```
-
-Finally, run the validator
-
-> Be sure you are in the SubVortex directory
-
-> NOTE: When registering a validator, it is highly recommended to not reuse hotkeys. Best practice is to always use a new hotkey when registering on the subnet.
-
-You can run the validator in your base environment
-
-```
-python3 neurons/validator.py \
-  --netuid <SUBNET_UID> \
-  --wallet.name <COLDKEY_NAME> \
-  --wallet.hotkey <HOTKEY_NAME> \
-  --logging.debug
-```
-
-But it is highly recommanded to run it via a process manager
-
-```
-pm2 start neurons/validator.py \
-  --name <UNIQUE_NAME> \
-  --interpreter <PATH_TO_PYTHON_LIBRARY> -- \
-  --netuid <SUBNET_UID> \
-  --wallet.name <COLDKEY_NAME> \
-  --wallet.hotkey <HOTKEY_NAME> \
-  --logging.debug
-```
-
-> It is highly recommended that all miners and validators to run their own local subtensor node. This will resolve the many issues commonly found with intermittent connectivity across all subnets. To do that, use the argument `--subtensor.chain_endpoint ws://<SUBTENSOR_IP>:9944`
-
-Options
-`--neuron.name`: Specifies the name of the validator neuron. Default: "core_storage_validator".
-
-`--neuron.device`: The device to run the validator on (e.g., "cuda" for GPU, "cpu" for CPU). Default: "cuda" if CUDA is available, else "cpu".
-
-`--neuron.curve`: The elliptic curve used for cryptography. Only "P-256" is currently available.
-
-`--neuron.maxsize`: The maximum size of random data to store. If None, a lognormal random Gaussian distribution is used (default: None).
-
-`--neuron.disable_log_rewards`: If set, disables all reward logging to suppress function values from being logged (e.g., to WandB). Default: False.
-
-`--neuron.num_concurrent_forwards`: The number of concurrent forward requests running at any time. Default: 1.
-
-`--neuron.disable_set_weights`: If set, disables setting weights on the chain. Default: False.
-
-`--neuron.checkpoint_block_length`: Blocks before a checkpoint is saved. Default: 100.
-
-`--neuron.events_retention_size`: File size for retaining event logs (e.g., "2 GB"). Default: "2 GB".
-
-`--neuron.dont_save_events`: If set, event logs will not be saved to a file. Default: False.
-
-`--neuron.vpermit_tao_limit`: The maximum TAO allowed for querying a validator with a vpermit. Default: 500.
-
-`--neuron.verbose`: If set, detailed verbose logs will be printed. Default: False.
-
-`--neuron.log_responses`: If set, all responses will be logged. Note: These logs can be extensive. Default: False.
-
-`--neuron.data_ttl`: The number of blocks before stored challenge data expires. Default: 50000 (approximately 7 days).
-
-`--neuron.profile`: If set, network and I/O actions will be profiled. Default: False.
-
-`--database.host`: Hostname of the Redis database. Default: "localhost".
-
-`--database.port`: Port of the Redis database. Default: 6379.
-
-`--database.index`: The database number for the Redis instance. Default: 1.
-
-These options allow you to fine-tune the behavior, storage, and network interaction of the validator neuron. Adjust these settings based on your specific requirements and infrastructure.
-
-### Install Subtensor
-
-A local subtensor can be installed via docker or binary. The instructions can be found on the official github repository [subtensor](https://github.com/opentensor/subtensor/blob/main/docs/running-subtensor-locally.md) with the help of the offical [documentation](https://docs.bittensor.com/getting-started/running-a-public-subtensor#lite-node-vs-archive-node)
 
 You should see output like this in your pm2 logs for the process at startup:
 
@@ -397,6 +259,7 @@ You should see output like this in your pm2 logs for the process at startup:
 ```
 
 ### Install Redis
+Redis is only required for running a validator.
 
 > Be sure you are in the SubVortex directory
 
@@ -409,7 +272,7 @@ Install redis
 Set Redis password
 
 ```
-./scripts/redis/set_redis_password.sh
+source ./scripts/redis/set_redis_password.sh
 ```
 
 Create Redis firewall
@@ -430,6 +293,55 @@ Check redis is up and running
 ./scripts/redis/test_persistence.sh
 ```
 
+### Registering your wallet
+
+In order to run either a miner or a validator, you will need to have a wallet registered to the subnet.  If you do not already have wallet set up on the server, following the steps below:
+
+If you are restoring an existing wallet:
+```
+btcli w regen_coldkey --wallet.name YOUR_WALLET_NAME
+btcli w regen_hotkey --wallet.name YOUR_WALLET_NAME --wallet.hotkey YOUR_HOTKEY_NAME
+```
+
+If you are creating the wallet for the first time:
+```
+btcli w new_coldkey --wallet.name YOUR_WALLET_NAME
+btcli w new_hotkey --wallet.name YOUR_WALLET_NAME --wallet.hotkey YOUR_HOTKEY_NAME
+```
+
+Once your wallet is ready, ensure you have sufficient funds to register to the subnet. To register, use the following command:
+```
+btcli s register --netuid <SUBNET_UID> --subtensor.network local --wallet.name YOUR_WALLET_NAME --wallet.hotkey YOUR_HOTKEY_NAME
+```
+Once you have successfully registered your wallet, you are now ready to start either your miner or validator.
+
+### Running a Miner
+To run a miner, navigate to the SubVortex directory.  It is highly recommended to run via a process manager like PM2.
+
+```
+pm2 start neurons/miner.py \
+  --name MINER_NAME \
+  --interpreter <PATH_TO_PYTHON_LIBRARY> -- \
+  --netuid <SUBNET_UID> \
+  --subtensor.network local \
+  --wallet.name YOUR_WALLET_NAME \
+  --wallet.hotkey YOUR_HOTKEY_NAME \
+  --logging.debug
+```
+
+### Running a Validator
+Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
+
+```
+pm2 start neurons/validator.py \
+  --name VALIDATOR_NAME \
+  --interpreter <PATH_TO_PYTHON_LIBRARY> -- \
+  --netuid <SUBNET_UID> \
+  --wallet.name YOUR_WALLET_NAME \
+  --wallet.hotkey YOUR_HOTKEY_NAME \
+  --logging.debug
+```
+
 ## New Releases
 
 When a new version of the subnet is released, each miner/validatior have to be updated.
@@ -446,6 +358,7 @@ Install the dependencies
 
 ```
 pip install -r requirements.txt
+pip install -e .
 ```
 
 Restart miners/validators if running them in your base environment or restart pm2 by executing `pm2 restart all` if you are using pm2 as process manager.

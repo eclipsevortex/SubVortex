@@ -182,6 +182,7 @@ Updating your base environment
 apt update && apt upgrade -y
 apt install nodejs npm -y
 npm i -g pm2
+apt install python3-pip
 ```
 
 Clone the subnet Subvortex

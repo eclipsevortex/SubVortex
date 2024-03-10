@@ -220,14 +220,12 @@ Navigate to the base subtensor directory and execute
 To run the subtensor in Mainnet, execute
 
 ```
-cd ~/SubVortex/
 ./scripts/subtensor/start_mainnet.sh
 ```
 
 Alternatively if testing in testnet, execute
 
 ```
-cd ~/SubVortex/
 ./scripts/subtensor/start_testnet.sh
 ```
 

@@ -24,6 +24,5 @@ from . import forward
 from . import localisation
 from . import score
 from . import state
-from . import util
 from . import weights
 

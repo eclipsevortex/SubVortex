@@ -33,13 +33,16 @@
 - [Team Composition](#team-composition)
 - [Road Map](#road-map)
 - [Conclusion](#conclusion)
-- [Installation](#installation-links)
+- [Installation](#installation)
   - [Install SubVortex](#install-subvortex)
-  - [Install Miner](#install-miner)
-  - [Install Validator](#install-validator)
-  - [Install Subtensor](#install-subtensor)
+  - [Install Subtensor](#install-local-subtensor)
   - [Install Redis](#install-redis)
+- [Registering your wallet](#registering-your-wallet)
+- [Running a Miner](#running-a-miner)
+- [Running a Validator](#running-a-validator)
 - [New Releases](#new-releases)
+- [Troubleshooting](#troubleshooting)
+  - [Troubleshooting Subtensor](#troubleshooting-subtensor) 
 - [License](#license)
 
 ## Abstract
@@ -143,24 +146,28 @@ Team timezone
 ## Road Map
 
 ### Phase 1
+
 - Create subnet in testnet and perform internal testing of the incentive mechanism
 - Register subnet on mainnet
 - Release preliminary information publicly
 
 ### Phase 2:
+
 - Internal testing on mainnet. Bug fixes, etc.
 - Public launch and allow key registrations.
 - Basic structure with equal emissions for all miners
 
 ### Phase 3:
+
 - Public Frontend
 - Public Backend
 
 ### Phase 4
+
 - Public SubVortex load balancer
 - Performance based emission structure
 
-> Note: The Road Map will be updated if any changes 
+> Note: The Road Map will be updated if any changes
 
 ## Conclusion
 
@@ -169,6 +176,7 @@ In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittens
 ## Installation
 
 ### Pre-requisite
+
 - Local Subtensor is mandatory for all miners, and highly recommended for validators.
 - Validators will need to install and configure Redis
 
@@ -180,9 +188,15 @@ Updating your base environment
 
 ```
 apt update && apt upgrade -y
-apt install nodejs npm -y
+apt install git nodejs npm -y
 npm i -g pm2
 apt install python3-pip
+```
+
+Select HOME directory
+
+```
+cd $HOME
 ```
 
 Clone the subnet Subvortex
@@ -210,30 +224,57 @@ pip install -e .
 ```
 
 ### Install Local Subtensor
-A local subtensor can be installed via docker or binary.  The steps below are one of many methods.  Please reference the official Subtensor GitHub for other ways to set up local subtensor.
 
-Navigate to the base subtensor directory and execute
+A local subtensor can be installed via docker or binary. The steps below are one of many methods. Please reference the official [Subtensor GitHub](https://github.com/opentensor/subtensor/blob/main/docs/running-subtensor-locally.md) and its [documentation](https://docs.bittensor.com/getting-started/running-a-public-subtensor#lite-node-vs-archive-node) for other ways to set up local subtensor.
 
-```
-./scripts/subtensor/install_subtensor.sh
-```
-
-To run the subtensor in Mainnet, execute
+Go to HOME directory
 
 ```
-./scripts/subtensor/start_mainnet.sh
+cd $HOME
 ```
 
-Alternatively if testing in testnet, execute
+Install the subtensor
 
 ```
-./scripts/subtensor/start_testnet.sh
+$HOME/SubVortex/scripts/subtensor/setup.sh <NETWORK> <EXECUTION_TYPE> <ROOT_DIRECTORY>
 ```
+
+Options
+
+- `NETWORK` is the network you want you local subtensor to run against. The possible value are `localnet`, `testnet` or `mainnet`. The default value is `mainnet` and recommended to keep it as such.
+
+- `EXECUTION_TYPE` choose `docker` if you want to install the subtensor in a docker container, `binary` to install in your base environment.
+
+- `ROOT_DIRECTORY` is the directory where you want to install Subtensor. By default, it is set to `$HOME` and it is recommended to keep it as such.
+
+Run the subtensor in your base environment
+
+```
+$HOME/SubVortex/scripts/subtensor/start.sh <NETWORK> <EXECUTION_TYPE> <ROOT_DIRECTORY>
+```
+
+Or via a process manager
+
+```
+pm2 start $HOME/SubVortex/scripts/subtensor/start.sh \
+  --name subtensor -- \
+  <NETWORK> \
+  <EXECUTION_TYPE> \
+  <ROOT_DIRECTORY>
+```
+
+Options
+
+- `NETWORK` is the network you want you local subtensor to run against. The possible value are `localnet`, `testnet` or `mainnet`. The default value is `mainnet` and recommended to keep as it is.
+
+- `EXECUTION_TYPE` choose `docker` if you want to install the subtensor in a docker container, `binary` to install in your base environment.
+
+- `ROOT_DIRECTORY` is the directory where you want to install Subtensor. By default, it is set to `$HOME` and it is recommended to keep it as such.
 
 You should see output like this in your pm2 logs for the process at startup:
 
 ```
-> pm2 logs subtensor
+> pm2 log subtensor
 
 1|subtenso | 2023-12-22 14:21:30 🔨 Initializing Genesis block/state (state: 0x4015…9643, header-hash: 0x2f05…6c03)
 1|subtenso | 2023-12-22 14:21:30 👴 Loading GRANDPA authority set from genesis on what appears to be first startup.
@@ -258,6 +299,7 @@ You should see output like this in your pm2 logs for the process at startup:
 ```
 
 ### Install Redis
+
 Redis is only required for running a validator.
 
 > Be sure you are in the SubVortex directory
@@ -294,28 +336,33 @@ Check redis is up and running
 
 ### Registering your wallet
 
-In order to run either a miner or a validator, you will need to have a wallet registered to the subnet.  If you do not already have wallet set up on the server, following the steps below:
+In order to run either a miner or a validator, you will need to have a wallet registered to the subnet. If you do not already have wallet set up on the server, following the steps below:
 
 If you are restoring an existing wallet:
+
 ```
 btcli w regen_coldkey --wallet.name YOUR_WALLET_NAME
 btcli w regen_hotkey --wallet.name YOUR_WALLET_NAME --wallet.hotkey YOUR_HOTKEY_NAME
 ```
 
 If you are creating the wallet for the first time:
+
 ```
 btcli w new_coldkey --wallet.name YOUR_WALLET_NAME
 btcli w new_hotkey --wallet.name YOUR_WALLET_NAME --wallet.hotkey YOUR_HOTKEY_NAME
 ```
 
 Once your wallet is ready, ensure you have sufficient funds to register to the subnet. To register, use the following command:
+
 ```
 btcli s register --netuid <SUBNET_UID> --subtensor.network local --wallet.name YOUR_WALLET_NAME --wallet.hotkey YOUR_HOTKEY_NAME
 ```
+
 Once you have successfully registered your wallet, you are now ready to start either your miner or validator.
 
 ### Running a Miner
-To run a miner, navigate to the SubVortex directory.  It is highly recommended to run via a process manager like PM2.
+
+To run a miner, navigate to the SubVortex directory. It is highly recommended to run via a process manager like PM2.
 
 ```
 pm2 start neurons/miner.py \
@@ -328,7 +375,10 @@ pm2 start neurons/miner.py \
   --logging.debug
 ```
 
+> IMPORTANT: Do not run more than one miner per machine, otherwise, you will penalize all the miners until you move all the keys to have one key (and thus one miner) per machine.
+
 ### Running a Validator
+
 Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
 
 ```
@@ -340,6 +390,8 @@ pm2 start neurons/validator.py \
   --wallet.hotkey YOUR_HOTKEY_NAME \
   --logging.debug
 ```
+
+> NOTE: if you run a validator in testnet do not forget to add the argument `--subtensor.network test` or `--subtensor.chain_endpoint ws://<LOCAL_SUBTENSOR_IP>:9944` (the local subtensor has to target the network testnet)
 
 ## New Releases
 
@@ -361,6 +413,29 @@ pip install -e .
 ```
 
 Restart miners/validators if running them in your base environment or restart pm2 by executing `pm2 restart all` if you are using pm2 as process manager.
+
+## Troubleshooting
+
+### Troubleshooting Subtensor
+
+#### State already discarded
+```
+Error: Service(Client(RuntimeApiError(UnknownBlock("State already discarded for 0x2f0555cc76fc2840a25a6ea3b9637146806f1f44b090c175ffde2a7e5ab36c03"))))
+```
+
+To resolve the above error, you have to purge your chain by running
+```
+$HOME/subtensor/target/release/node-subtensor purge-chain -y --base-path <BASE_PATH> --chain="<CHAIN>"
+```
+
+Options
+
+`BASE_PATH` is the path used to store the state of blockahin, the default value to use is `/tmp/blockchain`.
+
+`CHAIN` is the chain you want to use, `./raw_spec.json` for maintest and `./raw_testspec.json` for testnet.
+
+Once the state has been purge, you can re-execute the subtensor start script $HOME/SubVortex/scripts/subtensor/start.sh via a procedd manager or not. See the section [Install Subtensor](#install-subtensor) 
+
 
 ## License
 

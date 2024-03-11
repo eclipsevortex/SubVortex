@@ -22,11 +22,13 @@ import bittensor as bt
 
 
 class Score(bt.Synapse):
+    validator_uid: typing.Optional[int]
     availability: float    
     latency: float    
     reliability: float    
     distribution: float    
     score: float    
+    count: typing.Optional[int] = 0
 
 class IsAlive(bt.Synapse):
     # Returns

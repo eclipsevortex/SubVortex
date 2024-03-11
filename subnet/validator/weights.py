@@ -48,7 +48,6 @@ def set_weights_for_validator(
         uids (torch.Tensor): miners UIDs on the network.
         metagraph (bt.metagraph): Bittensor metagraph.
         moving_averaged_scores (torch.Tensor): .
-        wandb_on (bool, optional): Flag to determine if logging to Weights & Biases is enabled. Defaults to False.
         tempo (int): Tempo for 'netuid' subnet.
         wait_for_inclusion (bool, optional): Wether to wait for the extrinsic to enter a block
         wait_for_finalization (bool, optional): Wether to wait for the extrinsic to be finalized on the chain

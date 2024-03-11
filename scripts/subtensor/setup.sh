@@ -1,7 +1,8 @@
 #!/bin/bash
 
-EXEC_TYPE=${1:-"binary"}
-ROOT=${2:-$HOME}
+NETWORK=${1:-"mainnet"}
+EXEC_TYPE=${2:-"binary"}
+ROOT=${3:-$HOME}
 
 install_dependencies() {
     # Function to install packages on macOS
@@ -68,7 +69,6 @@ install_dependencies() {
     fi
 
     # Install rust and cargo
-    # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
     curl https://sh.rustup.rs -sSf | sh -s -- -y
     echo -e '\e[32mRust and Cargo installed\e[0m'
 
@@ -97,6 +97,23 @@ setup_environment() {
     # Setup rust
     ./scripts/init.sh
     echo -e '\e[32m[Subtensor] Setup done\e[0m'
+
+    # Compile the subtensor binary if needed
+    if [[ "$EXEC_TYPE" == "binary" ]]; then
+        # Compile the subtensor binary
+        if [[ $NETWORK == "testnet" ]]; then
+            echo "Compiling subtensor on network $NETWORK..."
+            cargo build --release --features pow-faucet --features runtime-benchmarks --locked
+            echo -e "\e[32mSubtensor on network $NETWORK is compiled\e[0m"
+        elif [[ $NETWORK == "main" ]]; then
+            echo "Compiling subtensor on network $NETWORK..."
+            cargo build --release --features runtime-benchmarks --locked
+            echo -e "\e[32mSubtensor on network $NETWORK is compiled\e[0m"
+        fi
+
+        # for localnet it is built in the script provided by subtensor
+        # reference: scripts/localnet.sh
+    fi
 
     # Go back 
     cd $ROOT

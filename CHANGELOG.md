@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3 / 2024-03-12
+
+## What's Changed
+* Release/0.2.2 by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/10
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v0.2.1...v0.2.3
+
 ## 0.2.2 / 2024-03-08
 
 **Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v0.2.1...v0.2.2

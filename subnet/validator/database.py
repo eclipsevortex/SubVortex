@@ -20,7 +20,7 @@ import json
 import bittensor as bt
 from typing import Any
 from redis import asyncio as aioredis
-from typing import Dict, Union, Optional
+from typing import Dict, Optional
 
 
 async def get_metadata_for_hotkey_and_hash(

@@ -28,7 +28,7 @@ import traceback
 
 from subnet.protocol import IsAlive, Score
 
-from subnet.shared.checks import check_environment, check_registration
+from subnet.shared.checks import check_registration
 
 from subnet.miner import run
 from subnet.miner.config import (
@@ -87,15 +87,6 @@ class Miner:
         bt.logging(config=self.config, logging_dir=self.config.miner.full_path)
         bt.logging.info(f"{self.config}")
 
-        try:
-            asyncio.run(check_environment(self.config.database.redis_conf_path))
-        except AssertionError as e:
-            bt.logging.warning(
-                f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
-            )
-
-        bt.logging.info("miner.__init__()")
-
         # Init device.
         bt.logging.debug("loading device")
         self.device = torch.device(self.config.miner.device)
@@ -106,7 +97,7 @@ class Miner:
         self.subtensor = (
             bt.MockSubtensor()
             if self.config.miner.mock_subtensor
-            else bt.subtensor(config=self.config)
+            else bt.subtensor(config=self.config, network="local")
         )
         bt.logging.debug(str(self.subtensor))
         self.current_block = self.subtensor.get_current_block()
@@ -136,7 +127,7 @@ class Miner:
             wallet=self.wallet, config=self.config, external_ip=bt.net.get_external_ip()
         )
         bt.logging.info(f"Axon {self.axon}")
-
+        
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward functions to axon.")
         self.axon.attach(
@@ -153,6 +144,16 @@ class Miner:
             f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
         self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
+
+        # Check there is not another miner running on the machine
+        number_of_miners = len(
+            [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]
+        )
+        if number_of_miners > 1:
+            bt.logging.error(
+                "At least one miner is already running on this machine. If you run more than one miner you will penalise all of your miners until you get de-registered or start each miner on a unique machine"
+            )
+            sys.exit(1)
 
         # Start  starts the miner's axon, making it active on the network.
         bt.logging.info(f"Starting axon server on port: {self.config.axon.port}")
@@ -181,11 +182,18 @@ class Miner:
         return False, synapse.dendrite.hotkey
 
     def _score(self, synapse: Score) -> Score:
-        bt.logging.info(f"Availability score {synapse.availability}")
-        bt.logging.info(f"Latency score {synapse.latency}")
-        bt.logging.info(f"Reliability score {synapse.reliability}")
-        bt.logging.info(f"Distribution score {synapse.distribution}")
-        bt.logging.success(f"Score {synapse.score}")
+        validator_uid = synapse.validator_uid
+
+        if synapse.count > 1:
+            bt.logging.error(
+                f"[{validator_uid}] {synapse.count} miners are running on this machine"
+            )
+
+        bt.logging.info(f"[{validator_uid}] Availability score {synapse.availability}")
+        bt.logging.info(f"[{validator_uid}] Latency score {synapse.latency}")
+        bt.logging.info(f"[{validator_uid}] Reliability score {synapse.reliability}")
+        bt.logging.info(f"[{validator_uid}] Distribution score {synapse.distribution}")
+        bt.logging.success(f"[{validator_uid}] Score {synapse.score}")
         return synapse
 
     def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:

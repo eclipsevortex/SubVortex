@@ -17,7 +17,6 @@
 # DEALINGS IN THE SOFTWARE.
 
 import math
-import asyncio
 from redis import asyncio as aioredis
 import bittensor as bt
 from subnet.constants import *

@@ -17,7 +17,7 @@
   <img src="subvortex.png" alt="Image Description" width="300" height="300">
 </div>
 <br />
-<div>Testnet: 92 • Mainnet: TBD</div>
+<div style="font-size: 20px">Testnet: 92 • Mainnet: TBD</div>
 
 </div>
 
@@ -375,7 +375,7 @@ pm2 start neurons/miner.py \
   --logging.debug
 ```
 
-> IMPORTANT: Do not run more than one miner per machine, otherwise, you will penalize all the miners until you move all the keys to have one key (and thus one miner) per machine.
+> IMPORTANT: Do not run more than one miner per machine. Running multiple miners will result in the loss of incentive and emissions on all miners.
 
 ### Running a Validator
 

@@ -168,16 +168,6 @@ In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittens
 
 ## Installation
 
-### Before you proceed
-
-Before you proceed with the installation of the subnet, note the following:
-
-- Use these instructions to run your subnet locally for your development and testing, or on Bittensor testnet or on Bittensor mainnet.
-- **IMPORTANT**: We **strongly recommend** that you first run your subnet locally and complete your development and testing before running the subnet on Bittensor testnet. Furthermore, make sure that you next run your subnet on Bittensor testnet before running it on the Bittensor mainnet.
-- You can run your subnet either as a subnet owner, or as a subnet validator or as a subnet miner.
-- **IMPORTANT:** Make sure you are aware of the minimum compute requirements for your subnet. See the [Minimum compute YAML configuration](./min_compute.yml).
-- Note that installation instructions differ based on your situation: For example, installing for local development and testing will require a few additional steps compared to installing for testnet. Similarly, installation instructions differ for a subnet owner vs a validator or a miner.
-
 ### Install SubVortex
 
 In order to run miner, validator or use some scripts that make your experience easier, you have to install the subnet SubVortex by following the steps.
@@ -213,6 +203,8 @@ Finally, run the miner
 > NOTE: When registering a miner, it is highly recommended to not reuse hotkeys. Best practice is to always use a new hotkey when registering on the subnet.
 
 You can run the miner in your base environment
+
+### SubVortex Testnet UID 92 | Mainnet UID TBD
 
 ```
 python3 neurons/miner.py \
@@ -265,6 +257,8 @@ Finally, run the validator
 > NOTE: When registering a validator, it is highly recommended to not reuse hotkeys. Best practice is to always use a new hotkey when registering on the subnet.
 
 You can run the validator in your base environment
+
+### SubVortex Testnet UID 92 | Mainnet UID TBD
 
 ```
 python3 neurons/validator.py \

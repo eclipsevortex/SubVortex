@@ -13,6 +13,7 @@ function run_command()
     # Different command options by network and node type
     MAINNET_CHAIN='--chain ./raw_spec.json'
     TESTNET_CHAIN='--chain ./raw_testspec.json'
+    # LOCAL_MAINNET_BOOTNODE='--bootnodes /ip4/13.58.175.193/tcp/30333/p2p/12D3KooWDe7g2JbNETiKypcKT1KsCEZJbTzEHCn8hpd4PHZ6pdz5'
     MAINNET_BOOTNODE='--bootnodes /dns/bootnode.finney.opentensor.ai/tcp/30333/ws/p2p/12D3KooWRwbMb85RWnT8DSXSYMWQtuDwh4LJzndoRrTDotTR5gDC'
     TESTNET_BOOTNODE='--bootnodes /dns/bootnode.test.finney.opentensor.ai/tcp/30333/p2p/12D3KooWPM4mLcKJGtyVtkggqdG84zWrd7Rij6PGQDoijh1X86Vr'
     NODE_TYPE_ARCHIVE='--pruning=archive'
@@ -45,9 +46,21 @@ function run_command()
     # Command to run subtensor
     $F_BIN_PATH \
         --base-path /tmp/blockchain \
-        --rpc-external --rpc-cors all \
-        --ws-external --no-mdns \
-        --ws-max-connections 10000 --in-peers 500 --out-peers 500 \
+        --execution wasm \
+        --wasm-execution compiled \
+        --max-runtime-instances 64 \
+        --rpc-max-response-size 2048 \
+        --rpc-external \
+        --rpc-cors all \
+        --ws-external \
+        --no-mdns \
+        --ws-max-connections 16000 \
+        --in-peers 8000 \
+        --out-peers 8000 \
+        --prometheus-external \
+        --rpc-port 9933 \
+        --ws-port 9944 \
+        --port 30333 \
         $SPECIFIC_OPTIONS
 }
 

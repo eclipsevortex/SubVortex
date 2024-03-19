@@ -105,7 +105,7 @@ setup_environment() {
             echo "Compiling subtensor on network $NETWORK..."
             cargo build --release --features pow-faucet --features runtime-benchmarks --locked
             echo -e "\e[32mSubtensor on network $NETWORK is compiled\e[0m"
-        elif [[ $NETWORK == "main" ]]; then
+        elif [[ $NETWORK == "mainnet" ]]; then
             echo "Compiling subtensor on network $NETWORK..."
             cargo build --release --features runtime-benchmarks --locked
             echo -e "\e[32mSubtensor on network $NETWORK is compiled\e[0m"

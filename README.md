@@ -300,39 +300,7 @@ You should see output like this in your pm2 logs for the process at startup:
 
 ### Install Redis
 
-Redis is only required for running a validator.
-
-> Be sure you are in the SubVortex directory
-
-Install redis
-
-```
-./scripts/redis/install_redis.sh
-```
-
-Set Redis password
-
-```
-source ./scripts/redis/set_redis_password.sh
-```
-
-Create Redis firewall
-
-```
-./scripts/redis/create_redis_firewall.sh
-```
-
-Disable Rdb
-
-```
-./scripts/redis/disable_rdb.sh
-```
-
-Check redis is up and running
-
-```
-./scripts/redis/test_persistence.sh
-```
+To install redis, refer to the [Redis guide](./scripts/redis/README.md)
 
 ### Registering your wallet
 

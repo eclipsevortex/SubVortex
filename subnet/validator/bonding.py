@@ -31,9 +31,7 @@ def wilson_score_interval(successes, total):
     p = successes / total
     denominator = 1 + z**2 / total
     centre_adjusted_probability = p + z**2 / (2 * total)
-    adjusted_standard_deviation = math.sqrt(
-        (p * (1 - p) + z**2 / (4 * total)) / total
-    )
+    adjusted_standard_deviation = math.sqrt((p * (1 - p) + z**2 / (4 * total)) / total)
 
     lower_bound = (
         centre_adjusted_probability - z * adjusted_standard_deviation
@@ -113,12 +111,3 @@ async def update_statistics(
         await database.hincrby(stats_key, f"{task_type}_attempts", 1)
         if success:
             await database.hincrby(stats_key, f"{task_type}_successes", 1)
-
-    # Update the total successes that we rollover every epoch
-    if await database.hget(stats_key, "total_successes") is None:
-        subtensor_successes = int(await database.hget(stats_key, "subtensor_successes"))
-        metric_successes = int(await database.hget(stats_key, "metric_successes"))
-        total_successes = subtensor_successes + metric_successes
-        await database.hset(stats_key, "total_successes", total_successes)
-    if success:
-        await database.hincrby(stats_key, "total_successes", 1)

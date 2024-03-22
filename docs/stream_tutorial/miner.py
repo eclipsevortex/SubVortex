@@ -149,8 +149,8 @@ class StreamMiner(ABC):
             hotkey_ss58=self.wallet.hotkey.ss58_address,
         ):
             bt.logging.error(
-                f"Wallet: {self.wallet} is not registered on netuid {self.config.netuid}"
-                f"Please register the hotkey using `btcli subnets register` before trying again"
+                f"Wallet: {self.wallet} is not registered on netuid {self.config.netuid}. "
+                f"Please register the hotkey using `btcli subnets register` before trying again."
             )
             exit()
 

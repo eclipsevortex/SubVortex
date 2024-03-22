@@ -182,13 +182,13 @@ async def ping_uids(self, uids):
 
 
 async def ping_and_retry_uids(
-    self, k: int = None, max_retries: int = 3, exclude_uids: List[int] = []
+    self, k: int = 4, max_retries: int = 3, exclude_uids: List[int] = []
 ):
     """
     Fetch available uids to minimize waiting for timeouts if they're going to fail anyways...
     """
     # Select initial subset of miners to query
-    uids = await get_available_query_miners(self, k=k or 4, exclude=exclude_uids)
+    uids = await get_available_query_miners(self, k=k, exclude=exclude_uids)
     bt.logging.debug("initial ping_and_retry() uids:", uids)
 
     retries = 0
@@ -200,16 +200,19 @@ async def ping_and_retry_uids(
         successful_uids.update(current_successful_uids)
         failed_uids.update(current_failed_uids)
 
+        bt.logging.debug(f"successful_uids: {successful_uids}")
+        bt.logging.debug(f"failed_uids: {failed_uids}")
+
         # If enough UIDs are successful, select the first k items
         if len(successful_uids) >= k:
             uids = list(successful_uids)[:k]
             break
 
         # Reroll for k UIDs excluding the successful ones
-        new_uids = await get_available_query_miners(
+        uids = await get_available_query_miners(
             self, k=k, exclude=list(successful_uids.union(failed_uids))
         )
-        bt.logging.debug(f"ping_and_retry() new uids: {new_uids}")
+        bt.logging.debug(f"ping_and_retry() new uids: {uids}")
         retries += 1
 
     # Log if the maximum retries are reached without enough successful UIDs

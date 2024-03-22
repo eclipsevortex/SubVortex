@@ -13,7 +13,7 @@ SIGMA = 20
 MAX_DISTANCE = 20010
 
 
-async def compute_reliability_score(database, hotkey: str):
+async def compute_reliability_score(uid, database, hotkey: str):
     stats_key = f"stats:{hotkey}"
 
     # Step 1: Retrieve statistics
@@ -21,6 +21,8 @@ async def compute_reliability_score(database, hotkey: str):
         await database.hget(stats_key, "challenge_successes") or 0
     )
     challenge_attempts = int(await database.hget(stats_key, "challenge_attempts") or 0)
+    bt.logging.trace(f"[{uid}][Score][Reliability] # challenge attempts {challenge_attempts}")
+    bt.logging.trace(f"[{uid}][Score][Reliability] # challenge succeeded {challenge_successes}")
 
     # Step 2: Normalization
     normalized_score = wilson_score_interval(challenge_successes, challenge_attempts)
@@ -29,6 +31,10 @@ async def compute_reliability_score(database, hotkey: str):
 
 
 def compute_latency_score(idx, uid, validator_country, responses):
+    initial_process_times = [response[2] for response in responses]
+    bt.logging.trace(f"[{uid}][Score][Latency] Process times {initial_process_times}")
+    bt.logging.trace(f"[{uid}][Score][Latency] Process time {initial_process_times[idx]}")
+
     # Step 1: Get the localisation of the validator
     validator_localisation = get_localisation(validator_country)
 
@@ -53,8 +59,9 @@ def compute_latency_score(idx, uid, validator_country, responses):
 
         process_time = process_time * tolerance if process_time else 5
         process_times.append(process_time)
-    bt.logging.trace(f"[{uid}][Score][Latency] Process times {process_times}")
-    
+    bt.logging.trace(
+        f"[{uid}][Score][Latency] Process times with tolerange {process_times}"
+    )
 
     # Step 3: Baseline Latency Calculation
     baseline_latency = np.mean(process_times)
@@ -65,6 +72,9 @@ def compute_latency_score(idx, uid, validator_country, responses):
     for process_time in process_times:
         relative_latency_score = 1 - (process_time / baseline_latency)
         relative_latency_scores.append(relative_latency_score)
+    bt.logging.trace(
+        f"[{uid}][Score][Latency] Relative scores {relative_latency_scores}"
+    )
 
     # Step 5: Normalization
     min_score = min(relative_latency_scores)
@@ -74,11 +84,9 @@ def compute_latency_score(idx, uid, validator_country, responses):
     score = relative_latency_scores[idx]
     bt.logging.trace(f"[{uid}][Score][Latency] Relative score {score}")
 
-    normalized_scores = (score - min_score) / (
-        max_score - min_score
-    )
+    normalized_score = (score - min_score) / (max_score - min_score)
 
-    return normalized_scores
+    return normalized_score
 
 
 def compute_distribution_score(idx, responses):

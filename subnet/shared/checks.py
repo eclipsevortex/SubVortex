@@ -148,8 +148,8 @@ def check_registration(subtensor, wallet, netuid):
         hotkey_ss58=wallet.hotkey.ss58_address,
     ):
         bt.logging.error(
-            f"Wallet: {wallet} is not registered on netuid {netuid}"
-            f"Please register the hotkey using `btcli subnets register` before trying again"
+            f"Wallet: {wallet} is not registered on netuid {netuid}. "
+            f"Please register the hotkey using `btcli subnets register` before trying again."
         )
         exit()
 

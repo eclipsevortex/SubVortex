@@ -177,6 +177,7 @@ In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittens
 
 ### Pre-requisite
 
+- Ubuntu 22.04, for other os please share with us to update our docs.
 - Local Subtensor is mandatory for all miners, and highly recommended for validators.
 - Validators will need to install and configure Redis
 
@@ -184,48 +185,11 @@ To simplify the installation process, scripts have been provided as part of this
 
 ### Install SubVortex
 
-Updating your base environment
-
-```
-apt update && apt upgrade -y
-apt install git nodejs npm -y
-npm i -g pm2
-apt install python3-pip
-```
-
-Select HOME directory
-
-```
-cd $HOME
-```
-
-Clone the subnet Subvortex
-
-```
-git clone https://github.com/eclipsevortex/SubVortex.git
-```
-
-Go the the SubVortex solution
-
-```
-cd SubVortex
-```
-
-Install the dependencies
-
-```
-pip install -r requirements.txt
-```
-
-Install the base software
-
-```
-pip install -e .
-```
+To install the subnet, refer to the [Subnet guide](./scripts/subnet/README.md)
 
 ### Install Local Subtensor
 
-To install redis, refer to the [Subtensor guide](./scripts/subtensor/README.md)
+To install a local subtensor, refer to the [Subtensor guide](./scripts/subtensor/README.md)
 
 ### Install Redis
 

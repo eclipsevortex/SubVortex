@@ -225,78 +225,7 @@ pip install -e .
 
 ### Install Local Subtensor
 
-A local subtensor can be installed via docker or binary. The steps below are one of many methods. Please reference the official [Subtensor GitHub](https://github.com/opentensor/subtensor/blob/main/docs/running-subtensor-locally.md) and its [documentation](https://docs.bittensor.com/getting-started/running-a-public-subtensor#lite-node-vs-archive-node) for other ways to set up local subtensor.
-
-Go to HOME directory
-
-```
-cd $HOME
-```
-
-Install the subtensor
-
-```
-$HOME/SubVortex/scripts/subtensor/setup.sh <NETWORK> <EXECUTION_TYPE> <ROOT_DIRECTORY>
-```
-
-Options
-
-- `NETWORK` is the network you want you local subtensor to run against. The possible value are `localnet`, `testnet` or `mainnet`. The default value is `mainnet` and recommended to keep it as such.
-
-- `EXECUTION_TYPE` choose `docker` if you want to install the subtensor in a docker container, `binary` to install in your base environment.
-
-- `ROOT_DIRECTORY` is the directory where you want to install Subtensor. By default, it is set to `$HOME` and it is recommended to keep it as such.
-
-Run the subtensor in your base environment
-
-```
-$HOME/SubVortex/scripts/subtensor/start.sh <NETWORK> <EXECUTION_TYPE> <ROOT_DIRECTORY>
-```
-
-Or via a process manager
-
-```
-pm2 start $HOME/SubVortex/scripts/subtensor/start.sh \
-  --name subtensor -- \
-  <NETWORK> \
-  <EXECUTION_TYPE> \
-  <ROOT_DIRECTORY>
-```
-
-Options
-
-- `NETWORK` is the network you want you local subtensor to run against. The possible value are `localnet`, `testnet` or `mainnet`. The default value is `mainnet` and recommended to keep as it is.
-
-- `EXECUTION_TYPE` choose `docker` if you want to install the subtensor in a docker container, `binary` to install in your base environment.
-
-- `ROOT_DIRECTORY` is the directory where you want to install Subtensor. By default, it is set to `$HOME` and it is recommended to keep it as such.
-
-You should see output like this in your pm2 logs for the process at startup:
-
-```
-> pm2 log subtensor
-
-1|subtenso | 2023-12-22 14:21:30 🔨 Initializing Genesis block/state (state: 0x4015…9643, header-hash: 0x2f05…6c03)
-1|subtenso | 2023-12-22 14:21:30 👴 Loading GRANDPA authority set from genesis on what appears to be first startup.
-1|subtenso | 2023-12-22 14:21:30 🏷  Local node identity is: 12D3KooWAXnooHcMSnMpML6ooVLzFwsmt5umFhCkmkxH88LvP5gm
-1|subtenso | 2023-12-22 14:21:30 💻 Operating system: linux
-1|subtenso | 2023-12-22 14:21:30 💻 CPU architecture: aarch64
-1|subtenso | 2023-12-22 14:21:30 💻 Target environment: gnu
-1|subtenso | 2023-12-22 14:21:30 💻 Memory: 62890MB
-1|subtenso | 2023-12-22 14:21:30 💻 Kernel: 5.15.0-1051-aws
-1|subtenso | 2023-12-22 14:21:30 💻 Linux distribution: Ubuntu 20.04.6 LTS
-1|subtenso | 2023-12-22 14:21:30 💻 Virtual machine: no
-1|subtenso | 2023-12-22 14:21:30 📦 Highest known block at #0
-1|subtenso | 2023-12-22 14:21:30 〽️ Prometheus exporter started at 127.0.0.1:9615
-1|subtenso | 2023-12-22 14:21:30 Running JSON-RPC HTTP server: addr=0.0.0.0:9933, allowed origins=["*"]
-1|subtenso | 2023-12-22 14:21:30 Running JSON-RPC WS server: addr=0.0.0.0:9944, allowed origins=["*"]
-1|subtenso | 2023-12-22 14:21:31 🔍 Discovered new external address for our node: /ip4/52.56.34.197/tcp/30333/ws/p2p/12D3KooWAXnooHcMSnMpML6ooVLzFwsmt5umFhCkmkxH88LvP5gm
-
-1|subtensor  | 2023-12-22 14:21:35 ⏩ Warping, Downloading state, 2.74 Mib (56 peers), best: #0 (0x2f05…6c03), finalized #0 (0x2f05…6c03), ⬇ 498.3kiB/s ⬆ 41.3kiB/s
-1|subtensor  | 2023-12-22 14:21:40 ⏩ Warping, Downloading state, 11.25 Mib (110 peers), best: #0 (0x2f05…6c03), finalized #0 (0x2f05…6c03), ⬇ 1.1MiB/s ⬆ 37.0kiB/s
-1|subtensor  | 2023-12-22 14:21:45 ⏩ Warping, Downloading state, 20.22 Mib (163 peers), best: #0 (0x2f05…6c03), finalized #0 (0x2f05…6c03), ⬇ 1.2MiB/s ⬆ 48.7kiB/s
-
-```
+To install redis, refer to the [Subtensor guide](./scripts/subtensor/README.md)
 
 ### Install Redis
 

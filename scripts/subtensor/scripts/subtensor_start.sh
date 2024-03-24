@@ -133,9 +133,10 @@ fi
 # Running subtensor
 case $EXEC_TYPE in
     docker)
-        docker compose down --remove-orphans
-        echo "Running docker compose up $BUILD --detach $NETWORK-$NODE_TYPE"
-        docker compose up $BUILD --detach $NETWORK-$NODE_TYPE
+      cd $HOME/subtensor
+      docker compose down --remove-orphans
+      echo "Running docker compose up $BUILD --detach $NETWORK-$NODE_TYPE"
+      docker compose up $BUILD --detach $NETWORK-$NODE_TYPE
     ;;
     binary)
         run_command $NETWORK $NODE_TYPE $BIN_PATH

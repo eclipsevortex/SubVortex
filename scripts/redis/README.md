@@ -5,7 +5,7 @@ Redis can be install in two way
 
 > Note: Before starting, be sure
 >
-> - docker is installed, see [docker installation](../docker/README.md)
+> - docker is installed if you deciode to run redis as docker container, see [docker installation](../docker/README.md)
 > - you are in the `SubVortext` directory
 
 <br />

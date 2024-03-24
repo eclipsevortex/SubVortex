@@ -1,12 +1,4 @@
-Subtensor can be install in two way
-
-- as process in the base environment
-- as container via docker
-
-> Note: Before starting, be sure
->
-> - docker is installed if you deciode to run the subtensor as docker container, see [docker installation](../docker/README.md)
-> - you are in the `SubVortext` directory
+This document explains how to install and uninstall a local subtensor.
 
 <br />
 
@@ -24,6 +16,16 @@ Subtensor can be install in two way
 <br />
 
 # Installation
+
+Subtensor can be install in two way
+
+- as process in the base environment
+- as container via docker
+
+> Note: Before starting, be sure
+>
+> - docker is installed if you deciode to run the subtensor as docker container, see [docker installation](../docker/README.md)
+> - you are in the `SubVortex` directory
 
 ## As process <a id="installation-as-process"></a>
 
@@ -54,6 +56,7 @@ With the options you can see by running
 ```
 
 If you have a process manager such as pm2, use it
+
 ```
 pm2 start ./scripts/subtensor/process/subtensor_process_start.sh --name subtensor
 ```
@@ -87,8 +90,9 @@ You shoud have something similar to
 ```
 
 At some point you have to see some line such as the following
+
 ```
-Imported #2596101 (0xfdc2…8016) 
+Imported #2596101 (0xfdc2…8016)
 ```
 
 Be sure the **#xxxxxxxx**, which is the current block, matches the one in [polkadot](https://polkadot.js.org/apps/#/explorer)
@@ -144,8 +148,9 @@ You shoud have something similar to
 ```
 
 At some point you have to see some line such as the following
+
 ```
-Imported #2596101 (0xfdc2…8016) 
+Imported #2596101 (0xfdc2…8016)
 ```
 
 Be sure the **#xxxxxxxx**, which is the current block, matches the one in [polkadot](https://polkadot.js.org/apps/#/explorer)
@@ -154,14 +159,18 @@ Be sure the **#xxxxxxxx**, which is the current block, matches the one in [polka
 
 # Uninstallation
 
+> Note: Before starting, be sure you are in the `SubVortex` directory
+
 ## As process <a id="uninstallation-as-process"></a>
 
 To uninstall a local subtensor, you can stop (and delete) it if running
+
 ```
 pm2 stop subtensor && pm2 delete subtensor
 ```
 
 Then, you can run
+
 ```
 ./scripts/subtensor/process/subtensor_process_teardown.sh
 ```
@@ -169,16 +178,19 @@ Then, you can run
 ## As docker container <a id="uninstallation-as-container"></a>
 
 To uninstall a local subtensor, you can stop (and delete) it if running
+
 ```
 docker stop $(docker ps --format "{{.Names}}" --filter "ancestor=opentensor/subtensor:latest") && docker rm $(docker ps -a --format "{{.Names}}" --filter "ancestor=opentensor/subtensor:latest")
 ```
 
 Then, you have to remove the subtensor image
+
 ```
 docker rmi $(docker images | awk 'NR>1 {print $3}')
 ```
 
 Then, you can run
+
 ```
 ./scripts/subtensor/docker/subtensor_docker_teardown.sh
 ```

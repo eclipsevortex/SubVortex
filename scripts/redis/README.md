@@ -1,12 +1,4 @@
-Redis can be install in two way
-
-- as process in the base environment
-- as container via docker
-
-> Note: Before starting, be sure
->
-> - docker is installed if you deciode to run redis as docker container, see [docker installation](../docker/README.md)
-> - you are in the `SubVortext` directory
+This document explains how to install and uninstall a redis.
 
 <br />
 
@@ -24,6 +16,16 @@ Redis can be install in two way
 <br />
 
 # Installation
+
+Redis can be install in two way
+
+- as process in the base environment
+- as container via docker
+
+> Note: Before starting, be sure
+>
+> - docker is installed if you deciode to run redis as docker container, see [docker installation](../docker/README.md)
+> - you are in the `SubVortex` directory
 
 ## As process <a id="installation-as-process"></a>
 
@@ -68,12 +70,14 @@ With the options you can see by running
 ./scripts/redis/process/redis_process_test_health.sh -h
 ```
 
-For the password, you can get it by running 
+For the password, you can get it by running
+
 ```
 sudo grep -Po '^requirepass \K.*' /etc/redis/redis.conf
 ```
 
-So the test health command will be 
+So the test health command will be
+
 ```
 ./scripts/redis/process/redis_process_test_health.sh -a $(sudo grep -Po '^requirepass \K.*' /etc/redis/redis.conf)
 ```
@@ -185,6 +189,8 @@ You have to see somethinng similar to
 
 # Uninstallation
 
+> Note: Before starting, be sure you are in the `SubVortex` directory
+
 ## As process <a id="uninstallation-as-process"></a>
 
 To uninstall redis, you can run
@@ -194,11 +200,13 @@ To uninstall redis, you can run
 ```
 
 Once redis is uninstalled, you can check redis cli does not exist anymore
+
 ```
 redis-cli
 ```
 
 You should have an error like this
+
 ```
 command not found: redis-cli
 ```
@@ -212,21 +220,25 @@ To uninstall redis, you can run
 ```
 
 Once redus is uninstalled, you can check the container does not exist anymore
+
 ```
 docker ps --filter name=subvortex-redis
 ```
 
 You shoud have something similar (or at least list that does not container `subvortex`)
+
 ```
 CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
 ```
 
 Besides, you can check every related images have been removed
+
 ```
 docker images --filter reference=subvortex-redis
 ```
 
 You shoud have something similar (or at least list that does not container `subvortex`)
+
 ```
 CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
 ```

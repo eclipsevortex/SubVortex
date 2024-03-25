@@ -274,6 +274,7 @@ class Validator:
                 self.stop_subscription_thread()
 
 
+    # TODO: After investigation done and decision taken, remove or change it
     def start_event_subscription(self):
         """
         Starts the subscription handler in a background thread.
@@ -317,14 +318,14 @@ class Validator:
                 # Fire off the script
                 hotkeys_str = ",".join(map(str, hotkeys))
                 hotkeys_arg = quote(hotkeys_str)
-                subprocess.Popen(
-                    [
-                        self.rebalance_script_path,
-                        hotkeys_arg,
-                        self.subtensor.chain_endpoint,
-                        str(self.config.database.index),
-                    ]
-                )
+                # subprocess.Popen(
+                #     [
+                #         self.rebalance_script_path,
+                #         hotkeys_arg,
+                #         self.subtensor.chain_endpoint,
+                #         str(self.config.database.index),
+                #     ]
+                # )
 
         substrate.subscribe_block_headers(neuron_registered_subscription_handler)
 

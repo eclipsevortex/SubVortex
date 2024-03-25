@@ -200,8 +200,8 @@ async def challenge_data(self):
     bt.logging.trace(f"Scattered rewards: {scattered_rewards}")
 
     # Update moving_averaged_scores with rewards produced by this step.
-    # alpha of 0.05 means that each new score replaces 5% of the weight of the previous weights
-    alpha: float = 0.05
+    # alpha of 0.2 means that each new score replaces 20% of the weight of the previous weights
+    alpha: float = 0.2
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)

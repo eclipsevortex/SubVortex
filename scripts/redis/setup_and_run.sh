@@ -59,6 +59,7 @@ else
     BASE="${current_dir%/}/${relative_dir#*/}"
 fi
 
+# Install docker if needed
 if [[ "$EXEC_TYPE" == "docker" ]]; then
     $BASE/../docker/docker_setup.sh
     echo -e "\\033[32mDocker setup\\033[0m"

@@ -205,7 +205,13 @@ For a quick and seamless setup, we provide a comprehensive script that installs 
 
 ### Setup and run a miner <a id="miner-fast-setup-and-run"></a>
 
-To use the full script, you have to follow the steps to install the subnet (except executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+> <span style="color: red;">**IMPORTANT**</span> <br />
+> To use the full script, you have to follow the steps to install the subnet (<span style="color: red;">**EXCEPT**</span> executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+
+Be sure you are in the **SubVortex** directory, if not 
+```
+cd SubVortex
+```
 
 Then, you can run the script
 
@@ -213,9 +219,7 @@ Then, you can run the script
 ./scripts/setup_and_run.sh -t miner
 ```
 
-> IMPORTANT:
->
-> - Be sure to be in the **SubVortex** directory
+> IMPORTANT
 > - If you any prompts, just confirm them
 > - Other options are available, pleaser take a look
 
@@ -233,7 +237,13 @@ Finally, if you prefer setup and run the miner in a more controlled way, you can
 
 ### Setup and run a validator <a id="validator-fast-setup-and-run"></a>
 
-To use the full script, you have to follow the steps to install the subnet (except executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+> <span style="color: red;">**IMPORTANT**</span> <br />
+> To use the full script, you have to follow the steps to install the subnet (<span style="color: red;">**EXCEPT**</span> executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+
+Be sure you are in the **SubVortex** directory, if not 
+```
+cd SubVortex
+```
 
 Then, you can run the script
 
@@ -241,11 +251,9 @@ Then, you can run the script
 ./scripts/setup_and_run.sh -t validator
 ```
 
-> IMPORTANT:
->
-> - Be sure to be in the **SubVortex** directory
+> IMPORTANT
 > - If you any prompts, just confirm them
-> - DO NOT USE **docker** execution for redis as we need more time to make it work
+> - <span style="color: red;">DO NOT USE **docker** execution for redis as we need more time to make it work</span>
 > - Other options are available, pleaser take a look
 
 Check the available options by running
@@ -267,11 +275,6 @@ Finally, if you prefer setup and run the validator in a more controlled way, you
 - Local Subtensor is mandatory for all miners, and highly recommended for validators.
 - Validators will need to install and configure Redis
 
-<<<<<<< Updated upstream
-To simplify the installation process, scripts have been provided as part of this repository to ease those setup.
-
-=======
->>>>>>> Stashed changes
 ### Install SubVortex
 
 To install the subnet, refer to the [Subnet guide](./scripts/subnet/README.md)
@@ -312,6 +315,8 @@ Once you have successfully registered your wallet, you are now ready to start ei
 
 ### Running a Miner
 
+> IMPORTANT: Before running a miner, be sure you have a local subtensor up and running. Please see the [Subtensor guide](./scripts/subtensor/README.md) for more details.
+
 To run a miner, navigate to the SubVortex directory. It is highly recommended to run via a process manager like PM2.
 
 ```
@@ -328,6 +333,8 @@ pm2 start neurons/miner.py \
 > IMPORTANT: Do not run more than one miner per machine. Running multiple miners will result in the loss of incentive and emissions on all miners.
 
 ### Running a Validator
+
+> IMPORTANT: Before running a validator, be sure you have a redis up and running. Please see the [Redis guide](./scripts/redis/README.md) for more details.
 
 Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
 

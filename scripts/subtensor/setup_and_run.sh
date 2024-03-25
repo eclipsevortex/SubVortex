@@ -57,9 +57,16 @@ else
     BASE="${current_dir%/}/${relative_dir#*/}"
 fi
 
+# Install docker if needed
+if [[ "$EXEC_TYPE" == "docker" ]]; then
+    $BASE/../docker/docker_setup.sh
+    echo -e "\\033[32mDocker setup\\033[0m"
+fi
+
 # Setup subtensor
 OPTIONS=$([[ "$EXEC_TYPE" == "process" ]] && echo "-n $NETWORK" || echo "")
 $BASE/$EXEC_TYPE/subtensor_"$EXEC_TYPE"_setup.sh $OPTIONS
 
 # Start subtensor
-$BASE/$EXEC_TYPE/subtensor_"$EXEC_TYPE"_start.sh -n $NETWORK -p
+OPTIONS=$([[ "$EXEC_TYPE" == "process" ]] && echo "-p" || echo "")
+$BASE/$EXEC_TYPE/subtensor_"$EXEC_TYPE"_start.sh -n $NETWORK $OPTIONS

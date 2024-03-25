@@ -30,10 +30,12 @@ git clone https://github.com/eclipsevortex/SubVortex.git
 Finally, to install the subnet, you can run
 
 ```
+# Go to SubVortex
+cd SubVortex
+
+# Setup the subnet
 ./scripts/subnet/subnet_setup.sh
 ```
-
-Be sure you are in **SubVortex** directory
 
 <br />
 

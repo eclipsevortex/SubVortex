@@ -1,9 +1,5 @@
 version: '3.8'
 
-volumes:
-  redis-prod-data:
-    name: "redis-data"
-
 services:
   redis:
     build:
@@ -12,6 +8,7 @@ services:
         REDIS_CONF: ${REDIS_CONF}
         REDIS_DATA: ${REDIS_DATA}
         REDIS_PASSWORD: ${REDIS_PASSWORD}
+      dockerfile: ./scripts/Dockerfile
     container_name: subvortex-redis
     image: subvortex-redis:latest
     restart: always

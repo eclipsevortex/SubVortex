@@ -29,7 +29,7 @@ from pprint import pformat
 from traceback import print_exception
 from substrateinterface.base import SubstrateInterface
 
-from subnet.shared.checks import check_environment, check_registration
+from subnet.shared.checks import check_registration
 from subnet.shared.utils import get_redis_password
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
@@ -86,13 +86,6 @@ class Validator:
         self.check_config(self.config)
         bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
 
-        try:
-            asyncio.run(check_environment(self.config.database.redis_conf_path))
-        except AssertionError as e:
-            bt.logging.warning(
-                f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
-            )
-
         # Init device.
         bt.logging.debug("loading device")
         self.device = torch.device(self.config.neuron.device)
@@ -131,6 +124,7 @@ class Validator:
         # Setup database
         bt.logging.info(f"loading database")
         redis_password = get_redis_password(self.config.database.redis_password)
+        print(f"[RD] password {redis_password}")
         self.database = aioredis.StrictRedis(
             host=self.config.database.host,
             port=self.config.database.port,

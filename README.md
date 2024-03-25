@@ -17,7 +17,7 @@
   <img src="subvortex.png" alt="Image Description" width="300" height="300">
 </div>
 <br />
-<div style="font-size: 20px">Testnet: 92 • Mainnet: TBD</div>
+<div style="font-size: 20px">Testnet: 92 • Mainnet: 7</div>
 
 </div>
 
@@ -33,6 +33,12 @@
 - [Team Composition](#team-composition)
 - [Road Map](#road-map)
 - [Conclusion](#conclusion)
+- [Machine Requirements](#machine-requirements)
+  - [Validator](#validator-requirements)
+  - [Miner](#miner-requirements)
+- [Fast Setup and Run](#fast-setup-and-run)
+  - [Validator](#validator-fast-setup-and-run)
+  - [Miner](#miner-fast-setup-and-run)
 - [Installation](#installation)
   - [Install SubVortex](#install-subvortex)
   - [Install Subtensor](#install-local-subtensor)
@@ -42,7 +48,7 @@
 - [Running a Validator](#running-a-validator)
 - [New Releases](#new-releases)
 - [Troubleshooting](#troubleshooting)
-  - [Troubleshooting Subtensor](#troubleshooting-subtensor) 
+  - [Troubleshooting Subtensor](#troubleshooting-subtensor)
 - [License](#license)
 
 ## Abstract
@@ -172,16 +178,100 @@ Team timezone
 
 In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittensor network, incentivizing decentralization, reliability, and accessibility. Through its innovative approach and robust infrastructure, SubVortex aims to catalyze the growth and sustainability of the decentralized machine-learning ecosystem that is Bittensor.
 
+## Machine requirements
+
+In terms of Operation System, you have to follow the requirements
+
+- Ubuntu (>= 22.04)
+- Others - please share with us to update our docs.
+
+### Miner <a id="miner-requirements"></a>
+
+For miner, you need a CPU machine (no GPU needed!) with the same requirements as a local subtensor. Go to the [Subtensor github](https://github.com/opentensor/subtensor) for more information;.
+
+For more information, take a look on the [min requirements](./min_compute.yml)
+
+> IMPORTANT: take a look at the [Incentive Mechanism](#incentive-mechanism) to understand better where you can play to get the best miner. To summarize, you need to be available, reliable, and present in various geographical locations with low latency.
+
+### Validator <a id="validator-requirements"></a>
+
+For validator, you need a CPU machine (no GPU needed!).
+
+For more information, take a look on the [min requirements](./min_compute.yml)
+
+## Fast Setup and Run
+
+For a quick and seamless setup, we provide a comprehensive script that installs and runs a miner or validator, taking care of everything from installation to execution.
+
+### Setup and run a miner <a id="miner-fast-setup-and-run"></a>
+
+To use the full script, you have to follow the steps to install the subnet (except executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+
+Then, you can run the script
+
+```
+./scripts/setup_and_run.sh -t miner
+```
+
+> IMPORTANT:
+>
+> - Be sure to be in the **SubVortex** directory
+> - If you any prompts, just confirm them
+> - Other options are available, pleaser take a look
+
+Check the available options by running
+
+```
+./scripts/setup_and_run.sh -h
+```
+
+Once the script is successfully executed, you'll have a miner up and running—nothing else required!
+
+Of course, if you have specific settings in mind, you can use this script as a base and update anything you want to tailor your experience to your needs.
+
+Finally, if you prefer setup and run the miner in a more controlled way, you can follow the different sections below.
+
+### Setup and run a validator <a id="validator-fast-setup-and-run"></a>
+
+To use the full script, you have to follow the steps to install the subnet (except executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+
+Then, you can run the script
+
+```
+./scripts/setup_and_run.sh -t validator
+```
+
+> IMPORTANT:
+>
+> - Be sure to be in the **SubVortex** directory
+> - If you any prompts, just confirm them
+> - DO NOT USE **docker** execution for redis as we need more time to make it work
+> - Other options are available, pleaser take a look
+
+Check the available options by running
+
+```
+./scripts/setup_and_run.sh -h
+```
+
+Once the script is successfully executed, you'll have a validator up and running—nothing else required!
+
+Of course, if you have specific settings in mind, you can use this script as a base and update anything you want to tailor your experience to your needs.
+
+Finally, if you prefer setup and run the validator in a more controlled way, you can follow the different sections below.
+
 ## Installation
 
 ### Pre-requisite
 
-- Ubuntu 22.04, for other os please share with us to update our docs.
 - Local Subtensor is mandatory for all miners, and highly recommended for validators.
 - Validators will need to install and configure Redis
 
+<<<<<<< Updated upstream
 To simplify the installation process, scripts have been provided as part of this repository to ease those setup.
 
+=======
+>>>>>>> Stashed changes
 ### Install SubVortex
 
 To install the subnet, refer to the [Subnet guide](./scripts/subnet/README.md)
@@ -279,11 +369,13 @@ Restart miners/validators if running them in your base environment or restart pm
 ### Troubleshooting Subtensor
 
 #### State already discarded
+
 ```
 Error: Service(Client(RuntimeApiError(UnknownBlock("State already discarded for 0x2f0555cc76fc2840a25a6ea3b9637146806f1f44b090c175ffde2a7e5ab36c03"))))
 ```
 
 To resolve the above error, you have to purge your chain by running
+
 ```
 $HOME/subtensor/target/release/node-subtensor purge-chain -y --base-path <BASE_PATH> --chain="<CHAIN>"
 ```
@@ -294,8 +386,7 @@ Options
 
 `CHAIN` is the chain you want to use, `./raw_spec.json` for maintest and `./raw_testspec.json` for testnet.
 
-Once the state has been purge, you can re-execute the subtensor start script $HOME/SubVortex/scripts/subtensor/start.sh via a procedd manager or not. See the section [Install Subtensor](#install-subtensor) 
-
+Once the state has been purge, you can re-execute the subtensor start script $HOME/SubVortex/scripts/subtensor/start.sh via a procedd manager or not. See the section [Install Subtensor](#install-subtensor)
 
 ## License
 

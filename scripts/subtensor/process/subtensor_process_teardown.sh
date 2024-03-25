@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Stop subtensor if running with pm2
+process=$(pm2 list | grep "subtensor")
+if [[ ! -z $process ]]; then
+    pm2 stop subtensor && pm2 delete subtensor
+    echo -e '\e[32mSubtensor stopped\e[0m'
+fi
+
 # Remove subtensor
 if [ -d "subtensor" ]; then
     rm -rf subtensor

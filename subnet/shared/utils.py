@@ -25,6 +25,7 @@ def get_redis_password(
     redis_password: str = None, redis_conf: str = "/etc/redis/redis.conf"
 ) -> str:
     redis_password = os.getenv("REDIS_PASSWORD") or redis_password
+    print(f"[RD] Password {redis_password}")
     if redis_password is None:
         try:
             redis_password = subprocess.check_output(

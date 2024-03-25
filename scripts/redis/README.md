@@ -1,3 +1,5 @@
+[Back to Main README](../../README.md)
+
 This document explains how to install and uninstall a redis.
 
 <br />
@@ -12,6 +14,8 @@ This document explains how to install and uninstall a redis.
   - [As docker container](#uninstallation-as-container)
 
 ---
+
+> IMPORTANT: DO NOT install redis via docker for now as we need more time to make it works!
 
 <br />
 
@@ -61,13 +65,13 @@ If you want to run a specific script, just execute it
 Once redis is installed, you can check redis health by executing the ping by executing
 
 ```
-./scripts/redis/process/redis_process_test_health.sh
+./scripts/redis/process/redis_process_health_check.sh
 ```
 
 With the options you can see by running
 
 ```
-./scripts/redis/process/redis_process_test_health.sh -h
+./scripts/redis/process/redis_process_health_check.sh -h
 ```
 
 For the password, you can get it by running
@@ -79,7 +83,7 @@ sudo grep -Po '^requirepass \K.*' /etc/redis/redis.conf
 So the test health command will be
 
 ```
-./scripts/redis/process/redis_process_test_health.sh -a $(sudo grep -Po '^requirepass \K.*' /etc/redis/redis.conf)
+./scripts/redis/process/redis_process_health_check.sh -a $(sudo grep -Po '^requirepass \K.*' /etc/redis/redis.conf)
 ```
 
 To check redis is up and running, you can check the logs as well by running
@@ -153,13 +157,19 @@ With the options you can see by running
 Once redis is started, you can check redis health by executing the ping by executing
 
 ```
-./scripts/redis/docker/redis_docker_test_health.sh
+./scripts/redis/docker/redis_docker_health_check.sh
 ```
 
 With the options you can see by running
 
 ```
-./scripts/redis/docker/redis_docker_test_health.sh -h
+./scripts/redis/docker/redis_docker_health_check.sh -h
+```
+
+For the password, you can get it by running
+
+```
+docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'"
 ```
 
 To check redis is up and running, you can check the logs as well by running
@@ -219,7 +229,7 @@ To uninstall redis, you can run
 ./scripts/redis/docker/redis_docker_teardown.sh
 ```
 
-Once redus is uninstalled, you can check the container does not exist anymore
+Once redis is uninstalled, you can check the container does not exist anymore
 
 ```
 docker ps --filter name=subvortex-redis

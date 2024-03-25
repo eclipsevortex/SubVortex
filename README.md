@@ -47,11 +47,11 @@
 
 ## Abstract
 
-SubVortex introduces an incentivized and decentralized network of subtensor nodes which are a pivotal element within the Bittensor ecosystem. This delineates the structure, objectives, and mechanisms of SubVortex, aiming to foster decentralization, stability, and efficient resource allocation within the broader Bittensor network.
+SubVortex introduces an incentivized and decentralized network of subtensor nodes that are pivotal elements within the Bittensor ecosystem. This delineates the structure, objectives, and mechanisms of SubVortex, aiming to foster decentralization, stability, and efficient resource allocation within the broader Bittensor network.
 
 ## Introduction
 
-Subtensor nodes play a vital role in the Bittensor network, governing various aspects such as incentivization, governance, and network health. SubVortex aims to enhance the decentralization and functionality of Bittensor by establishing an incentivised network of subtensors. This whitepaper describes the goals, roles, and operational phases of SubVortex, outlining its contribution and value proposition to the Bittensor ecosystem.
+Subtensor nodes play a vital role in the Bittensor network, governing various aspects such as incentivization, governance, and network health. SubVortex aims to enhance the decentralization and functionality of Bittensor by establishing an incentivized network of subtensors. This whitepaper describes the goals, roles, and operational phases of SubVortex, outlining its contribution and value proposition to the Bittensor ecosystem.
 
 ## Goals
 
@@ -88,24 +88,24 @@ Running subtensors locally offers advantages in speed, reliability, and control 
 
 ## Incentive Mechanism
 
-SubVortex's incentive mecanism will score miners based on multiple criteria of their subtensor node:
+SubVortex's incentive mechanism will score miners based on multiple criteria of their subtensor node:
 
-- **Availability** - Subtensor nodes must be reliable to ensure a good uptime.
-- **Latency** - Subtensor nodes must be efficient to ensure a good performance.
-- **Reliability** and Stability - Subtensor nodes must be efficient to ensure a good service quality.
+- **Availability** - Subtensor nodes must be reliable to ensure good uptime.
+- **Latency** - Subtensor nodes must be efficient to ensure good performance.
+- **Reliability** and Stability - Subtensor nodes must be efficient to ensure good service quality.
 - **Global distribution** - Subtensor nodes must be worldwide to ensure a good reach.
 
-The final score used to set the weight is an average of all theses scoring and will replaces 5% of the weight of the previous weights.
+The final score used to set the weight is an average of all these scores and will replace 5% of the weight of the previous weights.
 
 ### Availability
 
-This reward would incentivize miners to maintain high levels of uptime and accessibility.
+This reward incentivizes miners to maintain high levels of uptime and accessibility.
 
 To assign a score for each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by the success of getting that block.
 
 ### Latency
 
-This reward would incentivize miners to low-latency services and minimizing response times.
+This reward incentivizes miners to low-latency services and minimizes response times.
 
 To assign a score to each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by the time taken to process that request, using a normalized method as part of the reward system.
 
@@ -113,28 +113,28 @@ The validator can be in a different country than the miner, so we will incorpora
 
 ### Reliability and Stability
 
-This reward would incentivize miners to high levels of reliability and minimizing the occurrence and impact of failures.
+This reward incentivizes miners to have high levels of reliability and minimize the occurrence and impact of failures.
 
-To assign a score to each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by computing the ratio successes/attempts, using a normalized method as part of the reward system.
+To assign a score to each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by computing the ratio of successes/attempts, using a normalized method as part of the reward system.
 
 ### Global Distribution
 
-This reward would incentivize miners to effectively distribute subtensors across different geographical locations to optimize performance and reduce latency for a better subnet experience.
+This reward incentivizes miners to effectively distribute subtensors across different geographical locations to optimize performance and reduce latency for a better subnet experience.
 
 ## Value Proposition
 
-SubVortex enriches the Bittensor ecosystem by providing an alternative to the Finney network and promoting decentralization, reliability, and efficiency. It offers miners and validators a seamless experience with low entry barriers and continuous support.
+SubVortex enriches the Bittensor ecosystem by providing an alternative to the Finney network and promoting decentralization, reliability, and efficiency. It offers miners and validators a seamless experience with low barriers to entry and continuous support.
 
 ## Team Composition
 
-The team is compromised of individuals with diverse backgrounds and extensive experience in crypto, software development, engineering, business and data management. The SubVortex team ensures robust support and continuous improvement for the network.
+The team comprises individuals with diverse backgrounds and extensive experience in crypto, software development, engineering, business, and data management. The SubVortex team ensures robust support and continuous improvement for the network.
 
 Team responsabilities
 
 - **EclipseVortex** - Development and technology
 - **Ch3RNØbØG** - Operations and business development
 - **tww9** - Strategy and public relations
-- **HcL-CO** - QA Lead and Support
+- **HcL-CO** - QA Lead and support
 
 Team timezone
 
@@ -147,7 +147,7 @@ Team timezone
 
 ### Phase 1
 
-- Create subnet in testnet and perform internal testing of the incentive mechanism
+- Create a subnet in testnet and perform internal testing of the incentive mechanism
 - Register subnet on mainnet
 - Release preliminary information publicly
 
@@ -155,7 +155,7 @@ Team timezone
 
 - Internal testing on mainnet. Bug fixes, etc.
 - Public launch and allow key registrations.
-- Basic structure with equal emissions for all miners
+- Performance-based emission structure
 
 ### Phase 3:
 
@@ -165,13 +165,12 @@ Team timezone
 ### Phase 4
 
 - Public SubVortex load balancer
-- Performance based emission structure
 
-> Note: The Road Map will be updated if any changes
+> Note: The Road Map will be updated if there are any changes
 
 ## Conclusion
 
-In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittensor network, incentivising decentralization, reliability, and accessibility. Through its innovative approach and robust infrastructure, SubVortex aims to catalyze the growth and sustainability of the decentralized machine learning ecosystem that is Bittensor.
+In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittensor network, incentivizing decentralization, reliability, and accessibility. Through its innovative approach and robust infrastructure, SubVortex aims to catalyze the growth and sustainability of the decentralized machine-learning ecosystem that is Bittensor.
 
 ## Installation
 
@@ -181,7 +180,7 @@ In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittens
 - Local Subtensor is mandatory for all miners, and highly recommended for validators.
 - Validators will need to install and configure Redis
 
-To simplify the installation process, scripts have been provided as part of this repository to ease those set up.
+To simplify the installation process, scripts have been provided as part of this repository to ease those setup.
 
 ### Install SubVortex
 

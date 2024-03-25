@@ -160,7 +160,7 @@ async def challenge_data(self):
                 + (LATENCY_WEIGHT * latency_score)
                 + (RELIABILLITY_WEIGHT * reliability_score)
                 + (DISTRIBUTION_WEIGHT * distribution_score)
-            ) / 4.0
+            ) / 6.0
         else:
             # More than 1 miner running in the axon machine
             # Someone is trying to hack => Penalize all the miners on the axon machine

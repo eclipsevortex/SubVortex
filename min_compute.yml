@@ -72,4 +72,4 @@ compute_spec:
 network_spec:
   bandwidth:
     download: 250  # Minimum download bandwidth (Mbps)
-    upload: 25     # Minimum upload bandwidth (Mbps)
+    upload: 250    # Minimum upload bandwidth (Mbps)

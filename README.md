@@ -17,7 +17,7 @@
   <img src="subvortex.png" alt="Image Description" width="300" height="300">
 </div>
 <br />
-<div style="font-size: 20px">Testnet: 92 • Mainnet: TBD</div>
+<div style="font-size: 20px">Testnet: 92 • Mainnet: 7</div>
 
 </div>
 
@@ -33,6 +33,12 @@
 - [Team Composition](#team-composition)
 - [Road Map](#road-map)
 - [Conclusion](#conclusion)
+- [Machine Requirements](#machine-requirements)
+  - [Validator](#validator-requirements)
+  - [Miner](#miner-requirements)
+- [Fast Setup and Run](#fast-setup-and-run)
+  - [Validator](#validator-fast-setup-and-run)
+  - [Miner](#miner-fast-setup-and-run)
 - [Installation](#installation)
   - [Install SubVortex](#install-subvortex)
   - [Install Subtensor](#install-local-subtensor)
@@ -42,16 +48,16 @@
 - [Running a Validator](#running-a-validator)
 - [New Releases](#new-releases)
 - [Troubleshooting](#troubleshooting)
-  - [Troubleshooting Subtensor](#troubleshooting-subtensor) 
+  - [Troubleshooting Subtensor](#troubleshooting-subtensor)
 - [License](#license)
 
 ## Abstract
 
-SubVortex introduces an incentivized and decentralized network of subtensor nodes which are a pivotal element within the Bittensor ecosystem. This delineates the structure, objectives, and mechanisms of SubVortex, aiming to foster decentralization, stability, and efficient resource allocation within the broader Bittensor network.
+SubVortex introduces an incentivized and decentralized network of subtensor nodes that are pivotal elements within the Bittensor ecosystem. This delineates the structure, objectives, and mechanisms of SubVortex, aiming to foster decentralization, stability, and efficient resource allocation within the broader Bittensor network.
 
 ## Introduction
 
-Subtensor nodes play a vital role in the Bittensor network, governing various aspects such as incentivization, governance, and network health. SubVortex aims to enhance the decentralization and functionality of Bittensor by establishing an incentivised network of subtensors. This whitepaper describes the goals, roles, and operational phases of SubVortex, outlining its contribution and value proposition to the Bittensor ecosystem.
+Subtensor nodes play a vital role in the Bittensor network, governing various aspects such as incentivization, governance, and network health. SubVortex aims to enhance the decentralization and functionality of Bittensor by establishing an incentivized network of subtensors. This whitepaper describes the goals, roles, and operational phases of SubVortex, outlining its contribution and value proposition to the Bittensor ecosystem.
 
 ## Goals
 
@@ -88,24 +94,24 @@ Running subtensors locally offers advantages in speed, reliability, and control 
 
 ## Incentive Mechanism
 
-SubVortex's incentive mecanism will score miners based on multiple criteria of their subtensor node:
+SubVortex's incentive mechanism will score miners based on multiple criteria of their subtensor node:
 
-- **Availability** - Subtensor nodes must be reliable to ensure a good uptime.
-- **Latency** - Subtensor nodes must be efficient to ensure a good performance.
-- **Reliability** and Stability - Subtensor nodes must be efficient to ensure a good service quality.
+- **Availability** - Subtensor nodes must be reliable to ensure good uptime.
+- **Latency** - Subtensor nodes must be efficient to ensure good performance.
+- **Reliability** and Stability - Subtensor nodes must be efficient to ensure good service quality.
 - **Global distribution** - Subtensor nodes must be worldwide to ensure a good reach.
 
-The final score used to set the weight is an average of all theses scoring and will replaces 5% of the weight of the previous weights.
+The final score used to set the weight is an average of all these scores and will replace 5% of the weight of the previous weights.
 
 ### Availability
 
-This reward would incentivize miners to maintain high levels of uptime and accessibility.
+This reward incentivizes miners to maintain high levels of uptime and accessibility.
 
 To assign a score for each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by the success of getting that block.
 
 ### Latency
 
-This reward would incentivize miners to low-latency services and minimizing response times.
+This reward incentivizes miners to low-latency services and minimizes response times.
 
 To assign a score to each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by the time taken to process that request, using a normalized method as part of the reward system.
 
@@ -113,28 +119,28 @@ The validator can be in a different country than the miner, so we will incorpora
 
 ### Reliability and Stability
 
-This reward would incentivize miners to high levels of reliability and minimizing the occurrence and impact of failures.
+This reward incentivizes miners to have high levels of reliability and minimize the occurrence and impact of failures.
 
-To assign a score to each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by computing the ratio successes/attempts, using a normalized method as part of the reward system.
+To assign a score to each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by computing the ratio of successes/attempts, using a normalized method as part of the reward system.
 
 ### Global Distribution
 
-This reward would incentivize miners to effectively distribute subtensors across different geographical locations to optimize performance and reduce latency for a better subnet experience.
+This reward incentivizes miners to effectively distribute subtensors across different geographical locations to optimize performance and reduce latency for a better subnet experience.
 
 ## Value Proposition
 
-SubVortex enriches the Bittensor ecosystem by providing an alternative to the Finney network and promoting decentralization, reliability, and efficiency. It offers miners and validators a seamless experience with low entry barriers and continuous support.
+SubVortex enriches the Bittensor ecosystem by providing an alternative to the Finney network and promoting decentralization, reliability, and efficiency. It offers miners and validators a seamless experience with low barriers to entry and continuous support.
 
 ## Team Composition
 
-The team is compromised of individuals with diverse backgrounds and extensive experience in crypto, software development, engineering, business and data management. The SubVortex team ensures robust support and continuous improvement for the network.
+The team comprises individuals with diverse backgrounds and extensive experience in crypto, software development, engineering, business, and data management. The SubVortex team ensures robust support and continuous improvement for the network.
 
 Team responsabilities
 
 - **EclipseVortex** - Development and technology
 - **Ch3RNØbØG** - Operations and business development
 - **tww9** - Strategy and public relations
-- **HcL-CO** - QA Lead and Support
+- **HcL-CO** - QA Lead and support
 
 Team timezone
 
@@ -147,7 +153,7 @@ Team timezone
 
 ### Phase 1
 
-- Create subnet in testnet and perform internal testing of the incentive mechanism
+- Create a subnet in testnet and perform internal testing of the incentive mechanism
 - Register subnet on mainnet
 - Release preliminary information publicly
 
@@ -155,7 +161,7 @@ Team timezone
 
 - Internal testing on mainnet. Bug fixes, etc.
 - Public launch and allow key registrations.
-- Basic structure with equal emissions for all miners
+- Performance-based emission structure
 
 ### Phase 3:
 
@@ -165,13 +171,102 @@ Team timezone
 ### Phase 4
 
 - Public SubVortex load balancer
-- Performance based emission structure
 
-> Note: The Road Map will be updated if any changes
+> Note: The Road Map will be updated if there are any changes
 
 ## Conclusion
 
-In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittensor network, incentivising decentralization, reliability, and accessibility. Through its innovative approach and robust infrastructure, SubVortex aims to catalyze the growth and sustainability of the decentralized machine learning ecosystem that is Bittensor.
+In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittensor network, incentivizing decentralization, reliability, and accessibility. Through its innovative approach and robust infrastructure, SubVortex aims to catalyze the growth and sustainability of the decentralized machine-learning ecosystem that is Bittensor.
+
+## Machine requirements
+
+In terms of Operation System, you have to follow the requirements
+
+- Ubuntu (>= 22.04)
+- Others - please share with us to update our docs.
+
+### Miner <a id="miner-requirements"></a>
+
+For miner, you need a CPU machine (no GPU needed!) with the same requirements as a local subtensor. Go to the [Subtensor github](https://github.com/opentensor/subtensor) for more information;.
+
+For more information, take a look on the [min requirements](./min_compute.yml)
+
+> IMPORTANT: take a look at the [Incentive Mechanism](#incentive-mechanism) to understand better where you can play to get the best miner. To summarize, you need to be available, reliable, and present in various geographical locations with low latency.
+
+### Validator <a id="validator-requirements"></a>
+
+For validator, you need a CPU machine (no GPU needed!).
+
+For more information, take a look on the [min requirements](./min_compute.yml)
+
+## Fast Setup and Run
+
+For a quick and seamless setup, we provide a comprehensive script that installs and runs a miner or validator, taking care of everything from installation to execution.
+
+### Setup and run a miner <a id="miner-fast-setup-and-run"></a>
+
+> <span style="color: red;">**IMPORTANT**</span> <br />
+> To use the full script, you have to follow the steps to install the subnet (<span style="color: red;">**EXCEPT**</span> executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+
+Be sure you are in the **SubVortex** directory, if not 
+```
+cd SubVortex
+```
+
+Then, you can run the script
+
+```
+./scripts/setup_and_run.sh -t miner
+```
+
+> IMPORTANT
+> - If you any prompts, just confirm them
+> - Other options are available, pleaser take a look
+
+Check the available options by running
+
+```
+./scripts/setup_and_run.sh -h
+```
+
+Once the script is successfully executed, you'll have a miner up and running—nothing else required!
+
+Of course, if you have specific settings in mind, you can use this script as a base and update anything you want to tailor your experience to your needs.
+
+Finally, if you prefer setup and run the miner in a more controlled way, you can follow the different sections below.
+
+### Setup and run a validator <a id="validator-fast-setup-and-run"></a>
+
+> <span style="color: red;">**IMPORTANT**</span> <br />
+> To use the full script, you have to follow the steps to install the subnet (<span style="color: red;">**EXCEPT**</span> executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+
+Be sure you are in the **SubVortex** directory, if not 
+```
+cd SubVortex
+```
+
+Then, you can run the script
+
+```
+./scripts/setup_and_run.sh -t validator
+```
+
+> IMPORTANT
+> - If you any prompts, just confirm them
+> - <span style="color: red;">DO NOT USE **docker** execution for redis as we need more time to make it work</span>
+> - Other options are available, pleaser take a look
+
+Check the available options by running
+
+```
+./scripts/setup_and_run.sh -h
+```
+
+Once the script is successfully executed, you'll have a validator up and running—nothing else required!
+
+Of course, if you have specific settings in mind, you can use this script as a base and update anything you want to tailor your experience to your needs.
+
+Finally, if you prefer setup and run the validator in a more controlled way, you can follow the different sections below.
 
 ## Installation
 
@@ -180,159 +275,17 @@ In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittens
 - Local Subtensor is mandatory for all miners, and highly recommended for validators.
 - Validators will need to install and configure Redis
 
-To simplify the installation process, scripts have been provided as part of this repository to ease those set up.
-
 ### Install SubVortex
 
-Updating your base environment
-
-```
-apt update && apt upgrade -y
-apt install git nodejs npm -y
-npm i -g pm2
-apt install python3-pip
-```
-
-Select HOME directory
-
-```
-cd $HOME
-```
-
-Clone the subnet Subvortex
-
-```
-git clone https://github.com/eclipsevortex/SubVortex.git
-```
-
-Go the the SubVortex solution
-
-```
-cd SubVortex
-```
-
-Install the dependencies
-
-```
-pip install -r requirements.txt
-```
-
-Install the base software
-
-```
-pip install -e .
-```
+To install the subnet, refer to the [Subnet guide](./scripts/subnet/README.md)
 
 ### Install Local Subtensor
 
-A local subtensor can be installed via docker or binary. The steps below are one of many methods. Please reference the official [Subtensor GitHub](https://github.com/opentensor/subtensor/blob/main/docs/running-subtensor-locally.md) and its [documentation](https://docs.bittensor.com/getting-started/running-a-public-subtensor#lite-node-vs-archive-node) for other ways to set up local subtensor.
-
-Go to HOME directory
-
-```
-cd $HOME
-```
-
-Install the subtensor
-
-```
-$HOME/SubVortex/scripts/subtensor/setup.sh <NETWORK> <EXECUTION_TYPE> <ROOT_DIRECTORY>
-```
-
-Options
-
-- `NETWORK` is the network you want you local subtensor to run against. The possible value are `localnet`, `testnet` or `mainnet`. The default value is `mainnet` and recommended to keep it as such.
-
-- `EXECUTION_TYPE` choose `docker` if you want to install the subtensor in a docker container, `binary` to install in your base environment.
-
-- `ROOT_DIRECTORY` is the directory where you want to install Subtensor. By default, it is set to `$HOME` and it is recommended to keep it as such.
-
-Run the subtensor in your base environment
-
-```
-$HOME/SubVortex/scripts/subtensor/start.sh <NETWORK> <EXECUTION_TYPE> <ROOT_DIRECTORY>
-```
-
-Or via a process manager
-
-```
-pm2 start $HOME/SubVortex/scripts/subtensor/start.sh \
-  --name subtensor -- \
-  <NETWORK> \
-  <EXECUTION_TYPE> \
-  <ROOT_DIRECTORY>
-```
-
-Options
-
-- `NETWORK` is the network you want you local subtensor to run against. The possible value are `localnet`, `testnet` or `mainnet`. The default value is `mainnet` and recommended to keep as it is.
-
-- `EXECUTION_TYPE` choose `docker` if you want to install the subtensor in a docker container, `binary` to install in your base environment.
-
-- `ROOT_DIRECTORY` is the directory where you want to install Subtensor. By default, it is set to `$HOME` and it is recommended to keep it as such.
-
-You should see output like this in your pm2 logs for the process at startup:
-
-```
-> pm2 log subtensor
-
-1|subtenso | 2023-12-22 14:21:30 🔨 Initializing Genesis block/state (state: 0x4015…9643, header-hash: 0x2f05…6c03)
-1|subtenso | 2023-12-22 14:21:30 👴 Loading GRANDPA authority set from genesis on what appears to be first startup.
-1|subtenso | 2023-12-22 14:21:30 🏷  Local node identity is: 12D3KooWAXnooHcMSnMpML6ooVLzFwsmt5umFhCkmkxH88LvP5gm
-1|subtenso | 2023-12-22 14:21:30 💻 Operating system: linux
-1|subtenso | 2023-12-22 14:21:30 💻 CPU architecture: aarch64
-1|subtenso | 2023-12-22 14:21:30 💻 Target environment: gnu
-1|subtenso | 2023-12-22 14:21:30 💻 Memory: 62890MB
-1|subtenso | 2023-12-22 14:21:30 💻 Kernel: 5.15.0-1051-aws
-1|subtenso | 2023-12-22 14:21:30 💻 Linux distribution: Ubuntu 20.04.6 LTS
-1|subtenso | 2023-12-22 14:21:30 💻 Virtual machine: no
-1|subtenso | 2023-12-22 14:21:30 📦 Highest known block at #0
-1|subtenso | 2023-12-22 14:21:30 〽️ Prometheus exporter started at 127.0.0.1:9615
-1|subtenso | 2023-12-22 14:21:30 Running JSON-RPC HTTP server: addr=0.0.0.0:9933, allowed origins=["*"]
-1|subtenso | 2023-12-22 14:21:30 Running JSON-RPC WS server: addr=0.0.0.0:9944, allowed origins=["*"]
-1|subtenso | 2023-12-22 14:21:31 🔍 Discovered new external address for our node: /ip4/52.56.34.197/tcp/30333/ws/p2p/12D3KooWAXnooHcMSnMpML6ooVLzFwsmt5umFhCkmkxH88LvP5gm
-
-1|subtensor  | 2023-12-22 14:21:35 ⏩ Warping, Downloading state, 2.74 Mib (56 peers), best: #0 (0x2f05…6c03), finalized #0 (0x2f05…6c03), ⬇ 498.3kiB/s ⬆ 41.3kiB/s
-1|subtensor  | 2023-12-22 14:21:40 ⏩ Warping, Downloading state, 11.25 Mib (110 peers), best: #0 (0x2f05…6c03), finalized #0 (0x2f05…6c03), ⬇ 1.1MiB/s ⬆ 37.0kiB/s
-1|subtensor  | 2023-12-22 14:21:45 ⏩ Warping, Downloading state, 20.22 Mib (163 peers), best: #0 (0x2f05…6c03), finalized #0 (0x2f05…6c03), ⬇ 1.2MiB/s ⬆ 48.7kiB/s
-
-```
+To install a local subtensor, refer to the [Subtensor guide](./scripts/subtensor/README.md)
 
 ### Install Redis
 
-Redis is only required for running a validator.
-
-> Be sure you are in the SubVortex directory
-
-Install redis
-
-```
-./scripts/redis/install_redis.sh
-```
-
-Set Redis password
-
-```
-source ./scripts/redis/set_redis_password.sh
-```
-
-Create Redis firewall
-
-```
-./scripts/redis/create_redis_firewall.sh
-```
-
-Disable Rdb
-
-```
-./scripts/redis/disable_rdb.sh
-```
-
-Check redis is up and running
-
-```
-./scripts/redis/test_persistence.sh
-```
+To install redis, refer to the [Redis guide](./scripts/redis/README.md)
 
 ### Registering your wallet
 
@@ -362,6 +315,8 @@ Once you have successfully registered your wallet, you are now ready to start ei
 
 ### Running a Miner
 
+> IMPORTANT: Before running a miner, be sure you have a local subtensor up and running. Please see the [Subtensor guide](./scripts/subtensor/README.md) for more details.
+
 To run a miner, navigate to the SubVortex directory. It is highly recommended to run via a process manager like PM2.
 
 ```
@@ -378,6 +333,8 @@ pm2 start neurons/miner.py \
 > IMPORTANT: Do not run more than one miner per machine. Running multiple miners will result in the loss of incentive and emissions on all miners.
 
 ### Running a Validator
+
+> IMPORTANT: Before running a validator, be sure you have a redis up and running. Please see the [Redis guide](./scripts/redis/README.md) for more details.
 
 Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
 
@@ -419,11 +376,13 @@ Restart miners/validators if running them in your base environment or restart pm
 ### Troubleshooting Subtensor
 
 #### State already discarded
+
 ```
 Error: Service(Client(RuntimeApiError(UnknownBlock("State already discarded for 0x2f0555cc76fc2840a25a6ea3b9637146806f1f44b090c175ffde2a7e5ab36c03"))))
 ```
 
 To resolve the above error, you have to purge your chain by running
+
 ```
 $HOME/subtensor/target/release/node-subtensor purge-chain -y --base-path <BASE_PATH> --chain="<CHAIN>"
 ```
@@ -434,8 +393,7 @@ Options
 
 `CHAIN` is the chain you want to use, `./raw_spec.json` for maintest and `./raw_testspec.json` for testnet.
 
-Once the state has been purge, you can re-execute the subtensor start script $HOME/SubVortex/scripts/subtensor/start.sh via a procedd manager or not. See the section [Install Subtensor](#install-subtensor) 
-
+Once the state has been purge, you can re-execute the subtensor start script $HOME/SubVortex/scripts/subtensor/start.sh via a procedd manager or not. See the section [Install Subtensor](#install-subtensor)
 
 ## License
 

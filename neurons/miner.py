@@ -144,7 +144,7 @@ class Miner:
             f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
         self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
-
+        
         # Check there is not another miner running on the machine
         number_of_miners = len(
             [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]

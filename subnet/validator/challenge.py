@@ -14,7 +14,7 @@ from subnet.constants import (
     DISTRIBUTION_WEIGHT,
 )
 from subnet.shared.subtensor import get_current_block
-from subnet.validator.utils import ping_and_retry_uids, get_available_uids
+from subnet.validator.utils import ping_and_retry_uids, get_available_query_miners
 from subnet.validator.localisation import get_country
 from subnet.validator.bonding import update_statistics
 from subnet.validator.score import (
@@ -22,6 +22,7 @@ from subnet.validator.score import (
     compute_latency_score,
     compute_distribution_score,
 )
+from substrateinterface.base import SubstrateInterface
 
 
 CHALLENGE_NAME = "Challenge"
@@ -38,16 +39,20 @@ async def handle_synapse(self, uid: int):
     process_time = None
     try:
         # Create a subtensor with the ip return by the synapse
-        config = bt.subtensor.config()
-        config.subtensor.network = "local"
-        config.subtensor.chain_endpoint = f"ws://{ip}:9944"
-        miner_subtensor = bt.subtensor(config, log_verbose=False)
+        substrate = SubstrateInterface(
+            ss58_format=bt.__ss58_format__,
+            use_remote_preset=True,
+            url=f"ws://{ip}:9944",
+            type_registry=bt.__type_registry__,
+        )
 
         # Start the timer
         start_time = time.time()
 
         # Get the current block from the miner subtensor
-        miner_block = miner_subtensor.get_current_block()
+        miner_block = substrate.get_block()
+        if miner_block != None:
+            miner_block = miner_block["header"]["number"]
 
         # Compute the process time
         process_time = time.time() - start_time
@@ -56,9 +61,13 @@ async def handle_synapse(self, uid: int):
         validator_block = get_current_block(self.subtensor)
 
         # Check both blocks are the same
-        verified = miner_block == validator_block
-    except Exception:
+        verified = miner_block == validator_block or miner_block is not None
+
+        bt.logging.trace(f"[{CHALLENGE_NAME}][{uid}] Verified ? {verified} - val: {validator_block}, miner:{miner_block}")
+    except Exception as err:
         verified = False
+        process_time = 5 if process_time is None else process_time
+        bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Verified ? False")
 
     return verified, country, process_time
 
@@ -84,7 +93,7 @@ async def challenge_data(self):
         responses = await asyncio.gather(*tasks)
 
     # Compute the score
-    for idx, (uid, (verified)) in enumerate(zip(uids, responses)):
+    for idx, (uid, (verified, _, _)) in enumerate(zip(uids, responses)):
         # Get the hotkey
         hotkey = self.metagraph.hotkeys[uid]
 
@@ -130,7 +139,7 @@ async def challenge_data(self):
             bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Latency score {latency_score}")
 
             # Compute score for reliability
-            reliability_score = await compute_reliability_score(self.database, hotkey)
+            reliability_score = await compute_reliability_score(uid, self.database, hotkey)
             bt.logging.debug(
                 f"[{CHALLENGE_NAME}][{uid}] Reliability score {reliability_score}"
             )
@@ -151,7 +160,7 @@ async def challenge_data(self):
                 + (LATENCY_WEIGHT * latency_score)
                 + (RELIABILLITY_WEIGHT * reliability_score)
                 + (DISTRIBUTION_WEIGHT * distribution_score)
-            ) / 4.0
+            ) / 6.0
         else:
             # More than 1 miner running in the axon machine
             # Someone is trying to hack => Penalize all the miners on the axon machine
@@ -191,8 +200,8 @@ async def challenge_data(self):
     bt.logging.trace(f"Scattered rewards: {scattered_rewards}")
 
     # Update moving_averaged_scores with rewards produced by this step.
-    # alpha of 0.05 means that each new score replaces 5% of the weight of the previous weights
-    alpha: float = 0.05
+    # alpha of 0.2 means that each new score replaces 20% of the weight of the previous weights
+    alpha: float = 0.2
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)

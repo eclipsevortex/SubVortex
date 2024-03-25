@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  redis:
+    build:
+      context: ../
+      args:
+        REDIS_CONF: ${REDIS_CONF}
+        REDIS_DATA: ${REDIS_DATA}
+        REDIS_PASSWORD: ${REDIS_PASSWORD}
+      dockerfile: ./scripts/Dockerfile
+    container_name: subvortex-redis
+    image: subvortex-redis:latest
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--raw", "incr", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+    command:
+      - redis-server
+      - /etc/redis/redis.conf
+    ports:
+      - ${REDIS_PORT:-6379}:6379
+    volumes:
+      - ${REDIS_DATA:-/var/lib/redis}:/var/lib/redis

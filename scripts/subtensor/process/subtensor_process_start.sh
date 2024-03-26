@@ -1,6 +1,8 @@
 #!/bin/bash
 
 source ${BASH_SOURCE%/*}/../../utils/machine.sh
+source ${BASH_SOURCE%/*}/../../utils/tools.sh
+
 
 show_help() {
 cat << EOF
@@ -68,6 +70,10 @@ run_local_subtensor() {
 
 run_remote_subtensor() {
     if [[ $WITH_PM2 == true ]]; then
+        # install pm2 
+        install_pm2
+
+        # start the subtensor
         pm2 start $BASE/scripts/subtensor_start.sh -f \
             --name subtensor -- \
             -e binary \

@@ -22,7 +22,6 @@ import asyncio
 from redis import asyncio as aioredis
 import threading
 import bittensor as bt
-import subprocess
 from shlex import quote
 from copy import deepcopy
 from pprint import pformat
@@ -124,13 +123,16 @@ class Validator:
         # Setup database
         bt.logging.info(f"loading database")
         redis_password = get_redis_password(self.config.database.redis_password)
-        print(f"[RD] password {redis_password}")
         self.database = aioredis.StrictRedis(
             host=self.config.database.host,
             port=self.config.database.port,
             db=self.config.database.index,
             password=redis_password,
         )
+        print(f"HOST: {self.config.database.host}")
+        print(f"PORT: {self.config.database.port}")
+        print(f"DB: {self.config.database.index}")
+        print(f"PASSWORD: {redis_password}")
         self.db_semaphore = asyncio.Semaphore()
 
         # Init Weights.

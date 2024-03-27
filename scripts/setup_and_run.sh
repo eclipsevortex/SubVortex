@@ -93,7 +93,7 @@ if [[ $ACTION_ON_HOTKEY == "yes" ]]; then
     read -p "Enter the hotkey name: " HOTKEY_NAME
 
     if [[ $NEW_HOTKEY == 'no' ]]; then
-        read -p "Enter mnemonic, seed, or json file location for the coldkey? " HOTKEY_MNEMONIC
+        read -p "Enter mnemonic, seed, or json file location for the hotkey? " HOTKEY_MNEMONIC
     fi
 else
     read -p "Enter the hotkey name: " HOTKEY_NAME

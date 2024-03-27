@@ -32,6 +32,7 @@
 - [Value Proposition](#value-proposition)
 - [Team Composition](#team-composition)
 - [Road Map](#road-map)
+- [Credits](#credits)
 - [Conclusion](#conclusion)
 - [Machine Requirements](#machine-requirements)
   - [Validator](#validator-requirements)
@@ -173,6 +174,18 @@ Team timezone
 - Public SubVortex load balancer
 
 > Note: The Road Map will be updated if there are any changes
+
+## Credits
+
+Bittensor technology is still new and promising, and participants are eager to support each other. That's why the SubVortex team would like to express our gratitude to everyone who has helped us reach where we are today:
+
+- **Bittensor**: for providing a subnet template that enabled us to quickly set up our subnet.
+- **Subtensor**: for their local subtensor, scripts, and invaluable assistance.
+- **Subnet Storage (SN21)**: for their excellent subnet design, which adheres to best practices and simplifies the lives of developers.
+- **Users**: YES!!! Without you, we are nothing, and our vision to advance this new technology would never have materialized.
+- **Others**: undoubtedly, there are many other contributors deserving of recognition, and we look forward to acknowledging them in the future.
+
+Please don't hesitate to reach out if we've inadvertently omitted anyone, and you'd like us to give them a special shout-out on our GitHub!
 
 ## Conclusion
 

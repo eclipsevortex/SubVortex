@@ -184,7 +184,8 @@ def log_distribution(self, event: EventSchema, commit=False):
 
 
 def log_score(self, name: str, event: EventSchema, commit=False):
-    scores = getattr(event, f"{name}_scores")
+    property_name = f"{name}_scores" if name != "final" else "rewards"
+    scores = getattr(event, property_name)
 
     # Build the data for the metric
     data = {}
@@ -205,6 +206,7 @@ def log_event(self, event: EventSchema):
         log_distribution(self, event)
 
         # Add scores
+        log_score(self, "final", event)
         log_score(self, "availability", event)
         log_score(self, "latency", event)
         log_score(self, "reliability", event)

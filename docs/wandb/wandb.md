@@ -11,6 +11,7 @@ This document explains how to install and configure wandb
   - [Validator](#configuration-validator)
   - [Miner](#configuration-miner)
 - [User Guide](#user-guide)
+- [Roadmap](#roadmap)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -86,6 +87,8 @@ Options
 - `--wandb.offline` - Runs wandb in offline mode. Default **false**
 - `--wandb.run_step_length` - How many steps before we rollover to a new run. Default **360**
 
+To enhance user experience, we have decided to name each run using the format `validator-<VALIDATOR_UID>-<COUNT>`. This format allows users to easily identify the runs of the validator they wish to access. The count will increment with each run until it reaches 10000, at which point it will reset.
+
 ## Miner
 
 For miner, wandb is not needed so nothing to do here.
@@ -96,22 +99,50 @@ For miner, wandb is not needed so nothing to do here.
 
 ## Miners
 
+![miners](wandb-miners.png)
+
 The table display the list of miners with the following informations
-- `` - 
-- `` -
-- `` -
-- `` -
-- `` -
+
+- `UID` - UID of the miner.
+- `Version` - Version of the miner.
+- `Country` - Geographical location of the subtensor.
+- `Score` - Last final score of the subtensor.
+- `Availability` - Last availability score of the subtensor.
+- `Reliability` - Last reliability score of the subtensor.
+- `Latency` - Last latency score of the subtensor.
+- `Distribution` - Last distribution score of the subtensor.
 
 From that table, you can get a quick overview of how you are competing with others. You can sort the different columns to prioritize the desired information. We are still investigating if filtering is possible with Wandb.
 
 ## Localisation
 
+![localisation](wandb-distribution.png)
+
 The histogram gives you the number of subtensors per country. Based on how the distribution score is computed, you can easily identify a country where there are no subtensors or a very small number, in order to maximize it.
 
 ## Scores
 
+![scores](wandb-scores.png)
 
+The line plot gives you the an evolution of the score through time. There is on line plot per score (final, availability, reliability, latency and distribution) and per miner.
+
+With these scores, you can understand how your miners compete with others and make the appropriate adjustments of your choice.
+
+## Tips
+
+![alt text](wandb-search-bar.png)
+
+The search bar can be use to display only the scores related to your miner. To do so, just seize in the search input `_score.<UID` and replace **UID** by your miner ID. You are going to see something like below
+
+![alt text](wandb-search.png)
+
+<br />
+
+# Roadmap
+
+The wandb UI is a fallback plan while waiting for the realy Frontend to be developed. We feel the need from our users to find a plan B as quick as possible and we decided to go with wandb which is already a familiar tool for our users.
+
+In terms of our roadmap, we don't have a specific plan outlined yet, but we do have significant plans for the Frontend. Additionally, we'll be actively engaging with our users to gauge their needs and preferences. Depending on their feedback, we may need to add or modify certain graphs to ensure they have all the necessary information to understand their performance and make informed decisions accordingly.
 
 <br />
 

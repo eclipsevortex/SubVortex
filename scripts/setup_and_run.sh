@@ -209,7 +209,7 @@ if [[ "$TYPE" == "validator" ]]; then
     # Stop and delete validator if up and running
     process=$(pm2 list | grep "validator-$NETUID" &> /dev/null;)
     if [[ ! -z $process ]]; then
-        pm2 stop validator-$NETUID && pm2 validator miner-$NETUID
+        pm2 stop validator-$NETUID && pm2 delete validator-$NETUID
     fi
 
     # Set the redis password

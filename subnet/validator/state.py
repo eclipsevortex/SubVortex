@@ -1,6 +1,5 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-# Copyright © 2023 philanthrope
+# Copyright © 2024 Eclipse Vortex
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -19,9 +18,14 @@
 # Utils for checkpointing and saving the model.
 import torch
 import copy
+import wandb
 import bittensor as bt
+from dataclasses import asdict
 
+from subnet import __spec_version__ as THIS_SPEC_VERSION
+from subnet import __version__ as THIS_VERSION
 import subnet.validator as validator
+from subnet.validator.event import EventSchema
 
 
 def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
@@ -122,3 +126,172 @@ def load_state(self):
         )
     except Exception as e:
         bt.logging.warning(f"Failed to load model with error: {e}")
+
+
+def log_miners_table(self, event: EventSchema, commit=False):
+    # Build the dataset
+    # We convert any number into string to have a better style in wandb UI
+    data = []
+    for idx, (uid) in enumerate(event.uids):
+        data.append(
+            [
+                str(uid),
+                "0.2.4",
+                event.countries[idx],
+                str(event.rewards[idx]),
+                str(event.availability_scores[idx]),
+                str(event.latency_scores[idx]),
+                str(event.reliability_scores[idx]),
+                str(event.distribution_scores[idx]),
+            ]
+        )
+
+    # Create the graph
+    miners = wandb.Table(
+        columns=[
+            "UID",
+            "Version",
+            "Country",
+            "Score",
+            "Availability",
+            "Latency",
+            "Reliability",
+            "Distribution",
+        ],
+        data=data,
+    )
+
+    self.wandb.log({"miners": miners}, commit=commit)
+
+
+def log_distribution(self, event: EventSchema, commit=False):
+    # Build the data for the metric
+    country_counts = {}
+    for code in event.countries:
+        country_counts[code] = country_counts.get(code, 0) + 1
+
+    # Create the graph
+    data = [[country, count] for country, count in country_counts.items()]
+    table = wandb.Table(data=data, columns=["country", "count"])
+    wandb.log(
+        {
+            "distribution": wandb.plot.bar(
+                table, "country", "count", title="Miners Distribution"
+            )
+        },
+        commit=commit,
+    )
+
+
+def log_score(self, name: str, event: EventSchema, commit=False):
+    scores = getattr(event, f"{name}_scores")
+
+    # Build the data for the metric
+    data = {}
+    for idx, (score) in enumerate(scores):
+        data[f"{event.uids[idx]}"] = score
+
+    # Create the graph
+    self.wandb.log({f"{name}_score": data}, commit=commit)
+
+
+def log_event(self, event: EventSchema):
+    # Log the event to wandb
+    if not self.config.wandb.off and self.wandb is not None:
+        # Add the miner table
+        log_miners_table(self, event)
+
+        # Add miners distribution
+        log_distribution(self, event)
+
+        # Add scores
+        log_score(self, "availability", event)
+        log_score(self, "latency", event)
+        log_score(self, "reliability", event)
+        log_score(self, "distribution", event)
+
+        # Add the rest of the metrics
+        wandb_event = EventSchema.from_dict(event.__dict__)
+        self.wandb.log(asdict(wandb_event))
+
+
+def init_wandb(self, reinit=False):
+    """Starts a new wandb run."""
+    tags = [
+        self.wallet.hotkey.ss58_address,
+        THIS_VERSION,
+        str(THIS_SPEC_VERSION),
+        f"netuid_{self.metagraph.netuid}",
+    ]
+
+    if self.config.mock:
+        tags.append("mock")
+    if self.config.neuron.disable_set_weights:
+        tags.append("disable_set_weights")
+    if self.config.neuron.disable_log_rewards:
+        tags.append("disable_log_rewards")
+
+    wandb_config = {
+        key: copy.deepcopy(self.config.get(key, None))
+        for key in ("neuron", "reward", "netuid", "wandb")
+    }
+    wandb_config["neuron"].pop("full_path", None)
+
+    # Get the list of current runs for the validator
+    api = wandb.Api()
+    runs = api.runs(
+        f"{self.config.wandb.entity}/{self.config.wandb.project_name}",
+        order="-created_at",
+        filters={"display_name": {"$regex": f"^validator-{self.uid}"}},
+    )
+
+    name = f"validator-{self.uid}-1"
+    if len(runs) > 0:
+        # Take the first run as it will be the most recent one
+        last_number = runs[0].name.split("-")[-1]
+        name = f"validator-{self.uid}-{int(last_number) + 1}"
+
+    # Create a new run
+    self.wandb = wandb.init(
+        anonymous="allow",
+        reinit=reinit,
+        project=self.config.wandb.project_name,
+        entity=self.config.wandb.entity,
+        config=wandb_config,
+        mode="offline" if self.config.wandb.offline else "online",
+        dir=self.config.neuron.full_path,
+        tags=tags,
+        notes=self.config.wandb.notes,
+        name=name,
+    )
+
+    bt.logging.debug(f"[Wandb] {len(runs)} run(s) exist")
+
+    # Remove old runs - We keep only one archive + the new run
+    if len(runs) >= 2:
+        bt.logging.debug(f"[Wandb] Removing the {len(runs) - 1} oldest run(s)")
+        for i in range(len(runs) - 1, len(runs)):
+            # Remove artifacts too
+            runs[i].delete(True)
+            bt.logging.debug(f"[Wandb] Run {runs[i].name} removed")
+
+    bt.logging.success(
+        prefix="Started a new wandb run",
+        sufix=f"<blue> {self.wandb.name} </blue>",
+    )
+
+
+def reinit_wandb(self):
+    """Reinitializes wandb, rolling over the run."""
+    if self.wandb is not None:
+        self.wandb.finish()
+    init_wandb(self, reinit=True)
+
+
+def should_reinit_wandb(self):
+    """Check if wandb run needs to be rolled over."""
+    return (
+        not self.config.wandb.off
+        and self.step
+        and self.step % self.config.wandb.run_step_length == 0
+    )

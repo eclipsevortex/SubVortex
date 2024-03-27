@@ -43,6 +43,7 @@
   - [Install SubVortex](#install-subvortex)
   - [Install Subtensor](#install-local-subtensor)
   - [Install Redis](#install-redis)
+  - [Install Wandb](#install-wandb)
 - [Registering your wallet](#registering-your-wallet)
 - [Running a Miner](#running-a-miner)
 - [Running a Validator](#running-a-validator)
@@ -287,6 +288,10 @@ To install a local subtensor, refer to the [Subtensor guide](./scripts/subtensor
 
 To install redis, refer to the [Redis guide](./scripts/redis/README.md)
 
+### Install Wandb
+
+To install wandb, refer to the [Wandb guide](./docs/wandb/wandb.md)
+
 ### Registering your wallet
 
 In order to run either a miner or a validator, you will need to have a wallet registered to the subnet. If you do not already have wallet set up on the server, following the steps below:
@@ -317,6 +322,8 @@ Once you have successfully registered your wallet, you are now ready to start ei
 
 > IMPORTANT: Before running a miner, be sure you have a local subtensor up and running. Please see the [Subtensor guide](./scripts/subtensor/README.md) for more details.
 
+> IMPORTANT: **wandb** **IS NOT** for miners, **ONLY FOR** validators.
+
 To run a miner, navigate to the SubVortex directory. It is highly recommended to run via a process manager like PM2.
 
 ```
@@ -335,6 +342,8 @@ pm2 start neurons/miner.py \
 ### Running a Validator
 
 > IMPORTANT: Before running a validator, be sure you have a redis up and running. Please see the [Redis guide](./scripts/redis/README.md) for more details.
+
+> OPTIONAL: Before runninng a validator, you can install and configure **wandb**, but **HIGHLY RECOMMENDED** as it enables everyone to access various statistics for better performance on the subnet.
 
 Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
 
@@ -401,7 +410,7 @@ This repository is licensed under the MIT License.
 
 ```text
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
+# Copyright © 2024 Eclipse Vortex
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation

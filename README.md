@@ -349,6 +349,8 @@ pm2 start neurons/miner.py \
 
 > OPTIONAL: Before runninng a validator, you can install and configure **wandb**, but **HIGHLY RECOMMENDED** as it enables everyone to access various statistics for better performance on the subnet. Please see the [Wandb guide](./docs/wandb/wandb.md) for more details.
 
+> IMPORTANT: If you want to run Wandb on the testnet, please ensure you include the argument `--wandb.project_name` when running a miner. The project name can be any project you have created on your account, or you can use the testnet subvortex project, which is **test-subvortex-team**.
+
 Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
 
 ```

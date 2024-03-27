@@ -97,6 +97,8 @@ For miner, wandb is not needed so nothing to do here.
 
 # User Guide
 
+To access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
+
 ## Miners
 
 ![miners](wandb-miners.png)

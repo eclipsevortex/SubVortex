@@ -249,7 +249,8 @@ def init_wandb(self, reinit=False):
     if len(runs) > 0:
         # Take the first run as it will be the most recent one
         last_number = runs[0].name.split("-")[-1]
-        name = f"validator-{self.uid}-{int(last_number) + 1}"
+        next_number = (int(last_number) % 10000) + 1
+        name = f"validator-{self.uid}-{next_number}"
 
     # Create a new run
     self.wandb = wandb.init(

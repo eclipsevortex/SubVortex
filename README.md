@@ -183,7 +183,7 @@ Bittensor technology is still new and promising, and participants are eager to s
 - **Subtensor**: for their local subtensor, scripts, and invaluable assistance.
 - **Subnet Storage (SN21)**: for their excellent subnet design, which adheres to best practices and simplifies the lives of developers.
 - **Users**: YES!!! Without you, we are nothing, and our vision to advance this new technology would never have materialized.
-- **Others**: Undoubtedly, there are many other contributors deserving of recognition, and we look forward to acknowledging them in the future.
+- **Others**: undoubtedly, there are many other contributors deserving of recognition, and we look forward to acknowledging them in the future.
 
 Please don't hesitate to reach out if we've inadvertently omitted anyone, and you'd like us to give them a special shout-out on our GitHub!
 

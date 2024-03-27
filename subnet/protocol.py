@@ -29,11 +29,3 @@ class Score(bt.Synapse):
     distribution: float    
     score: float    
     count: typing.Optional[int] = 0
-
-class IsAlive(bt.Synapse):
-    # Returns
-    answer: typing.Optional[str] = None
-
-    def deserialize(self) -> typing.Optional[str]:
-        return self.answer
-    

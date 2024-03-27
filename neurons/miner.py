@@ -26,7 +26,7 @@ import bittensor as bt
 import threading
 import traceback
 
-from subnet.protocol import IsAlive, Score
+from subnet.protocol import Score
 
 from subnet.shared.checks import check_registration
 
@@ -131,9 +131,6 @@ class Miner:
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward functions to axon.")
         self.axon.attach(
-            forward_fn=self._is_alive,
-            blacklist_fn=self.blacklist_isalive,
-        ).attach(
             forward_fn=self._score,
             blacklist_fn=self.blacklist_score,
         )
@@ -173,14 +170,6 @@ class Miner:
 
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
-    def _is_alive(self, synapse: IsAlive) -> IsAlive:
-        bt.logging.info("I'm alive!")
-        synapse.answer = "alive"
-        return synapse
-
-    def blacklist_isalive(self, synapse: IsAlive) -> typing.Tuple[bool, str]:
-        return False, synapse.dendrite.hotkey
-
     def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
@@ -197,7 +186,19 @@ class Miner:
         return synapse
 
     def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
-        return False, synapse.dendrite.hotkey
+        caller = synapse.dendrite.hotkey
+
+        if caller in self.config.blacklist.blacklist_hotkeys:
+            return True, f"Hotkey {caller} in blacklist."
+        elif caller in self.config.blacklist.whitelist_hotkeys:
+            return False, f"Hotkey {caller} in whitelist."
+
+        if caller not in self.metagraph.hotkeys:
+            bt.logging.trace(f"Blacklisting unrecognized hotkey {caller}")
+            return True, "Unrecognized hotkey"
+
+        bt.logging.trace(f"Not Blacklisting recognized hotkey {caller}")
+        return False, "Hotkey recognized!"
 
     def run(self):
         run(self)

@@ -100,6 +100,9 @@ async def update_statistics(
         database (redis.Redis): The Redis client instance for database operations.
     """
     # Check and see if this miner is registered.
+    result = await database.ping()
+    print(f"IS CONNECTED: {result}")
+
     if not await miner_is_registered(ss58_address, database):
         bt.logging.debug(f"Registering new miner {ss58_address}...")
         await register_miner(ss58_address, database)

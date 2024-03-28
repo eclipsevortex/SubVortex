@@ -140,7 +140,7 @@ The histogram gives you the number of subtensors per country. Based on how the d
 
 ![scores](wandb-scores.png)
 
-The line plot gives you the an evolution of the score through time. There is on line plot per score (final, availability, reliability, latency and distribution) and per miner.
+The line plot gives you the an evolution of the score through time. There is one line plot per score (final, availability, reliability, latency and distribution) and per miner.
 
 With these scores, you can understand how your miners compete with others and make the appropriate adjustments of your choice.
 

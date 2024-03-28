@@ -142,11 +142,6 @@ class Validator:
         self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         bt.logging.info(f"Running validator on uid: {self.uid}")
 
-        # Init wandb.
-        if not self.config.wandb.off:
-            bt.logging.debug("loading wandb")
-            init_wandb(self)
-
         # Dendrite pool for querying the network.
         bt.logging.debug("loading dendrite_pool")
         if self.config.neuron.mock_dendrite_pool:
@@ -162,6 +157,11 @@ class Validator:
             country_localisation["country"] if country_localisation else "None"
         )
         bt.logging.debug(f"Validator based in {country_name}")
+
+        # Init wandb.
+        if not self.config.wandb.off:
+            bt.logging.debug("loading wandb")
+            init_wandb(self)
 
         # Init the event loop.
         self.loop = asyncio.get_event_loop()

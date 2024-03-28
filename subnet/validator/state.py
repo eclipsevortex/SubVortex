@@ -201,9 +201,9 @@ def log_score(self, name: str, event: EventSchema, commit=False):
 
 
 def log_moving_averaged_score(self, event: EventSchema, commit=False):
-    '''
+    """
     Create a graph showing the moving score for each miner over time
-    '''
+    """
     # Build the data for the metric
     data = {}
     for idx, (score) in enumerate(event.moving_averaged_scores):
@@ -217,9 +217,9 @@ def log_moving_averaged_score(self, event: EventSchema, commit=False):
 
 
 def log_completion_times(self, event: EventSchema, commit=False):
-    '''
+    """
     Create a graph showing the time to process the challenge over time
-    '''
+    """
     # Build the data for the metric
     data = {}
     for idx, (time) in enumerate(event.completion_times):
@@ -294,11 +294,20 @@ def init_wandb(self, reinit=False):
         next_number = (int(last_number) % 10000) + 1
         name = f"validator-{self.uid}-{next_number}"
 
+    # Ensure "subvortex-team" and "test-subvortex-team" are used with the right subnet UID
+    # If user provide its own project name we keep it
+    project_name = self.config.wandb.project_name
+    if self.config.netuid == 7 and project_name.endswith("subvortex-team"):
+        project_name = "subvortex-team"
+    elif self.config.netuid == 92 and project_name.endswith("subvortex-team"):
+        project_name = "test-subvortex-team"
+    bt.logging.debug(f"Wandb project {project_name} used for Subnet {self.config.netuid}")
+
     # Create a new run
     self.wandb = wandb.init(
         anonymous="allow",
         reinit=reinit,
-        project=self.config.wandb.project_name,
+        project=project_name,
         entity=self.config.wandb.entity,
         config=wandb_config,
         mode="offline" if self.config.wandb.offline else "online",

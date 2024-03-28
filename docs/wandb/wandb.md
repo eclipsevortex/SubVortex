@@ -1,6 +1,6 @@
 [Back to Main README](../../README.md)
 
-This document explains how to install and configure wandb
+This document explains how to install and configure wandb.
 
 <br />
 
@@ -172,4 +172,20 @@ In terms of our roadmap, we don't have a specific plan outlined yet, but we do h
 
 # Troubleshooting
 
-None
+## The sections are not ordered
+
+At that time, we could not guarantee the sorting to work every time.
+
+To resolve your issue, either drag and drop manually the sections or click on the settings on the right on the `Search panel with regex` input
+
+![settings](wandb-settings.png)
+
+Then, click to the locker to unlock the `Prtected settings` section
+
+![settings-modal](wandb-settings-modal.png)
+
+Choose the empty option in the `Organize panels into sections by metric name` section, and then re-select the initial option. Ensure that the selection remains the same as before. While performing this action, you might observe changes on the page behind the modal.
+
+![settings-modal](wandb-settings-modal.png)
+
+Finally, click on `Done` to see the sections sorted as expected

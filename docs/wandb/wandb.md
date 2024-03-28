@@ -164,9 +164,9 @@ The search bar can be use to display only the scores related to your miner. To d
 
 # Roadmap
 
-The wandb UI is a fallback plan while waiting for the realy Frontend to be developed. We feel the need from our users to find a plan B as quick as possible and we decided to go with wandb which is already a familiar tool for our users.
+This wandb UI is built as a temporary solution to provide miners and validators with tools and data as quick as possible. A more professional and robust front-end website will developped in the future to further enhance the user experience.
 
-In terms of our roadmap, we don't have a specific plan outlined yet, but we do have significant plans for the Frontend. Additionally, we'll be actively engaging with our users to gauge their needs and preferences. Depending on their feedback, we may need to add or modify certain graphs to ensure they have all the necessary information to understand their performance and make informed decisions accordingly.
+SubVortex will be actively engaging with our users to gauge their needs and preferences. Based on their feedback, we will implement strategic changes to the provided tools. We will continue to ensure all users have the necessary information needed to make informed decisions to optimize their performance.
 
 <br />
 

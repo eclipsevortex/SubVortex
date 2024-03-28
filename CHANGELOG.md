@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 / 2024-03-28
+
+## What's Changed
+* README - Add credit section by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/15
+* fix the deletion of the process via pm2 by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/16
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v0.2.4...v2.0.0
+
 ## 0.2.4 / 2024-03-25
 
 **Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v0.2.3...v0.2.4

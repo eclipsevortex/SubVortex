@@ -77,6 +77,8 @@ wandb: Paste an API key from your profile and hit enter, or press ctrl+c to quit
 
 The default configuration is enough to have a good user experience so there is no real need to update it.
 
+> IMPORTANT: if you want to use wandb in testnet, please add to your validator command `--wandb.project_name` with the value `test-subvortex-team`. We separated the test and finney network for better experience.
+
 The default configuration will create a maximum of 2 runs (active + one archive) containing 360 steps of data. We chose 360, which corresponds to an epoch, and we believe it is sufficient to understand the trend and adjust the subtensor accordingly.
 
 Options
@@ -97,7 +99,19 @@ For miner, wandb is not needed so nothing to do here.
 
 # User Guide
 
-To access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
+To access the wandb UI to get statistics about the miners, you can click on this folling links and choose the validator run you want
+
+- mainnet - [`subvortex-team`](https://wandb.ai/eclipsevortext/subvortex-team)
+- testnet - [`test-subvortex-team`](https://wandb.ai/eclipsevortext/test-subvortex-team)
+
+## Overview
+
+![overview](wandb-overview.png)
+
+The line plot provides valuable insights, including:
+
+- The performance of the best miner (UID) over time.
+- The step time evolution, representing the time taken for the validator to test all subtensors and compute the final score.
 
 ## Miners
 
@@ -116,9 +130,9 @@ The table display the list of miners with the following informations
 
 From that table, you can get a quick overview of how you are competing with others. You can sort the different columns to prioritize the desired information. We are still investigating if filtering is possible with Wandb.
 
-## Localisation
+## Distribution
 
-![localisation](wandb-distribution.png)
+![distribution](wandb-distribution.png)
 
 The histogram gives you the number of subtensors per country. Based on how the distribution score is computed, you can easily identify a country where there are no subtensors or a very small number, in order to maximize it.
 
@@ -129,6 +143,14 @@ The histogram gives you the number of subtensors per country. Based on how the d
 The line plot gives you the an evolution of the score through time. There is on line plot per score (final, availability, reliability, latency and distribution) and per miner.
 
 With these scores, you can understand how your miners compete with others and make the appropriate adjustments of your choice.
+
+## Miscellaneous
+
+![miscellaneous](wandb-miscellaneous.png)
+
+The line plot provides valuable insights, including:
+
+- The process time evolution, representing the time taken for the validator to get the current block from the subtensor. This time is a rwa time and does not include the tolerance based on the distance between the validator and the subtensor.
 
 ## Tips
 

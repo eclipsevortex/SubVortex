@@ -24,8 +24,8 @@ class EventSchema:
     successful: List[bool]  # List of whether or not the task was successful or not
     completion_times: List[float]  # List of completion times for a given task
     block: float  # Current block at given step
-    uids: List[int]  # Queried uids
-    countries: List[int]  # Queried countries
+    uids: Optional[List[int]]  # Queried uids
+    countries: Optional[List[int]]  # Queried countries
     step_length: float  # Elapsed time between the beginning of a run step to the end of a run step
     best_uid: str  # Best completion for given task
     best_hotkey: str  # Best hotkey for given task
@@ -35,30 +35,7 @@ class EventSchema:
     distribution_scores: List[float]  # list of distribution score
 
     # Reward data
-    rewards: List[float]  # Reward vector for given step
+    rewards: Optional[List[float]]  # Reward vector for given step
 
     # Weights data and moving averages
-    set_weights: Optional[List[List[float]]] = None
-    moving_averaged_scores: Optional[List[float]] = None
-
-    @staticmethod
-    def from_dict(event_dict: dict) -> "EventSchema":
-        """Converts a dictionary to an EventSchema object."""
-
-        return EventSchema(
-            successful=event_dict["successful"],
-            completion_times=event_dict["completion_times"],
-            block=event_dict["block"],
-            uids=event_dict["uids"],
-            step_length=event_dict["step_length"],
-            best_uid=event_dict["best_uid"],
-            best_hotkey=event_dict["best_hotkey"],
-            countries=event_dict["countries"],
-            rewards=event_dict["rewards"],
-            availability_scores=event_dict["availability_scores"],
-            latency_scores=event_dict["latency_scores"],
-            reliability_scores=event_dict["reliability_scores"],
-            distribution_scores=event_dict["distribution_scores"],
-            set_weights=event_dict["set_weights"],
-            moving_averaged_scores=event_dict["moving_averaged_scores"],
-        )
+    moving_averaged_scores: List[float] = None

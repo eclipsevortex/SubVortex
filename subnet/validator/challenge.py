@@ -89,6 +89,7 @@ async def challenge_data(self):
         latency_scores=[],
         reliability_scores=[],
         distribution_scores=[],
+        moving_averaged_scores=[],
         countries=[],
         block=self.subtensor.get_current_block(),
         uids=[],
@@ -244,7 +245,7 @@ async def challenge_data(self):
         )
         .to(self.device)
     )
-    bt.logging.trace(f"Scattered rewards: {scattered_rewards}")
+    bt.logging.trace(f"[{CHALLENGE_NAME}] Scattered rewards: {scattered_rewards}")
 
     # Update moving_averaged_scores with rewards produced by this step.
     # alpha of 0.2 means that each new score replaces 20% of the weight of the previous weights
@@ -252,7 +253,8 @@ async def challenge_data(self):
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)
-    bt.logging.trace(f"Updated moving avg scores: {self.moving_averaged_scores}")
+    event.moving_averaged_scores = self.moving_averaged_scores.tolist()
+    bt.logging.trace(f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}")
 
     # Display step time
     forward_time = time.time() - start_time

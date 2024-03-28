@@ -119,7 +119,7 @@ if [[ "$TYPE" == "validator" ]]; then
     read -p "Do you want to install wandb - it is highly recommended to expose statics to users (yes/no)? " WANDB
     
     # Check the value entered
-    if [ "$WANDB" != "yes" ] && [ "$VALIDATOR_EXEC_TYPE" != "no" ]; then
+    if [ "$WANDB" != "yes" ] && [ "$WANDB" != "no" ]; then
         echo -e "\\e[31mThe possible choices are 'yes' or 'no'.\\e[0m"
         exit 1
     fi

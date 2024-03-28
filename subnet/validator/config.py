@@ -246,7 +246,7 @@ def add_args(cls, parser):
         "--wandb.run_step_length",
         type=int,
         help="How many steps before we rollover to a new run.",
-        default=1,
+        default=360,
     )
     parser.add_argument(
         "--wandb.notes",

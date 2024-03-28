@@ -1,3 +1,5 @@
+#!/bin/bash
+
 function install_npm() {
     # Check pm2 is already installed
     if command -v npm &> /dev/null; then

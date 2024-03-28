@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 # Utils for checkpointing and saving the model.
+import os
 import torch
 import copy
 import wandb
@@ -164,7 +165,7 @@ def log_miners_table(self, event: EventSchema, commit=False):
         data=data,
     )
 
-    self.wandb.log({"miners": miners}, commit=commit)
+    self.wandb.log({"02 Miners/miners": miners}, commit=commit)
 
 
 def log_distribution(self, event: EventSchema, commit=False):
@@ -178,7 +179,7 @@ def log_distribution(self, event: EventSchema, commit=False):
     table = wandb.Table(data=data, columns=["country", "count"])
     wandb.log(
         {
-            "distribution": wandb.plot.bar(
+            "03 Distribution/distribution": wandb.plot.bar(
                 table, "country", "count", title="Miners Distribution"
             )
         },
@@ -196,12 +197,47 @@ def log_score(self, name: str, event: EventSchema, commit=False):
         data[f"{event.uids[idx]}"] = score
 
     # Create the graph
-    self.wandb.log({f"{name}_score": data}, commit=commit)
+    self.wandb.log({f"04 Scores/{name}_score": data}, commit=commit)
+
+
+def log_moving_averaged_score(self, event: EventSchema, commit=False):
+    '''
+    Create a graph showing the moving score for each miner over time
+    '''
+    # Build the data for the metric
+    data = {}
+    for idx, (score) in enumerate(event.moving_averaged_scores):
+        if self.metagraph.uids[idx] not in event.uids:
+            continue
+
+        data[f"{self.metagraph.uids[idx]}"] = score
+
+    # Create the graph
+    self.wandb.log({"04 Scores/moving_averaged_score": data}, commit=commit)
+
+
+def log_completion_times(self, event: EventSchema, commit=False):
+    '''
+    Create a graph showing the time to process the challenge over time
+    '''
+    # Build the data for the metric
+    data = {}
+    for idx, (time) in enumerate(event.completion_times):
+        data[f"{event.uids[idx]}"] = time
+
+    # Create the graph
+    self.wandb.log({"05 Miscellaneous/completion_times": data}, commit=commit)
 
 
 def log_event(self, event: EventSchema):
     # Log the event to wandb
     if not self.config.wandb.off and self.wandb is not None:
+        # Add overview metrics
+        self.wandb.log({"01 Overview/best_uid": event.best_uid}, commit=False)
+        self.wandb.log(
+            {"01 Overview/step_process_time": event.step_length}, commit=False
+        )
+
         # Add the miner table
         log_miners_table(self, event)
 
@@ -214,10 +250,10 @@ def log_event(self, event: EventSchema):
         log_score(self, "latency", event)
         log_score(self, "reliability", event)
         log_score(self, "distribution", event)
+        log_moving_averaged_score(self, event)
 
-        # Add the rest of the metrics
-        wandb_event = EventSchema.from_dict(event.__dict__)
-        self.wandb.log(asdict(wandb_event))
+        # Add miscellaneous
+        log_completion_times(self, event, True)
 
 
 def init_wandb(self, reinit=False):
@@ -294,8 +330,15 @@ def init_wandb(self, reinit=False):
             run_local_path = f"{wandb_base}/run-{output_datetime_str}-{run.id}"
 
             # Remove local run
-            shutil.rmtree(run_local_path)
-            bt.logging.debug(f"[Wandb] Run {run.name} removed locally {run_local_path}")
+            if os.path.exists(run_local_path):
+                shutil.rmtree(run_local_path)
+                bt.logging.debug(
+                    f"[Wandb] Run {run.name} removed locally {run_local_path}"
+                )
+            else:
+                bt.logging.warning(
+                    f"[Wandb] Run local directory {run_local_path} does not exist. Please check it has been removed."
+                )
 
             # Remove remote run
             run.delete(True)

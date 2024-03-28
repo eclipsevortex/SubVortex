@@ -165,7 +165,7 @@ def log_miners_table(self, event: EventSchema, commit=False):
         data=data,
     )
 
-    self.wandb.log({"02 Miners/miners": miners}, commit=commit)
+    self.wandb.log({"02. Miners/miners": miners}, commit=commit)
 
 
 def log_distribution(self, event: EventSchema, commit=False):
@@ -179,7 +179,7 @@ def log_distribution(self, event: EventSchema, commit=False):
     table = wandb.Table(data=data, columns=["country", "count"])
     wandb.log(
         {
-            "03 Distribution/distribution": wandb.plot.bar(
+            "03. Distribution/distribution": wandb.plot.bar(
                 table, "country", "count", title="Miners Distribution"
             )
         },
@@ -213,7 +213,7 @@ def log_moving_averaged_score(self, event: EventSchema, commit=False):
         data[f"{self.metagraph.uids[idx]}"] = score
 
     # Create the graph
-    self.wandb.log({"04 Scores/moving_averaged_score": data}, commit=commit)
+    self.wandb.log({"04. Scores/moving_averaged_score": data}, commit=commit)
 
 
 def log_completion_times(self, event: EventSchema, commit=False):
@@ -226,16 +226,16 @@ def log_completion_times(self, event: EventSchema, commit=False):
         data[f"{event.uids[idx]}"] = time
 
     # Create the graph
-    self.wandb.log({"05 Miscellaneous/completion_times": data}, commit=commit)
+    self.wandb.log({"05. Miscellaneous/completion_times": data}, commit=commit)
 
 
 def log_event(self, event: EventSchema):
     # Log the event to wandb
     if not self.config.wandb.off and self.wandb is not None:
         # Add overview metrics
-        self.wandb.log({"01 Overview/best_uid": event.best_uid}, commit=False)
+        self.wandb.log({"01. Overview/best_uid": event.best_uid}, commit=False)
         self.wandb.log(
-            {"01 Overview/step_process_time": event.step_length}, commit=False
+            {"01. Overview/step_process_time": event.step_length}, commit=False
         )
 
         # Add the miner table
@@ -301,7 +301,9 @@ def init_wandb(self, reinit=False):
         project_name = "subvortex-team"
     elif self.config.netuid == 92 and project_name.endswith("subvortex-team"):
         project_name = "test-subvortex-team"
-    bt.logging.debug(f"Wandb project {project_name} used for Subnet {self.config.netuid}")
+    bt.logging.debug(
+        f"Wandb project {project_name} used for Subnet {self.config.netuid}"
+    )
 
     # Create a new run
     self.wandb = wandb.init(

@@ -44,6 +44,7 @@
   - [Install SubVortex](#install-subvortex)
   - [Install Subtensor](#install-local-subtensor)
   - [Install Redis](#install-redis)
+  - [Install Wandb](#install-wandb)
 - [Registering your wallet](#registering-your-wallet)
 - [Running a Miner](#running-a-miner)
 - [Running a Validator](#running-a-validator)
@@ -218,10 +219,11 @@ For a quick and seamless setup, we provide a comprehensive script that installs 
 
 ### Setup and run a miner <a id="miner-fast-setup-and-run"></a>
 
-> <span style="color: red;">**IMPORTANT**</span> <br />
-> To use the full script, you have to follow the steps to install the subnet (<span style="color: red;">**EXCEPT**</span> executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+> **IMPORTANT** <br />
+> To use the full script, you have to follow the steps to install the subnet (**EXCEPT** executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
 
-Be sure you are in the **SubVortex** directory, if not 
+Be sure you are in the **SubVortex** directory, if not
+
 ```
 cd SubVortex
 ```
@@ -233,6 +235,7 @@ Then, you can run the script
 ```
 
 > IMPORTANT
+>
 > - If you any prompts, just confirm them
 > - Other options are available, pleaser take a look
 
@@ -250,10 +253,11 @@ Finally, if you prefer setup and run the miner in a more controlled way, you can
 
 ### Setup and run a validator <a id="validator-fast-setup-and-run"></a>
 
-> <span style="color: red;">**IMPORTANT**</span> <br />
-> To use the full script, you have to follow the steps to install the subnet (<span style="color: red;">**EXCEPT**</span> executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+> **IMPORTANT** <br />
+> To use the full script, you have to follow the steps to install the subnet (**EXCEPT** executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
 
-Be sure you are in the **SubVortex** directory, if not 
+Be sure you are in the **SubVortex** directory, if not
+
 ```
 cd SubVortex
 ```
@@ -263,11 +267,6 @@ Then, you can run the script
 ```
 ./scripts/setup_and_run.sh -t validator
 ```
-
-> IMPORTANT
-> - If you any prompts, just confirm them
-> - <span style="color: red;">DO NOT USE **docker** execution for redis as we need more time to make it work</span>
-> - Other options are available, pleaser take a look
 
 Check the available options by running
 
@@ -300,6 +299,10 @@ To install a local subtensor, refer to the [Subtensor guide](./scripts/subtensor
 
 To install redis, refer to the [Redis guide](./scripts/redis/README.md)
 
+### Install Wandb
+
+To install wandb, refer to the [Wandb guide](./docs/wandb/wandb.md)
+
 ### Registering your wallet
 
 In order to run either a miner or a validator, you will need to have a wallet registered to the subnet. If you do not already have wallet set up on the server, following the steps below:
@@ -330,6 +333,8 @@ Once you have successfully registered your wallet, you are now ready to start ei
 
 > IMPORTANT: Before running a miner, be sure you have a local subtensor up and running. Please see the [Subtensor guide](./scripts/subtensor/README.md) for more details.
 
+> IMPORTANT: **wandb** **IS NOT** for miners, **ONLY FOR** validators.
+
 To run a miner, navigate to the SubVortex directory. It is highly recommended to run via a process manager like PM2.
 
 ```
@@ -349,6 +354,8 @@ pm2 start neurons/miner.py \
 
 > IMPORTANT: Before running a validator, be sure you have a redis up and running. Please see the [Redis guide](./scripts/redis/README.md) for more details.
 
+> IMPORTANT: By default wandb is enabled when running a validator. It is **HIGHLY RECOMMANDED** to not disable it as it enables everyone to access various statistics for better performance on the subnet but if you want to do it, just add `--wandb.off` to the followed pm2 command. If you want to keep wandb enabled, please refer to the [Wandb guide](./docs/wandb/wandb.md) for more details as there are some manually steps to go throught before running the validator.
+
 Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
 
 ```
@@ -362,6 +369,8 @@ pm2 start neurons/validator.py \
 ```
 
 > NOTE: if you run a validator in testnet do not forget to add the argument `--subtensor.network test` or `--subtensor.chain_endpoint ws://<LOCAL_SUBTENSOR_IP>:9944` (the local subtensor has to target the network testnet)
+
+> NOTE: to access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
 
 ## New Releases
 
@@ -383,6 +392,8 @@ pip install -e .
 ```
 
 Restart miners/validators if running them in your base environment or restart pm2 by executing `pm2 restart all` if you are using pm2 as process manager.
+
+> NOTE: to access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
 
 ## Troubleshooting
 
@@ -414,7 +425,7 @@ This repository is licensed under the MIT License.
 
 ```text
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
+# Copyright © 2024 Eclipse Vortex
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation

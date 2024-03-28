@@ -115,6 +115,14 @@ if [[ "$TYPE" == "validator" ]]; then
         echo -e "\\e[31mThe possible choices are 'process' or 'docker'.\\e[0m"
         exit 1
     fi
+
+    read -p "Do you want to install wandb - it is highly recommended to expose statics to users (yes/no)? " WANDB
+    
+    # Check the value entered
+    if [ "$WANDB" != "yes" ] && [ "$VALIDATOR_EXEC_TYPE" != "no" ]; then
+        echo -e "\\e[31mThe possible choices are 'yes' or 'no'.\\e[0m"
+        exit 1
+    fi
 fi
 
 ## User want to setup and run a miner
@@ -205,6 +213,7 @@ fi
 if [[ "$TYPE" == "validator" ]]; then
     # Get subtensor option
     OPTIONS=$([[ "$SUBTENSOR" == "ws://"* ]] && echo "--subtensor.chain_endpoint $SUBTENSOR" || echo "--subtensor.network $SUBTENSOR")
+    OPTIONS+=$([[ "$WANDB" == "no" ]] && echo " --wandb.off" || echo "")
 
     # Stop and delete validator if up and running
     process=$(pm2 list | grep "validator-$NETUID" &> /dev/null;)

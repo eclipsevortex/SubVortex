@@ -19,7 +19,10 @@
 import torch
 import copy
 import wandb
+from wandb.apis import public
+import shutil
 import bittensor as bt
+from datetime import datetime
 from dataclasses import asdict
 
 from subnet import __spec_version__ as THIS_SPEC_VERSION
@@ -273,10 +276,30 @@ def init_wandb(self, reinit=False):
     # Remove old runs - We keep only one archive + the new run
     if len(runs) >= 2:
         bt.logging.debug(f"[Wandb] Removing the {len(runs) - 1} oldest run(s)")
-        for i in range(len(runs) - 1, len(runs)):
-            # Remove artifacts too
-            runs[i].delete(True)
-            bt.logging.debug(f"[Wandb] Run {runs[i].name} removed")
+        for i in range(1, len(runs)):
+            run: public.Run = runs[i]
+
+            wandb_base = wandb.run.settings.wandb_dir
+
+            # Get the run started at time
+            startedAt = run.metadata["startedAt"]
+
+            # Parse input datetime string into a datetime object
+            input_datetime = datetime.strptime(startedAt, "%Y-%m-%dT%H:%M:%S.%f")
+
+            # Format the datetime object into the desired string format
+            output_datetime_str = input_datetime.strftime("%Y%m%d_%H%M%S")
+
+            # Local path to the run files
+            run_local_path = f"{wandb_base}/run-{output_datetime_str}-{run.id}"
+
+            # Remove local run
+            shutil.rmtree(run_local_path)
+            bt.logging.debug(f"[Wandb] Run {run.name} removed locally {run_local_path}")
+
+            # Remove remote run
+            run.delete(True)
+            bt.logging.debug(f"[Wandb] Run {run.name} removed remotely")
 
     bt.logging.success(
         prefix="Started a new wandb run",

@@ -77,17 +77,15 @@ wandb: Paste an API key from your profile and hit enter, or press ctrl+c to quit
 
 The default configuration is enough to have a good user experience so there is no real need to update it.
 
-> IMPORTANT: if you want to use wandb in testnet, please add to your validator command `--wandb.project_name` with the value `test-subvortex-team`. We separated the test and finney network for better experience.
-
 The default configuration will create a maximum of 2 runs (active + one archive) containing 360 steps of data. We chose 360, which corresponds to an epoch, and we believe it is sufficient to understand the trend and adjust the subtensor accordingly.
 
 Options
 
-- `--wandb.off` - turn off wandb. Default **false**
-- `--wandb.project_name` - The name of the project where you are sending the new run. Default is **subvortex-team** for mainnet and **test-subvortex-team** for testnet
-- `--wandb.entity` - An entity is a username or team name where youre sending runs. Default is **eclipsevortext**
-- `--wandb.offline` - Runs wandb in offline mode. Default **false**
-- `--wandb.run_step_length` - How many steps before we rollover to a new run. Default **360**
+- `--wandb.off` - turn off wandb. Default **false**.
+- `--wandb.project_name` - The name of the project where you are sending the new runs. Default is **subvortex-team** for mainnet and **test-subvortex-team** for testnet.
+- `--wandb.entity` - An entity is a username or team name where youre sending runs. Default is **eclipsevortext**.
+- `--wandb.offline` - Runs wandb in offline mode. Default **false**.
+- `--wandb.run_step_length` - How many steps before we rollover to a new run. Default **360**.
 
 To enhance user experience, we have decided to name each run using the format `validator-<VALIDATOR_UID>-<COUNT>`. This format allows users to easily identify the runs of the validator they wish to access. The count will increment with each run until it reaches 10000, at which point it will reset.
 

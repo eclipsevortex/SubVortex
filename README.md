@@ -206,8 +206,8 @@ For a quick and seamless setup, we provide a comprehensive script that installs 
 
 ### Setup and run a miner <a id="miner-fast-setup-and-run"></a>
 
-> <span style="color: red;">**IMPORTANT**</span> <br />
-> To use the full script, you have to follow the steps to install the subnet (<span style="color: red;">**EXCEPT**</span> executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+> **IMPORTANT** <br />
+> To use the full script, you have to follow the steps to install the subnet (**EXCEPT** executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
 
 Be sure you are in the **SubVortex** directory, if not
 
@@ -240,8 +240,8 @@ Finally, if you prefer setup and run the miner in a more controlled way, you can
 
 ### Setup and run a validator <a id="validator-fast-setup-and-run"></a>
 
-> <span style="color: red;">**IMPORTANT**</span> <br />
-> To use the full script, you have to follow the steps to install the subnet (<span style="color: red;">**EXCEPT**</span> executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+> **IMPORTANT** <br />
+> To use the full script, you have to follow the steps to install the subnet (**EXCEPT** executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
 
 Be sure you are in the **SubVortex** directory, if not
 
@@ -254,12 +254,6 @@ Then, you can run the script
 ```
 ./scripts/setup_and_run.sh -t validator
 ```
-
-> IMPORTANT
->
-> - If you any prompts, just confirm them
-> - <span style="color: red;">DO NOT USE **docker** execution for redis as we need more time to make it work</span>
-> - Other options are available, pleaser take a look
 
 Check the available options by running
 
@@ -347,9 +341,7 @@ pm2 start neurons/miner.py \
 
 > IMPORTANT: Before running a validator, be sure you have a redis up and running. Please see the [Redis guide](./scripts/redis/README.md) for more details.
 
-> OPTIONAL: Before runninng a validator, you can install and configure **wandb**, but **HIGHLY RECOMMENDED** as it enables everyone to access various statistics for better performance on the subnet. Please see the [Wandb guide](./docs/wandb/wandb.md) for more details.
-
-> IMPORTANT: If you want to run Wandb on the testnet, please ensure you include the argument `--wandb.project_name` when running a miner. The project name can be any project you have created on your account, or you can use the testnet subvortex project, which is **test-subvortex-team**.
+> IMPORTANT: By default wandb is enabled when running a validator. It is **HIGHLY RECOMMANDED** to not disable it as it enables everyone to access various statistics for better performance on the subnet but if you want to do it, just add `--wandb.off` to the followed pm2 command. If you want to keep wandb enabled, please refer to the [Wandb guide](./docs/wandb/wandb.md) for more details as there are some manually steps to go throught before running the validator.
 
 Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
 

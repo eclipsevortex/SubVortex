@@ -279,21 +279,6 @@ def init_wandb(self, reinit=False):
     }
     wandb_config["neuron"].pop("full_path", None)
 
-    # Get the list of current runs for the validator
-    api = wandb.Api()
-    runs = api.runs(
-        f"{self.config.wandb.entity}/{self.config.wandb.project_name}",
-        order="-created_at",
-        filters={"display_name": {"$regex": f"^validator-{self.uid}"}},
-    )
-
-    name = f"validator-{self.uid}-1"
-    if len(runs) > 0:
-        # Take the first run as it will be the most recent one
-        last_number = runs[0].name.split("-")[-1]
-        next_number = (int(last_number) % 10000) + 1
-        name = f"validator-{self.uid}-{next_number}"
-
     # Ensure "subvortex-team" and "test-subvortex-team" are used with the right subnet UID
     # If user provide its own project name we keep it
     project_name = self.config.wandb.project_name
@@ -304,6 +289,21 @@ def init_wandb(self, reinit=False):
     bt.logging.debug(
         f"Wandb project {project_name} used for Subnet {self.config.netuid}"
     )
+
+    # Get the list of current runs for the validator
+    api = wandb.Api()
+    runs = api.runs(
+        f"{self.config.wandb.entity}/{project_name}",
+        order="-created_at",
+        filters={"display_name": {"$regex": f"^validator-{self.uid}"}},
+    )
+
+    name = f"validator-{self.uid}-1"
+    if len(runs) > 0:
+        # Take the first run as it will be the most recent one
+        last_number = runs[0].name.split("-")[-1]
+        next_number = (int(last_number) % 10000) + 1
+        name = f"validator-{self.uid}-{next_number}"
 
     # Create a new run
     self.wandb = wandb.init(
@@ -339,7 +339,7 @@ def init_wandb(self, reinit=False):
             output_datetime_str = input_datetime.strftime("%Y%m%d_%H%M%S")
 
             # Local path to the run files
-            run_local_path = f"{wandb_base}/run-{output_datetime_str}-{run.id}"
+            run_local_path = f"{wandb_base}run-{output_datetime_str}-{run.id}"
 
             # Remove local run
             if os.path.exists(run_local_path):

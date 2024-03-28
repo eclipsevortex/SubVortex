@@ -263,6 +263,7 @@ def init_wandb(self, reinit=False):
         THIS_VERSION,
         str(THIS_SPEC_VERSION),
         f"netuid_{self.metagraph.netuid}",
+        self.country,
     ]
 
     if self.config.mock:

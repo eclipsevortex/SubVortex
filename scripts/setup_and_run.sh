@@ -222,7 +222,9 @@ if [[ "$TYPE" == "validator" ]]; then
     fi
 
     # Set the redis password
-    export REDIS_PASSWORD=$(docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
+    if [[ $VALIDATOR_EXEC_TYPE == "docker" ]]; then
+        export REDIS_PASSWORD=$(docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
+    fi
 
     # Run the validator
     pm2 start $HOME/SubVortex/neurons/validator.py -f \

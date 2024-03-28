@@ -197,7 +197,7 @@ def log_score(self, name: str, event: EventSchema, commit=False):
         data[f"{event.uids[idx]}"] = score
 
     # Create the graph
-    self.wandb.log({f"04 Scores/{name}_score": data}, commit=commit)
+    self.wandb.log({f"04. Scores/{name}_score": data}, commit=commit)
 
 
 def log_moving_averaged_score(self, event: EventSchema, commit=False):

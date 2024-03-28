@@ -1,7 +1,5 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-# TODO(developer): Set your name
-# Copyright © 2023 <your name>
+# Copyright © 2024 Eclipse Vortex
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -23,11 +21,11 @@ import bittensor as bt
 
 class Score(bt.Synapse):
     validator_uid: typing.Optional[int]
-    availability: float    
-    latency: float    
-    reliability: float    
-    distribution: float    
-    score: float    
+    availability: float
+    latency: float
+    reliability: float
+    distribution: float
+    score: float
     count: typing.Optional[int] = 0
 
 class IsAlive(bt.Synapse):

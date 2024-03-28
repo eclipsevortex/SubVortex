@@ -1,6 +1,5 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-# Copyright © 2023 philanthrope
+# Copyright © 2024 Eclipse Vortex
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -97,6 +96,7 @@ def check_config(cls, config: "bt.Config"):
             level="TRACE",
             format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
         )
+        
 
         # Set miner stats and total storage save path
         config.neuron.miner_stats_path = os.path.expanduser(
@@ -120,7 +120,7 @@ def add_args(cls, parser):
         "--neuron.name",
         type=str,
         help="Trials for this miner go in miner.root / (wallet_cold - wallet_hot) / miner.name. ",
-        default="core_storage_validator",
+        default="subvortex_validator",
     )
     parser.add_argument(
         "--neuron.device",
@@ -212,6 +212,47 @@ def add_args(cls, parser):
         type=str,
         help="Redis configuration path.",
         default="/etc/redis/redis.conf",
+    )
+
+    # Wandb args
+    parser.add_argument(
+        "--wandb.off", action="store_true", help="Turn off wandb.", default=False
+    )
+    parser.add_argument(
+        "--wandb.project_name",
+        type=str,
+        help="The name of the project where you are sending the new run.",
+        default="subvortex-team",
+    )
+    parser.add_argument(
+        "--wandb.entity",
+        type=str,
+        help="An entity is a username or team name where youre sending runs.",
+        default="eclipsevortext",
+    )
+    parser.add_argument(
+        "--wandb.offline",
+        action="store_true",
+        help="Runs wandb in offline mode.",
+        default=False,
+    )
+    parser.add_argument(
+        "--wandb.weights_step_length",
+        type=int,
+        help="How many steps before we log the weights.",
+        default=10,
+    )
+    parser.add_argument(
+        "--wandb.run_step_length",
+        type=int,
+        help="How many steps before we rollover to a new run.",
+        default=360,
+    )
+    parser.add_argument(
+        "--wandb.notes",
+        type=str,
+        help="Notes to add to the wandb run.",
+        default="",
     )
 
     # Mocks

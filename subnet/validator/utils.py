@@ -257,7 +257,7 @@ async def get_next_uids(self, ss58_address: str, k: int = 4):
     bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
 
     # If no uids available we start again
-    if len(uids_selected):
+    if len(uids_selected) == 0:
         uids_already_selected = []
         uids_selected = uids
         bt.logging.debug(f"get_next_uids() reset selection {uids_selected}")

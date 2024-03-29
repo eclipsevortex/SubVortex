@@ -87,7 +87,7 @@ async def handle_synapse(self, uid: int):
         # Get the current block from the validator subtensor
         validator_block = get_current_block(self.subtensor)
 
-        # Check blocks and miner availability
+        # Check both blocks are the same
         verified = miner_block == validator_block or miner_block is not None
 
         bt.logging.trace(

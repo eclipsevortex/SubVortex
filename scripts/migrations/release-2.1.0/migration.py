@@ -8,6 +8,7 @@ from subnet.shared.checks import check_environment
 
 # This migration is to clean useless keys and new ones
 
+
 def check_redis(args):
     try:
         asyncio.run(check_environment(args.redis_conf_path))
@@ -17,62 +18,8 @@ def check_redis(args):
         )
 
 
-async def rollout(args):
-    try:
-        bt.logging.info(
-            f"Loading database from {args.database_host}:{args.database_port}"
-        )
-        redis_password = get_redis_password(args.redis_password)
-        database = aioredis.StrictRedis(
-            host=args.database_host,
-            port=args.database_port,
-            db=args.database_index,
-            password=redis_password,
-        )
-
-        bt.logging.info("Rollout starting")
-        async for key in database.scan_iter("*"):
-            metadata_dict = await database.hgetall(key)
-
-            # Remove keys
-            if b"subtensor_successes" in metadata_dict:
-                await database.hdel(key, b"subtensor_successes")
-            if b"subtensor_attempts" in metadata_dict:
-                await database.hdel(key, b"subtensor_attempts")
-            if b"metric_successes" in metadata_dict:
-                await database.hdel(key, b"metric_successes")
-            if b"metric_attempts" in metadata_dict:
-                await database.hdel(key, b"metric_attempts")
-            if b"total_successes" in metadata_dict:
-                await database.hdel(key, b"total_successes")
-            if b"tier" in metadata_dict:
-                await database.hdel(key, b"tier")
-
-            # Add keys
-            if b"uid" not in metadata_dict:
-                await database.hset(key, b"uid", -1)
-            if b"version" not in metadata_dict:
-                await database.hset(key, b"version", "")
-            if b"country" not in metadata_dict:
-                await database.hset(key, b"country", "")
-            if b"score" not in metadata_dict:
-                await database.hset(key, b"score", 0)
-            if b"availability_score" not in metadata_dict:
-                await database.hset(key, b"availability_score", 0)
-            if b"latency_score" not in metadata_dict:
-                await database.hset(key, b"latency_score", 0)
-            if b"reliability_score" not in metadata_dict:
-                await database.hset(key, b"reliability_score", 0)
-            if b"distribution_score" not in metadata_dict:
-                await database.hset(key, b"distribution_score", 0)
-            if b"challenge_successes" not in metadata_dict:
-                await database.hset(key, b"challenge_successes", 0)
-            if b"challenge_attempts" not in metadata_dict:
-                await database.hset(key, b"challenge_attempts", 0)
-
-        bt.logging.info("Rollout done")
-    except Exception as e:
-        bt.logging.error(f"Error converting to new schema: {e}")
+def rollout():
+    bt.logging.info("No rollout")
 
 
 async def rollback(args):
@@ -89,53 +36,26 @@ async def rollback(args):
         )
 
         bt.logging.info("Rollback starting")
-        async for key in database.scan_iter("*"):
-            metadata_dict = await database.hgetall(key)
-
-            # Remove keys
-            if b"uid" in metadata_dict:
-                await database.hdel(key, b"uid")
-            if b"version" in metadata_dict:
-                await database.hdel(key, b"version")
-            if b"country" in metadata_dict:
-                await database.hdel(key, b"country")
-            if b"score" in metadata_dict:
-                await database.hdel(key, b"score")
-            if b"availability_score" in metadata_dict:
-                await database.hdel(key, b"availability_score")
-            if b"latency_score" in metadata_dict:
-                await database.hdel(key, b"latency_score")
-            if b"reliability_score" in metadata_dict:
-                await database.hdel(key, b"reliability_score")
-            if b"distribution_score" in metadata_dict:
-                await database.hdel(key, b"distribution_score")
-
-            # Add keys
-            if b"subtensor_successes" not in metadata_dict:
-                await database.hset(key, b"subtensor_successes", 0)
-            if b"subtensor_attempts" not in metadata_dict:
-                await database.hset(key, b"subtensor_attempts", 0)
-            if b"metric_successes" not in metadata_dict:
-                await database.hset(key, b"metric_successes", 0)
-            if b"metric_attempts" not in metadata_dict:
-                await database.hset(key, b"metric_attempts", 0)
-            if b"total_successes" not in metadata_dict:
-                await database.hset(key, b"total_successes", 0)
-            if b"tier" not in metadata_dict:
-                await database.hset(key, b"tier", "Bronze")
-            if b"challenge_successes" not in metadata_dict:
-                await database.hset(key, b"challenge_successes", 0)
-            if b"challenge_attempts" not in metadata_dict:
-                await database.hset(key, b"challenge_attempts", 0)
-
+        async for key in database.scan_iter("selection:*"):
+            await database.delete(key)
         bt.logging.info("Rollback done")
+
+        bt.logging.info("Checking rollback...")
+        count = 0
+        async for key in database.scan_iter("selection:*"):
+            count += 1
+        if count == 0:
+            bt.logging.info("Check rollback successfull")
+        else:
+            bt.logging.error(f"Check rollback failed! You still have {count} keys to remove.")
+
     except Exception as e:
-        bt.logging.error(f"Error converting to new schema: {e}")
+        bt.logging.error(f"Error during rollback: {e}")
 
 
 async def main(args):
     if args.run_type == "rollout":
-        await rollout(args)
+        rollout()
     else:
         await rollback(args)
 

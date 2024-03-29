@@ -26,13 +26,19 @@ To create a dump of your Redis database, follow these steps:
    SAVE
    ```
 
-3. **Make a copy**: Copy the dump file `dump.rdb` in `/var/lib/redis` and make a copy of it
+3. **Create the Dump**: Exit redis environment
+
+   ```bash
+   exit
+   ```
+
+4. **Make a copy**: Copy the dump file `dump.rdb` in `/var/lib/redis` and make a copy of it
 
    ```bash
    sudo cp /var/lib/redis/dump.rdb /var/lib/redis/dump.bak.rdb
    ```
 
-4. **Verify the Dump**: Check that the copy of the dump file (`dump.bak.rdb`) has been created in `/var/lib/redis`.
+5. **Verify the Dump**: Check that the copy of the dump file (`dump.bak.rdb`) has been created in `/var/lib/redis`.
    ```bash
    ls /var/lib/redis
    ```

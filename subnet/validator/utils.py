@@ -254,16 +254,17 @@ async def get_next_uids(self, ss58_address: str, k: int = 4):
 
     # Get the k uids requested
     uids_selected = list(set(uids) - set(uids_already_selected))
-    bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
 
     # If no uids available we start again
-    if len(uids_selected) == 0:
+    if len(uids_selected) < k:
         uids_already_selected = []
         
-        # Get the list of available uids
-        uids_selected = await get_available_query_miners(self, k=k, exclude=uids_already_selected)
+        # Complete the selection with k - len(uids_selected) elements 
+        # We always to have k miners selected
+        new_uids_selected = await get_available_query_miners(self, k=k)
+        uids_selected = uids_selected + new_uids_selected[:k - len(uids_selected)]
 
-        bt.logging.debug(f"get_next_uids() reset selection {uids_selected}")
+    bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
 
     # Store the new selection in the database
     selection_key = f"selection:{ss58_address}"

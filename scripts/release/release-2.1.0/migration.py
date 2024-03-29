@@ -6,7 +6,9 @@ from redis import asyncio as aioredis
 from subnet.shared.utils import get_redis_password
 from subnet.shared.checks import check_environment
 
-# This migration is to clean useless keys and new ones
+
+def can_execute():
+    pass
 
 
 def check_redis(args):
@@ -47,7 +49,9 @@ async def rollback(args):
         if count == 0:
             bt.logging.info("Rollback checked successfully")
         else:
-            bt.logging.error(f"Check rollback failed! You still have {count} keys to remove.")
+            bt.logging.error(
+                f"Check rollback failed! You still have {count} keys to remove."
+            )
 
     except Exception as e:
         bt.logging.error(f"Error during rollback: {e}")

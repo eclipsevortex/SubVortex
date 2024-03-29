@@ -7,10 +7,6 @@ from subnet.shared.utils import get_redis_password
 from subnet.shared.checks import check_environment
 
 
-def can_execute():
-    pass
-
-
 def check_redis(args):
     try:
         asyncio.run(check_environment(args.redis_conf_path))

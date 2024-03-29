@@ -153,7 +153,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
 
 4. **Check logs**: Check the validator logs to see if you see some `New Block`
    ```bash
-   pm2 logs v
+   pm2 logs validator-92
    ```
 
 <br />

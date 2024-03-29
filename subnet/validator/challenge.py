@@ -21,6 +21,7 @@ from subnet.validator.utils import ping_and_retry_uids
 from subnet.validator.localisation import get_country
 from subnet.validator.bonding import update_statistics
 from subnet.validator.state import log_event
+from subnet.validator.database import build_miners_table
 from subnet.validator.score import (
     compute_reliability_score,
     compute_latency_score,
@@ -83,14 +84,12 @@ async def challenge_data(self):
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
     event = EventSchema(
-        successful=[],
         completion_times=[],
         availability_scores=[],
         latency_scores=[],
         reliability_scores=[],
         distribution_scores=[],
         moving_averaged_scores=[],
-        countries=[],
         block=self.subtensor.get_current_block(),
         uids=[],
         step_length=0.0,
@@ -127,14 +126,6 @@ async def challenge_data(self):
     ):
         # Get the hotkey
         hotkey = self.metagraph.hotkeys[uid]
-
-        # Update statistics
-        await update_statistics(
-            ss58_address=hotkey,
-            success=verified,
-            task_type="challenge",
-            database=self.database,
-        )
 
         # Initialise scores
         availability_score = 0
@@ -173,7 +164,7 @@ async def challenge_data(self):
 
             # Compute score for reliability
             reliability_score = await compute_reliability_score(
-                uid, self.database, hotkey
+                uid, verified, self.database, hotkey
             )
             reliability_scores.append(reliability_score)
             bt.logging.debug(
@@ -197,7 +188,12 @@ async def challenge_data(self):
                 + (LATENCY_WEIGHT * latency_score)
                 + (RELIABILLITY_WEIGHT * reliability_score)
                 + (DISTRIBUTION_WEIGHT * distribution_score)
-            ) / 6.0
+            ) / (
+                AVAILABILITY_WEIGHT
+                + LATENCY_WEIGHT
+                + RELIABILLITY_WEIGHT
+                + DISTRIBUTION_WEIGHT
+            )
         else:
             # More than 1 miner running in the axon machine
             # Someone is trying to hack => Penalize all the miners on the axon machine
@@ -208,19 +204,8 @@ async def challenge_data(self):
 
         bt.logging.info(f"[{CHALLENGE_NAME}][{uid}] Final score {rewards[idx]}")
 
-        # Log the event data for this specific challenge
-        event.uids.append(uid)
-        event.countries.append(country)
-        event.successful.append(verified)
-        event.completion_times.append(process_time)
-        event.rewards.append(rewards[idx].item())
-        event.availability_scores.append(availability_score)
-        event.latency_scores.append(latency_score)
-        event.reliability_scores.append(reliability_score)
-        event.distribution_scores.append(distribution_score)
-
         # Send the score details to the miner
-        await self.dendrite(
+        response = await self.dendrite(
             axons=[self.metagraph.axons[uid]],
             synapse=protocol.Score(
                 validator_uid=self.uid,
@@ -234,6 +219,30 @@ async def challenge_data(self):
             deserialize=True,
             timeout=5,
         )
+
+        # Update statistics
+        await update_statistics(
+            ss58_address=hotkey,
+            success=verified,
+            uid=uid,
+            country=country,
+            version=response[0],
+            reward=rewards[idx].item(),
+            availability_score=availability_score,
+            latency_score=latency_score,
+            reliability_score=reliability_score,
+            distribution_score=distribution_score,
+            database=self.database,
+        )
+
+        # Log the event data for this specific challenge
+        event.uids.append(uid)
+        event.completion_times.append(process_time)
+        event.rewards.append(rewards[idx].item())
+        event.availability_scores.append(availability_score)
+        event.latency_scores.append(latency_score)
+        event.reliability_scores.append(reliability_score)
+        event.distribution_scores.append(distribution_score)
 
     # Compute forward pass rewards
     scattered_rewards: torch.FloatTensor = (
@@ -254,9 +263,11 @@ async def challenge_data(self):
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)
     event.moving_averaged_scores = self.moving_averaged_scores.tolist()
-    bt.logging.trace(f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}")
+    bt.logging.trace(
+        f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
+    )
 
-    # Display step time
+    # Display step time in seconds
     forward_time = time.time() - start_time
     event.step_length = forward_time
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")
@@ -267,5 +278,9 @@ async def challenge_data(self):
         event.best_uid = event.uids[best_index]
         event.best_hotkey = self.metagraph.hotkeys[event.best_uid]
 
+    # Build miners table
+    miners = await build_miners_table(self.database, self.metagraph)
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Miners table contains {len(miners)} elements")
+
     # Log event
-    log_event(self, event)
+    log_event(self, event, miners)

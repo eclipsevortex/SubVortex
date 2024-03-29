@@ -21,11 +21,9 @@ from typing import List, Optional, Any
 
 @dataclass
 class EventSchema:
-    successful: List[bool]  # List of whether or not the task was successful or not
     completion_times: List[float]  # List of completion times for a given task
     block: float  # Current block at given step
-    uids: Optional[List[int]]  # Queried uids
-    countries: Optional[List[int]]  # Queried countries
+    uids: List[int]  # Queried uids
     step_length: float  # Elapsed time between the beginning of a run step to the end of a run step
     best_uid: str  # Best completion for given task
     best_hotkey: str  # Best hotkey for given task

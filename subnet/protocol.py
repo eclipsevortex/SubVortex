@@ -20,13 +20,20 @@ import bittensor as bt
 
 
 class Score(bt.Synapse):
+    # Input properties
     validator_uid: typing.Optional[int]
     availability: float
     latency: float
     reliability: float
     distribution: float
     score: float
-    count: typing.Optional[int] = 0
+    count: int
+
+    # Output properties
+    version: typing.Optional[str] = ""
+
+    def deserialize(self) -> typing.Optional[str]:
+        return self.version
 
 class IsAlive(bt.Synapse):
     # Returns

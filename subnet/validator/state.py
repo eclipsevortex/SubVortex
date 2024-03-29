@@ -24,7 +24,7 @@ from wandb.apis import public
 import shutil
 import bittensor as bt
 from datetime import datetime
-from dataclasses import asdict
+from typing import List
 
 from subnet import __spec_version__ as THIS_SPEC_VERSION
 from subnet import __version__ as THIS_VERSION
@@ -132,21 +132,25 @@ def load_state(self):
         bt.logging.warning(f"Failed to load model with error: {e}")
 
 
-def log_miners_table(self, event: EventSchema, commit=False):
+def log_miners_table(self, miners: List, commit=False):
     # Build the dataset
     # We convert any number into string to have a better style in wandb UI
     data = []
-    for idx, (uid) in enumerate(event.uids):
+    for miner in miners:
+        miner_uid = miner.get('uid')
+        if miner_uid == "-1":
+            continue
+
         data.append(
             [
-                str(uid),
-                "0.2.4",
-                event.countries[idx],
-                str(event.rewards[idx]),
-                str(event.availability_scores[idx]),
-                str(event.latency_scores[idx]),
-                str(event.reliability_scores[idx]),
-                str(event.distribution_scores[idx]),
+                miner_uid,
+                miner.get('version'),
+                miner.get('country'),
+                miner.get('score'),
+                miner.get('availability_score'),
+                miner.get('latency_score'),
+                miner.get('reliability_score'),
+                miner.get('distribution_score'),
             ]
         )
 
@@ -168,11 +172,16 @@ def log_miners_table(self, event: EventSchema, commit=False):
     self.wandb.log({"02. Miners/miners": miners}, commit=commit)
 
 
-def log_distribution(self, event: EventSchema, commit=False):
+def log_distribution(miners: List, commit=False):
     # Build the data for the metric
     country_counts = {}
-    for code in event.countries:
-        country_counts[code] = country_counts.get(code, 0) + 1
+    for miner in miners:
+        miner_uid = miner.get('uid')
+        if miner_uid == "-1":
+            continue
+
+        miner_country = miner.get('country')
+        country_counts[miner_country] = country_counts.get(miner_country, 0) + 1
 
     # Create the graph
     data = [[country, count] for country, count in country_counts.items()]
@@ -229,7 +238,7 @@ def log_completion_times(self, event: EventSchema, commit=False):
     self.wandb.log({"05. Miscellaneous/completion_times": data}, commit=commit)
 
 
-def log_event(self, event: EventSchema):
+def log_event(self, event: EventSchema, miners: List):
     # Log the event to wandb
     if not self.config.wandb.off and self.wandb is not None:
         # Add overview metrics
@@ -239,10 +248,10 @@ def log_event(self, event: EventSchema):
         )
 
         # Add the miner table
-        log_miners_table(self, event)
+        log_miners_table(self, miners)
 
         # Add miners distribution
-        log_distribution(self, event)
+        log_distribution(miners)
 
         # Add scores
         log_score(self, "final", event)

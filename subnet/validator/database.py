@@ -118,3 +118,24 @@ async def hotkey_at_capacity(
                 f"Hotkey {hotkey} has {(limit - total_storage) // 1024**3} GB free."
             )
         return False
+
+
+async def build_miners_table(database: aioredis.Redis, metagraph: bt.metagraph):
+    miners = []
+    async for key in database.scan_iter("*"):
+        result = await database.hgetall(key)
+
+        miner = {}
+        for field, value in result.items():
+            field_str = field.decode('utf-8') if isinstance(field, bytes) else field
+            value_str = value.decode('utf-8') if isinstance(value, bytes) else value
+
+            if field_str == "uid" and value_str == -1:
+                idx = metagraph.hotkeys.index(key)
+                value_str = metagraph.uids[idx]
+            
+            miner[field_str] = value_str
+
+        miners.append(miner)
+
+    return miners

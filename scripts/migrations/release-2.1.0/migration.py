@@ -45,7 +45,7 @@ async def rollback(args):
         async for key in database.scan_iter("selection:*"):
             count += 1
         if count == 0:
-            bt.logging.info("Check rollback successfull")
+            bt.logging.info("Rollback checked successfully")
         else:
             bt.logging.error(f"Check rollback failed! You still have {count} keys to remove.")
 

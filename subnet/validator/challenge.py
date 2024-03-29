@@ -143,7 +143,7 @@ async def challenge_data(self):
     reliability_scores = []
     distribution_scores = []
 
-    bt.logging.warning(f"[{CHALLENGE_NAME}] Computing uids scores")
+    bt.logging.info(f"[{CHALLENGE_NAME}] Computing uids scores")
 
     # Compute the score
     for idx, (uid, (verified, country, process_time)) in enumerate(

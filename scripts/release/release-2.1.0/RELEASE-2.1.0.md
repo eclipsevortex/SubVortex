@@ -49,7 +49,7 @@ Previous Release: 2.0.0
    git checkout main
    ```
 
-   Then, get the latest version of the subnet
+   Otherwise/Then, get the latest version of the subnet
 
    ```bash
    git pull
@@ -63,8 +63,14 @@ Previous Release: 2.0.0
    ```
 
 3. **Restart validator**: Restart your validator to take the new version into the new version
+
    ```bash
    pm2 restart validator-92
+   ```
+
+4. **Check logs**: Check the validator logs to see if you see some `New Block`
+   ```bash
+   pm2 logs validator-92
    ```
 
 <br />
@@ -140,8 +146,14 @@ If any issues arise during or after the rollout, follow these steps to perform a
    ```
 
 3. **Restart validator**: Restart your validator to take the new version into the new version
+
    ```bash
    pm2 restart validator-92
+   ```
+
+4. **Check logs**: Check the validator logs to see if you see some `New Block`
+   ```bash
+   pm2 logs v
    ```
 
 <br />

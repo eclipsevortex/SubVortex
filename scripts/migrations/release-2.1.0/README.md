@@ -35,7 +35,7 @@ cd $HOME/SubVortex
 Then, execute
 
 ```
-python3 ./scripts/migration/release-2.0.1/migration.py --run-type rollback
+python3 ./scripts/migration/release-2.1.0/migration.py --run-type rollback
 ```
 
 The script is performing a check to ensure that everything has been rolled back. You should see

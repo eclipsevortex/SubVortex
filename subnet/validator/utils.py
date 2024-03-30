@@ -262,6 +262,11 @@ async def get_next_uids(self, ss58_address: str, k: int = 4):
         # Complete the selection with k - len(uids_selected) elements 
         # We always to have k miners selected
         new_uids_selected = await get_available_query_miners(self, k=k)
+
+        # Ensure the new_uids_selected does not contain a uid that exist in uids_selected
+        # We do not want to have twice the same uid
+        new_uids_selected = [uid for uid in new_uids_selected if uid not in uids_selected]
+
         uids_selected = uids_selected + new_uids_selected[:k - len(uids_selected)]
 
     bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")

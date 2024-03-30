@@ -10,6 +10,7 @@ from subnet.constants import (
     AVAILABILITY_FAILURE_REWARD,
     LATENCY_FAILURE_REWARD,
     DISTRIBUTION_FAILURE_REWARD,
+    RELIABILLITY_WEIGHT_FAILURE_REWARD,
     AVAILABILITY_WEIGHT,
     LATENCY_WEIGHT,
     RELIABILLITY_WEIGHT,
@@ -17,7 +18,7 @@ from subnet.constants import (
 )
 from subnet.shared.subtensor import get_current_block
 from subnet.validator.event import EventSchema
-from subnet.validator.utils import ping_and_retry_uids
+from subnet.validator.utils import ping_and_retry_uids, get_next_uids, ping_uid
 from subnet.validator.localisation import get_country
 from subnet.validator.bonding import update_statistics
 from subnet.validator.state import log_event
@@ -30,6 +31,20 @@ from substrateinterface.base import SubstrateInterface
 
 
 CHALLENGE_NAME = "Challenge"
+DEFAULT_PROCESS_TIME = 5
+
+
+async def check_miner_availability(self, uid: int):
+    # Check the miner
+    availble = False
+
+    try:
+        # Ping the miner - miner and subtensor are unique so we consider a failure if one or the other is not reachable
+        availble = await ping_uid(self, uid)
+    except Exception:
+        availble = False
+
+    return availble
 
 
 async def handle_synapse(self, uid: int):
@@ -40,6 +55,13 @@ async def handle_synapse(self, uid: int):
     country = get_country(ip)
     bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Subtensor country {country}")
 
+    # Check miner is available
+    available = await check_miner_availability(self, uid)
+    if available == False:
+        bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Miner is not reachable")
+        return available, country, DEFAULT_PROCESS_TIME
+
+    # Check the subtensor is available
     process_time = None
     try:
         # Create a subtensor with the ip return by the synapse
@@ -70,10 +92,10 @@ async def handle_synapse(self, uid: int):
         bt.logging.trace(
             f"[{CHALLENGE_NAME}][{uid}] Verified ? {verified} - val: {validator_block}, miner:{miner_block}"
         )
-    except Exception as err:
+    except Exception:
         verified = False
-        process_time = 5 if process_time is None else process_time
-        bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Verified ? False")
+        process_time = DEFAULT_PROCESS_TIME if process_time is None else process_time
+        bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Subtensor not verified")
 
     return verified, country, process_time
 
@@ -100,7 +122,8 @@ async def challenge_data(self):
     )
 
     # Select the miners
-    uids, _ = await ping_and_retry_uids(self, k=10)
+    validator_hotkey = self.metagraph.hotkeys[self.uid]
+    uids = await get_next_uids(self, validator_hotkey, k=10)
     bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
     # Initialise the rewards object
@@ -120,6 +143,8 @@ async def challenge_data(self):
     latency_scores = []
     reliability_scores = []
     distribution_scores = []
+
+    bt.logging.info(f"[{CHALLENGE_NAME}] Computing uids scores")
 
     # Compute the score
     for idx, (uid, (verified, country, process_time)) in enumerate(
@@ -172,8 +197,10 @@ async def challenge_data(self):
             bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Latency score {latency_score}")
 
             # Compute score for reliability
-            reliability_score = await compute_reliability_score(
-                uid, self.database, hotkey
+            reliability_score = (
+                await compute_reliability_score(uid, self.database, hotkey)
+                if verified
+                else RELIABILLITY_WEIGHT_FAILURE_REWARD
             )
             reliability_scores.append(reliability_score)
             bt.logging.debug(
@@ -183,7 +210,7 @@ async def challenge_data(self):
             # Compute score for distribution
             distribution_score = (
                 compute_distribution_score(idx, responses)
-                if responses[idx][2] is not None
+                if verified and responses[idx][2] is not None
                 else DISTRIBUTION_FAILURE_REWARD
             )
             distribution_scores.append((uid, distribution_score))
@@ -254,7 +281,9 @@ async def challenge_data(self):
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)
     event.moving_averaged_scores = self.moving_averaged_scores.tolist()
-    bt.logging.trace(f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}")
+    bt.logging.trace(
+        f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
+    )
 
     # Display step time
     forward_time = time.time() - start_time

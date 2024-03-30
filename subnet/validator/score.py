@@ -21,8 +21,12 @@ async def compute_reliability_score(uid, database, hotkey: str):
         await database.hget(stats_key, "challenge_successes") or 0
     )
     challenge_attempts = int(await database.hget(stats_key, "challenge_attempts") or 0)
-    bt.logging.trace(f"[{uid}][Score][Reliability] # challenge attempts {challenge_attempts}")
-    bt.logging.trace(f"[{uid}][Score][Reliability] # challenge succeeded {challenge_successes}")
+    bt.logging.trace(
+        f"[{uid}][Score][Reliability] # challenge attempts {challenge_attempts}"
+    )
+    bt.logging.trace(
+        f"[{uid}][Score][Reliability] # challenge succeeded {challenge_successes}"
+    )
 
     # Step 2: Normalization
     normalized_score = wilson_score_interval(challenge_successes, challenge_attempts)
@@ -33,7 +37,9 @@ async def compute_reliability_score(uid, database, hotkey: str):
 def compute_latency_score(idx, uid, validator_country, responses):
     initial_process_times = [response[2] for response in responses]
     bt.logging.trace(f"[{uid}][Score][Latency] Process times {initial_process_times}")
-    bt.logging.trace(f"[{uid}][Score][Latency] Process time {initial_process_times[idx]}")
+    bt.logging.trace(
+        f"[{uid}][Score][Latency] Process time {initial_process_times[idx]}"
+    )
 
     # Step 1: Get the localisation of the validator
     validator_localisation = get_localisation(validator_country)
@@ -54,7 +60,7 @@ def compute_latency_score(idx, uid, validator_country, responses):
                 location["longitude"],
             )
 
-        scaled_distance = distance / MAX_DISTANCE
+        scaled_distance = distance / MAX_DISTANCE if distance > 0 else 0
         tolerance = 1 - scaled_distance
 
         process_time = process_time * tolerance if process_time else 5
@@ -84,7 +90,11 @@ def compute_latency_score(idx, uid, validator_country, responses):
     score = relative_latency_scores[idx]
     bt.logging.trace(f"[{uid}][Score][Latency] Relative score {score}")
 
-    normalized_score = (score - min_score) / (max_score - min_score)
+    normalized_score = (
+        (score - min_score) / (max_score - min_score)
+        if max_score - min_score > 0
+        else 0
+    )
 
     return normalized_score
 

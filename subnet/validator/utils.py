@@ -148,6 +148,26 @@ async def get_available_query_miners(
     return get_pseudorandom_uids(self, muids, k=k)
 
 
+async def ping_uid(self, uid):
+    """
+    Ping a list of UIDs to check their availability.
+    Returns a tuple with a list of successful UIDs and a list of failed UIDs.
+    """
+    try:
+        response = await self.dendrite(
+            self.metagraph.axons[uid],
+            bt.Synapse(),
+            deserialize=False,
+            timeout=5,
+        )
+
+        return response.dendrite.status_code == 200
+    except Exception as e:
+        bt.logging.error(f"Dendrite ping failed: {e}")
+
+    return False
+
+
 async def ping_uids(self, uids):
     """
     Ping a list of UIDs to check their availability.
@@ -221,3 +241,51 @@ async def ping_and_retry_uids(
         )
 
     return list(successful_uids)[:k], failed_uids
+
+
+async def get_next_uids(self, ss58_address: str, k: int = 4):
+    # Get the list of uids already selected
+    uids_already_selected = await get_selected_miners(self, ss58_address)
+    bt.logging.debug(f"get_next_uids() uids already selected: {uids_already_selected}")
+
+    # Get the list of available uids
+    uids = await get_available_query_miners(self, k=k, exclude=uids_already_selected)
+    bt.logging.debug(f"get_next_uids() uids:{uids}")
+
+    # Get the k uids requested
+    uids_selected = list(set(uids) - set(uids_already_selected))
+
+    # If no uids available we start again
+    if len(uids_selected) < k:
+        uids_already_selected = []
+        
+        # Complete the selection with k - len(uids_selected) elements 
+        # We always to have k miners selected
+        new_uids_selected = await get_available_query_miners(self, k=k)
+        uids_selected = uids_selected + new_uids_selected[:k - len(uids_selected)]
+
+    bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
+
+    # Store the new selection in the database
+    selection_key = f"selection:{ss58_address}"
+    selection = ",".join(str(uid) for uid in uids_already_selected + uids_selected)
+    await self.database.set(selection_key, selection)
+    bt.logging.debug(f"get_next_uids() new uids selection stored: {selection}")
+
+    return uids_selected
+
+
+async def get_selected_miners(self, ss58_address: str):
+    selection_key = f"selection:{ss58_address}"
+
+    # Get the uids selection
+    value = await self.database.get(selection_key)
+    if value is None:
+        bt.logging.debug(f"get_selected_miners() no uids")
+        return []
+
+    # Get the uids already selected
+    uids_str = value.decode("utf-8") if isinstance(value, bytes) else value
+    uids = [int(uid) for uid in uids_str.split(",")]
+
+    return uids

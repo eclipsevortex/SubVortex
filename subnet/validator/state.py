@@ -329,6 +329,12 @@ def init_wandb(self, reinit=False):
 
             wandb_base = wandb.run.settings.wandb_dir
 
+            if run.metadata is None:
+                bt.logging.warning(
+                    f"[Wandb] Could not remove the local run {run.name} as metadata are None. Please remove it manually to not overcharge your disk."
+                )
+                continue
+
             # Get the run started at time
             startedAt = run.metadata["startedAt"]
 

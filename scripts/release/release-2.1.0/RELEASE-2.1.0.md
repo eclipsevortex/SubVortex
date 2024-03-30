@@ -62,13 +62,27 @@ Previous Release: 2.0.0
    pip install -e .
    ```
 
-3. **Restart validator**: Restart your validator to take the new version into the new version
+3. **Rollout Redis**: Rollout redis by running in **SubVortex** directory
+   ```bash
+   python3 ./scripts/release/release-2.1.0/migration.py
+   ```
+
+   You will see
+   ```bash
+   2024-03-30 13:12:25.887 |       INFO       | Loading database from localhost:6379
+   2024-03-30 13:12:25.899 |       INFO       | Rollout starting              
+   2024-03-30 13:12:25.932 |       INFO       | Rollout done                  
+   2024-03-30 13:12:25.933 |       INFO       | Checking rollout...           
+   2024-03-30 13:12:25.940 |       INFO       | Rollout checked successfully  
+   ```
+
+4. **Restart validator**: Restart your validator to take the new version into the new version
 
    ```bash
    pm2 restart validator-92
    ```
 
-4. **Check logs**: Check the validator logs to see if you see some `New Block`
+5. **Check logs**: Check the validator logs to see if you see some `New Block`
    ```bash
    pm2 logs validator-92
    ```
@@ -79,7 +93,7 @@ Previous Release: 2.0.0
 
 If any issues arise during or after the rollout, follow these steps to perform a rollback:
 
-1. **Rollback Database**: Rollback the database by running in **SubVortex** directory
+1. **Rollback Redis**: Rollback redis by running in **SubVortex** directory
 
    ```bash
    python3 ./scripts/migrations/release-2.1.0/migration.py --run-type rollback
@@ -88,11 +102,11 @@ If any issues arise during or after the rollout, follow these steps to perform a
    You should see
 
    ```bash
-    2024-03-29 22:08:27.867 |       INFO       | Loading database from localhost:6379
-    2024-03-29 22:08:27.901 |       INFO       | Rollback starting
-    2024-03-29 22:08:27.907 |       INFO       | Rollback done
-    2024-03-29 22:08:27.908 |       INFO       | Checking rollback...
-    2024-03-29 22:08:27.910 |       INFO       | Rollback checked successfully
+   2024-03-30 13:12:20.909 |       INFO       | Loading database from localhost:6379
+   2024-03-30 13:12:20.920 |       INFO       | Rollback starting             
+   2024-03-30 13:12:20.961 |       INFO       | Rollback done                 
+   2024-03-30 13:12:20.961 |       INFO       | Checking rollback...          
+   2024-03-30 13:12:20.962 |       INFO       | Rollback checked successfully 
    ```
 
    If any issue, restore your backup database using the [Backup Guide](../../migrations/backup.md#restore-a-dump).

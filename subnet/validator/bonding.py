@@ -74,18 +74,32 @@ async def register_miner(ss58_address: str, database: aioredis.Redis):
     await database.hmset(
         f"stats:{ss58_address}",
         {
-            "subtensor_successes": 0,
-            "subtensor_attempts": 0,
-            "metric_successes": 0,
-            "metric_attempts": 0,
-            "total_successes": 0,
-            "tier": "Bronze",
+            "uid": -1,
+            "version": "",
+            "country": "",
+            "score": 0,
+            "availability_score": 0,
+            "latency_score": 0,
+            "reliability_score": 0,
+            "distribution_score": 0,
+            "challenge_successes": 0,
+            "challenge_attempts": 0,
         },
     )
 
 
 async def update_statistics(
-    ss58_address: str, success: bool, task_type: str, database: aioredis.Redis
+    ss58_address: str,
+    success: bool,
+    uid: int,
+    country: str,
+    version: str,
+    reward: float,
+    availability_score: float,
+    latency_score: float,
+    reliability_score: float,
+    distribution_score: float,
+    database: aioredis.Redis,
 ):
     """
     Updates the statistics of a miner in the decentralized storage system.
@@ -106,7 +120,19 @@ async def update_statistics(
     # Update statistics in the stats hash
     stats_key = f"stats:{ss58_address}"
 
-    if task_type in ["challenge"]:
-        await database.hincrby(stats_key, f"{task_type}_attempts", 1)
-        if success:
-            await database.hincrby(stats_key, f"{task_type}_successes", 1)
+    # Update general info
+    await database.hset(stats_key, "uid", uid)
+    await database.hset(stats_key, "version", version)
+    await database.hset(stats_key, "country", country)
+
+    # Update scores
+    await database.hset(stats_key, "score", reward)
+    await database.hset(stats_key, "availability_score", availability_score)
+    await database.hset(stats_key, "latency_score", latency_score)
+    await database.hset(stats_key, "reliability_score", reliability_score)
+    await database.hset(stats_key, "distribution_score", distribution_score)
+
+    # Update challenge
+    await database.hincrby(stats_key, "challenge_attempts", 1)
+    if success:
+        await database.hincrby(stats_key, "challenge_successes", 1)

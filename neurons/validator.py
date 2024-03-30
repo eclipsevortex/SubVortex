@@ -274,16 +274,21 @@ class Validator:
             bt.logging.error("Error in training loop", str(err))
             bt.logging.debug(print_exception(type(err), err, err.__traceback__))
 
+        except KeyboardInterrupt:
+            if not self.config.wandb.off:
+                bt.logging.info(
+                    "KeyboardInterrupt caught, gracefully closing the wandb run..."
+                )
+                if self.wandb is not None:
+                    self.wandb.finish()
+                    assert self.wandb.run is None
+
         # After all we have to ensure subtensor connection is closed properly
         finally:
             if hasattr(self, "subtensor"):
                 bt.logging.debug("Closing subtensor connection")
                 self.subtensor.close()
                 self.stop_subscription_thread()
-
-            if self.wandb is not None:
-                bt.logging.debug("Finishing wandb run")
-                self.wandb.finish()
 
     # TODO: After investigation done and decision taken, remove or change it
     def start_event_subscription(self):

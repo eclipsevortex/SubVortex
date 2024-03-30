@@ -17,6 +17,7 @@
 
 # Utils for checkpointing and saving the model.
 import os
+import re
 import torch
 import copy
 import wandb
@@ -24,12 +25,14 @@ from wandb.apis import public
 import shutil
 import bittensor as bt
 from datetime import datetime
-from dataclasses import asdict
+from typing import List
 
 from subnet import __spec_version__ as THIS_SPEC_VERSION
 from subnet import __version__ as THIS_VERSION
 import subnet.validator as validator
 from subnet.validator.event import EventSchema
+
+api = wandb.Api()
 
 
 def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
@@ -132,21 +135,25 @@ def load_state(self):
         bt.logging.warning(f"Failed to load model with error: {e}")
 
 
-def log_miners_table(self, event: EventSchema, commit=False):
+def log_miners_table(self, miners: List, commit=False):
     # Build the dataset
     # We convert any number into string to have a better style in wandb UI
     data = []
-    for idx, (uid) in enumerate(event.uids):
+    for miner in miners:
+        miner_uid = miner.get("uid")
+        if miner_uid == "-1":
+            continue
+
         data.append(
             [
-                str(uid),
-                "0.2.4",
-                event.countries[idx],
-                str(event.rewards[idx]),
-                str(event.availability_scores[idx]),
-                str(event.latency_scores[idx]),
-                str(event.reliability_scores[idx]),
-                str(event.distribution_scores[idx]),
+                miner_uid,
+                miner.get("version"),
+                miner.get("country"),
+                miner.get("score"),
+                miner.get("availability_score"),
+                miner.get("latency_score"),
+                miner.get("reliability_score"),
+                miner.get("distribution_score"),
             ]
         )
 
@@ -166,17 +173,24 @@ def log_miners_table(self, event: EventSchema, commit=False):
     )
 
     self.wandb.log({"02. Miners/miners": miners}, commit=commit)
+    bt.logging.trace(f"log_miners_table() {data} miners")
 
 
-def log_distribution(self, event: EventSchema, commit=False):
+def log_distribution(self, miners: List, commit=False):
     # Build the data for the metric
     country_counts = {}
-    for code in event.countries:
-        country_counts[code] = country_counts.get(code, 0) + 1
+    for miner in miners:
+        miner_uid = miner.get("uid")
+        if miner_uid == "-1":
+            continue
+
+        miner_country = miner.get("country")
+        country_counts[miner_country] = country_counts.get(miner_country, 0) + 1
 
     # Create the graph
     data = [[country, count] for country, count in country_counts.items()]
     table = wandb.Table(data=data, columns=["country", "count"])
+
     wandb.log(
         {
             "03. Distribution/distribution": wandb.plot.bar(
@@ -185,6 +199,7 @@ def log_distribution(self, event: EventSchema, commit=False):
         },
         commit=commit,
     )
+    bt.logging.trace(f"log_distribution() {data} countries")
 
 
 def log_score(self, name: str, event: EventSchema, commit=False):
@@ -198,6 +213,7 @@ def log_score(self, name: str, event: EventSchema, commit=False):
 
     # Create the graph
     self.wandb.log({f"04. Scores/{name}_score": data}, commit=commit)
+    bt.logging.trace(f"log_score() {name} {len(data)} scores")
 
 
 def log_moving_averaged_score(self, event: EventSchema, commit=False):
@@ -214,6 +230,7 @@ def log_moving_averaged_score(self, event: EventSchema, commit=False):
 
     # Create the graph
     self.wandb.log({"04. Scores/moving_averaged_score": data}, commit=commit)
+    bt.logging.trace(f"log_moving_averaged_score() {len(data)} moving averaged scores")
 
 
 def log_completion_times(self, event: EventSchema, commit=False):
@@ -227,9 +244,10 @@ def log_completion_times(self, event: EventSchema, commit=False):
 
     # Create the graph
     self.wandb.log({"05. Miscellaneous/completion_times": data}, commit=commit)
+    bt.logging.trace(f"log_completion_times() {len(data)} completion times")
 
 
-def log_event(self, event: EventSchema):
+def log_event(self, event: EventSchema, miners: List):
     # Log the event to wandb
     if not self.config.wandb.off and self.wandb is not None:
         # Add overview metrics
@@ -239,10 +257,10 @@ def log_event(self, event: EventSchema):
         )
 
         # Add the miner table
-        log_miners_table(self, event)
+        log_miners_table(self, miners)
 
         # Add miners distribution
-        log_distribution(self, event)
+        log_distribution(self, miners)
 
         # Add scores
         log_score(self, "final", event)
@@ -291,7 +309,7 @@ def init_wandb(self, reinit=False):
     )
 
     # Get the list of current runs for the validator
-    api = wandb.Api()
+    # Rate limite for free accounts - 50 requests per minutes
     runs = api.runs(
         f"{self.config.wandb.entity}/{project_name}",
         order="-created_at",
@@ -323,29 +341,65 @@ def init_wandb(self, reinit=False):
 
     # Remove old runs - We keep only one archive + the new run
     if len(runs) >= 2:
+        clean_wandb_old_runs(runs)
+
+    bt.logging.success(
+        prefix="Started a new wandb run",
+        sufix=f"<blue> {self.wandb.name} </blue>",
+    )
+
+
+def reinit_wandb(self):
+    """Reinitializes wandb, rolling over the run."""
+    if self.wandb is not None:
+        self.wandb.finish()
+        assert self.wandb.run is None
+
+    init_wandb(self, reinit=True)
+
+
+def clean_wandb_old_runs(runs):
+    try:
         bt.logging.debug(f"[Wandb] Removing the {len(runs) - 1} oldest run(s)")
         for i in range(1, len(runs)):
             run: public.Run = runs[i]
 
+            # Remove remote run
+            run.delete(True)
+            bt.logging.debug(f"[Wandb] Run {run.name} removed remotely")
+
+            # Remove local run
             wandb_base = wandb.run.settings.wandb_dir
 
             if run.metadata is None:
-                bt.logging.warning(
-                    f"[Wandb] Could not remove the local run {run.name} as metadata are None. Please remove it manually to not overcharge your disk."
-                )
-                continue
+                pattern = r"run-\d{8}_\d{6}-" + re.escape(run.id)
 
-            # Get the run started at time
-            startedAt = run.metadata["startedAt"]
+                # re.match(run-\d{8}_\d{6}-6mh2vqw2,"/root/.bittensor/miners/validator/default/netuid92/subvortex_validator/wandb")
 
-            # Parse input datetime string into a datetime object
-            input_datetime = datetime.strptime(startedAt, "%Y-%m-%dT%H:%M:%S.%f")
+                # matches = re.match(pattern, wandb_base)
+                matches = [
+                    subdir
+                    for subdir in os.listdir(wandb_base)
+                    if re.match(pattern, subdir)
+                ]
+                if len(matches) == 0:
+                    continue
 
-            # Format the datetime object into the desired string format
-            output_datetime_str = input_datetime.strftime("%Y%m%d_%H%M%S")
+                run_local_path = f"{wandb_base}{matches[0]}"
+                bt.logging.debug("[Wandb] Local path computed")
+            else:
+                # Get the run started at time
+                startedAt = run.metadata["startedAt"]
 
-            # Local path to the run files
-            run_local_path = f"{wandb_base}run-{output_datetime_str}-{run.id}"
+                # Parse input datetime string into a datetime object
+                input_datetime = datetime.strptime(startedAt, "%Y-%m-%dT%H:%M:%S.%f")
+
+                # Format the datetime object into the desired string format
+                output_datetime_str = input_datetime.strftime("%Y%m%d_%H%M%S")
+
+                # Local path to the run files
+                run_local_path = f"{wandb_base}run-{output_datetime_str}-{run.id}"
+                bt.logging.debug("[Wandb] Local path retrieve from metadata")
 
             # Remove local run
             if os.path.exists(run_local_path):
@@ -358,21 +412,11 @@ def init_wandb(self, reinit=False):
                     f"[Wandb] Run local directory {run_local_path} does not exist. Please check it has been removed."
                 )
 
-            # Remove remote run
-            run.delete(True)
-            bt.logging.debug(f"[Wandb] Run {run.name} removed remotely")
-
-    bt.logging.success(
-        prefix="Started a new wandb run",
-        sufix=f"<blue> {self.wandb.name} </blue>",
-    )
-
-
-def reinit_wandb(self):
-    """Reinitializes wandb, rolling over the run."""
-    if self.wandb is not None:
-        self.wandb.finish()
-    init_wandb(self, reinit=True)
+    except Exception as err:
+        run_names = [run.name for un in range(1, len(runs))]
+        bt.logging.warning(
+            f"[Wandb] Could not remove the local runs {run_names}: {err}"
+        )
 
 
 def should_reinit_wandb(self):

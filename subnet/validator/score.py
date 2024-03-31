@@ -99,17 +99,19 @@ def compute_latency_score(idx, uid, validator_country, responses):
     return normalized_score
 
 
-def compute_distribution_score(idx, responses):
-    # Step 1: Country of the requested response
-    country = responses[idx][1]
+def compute_distribution_score(uid, countries):
+    # Step 1: Country of the uid
+    country = countries[f"{uid}"]
+    bt.logging.trace(f"[{uid}][Score][Distribution] Uid country {country}")
 
-    # Step 1: Country the number of miners in the country
-    count = 0
-    for response in responses:
-        if response[1] == country:
-            count = count + 1
+    # Step 2: Get all uids in that country
+    others = []
+    for key, value in countries.items():
+        if value == country:
+            others.append(key)
+    bt.logging.trace(f"[{uid}][Score][Distribution] Other Uids country {others}")
 
-    # Step 2: Compute the score
-    score = 1 / count
+    # Step 3: Compute the score
+    score = 1 / len(others) if country != None else 0
 
     return score

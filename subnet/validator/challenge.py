@@ -18,7 +18,7 @@ from subnet.constants import (
 )
 from subnet.shared.subtensor import get_current_block
 from subnet.validator.event import EventSchema
-from subnet.validator.utils import get_next_uids, ping_uid
+from subnet.validator.utils import get_next_uids, ping_uid, get_available_uids
 from subnet.validator.localisation import get_country
 from subnet.validator.bonding import update_statistics
 from subnet.validator.database import build_miners_table
@@ -127,6 +127,13 @@ async def challenge_data(self):
     uids = await get_next_uids(self, validator_hotkey, k=10)
     bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
+    # Get the countries
+    uids_countries = {}
+    for idx, (uid) in enumerate(get_available_uids(self)):
+        ip = self.metagraph.axons[uid].ip
+        uids_countries[f"{uid}"] = get_country(ip)
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Country loaded for {len(uids_countries)} uids")
+
     # Initialise the rewards object
     rewards: torch.FloatTensor = torch.zeros(len(uids), dtype=torch.float32).to(
         self.device
@@ -164,7 +171,7 @@ async def challenge_data(self):
         ip = self.metagraph.axons[uid].ip
         miners_on_ip = [
             self.metagraph.axons[uid].ip
-            for uid in uids
+            for uid in self.metagraph.uids.tolist()
             if self.metagraph.axons[uid].ip == ip
         ]
         number_of_miners = len(miners_on_ip)
@@ -202,8 +209,8 @@ async def challenge_data(self):
 
             # Compute score for distribution
             distribution_score = (
-                compute_distribution_score(idx, responses)
-                if verified and responses[idx][2] is not None
+                compute_distribution_score(uid, uids_countries)
+                if verified
                 else DISTRIBUTION_FAILURE_REWARD
             )
             distribution_scores.append((uid, distribution_score))
@@ -255,7 +262,6 @@ async def challenge_data(self):
             success=verified,
             uid=uid,
             country=country,
-            # Keep the expecting format otherwise wandb throw an exception 
             version=response[0] if len(response[0]) > 0 else '0.0.0',
             reward=rewards[idx].item(),
             availability_score=availability_score,

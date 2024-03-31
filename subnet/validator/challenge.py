@@ -256,13 +256,16 @@ async def challenge_data(self):
             timeout=5,
         )
 
+        # Get the miner version
+        miner_versionn = response[0] if len(response[0]) > 0 and response[0] != '' else '0.0.0'
+
         # Update statistics
         await update_statistics(
             ss58_address=hotkey,
             success=verified,
             uid=uid,
             country=country,
-            version=response[0] if len(response[0]) > 0 else '0.0.0',
+            version=miner_versionn,
             reward=rewards[idx].item(),
             availability_score=availability_score,
             latency_score=latency_score,

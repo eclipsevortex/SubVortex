@@ -24,7 +24,23 @@ Previous Release: 2.0.0
 
 1. **Backup Database**: Before starting the rollout process, backup your database using the [Backup Guide](../../redis/docs/redis-backup.md#create-a-dump).
 
-2. **Upgrade Subnet**: Check if you are on main or on a tag
+2. **Stop validator**: Stop your validator. We **HAVE TO** stop it because there is a redis migration.
+
+   ```bash
+   pm2 stop validator-92
+   ```
+
+   Check you have **stopped** in the status as shown below
+
+   ```
+   ┌────┬─────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+   │ id │ name            │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+   ├────┼─────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+   │ 0  │ validator-92    │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+   └────┴─────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+   ```
+
+3. **Upgrade Subnet**: Check if you are on main or on a tag
 
    ```bash
    git branch -vvv
@@ -41,7 +57,7 @@ Previous Release: 2.0.0
    ```
 
    > IMPORTANT <br />
-   > The \* tell you your active branch. It has to be hear on the tag on the main branch.
+   > The \* tell you your active branch. It has to be on the tag or on the main branch.
 
    If you are on a tag branch, checkout main
 
@@ -62,27 +78,31 @@ Previous Release: 2.0.0
    pip install -e .
    ```
 
-3. **Rollout Redis**: Rollout redis by running in **SubVortex** directory
+4. **Wandb login**: Login do wandb with the api key by following the [Wandb guide](../../../docs/wandb/wandb.md#installation) section installation.
+
+5. **Rollout Redis**: Rollout redis by running in **SubVortex** directory
+
    ```bash
    python3 ./scripts/release/release-2.1.0/migration.py
    ```
 
    You will see
+
    ```bash
    2024-03-30 13:12:25.887 |       INFO       | Loading database from localhost:6379
-   2024-03-30 13:12:25.899 |       INFO       | Rollout starting              
-   2024-03-30 13:12:25.932 |       INFO       | Rollout done                  
-   2024-03-30 13:12:25.933 |       INFO       | Checking rollout...           
-   2024-03-30 13:12:25.940 |       INFO       | Rollout checked successfully  
+   2024-03-30 13:12:25.899 |       INFO       | Rollout starting
+   2024-03-30 13:12:25.932 |       INFO       | Rollout done
+   2024-03-30 13:12:25.933 |       INFO       | Checking rollout...
+   2024-03-30 13:12:25.940 |       INFO       | Rollout checked successfully
    ```
 
-4. **Restart validator**: Restart your validator to take the new version into the new version
+6. **Restart validator**: Restart your validator to take the new version
 
    ```bash
    pm2 restart validator-92
    ```
 
-5. **Check logs**: Check the validator logs to see if you see some `New Block`
+7. **Check logs**: Check the validator logs to see if you see some `New Block`
    ```bash
    pm2 logs validator-92
    ```
@@ -93,31 +113,47 @@ Previous Release: 2.0.0
 
 If any issues arise during or after the rollout, follow these steps to perform a rollback:
 
-1. **Rollback Redis**: Rollback redis by running in **SubVortex** directory
+1. **Stop validator**: Stop your validator. We **HAVE TO** stop it because there is a redis migration.
 
    ```bash
-   python3 ./scripts/migrations/release-2.1.0/migration.py --run-type rollback
+   pm2 stop validator-92
+   ```
+
+   Check you have **stopped** in the status as shown below
+
+   ```
+   ┌────┬─────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+   │ id │ name            │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+   ├────┼─────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+   │ 0  │ validator-92    │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+   └────┴─────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+   ```
+
+2. **Rollback Redis**: Rollback redis by running in **SubVortex** directory
+
+   ```bash
+   python3 ./scripts/release/release-2.1.0/migration.py --run-type rollback
    ```
 
    You should see
 
    ```bash
    2024-03-30 13:12:20.909 |       INFO       | Loading database from localhost:6379
-   2024-03-30 13:12:20.920 |       INFO       | Rollback starting             
-   2024-03-30 13:12:20.961 |       INFO       | Rollback done                 
-   2024-03-30 13:12:20.961 |       INFO       | Checking rollback...          
-   2024-03-30 13:12:20.962 |       INFO       | Rollback checked successfully 
+   2024-03-30 13:12:20.920 |       INFO       | Rollback starting
+   2024-03-30 13:12:20.961 |       INFO       | Rollback done
+   2024-03-30 13:12:20.961 |       INFO       | Checking rollback...
+   2024-03-30 13:12:20.962 |       INFO       | Rollback checked successfully
    ```
 
    If any issue, restore your backup database using the [Backup Guide](../../migrations/backup.md#restore-a-dump).
 
-2. **Downgrade Subnet**: Get the tags
+3. **Downgrade Subnet**: Get the tags
 
    ```bash
    git fetch --tags
    ```
 
-   Check tag v2.0.0 exist
+   Check tag v2.0.0 exists
 
    ```bash
    git tag
@@ -132,7 +168,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
    you will see
 
    ```
-   Note: switching to 'tags/v0.2.4'.
+   Note: switching to 'tags/v2.0.0'.
 
    You are in 'detached HEAD' state. You can look around, make experimental
    changes and commit them, and you can discard any commits you make in this
@@ -159,13 +195,13 @@ If any issues arise during or after the rollout, follow these steps to perform a
    pip install -e .
    ```
 
-3. **Restart validator**: Restart your validator to take the new version into the new version
+4. **Restart validator**: Restart your validator to take the old version
 
    ```bash
    pm2 restart validator-92
    ```
 
-4. **Check logs**: Check the validator logs to see if you see some `New Block`
+5. **Check logs**: Check the validator logs to see if you see some `New Block`
    ```bash
    pm2 logs validator-92
    ```
@@ -176,11 +212,117 @@ If any issues arise during or after the rollout, follow these steps to perform a
 
 ## Rollout Process <a id="miner-rollout-process"></a>
 
-There is no rollout for miners.
+1. **Upgrade Subnet**: Check if you are on main or on a tag
+
+   ```bash
+   git branch -vvv
+   ```
+
+   You will see something similar
+
+   ```bash
+   # If you are on a tag
+   * (HEAD detached at v0.2.4)  d6e233a Merge pull request #13 from eclipsevortex/release/0.2.4
+
+   # If you are on main
+   * main                       13e555e [origin/main] Merge pull request #19 from eclipsevortex/release/2.0.0
+   ```
+
+   > IMPORTANT <br />
+   > The \* tell you your active branch. It has to be on the tag or on the main branch.
+
+   If you are on a tag branch, checkout main
+
+   ```bash
+   git checkout main
+   ```
+
+   Otherwise/Then, get the latest version of the subnet
+
+   ```bash
+   git pull
+   ```
+
+   Then, install the dependencies
+
+   ```bash
+   pip install -r requirements.txt
+   pip install -e .
+   ```
+
+2. **Restart miner**: Restart your miner to take the new version
+
+   ```bash
+   pm2 restart miner-92
+   ```
+
+3. **Check logs**: Check the miner logs to see if you see some `New Block`
+   ```bash
+   pm2 logs miner-92
+   ```
 
 ## Rollback Process <a id="miner-rollback-process"></a>
 
-There is no rollback for miners.
+If any issues arise during or after the rollout, follow these steps to perform a rollback:
+
+1. **Downgrade Subnet**: Get the tags
+
+   ```bash
+   git fetch --tags
+   ```
+
+   Check tag v2.0.0 exists
+
+   ```bash
+   git tag
+   ```
+
+   Checkout the tag
+
+   ```bash
+   git checkout tags/v2.0.0
+   ```
+
+   you will see
+
+   ```
+   Note: switching to 'tags/v2.0.0'.
+
+   You are in 'detached HEAD' state. You can look around, make experimental
+   changes and commit them, and you can discard any commits you make in this
+   state without impacting any branches by switching back to a branch.
+
+   If you want to create a new branch to retain commits you create, you may
+   do so (now or later) by using -c with the switch command. Example:
+
+   git switch -c <new-branch-name>
+
+   Or undo this operation with:
+
+   git switch -
+
+   Turn off this advice by setting config variable advice.detachedHead to false
+
+   HEAD is now at d6e233a Merge pull request #13 from eclipsevortex/release/0.2.4
+   ```
+
+   Then install the dependencies
+
+   ```bash
+   pip install -r requirements.txt
+   pip install -e .
+   ```
+
+2. **Restart miner**: Restart your miner to take the old version
+
+   ```bash
+   pm2 restart miner-92
+   ```
+
+3. **Check logs**: Check the miner logs to see if you see some `New Block`
+   ```bash
+   pm2 logs miner-92
+   ```
 
 <br />
 

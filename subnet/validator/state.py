@@ -30,9 +30,7 @@ from typing import List
 from subnet import __spec_version__ as THIS_SPEC_VERSION
 from subnet import __version__ as THIS_VERSION
 import subnet.validator as validator
-from subnet.validator.event import EventSchema
 
-api = wandb.Api()
 
 
 def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
@@ -323,6 +321,7 @@ def init_wandb(self, reinit=False):
 
     # Get the list of current runs for the validator
     # Rate limite for free accounts - 50 requests per minutes
+    api = wandb.Api()
     runs = api.runs(
         f"{self.config.wandb.entity}/{project_name}",
         order="-created_at",

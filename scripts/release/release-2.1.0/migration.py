@@ -89,11 +89,14 @@ async def rollout(args):
                 "version",
                 "country",
                 "verified",
+                "score",
                 "availability_score",
                 "latency_score",
                 "reliability_score",
                 "distribution_score",
                 "process_time",
+                "challenge_successes",
+                "challenge_attempts",
             ]
 
             keys = [
@@ -185,10 +188,13 @@ async def rollback(args):
                 "uid",
                 "version",
                 "country",
+                "verified",
+                "score",
                 "availability_score",
                 "latency_score",
                 "reliability_score",
                 "distribution_score",
+                "process_time",
             ]
 
             keys = [
@@ -197,8 +203,26 @@ async def rollback(args):
                 if prop.encode() not in hash_data.keys()
             ]
 
+            diff = list(set(properties_removed) - set(keys))
             if len(keys) > 0:
-                bt.logging.warning(f"The stats key(s) {keys} still exist.")
+                bt.logging.warning(f"The stats key(s) {diff} still exist.")
+                checked = False
+                break
+
+            properties_added = [
+                "challenge_successes",
+                "challenge_attempts",
+            ]
+
+            keys = [
+                prop
+                for prop in properties_added
+                if f"b{prop}" not in hash_data.keys()
+            ]
+
+            diff = list(set(properties_added) - set(keys))
+            if len(keys) > 0:
+                bt.logging.warning(f"The stats key(s) {diff} does not exist.")
                 checked = False
                 break
 

@@ -323,7 +323,7 @@ async def build_miners_table(self, countries):
         process_time = get_field_value(statistics.get(b"process_time"), 0)
 
         miner = {
-            "uid": uid,
+            "uid": int(uid),
             "version": version,
             "country": countries.get(f"{uid}"),
             "verified": verified == '1',

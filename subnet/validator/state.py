@@ -225,10 +225,12 @@ def log_moving_averaged_score(
     """
     Create a graph showing the moving score for each miner over time
     """
+    metagraph_uids = self.metagraph.uids.tolist()
+
     # Build the data for the metric
     data = {}
     for idx, (score) in enumerate(moving_averaged_scores):
-        uid = self.metagraph.uids[idx]
+        uid = metagraph_uids[idx]
         if uid not in uids:
             continue
 

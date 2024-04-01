@@ -203,7 +203,7 @@ def log_distribution(self, miners: List, commit=False):
 
 
 def log_score(self, name: str, uids: List[int], miners: List, commit=False):
-    property_name = f"{name}_scores" if name != "final" else "rewards"
+    property_name = f"{name}_score" if name != "final" else "score"
 
     # Build the data for the metric
     data = {}
@@ -212,7 +212,7 @@ def log_score(self, name: str, uids: List[int], miners: List, commit=False):
         if uid not in uids:
             continue
 
-        data[str(uid)] = miner.get(f"{property_name}_score")
+        data[str(uid)] = miner.get(property_name)
 
     # Create the graph
     self.wandb.log({f"04. Scores/{name}_score": data}, commit=commit)

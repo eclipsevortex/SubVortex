@@ -24,7 +24,7 @@ def compute_availability_score(verified):
     Compute the availability score of the uid
     """
 
-    score = 1 if verified else AVAILABILITY_FAILURE_REWARD
+    score = 1.0 if verified else AVAILABILITY_FAILURE_REWARD
     return score
 
 

@@ -141,19 +141,19 @@ def log_miners_table(self, miners: List, commit=False):
     data = []
     for miner in miners:
         miner_uid = miner.get("uid")
-        if miner_uid == "-1":
+        if miner_uid == -1:
             continue
 
         data.append(
             [
-                miner_uid,
-                miner.get("version"),
-                miner.get("country"),
-                miner.get("score"),
-                miner.get("availability_score"),
-                miner.get("latency_score"),
-                miner.get("reliability_score"),
-                miner.get("distribution_score"),
+                str(miner_uid),
+                str(miner.get("version")),
+                str(miner.get("country")),
+                str(miner.get("score")),
+                str(miner.get("availability_score")),
+                str(miner.get("latency_score")),
+                str(miner.get("reliability_score")),
+                str(miner.get("distribution_score")),
             ]
         )
 
@@ -202,59 +202,70 @@ def log_distribution(self, miners: List, commit=False):
     bt.logging.trace(f"log_distribution() {data} countries")
 
 
-def log_score(self, name: str, event: EventSchema, commit=False):
+def log_score(self, name: str, uids: List[int], miners: List, commit=False):
     property_name = f"{name}_scores" if name != "final" else "rewards"
-    scores = getattr(event, property_name)
 
     # Build the data for the metric
     data = {}
-    for idx, (score) in enumerate(scores):
-        data[f"{event.uids[idx]}"] = score
+    for miner in miners:
+        uid = miner.get("uid")
+        if uid not in uids:
+            continue
+
+        data[str(uid)] = miner.get(f"{property_name}_score")
 
     # Create the graph
     self.wandb.log({f"04. Scores/{name}_score": data}, commit=commit)
     bt.logging.trace(f"log_score() {name} {len(data)} scores")
 
 
-def log_moving_averaged_score(self, event: EventSchema, commit=False):
+def log_moving_averaged_score(
+    self, uids: List[int], moving_averaged_scores: List, commit=False
+):
     """
     Create a graph showing the moving score for each miner over time
     """
     # Build the data for the metric
     data = {}
-    for idx, (score) in enumerate(event.moving_averaged_scores):
-        if self.metagraph.uids[idx] not in event.uids:
+    for idx, (score) in enumerate(moving_averaged_scores):
+        uid = self.metagraph.uids[idx]
+        if uid not in uids:
             continue
 
-        data[f"{self.metagraph.uids[idx]}"] = score
+        data[str(uid)] = score
 
     # Create the graph
     self.wandb.log({"04. Scores/moving_averaged_score": data}, commit=commit)
     bt.logging.trace(f"log_moving_averaged_score() {len(data)} moving averaged scores")
 
 
-def log_completion_times(self, event: EventSchema, commit=False):
+def log_completion_times(self, uids: List[int], miners: List, commit=False):
     """
     Create a graph showing the time to process the challenge over time
     """
     # Build the data for the metric
     data = {}
-    for idx, (time) in enumerate(event.completion_times):
-        data[f"{event.uids[idx]}"] = time
+    for miner in miners:
+        uid = miner.get("uid")
+        if uid not in uids:
+            continue
+
+        data[str(uid)] = miner.get("process_time") or 0
 
     # Create the graph
     self.wandb.log({"05. Miscellaneous/completion_times": data}, commit=commit)
     bt.logging.trace(f"log_completion_times() {len(data)} completion times")
 
 
-def log_event(self, event: EventSchema, miners: List):
+def log_event(self, uids: List[int], miners: List, step_length, moving_averaged_scores):
     # Log the event to wandb
     if not self.config.wandb.off and self.wandb is not None:
         # Add overview metrics
-        self.wandb.log({"01. Overview/best_uid": event.best_uid}, commit=False)
+        best_miner = max(miners, key=lambda item: item["score"])
         self.wandb.log(
-            {"01. Overview/step_process_time": event.step_length}, commit=False
+            {"01. Overview/best_uid": str(best_miner.get("uid"))}, commit=False
         )
+        self.wandb.log({"01. Overview/step_process_time": step_length}, commit=False)
 
         # Add the miner table
         log_miners_table(self, miners)
@@ -263,15 +274,15 @@ def log_event(self, event: EventSchema, miners: List):
         log_distribution(self, miners)
 
         # Add scores
-        log_score(self, "final", event)
-        log_score(self, "availability", event)
-        log_score(self, "latency", event)
-        log_score(self, "reliability", event)
-        log_score(self, "distribution", event)
-        log_moving_averaged_score(self, event)
+        log_score(self, "final", uids, miners)
+        log_score(self, "availability", uids, miners)
+        log_score(self, "latency", uids, miners)
+        log_score(self, "reliability", uids, miners)
+        log_score(self, "distribution", uids, miners)
+        log_moving_averaged_score(self, uids, moving_averaged_scores)
 
         # Add miscellaneous
-        log_completion_times(self, event, True)
+        log_completion_times(self, uids, miners, True)
 
 
 def init_wandb(self, reinit=False):

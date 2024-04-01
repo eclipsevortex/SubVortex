@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import math
+from typing import List
 from redis import asyncio as aioredis
 import bittensor as bt
 from subnet.constants import *
@@ -77,6 +78,7 @@ async def register_miner(ss58_address: str, database: aioredis.Redis):
             "uid": -1,
             "version": "",
             "country": "",
+            "verified": 0,
             "score": 0,
             "availability_score": 0,
             "latency_score": 0,
@@ -84,55 +86,34 @@ async def register_miner(ss58_address: str, database: aioredis.Redis):
             "distribution_score": 0,
             "challenge_successes": 0,
             "challenge_attempts": 0,
+            "process_time": 0,
         },
     )
 
 
 async def update_statistics(
-    ss58_address: str,
-    success: bool,
-    uid: int,
-    country: str,
-    version: str,
-    reward: float,
-    availability_score: float,
-    latency_score: float,
-    reliability_score: float,
-    distribution_score: float,
-    database: aioredis.Redis,
+    self,
+    miners: List,
 ):
-    """
-    Updates the statistics of a miner in the decentralized storage system.
-    If the miner is not already registered, they are registered first. This function updates
-    the miner's statistics based on the task performed (store, challenge, retrieve) and whether
-    it was successful.
-    Args:
-        ss58_address (str): The unique address (hotkey) of the miner.
-        success (bool): Indicates whether the task was successful or not.
-        task_type (str): The type of task performed ('store', 'challenge', 'retrieve').
-        database (redis.Redis): The Redis client instance for database operations.
-    """
-    # Check and see if this miner is registered.
-    if not await miner_is_registered(ss58_address, database):
-        bt.logging.debug(f"Registering new miner {ss58_address}...")
-        await register_miner(ss58_address, database)
+    for miner in miners:
+        # Get the hotkey
+        hotkey = self.metagraph.hotkeys[miner.get("uid")]
 
-    # Update statistics in the stats hash
-    stats_key = f"stats:{ss58_address}"
-
-    # Update general info
-    await database.hset(stats_key, "uid", uid)
-    await database.hset(stats_key, "version", version)
-    await database.hset(stats_key, "country", country)
-
-    # Update scores
-    await database.hset(stats_key, "score", reward)
-    await database.hset(stats_key, "availability_score", availability_score)
-    await database.hset(stats_key, "latency_score", latency_score)
-    await database.hset(stats_key, "reliability_score", reliability_score)
-    await database.hset(stats_key, "distribution_score", distribution_score)
-
-    # Update challenge
-    await database.hincrby(stats_key, "challenge_attempts", 1)
-    if success:
-        await database.hincrby(stats_key, "challenge_successes", 1)
+        # Update statistics 
+        await self.database.hmset(
+            f"stats:{hotkey}",
+            {
+                "uid": miner.get("uid"),
+                "version": miner.get("version"),
+                "country": miner.get("country"),
+                "verified": 1 if miner.get("verified") == True else 0,
+                "score": miner.get("score"),
+                "availability_score": miner.get("availability_score"),
+                "latency_score": miner.get("latency_score"),
+                "reliability_score": miner.get("reliability_score"),
+                "distribution_score": miner.get("distribution_score"),
+                "challenge_successes": miner.get("challenge_successes"),
+                "challenge_attempts": miner.get("challenge_attempts"),
+                "process_time": miner.get("process_time"),
+            },
+        )

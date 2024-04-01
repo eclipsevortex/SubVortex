@@ -54,6 +54,8 @@ async def rollout(args):
                 await database.hset(key, b"version", "")
             if b"country" not in metadata_dict:
                 await database.hset(key, b"country", "")
+            if b"verified" not in metadata_dict:
+                await database.hset(key, b"verified", 0)
             if b"score" not in metadata_dict:
                 await database.hset(key, b"score", 0)
             if b"availability_score" not in metadata_dict:
@@ -68,6 +70,8 @@ async def rollout(args):
                 await database.hset(key, b"challenge_successes", 0)
             if b"challenge_attempts" not in metadata_dict:
                 await database.hset(key, b"challenge_attempts", 0)
+            if b"process_time" not in metadata_dict:
+                await database.hset(key, b"process_time", 0)
         bt.logging.info("Rollout done")
 
         bt.logging.info("Checking rollout...")
@@ -84,10 +88,12 @@ async def rollout(args):
                 "uid",
                 "version",
                 "country",
+                "verified",
                 "availability_score",
                 "latency_score",
                 "reliability_score",
                 "distribution_score",
+                "process_time",
             ]
 
             keys = [
@@ -137,6 +143,8 @@ async def rollback(args):
                 await database.hdel(key, b"version")
             if b"country" in metadata_dict:
                 await database.hdel(key, b"country")
+            if b"verified" in metadata_dict:
+                await database.hdel(key, b"verified")
             if b"score" in metadata_dict:
                 await database.hdel(key, b"score")
             if b"availability_score" in metadata_dict:
@@ -147,6 +155,8 @@ async def rollback(args):
                 await database.hdel(key, b"reliability_score")
             if b"distribution_score" in metadata_dict:
                 await database.hdel(key, b"distribution_score")
+            if b"process_time" in metadata_dict:
+                await database.hdel(key, b"process_time")
 
             # Add keys
             if b"challenge_successes" not in metadata_dict:

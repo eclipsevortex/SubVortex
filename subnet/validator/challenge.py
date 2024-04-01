@@ -265,7 +265,6 @@ async def challenge_data(self):
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)
-    # event.moving_averaged_scores = self.moving_averaged_scores.tolist()
     bt.logging.trace(
         f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
     )

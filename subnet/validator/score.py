@@ -36,11 +36,14 @@ async def compute_reliability_score(verified, uid, miner):
         return RELIABILLITY_FAILURE_REWARD
 
     # Step 1: Retrieve statistics
-    challenge_successes = miner.get("challenge_successes") or 0
-    challenge_attempts = miner.get("challenge_attempts") or 0
+    challenge_attempts = (miner.get("challenge_attempts") or 0) + 1
+    miner["challenge_attempts"] = challenge_attempts
     bt.logging.trace(
         f"[{uid}][Score][Reliability] # challenge attempts {challenge_attempts}"
     )
+
+    challenge_successes = (miner.get("challenge_successes") or 0) + (1 if verified else 0)
+    miner["challenge_successes"] = challenge_successes
     bt.logging.trace(
         f"[{uid}][Score][Reliability] # challenge succeeded {challenge_successes}"
     )

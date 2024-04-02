@@ -17,7 +17,7 @@
 
 import json
 import bittensor as bt
-from typing import Any
+from typing import Any, List
 from redis import asyncio as aioredis
 from typing import Dict, Optional
 

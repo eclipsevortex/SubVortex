@@ -58,6 +58,12 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# We change the default value of the subnet if testnet network is choosen
+# and no subtensor is provided
+if [[ $NETWORK == "testnet" ]] && [[ $SUBTENSOR == "finney" ]]; then 
+    SUBTENSOR='test'
+fi
+
 # Static variables
 REPOSITORY_NAME=SubVortex
 NETUID=$([[ $NETWORK == "testnet" ]] && echo 92 || echo 7)
@@ -116,7 +122,7 @@ if [[ "$TYPE" == "validator" ]]; then
         exit 1
     fi
 
-    read -p "Do you want to install wandb - it is highly recommended to expose statics to users (yes/no)? " WANDB
+    read -p "Do you want to use wandb - it is highly recommended to expose statics to users (yes/no)? " WANDB
     
     # Check the value entered
     if [ "$WANDB" != "yes" ] && [ "$WANDB" != "no" ]; then
@@ -219,6 +225,11 @@ if [[ "$TYPE" == "validator" ]]; then
     process=$(pm2 list | grep "validator-$NETUID" &> /dev/null;)
     if [[ ! -z $process ]]; then
         pm2 stop validator-$NETUID && pm2 delete validator-$NETUID
+    fi
+
+    # Wandb login
+    if [[ "$WANDB" == "yes" ]]; then
+        wandb login
     fi
 
     # Set the redis password

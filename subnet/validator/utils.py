@@ -148,6 +148,26 @@ async def get_available_query_miners(
     return get_pseudorandom_uids(self, muids, k=k)
 
 
+async def ping_uid(self, uid):
+    """
+    Ping a list of UIDs to check their availability.
+    Returns a tuple with a list of successful UIDs and a list of failed UIDs.
+    """
+    try:
+        response = await self.dendrite(
+            self.metagraph.axons[uid],
+            bt.Synapse(),
+            deserialize=False,
+            timeout=5,
+        )
+
+        return response.dendrite.status_code == 200
+    except Exception as e:
+        bt.logging.error(f"Dendrite ping failed: {e}")
+
+    return False
+
+
 async def ping_uids(self, uids):
     """
     Ping a list of UIDs to check their availability.
@@ -221,3 +241,102 @@ async def ping_and_retry_uids(
         )
 
     return list(successful_uids)[:k], failed_uids
+
+
+async def get_next_uids(self, ss58_address: str, k: int = 4):
+    # Get the list of uids already selected
+    uids_already_selected = await get_selected_miners(self, ss58_address)
+    bt.logging.debug(f"get_next_uids() uids already selected: {uids_already_selected}")
+
+    # Get the list of available uids
+    uids = await get_available_query_miners(self, k=k, exclude=uids_already_selected)
+    bt.logging.debug(f"get_next_uids() uids:{uids}")
+
+    # Get the k uids requested
+    uids_selected = list(set(uids) - set(uids_already_selected))
+
+    # If no uids available we start again
+    if len(uids_selected) < k:
+        uids_already_selected = []
+
+        # Complete the selection with k - len(uids_selected) elements
+        # We always to have k miners selected
+        new_uids_selected = await get_available_query_miners(self, k=k)
+
+        # Ensure the new_uids_selected does not contain a uid that exist in uids_selected
+        # We do not want to have twice the same uid
+        new_uids_selected = [
+            uid for uid in new_uids_selected if uid not in uids_selected
+        ]
+
+        uids_selected = uids_selected + new_uids_selected[: k - len(uids_selected)]
+
+    bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
+
+    # Store the new selection in the database
+    selection_key = f"selection:{ss58_address}"
+    selection = ",".join(str(uid) for uid in uids_already_selected + uids_selected)
+    await self.database.set(selection_key, selection)
+    bt.logging.debug(f"get_next_uids() new uids selection stored: {selection}")
+
+    return uids_selected
+
+
+async def get_selected_miners(self, ss58_address: str):
+    selection_key = f"selection:{ss58_address}"
+
+    # Get the uids selection
+    value = await self.database.get(selection_key)
+    if value is None:
+        bt.logging.debug(f"get_selected_miners() no uids")
+        return []
+
+    # Get the uids already selected
+    uids_str = value.decode("utf-8") if isinstance(value, bytes) else value
+    uids = [int(uid) for uid in uids_str.split(",")]
+
+    return uids
+
+
+def get_field_value(value, default_value=None):
+    field_value = value.decode("utf-8") if isinstance(value, bytes) else value
+    return field_value or default_value
+
+
+async def build_miners_table(self, countries):
+    miners = []
+
+    uids = get_available_uids(self)
+    for uid in uids:
+        hotkey = self.metagraph.axons[uid].hotkey
+        statistics = await self.database.hgetall(f"stats:{hotkey}")
+
+        version = get_field_value(statistics.get(b"version"), "0.0.0")
+        verified = get_field_value(statistics.get(b"verified"), 0)
+        score = get_field_value(statistics.get(b"score"), 0)
+        availability_score = get_field_value(statistics.get(b"availability_score"), 0)
+        latency_score = get_field_value(statistics.get(b"latency_score"), 0)
+        reliability_score = get_field_value(statistics.get(b"reliability_score"), 0)
+        distribution_score = get_field_value(statistics.get(b"distribution_score"), 0)
+        challenge_successes = get_field_value(statistics.get(b"challenge_successes"), 0)
+        challenge_attempts = get_field_value(statistics.get(b"challenge_attempts"), 0)
+        process_time = get_field_value(statistics.get(b"process_time"), 0)
+
+        miner = {
+            "uid": int(uid),
+            "version": version,
+            "country": countries.get(f"{uid}"),
+            "verified": verified == '1',
+            "score": float(score),
+            "availability_score": float(availability_score),
+            "latency_score": float(latency_score),
+            "reliability_score": float(reliability_score),
+            "distribution_score": float(distribution_score),
+            "challenge_successes": int(challenge_successes),
+            "challenge_attempts": int(challenge_attempts),
+            "process_time": float(process_time),
+        }
+
+        miners.append(miner)
+
+    return miners

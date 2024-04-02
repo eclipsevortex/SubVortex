@@ -73,7 +73,7 @@ wandb: Paste an API key from your profile and hit enter, or press ctrl+c to quit
 
 # Configuration
 
-## Validator
+## Validator <a id="configuration-validator"></a>
 
 The default configuration is enough to have a good user experience so there is no real need to update it.
 
@@ -89,7 +89,7 @@ Options
 
 To enhance user experience, we have decided to name each run using the format `validator-<VALIDATOR_UID>-<COUNT>`. This format allows users to easily identify the runs of the validator they wish to access. The count will increment with each run until it reaches 10000, at which point it will reset.
 
-## Miner
+## Miner <a id="configuration-miner"></a>
 
 For miner, wandb is not needed so nothing to do here.
 

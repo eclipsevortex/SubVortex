@@ -2,8 +2,7 @@ This guide provides step-by-step instructions for creating and restoring a dump 
 
 <br />
 
-Table of Contents
----
+## Table of Contents
 
 - [Create a dump](#create-a-dump)
 - [Restore a dump](#restore-a-dump)
@@ -35,8 +34,17 @@ To create a dump of your Redis database, follow these steps:
 4. **Make a copy**: Copy the dump file `dump.rdb` in `/var/lib/redis` and make a copy of it
 
    ```bash
-   sudo cp /var/lib/redis/dump.rdb /var/lib/redis/dump.bak.rdb
+   sudo cp -p /var/lib/redis/dump.rdb /var/lib/redis/dump.bak.rdb
    ```
+
+   And, same for the file `appendonly.aof`
+
+   ```bash
+   sudo cp -p /var/lib/redis/appendonly.aof /var/lib/redis/appendonly.bak.aof
+   ```
+
+   > IMPORTANT <br />
+   > Copy both files otherwise your restoration won't work!
 
 5. **Verify the Dump**: Check that the copy of the dump file (`dump.bak.rdb`) has been created in `/var/lib/redis`.
    ```bash
@@ -53,7 +61,20 @@ To restore a dump in Redis, follow these steps:
    sudo systemctl stop redis-server.service
    ```
 
-2. **Replace the Dump File**: Replace the existing `dump.rdb` file in the Redis data directory with the dump file you want to restore.
+2. **Replace the Dump File**: Restore the dump file `dump.bak.rdb` in `/var/lib/redis`
+
+   ```bash
+   sudo cp -p /var/lib/redis/dump.bak.rdb /var/lib/redis/dump.rdb
+   ```
+
+   And, same for the file `appendonly.bak.aof`
+
+   ```bash
+   sudo cp -p /var/lib/redis/appendonly.bak.aof /var/lib/redis/appendonly.aof
+   ```
+
+   > IMPORTANT <br />
+   > Restore both files otherwise your restoration won't work!
 
 3. **Start the Redis Server**: Start the Redis server again.
 

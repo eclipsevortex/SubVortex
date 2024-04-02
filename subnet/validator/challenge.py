@@ -10,7 +10,6 @@ from subnet.constants import (
     AVAILABILITY_FAILURE_REWARD,
     LATENCY_FAILURE_REWARD,
     DISTRIBUTION_FAILURE_REWARD,
-    RELIABILLITY_FAILURE_REWARD,
     AVAILABILITY_WEIGHT,
     LATENCY_WEIGHT,
     RELIABILLITY_WEIGHT,
@@ -18,17 +17,11 @@ from subnet.constants import (
 )
 from subnet.shared.subtensor import get_current_block
 from subnet.validator.event import EventSchema
-from subnet.validator.utils import (
-    get_next_uids,
-    ping_uid,
-    get_available_uids,
-    build_miners_table,
-)
+from subnet.validator.utils import ping_and_retry_uids
 from subnet.validator.localisation import get_country
 from subnet.validator.bonding import update_statistics
 from subnet.validator.state import log_event
 from subnet.validator.score import (
-    compute_availability_score,
     compute_reliability_score,
     compute_latency_score,
     compute_distribution_score,
@@ -37,20 +30,6 @@ from substrateinterface.base import SubstrateInterface
 
 
 CHALLENGE_NAME = "Challenge"
-DEFAULT_PROCESS_TIME = 5
-
-
-async def check_miner_availability(self, uid: int):
-    # Check the miner
-    availble = False
-
-    try:
-        # Ping the miner - miner and subtensor are unique so we consider a failure if one or the other is not reachable
-        availble = await ping_uid(self, uid)
-    except Exception:
-        availble = False
-
-    return availble
 
 
 async def handle_synapse(self, uid: int):
@@ -61,13 +40,6 @@ async def handle_synapse(self, uid: int):
     country = get_country(ip)
     bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Subtensor country {country}")
 
-    # Check miner is available
-    available = await check_miner_availability(self, uid)
-    if available == False:
-        bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Miner is not reachable")
-        return uid, available, country, DEFAULT_PROCESS_TIME
-
-    # Check the subtensor is available
     process_time = None
     try:
         # Create a subtensor with the ip return by the synapse
@@ -98,35 +70,38 @@ async def handle_synapse(self, uid: int):
         bt.logging.trace(
             f"[{CHALLENGE_NAME}][{uid}] Verified ? {verified} - val: {validator_block}, miner:{miner_block}"
         )
-    except Exception:
+    except Exception as err:
         verified = False
-        process_time = DEFAULT_PROCESS_TIME if process_time is None else process_time
-        bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Subtensor not verified")
+        process_time = 5 if process_time is None else process_time
+        bt.logging.warning(f"[{CHALLENGE_NAME}][{uid}] Verified ? False")
 
-    return uid, verified, country, process_time
+    return verified, country, process_time
 
 
 async def challenge_data(self):
     start_time = time.time()
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
-    # Select the miners
-    validator_hotkey = self.metagraph.hotkeys[self.uid]
-    uids = await get_next_uids(self, validator_hotkey, k=10)
-    bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
-
-    # Get the countries
-    miners_countries = {}
-    for idx, (uid) in enumerate(get_available_uids(self)):
-        ip = self.metagraph.axons[uid].ip
-        miners_countries[f"{uid}"] = get_country(ip)
-    bt.logging.debug(
-        f"[{CHALLENGE_NAME}] Country loaded for {len(miners_countries)} uids"
+    event = EventSchema(
+        successful=[],
+        completion_times=[],
+        availability_scores=[],
+        latency_scores=[],
+        reliability_scores=[],
+        distribution_scores=[],
+        moving_averaged_scores=[],
+        countries=[],
+        block=self.subtensor.get_current_block(),
+        uids=[],
+        step_length=0.0,
+        best_uid=-1,
+        best_hotkey="",
+        rewards=[],
     )
 
-    # Initialise the miners table
-    miners = await build_miners_table(self, miners_countries)
-    bt.logging.debug(f"[{CHALLENGE_NAME}] Miners table contains {len(miners)} elements")
+    # Select the miners
+    uids, _ = await ping_and_retry_uids(self, k=10)
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
     # Initialise the rewards object
     rewards: torch.FloatTensor = torch.zeros(len(uids), dtype=torch.float32).to(
@@ -140,112 +115,125 @@ async def challenge_data(self):
         tasks.append(asyncio.create_task(handle_synapse(self, uid)))
         responses = await asyncio.gather(*tasks)
 
-    bt.logging.info(f"[{CHALLENGE_NAME}] Computing uids scores")
+    # Init wandb table data
+    availability_scores = []
+    latency_scores = []
+    reliability_scores = []
+    distribution_scores = []
 
     # Compute the score
-    for idx, (uid, verified, _, process_time) in enumerate(responses):
-        # Compute the scores if only one miner is running on the axon machine
-        miner = [miner for miner in miners if int(miner["uid"]) == uid][0]
+    for idx, (uid, (verified, country, process_time)) in enumerate(
+        zip(uids, responses)
+    ):
+        # Get the hotkey
+        hotkey = self.metagraph.hotkeys[uid]
 
-        # Store verified
-        miner["verified"] = verified
+        # Update statistics
+        await update_statistics(
+            ss58_address=hotkey,
+            success=verified,
+            task_type="challenge",
+            database=self.database,
+        )
+
+        # Initialise scores
+        availability_score = 0
+        latency_score = 0
+        reliability_score = 0
+        distribution_score = 0
 
         # Check # of miners per IP - Only one miner per IP is allowed
         ip = self.metagraph.axons[uid].ip
         miners_on_ip = [
             self.metagraph.axons[uid].ip
-            for uid in self.metagraph.uids.tolist()
+            for uid in uids
             if self.metagraph.axons[uid].ip == ip
         ]
         number_of_miners = len(miners_on_ip)
-
-        # Miner is verified if miner/subtensor are up and running and no more than 1 miner
-        miner["verified"] = verified and number_of_miners == 1
-
         if number_of_miners == 1:
-            # Set other statistics for verified miners only
-            miner["process_time"] = process_time
+            # Compute the scores if only one miner is running on the axon machine
 
             # Compute score for availability
-            miner["availability_score"] = compute_availability_score(verified)
+            availability_score = (
+                1.0 if verified and number_of_miners else AVAILABILITY_FAILURE_REWARD
+            )
+            availability_scores.append(availability_score)
             bt.logging.debug(
-                f"[{CHALLENGE_NAME}][{uid}] Availability score {miner['availability_score']}"
+                f"[{CHALLENGE_NAME}][{uid}] Availability score {availability_score}"
             )
 
             # Compute score for latency
-            miner["latency_score"] = compute_latency_score(
-                verified, uid, self.country, responses, miners
+            latency_score = (
+                compute_latency_score(idx, uid, self.country, responses)
+                if verified
+                else LATENCY_FAILURE_REWARD
             )
-            bt.logging.debug(
-                f"[{CHALLENGE_NAME}][{uid}] Latency score {miner['latency_score']}"
-            )
+            latency_scores.append(latency_score)
+            bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Latency score {latency_score}")
 
             # Compute score for reliability
-            miner["reliability_score"] = await compute_reliability_score(
-                verified, uid, miner
+            reliability_score = await compute_reliability_score(
+                uid, self.database, hotkey
             )
+            reliability_scores.append(reliability_score)
             bt.logging.debug(
-                f"[{CHALLENGE_NAME}][{uid}] Reliability score {miner['reliability_score']}"
+                f"[{CHALLENGE_NAME}][{uid}] Reliability score {reliability_score}"
             )
 
             # Compute score for distribution
-            miner["distribution_score"] = compute_distribution_score(
-                verified, uid, miners_countries
+            distribution_score = (
+                compute_distribution_score(idx, responses)
+                if responses[idx][2] is not None
+                else DISTRIBUTION_FAILURE_REWARD
             )
+            distribution_scores.append((uid, distribution_score))
             bt.logging.debug(
-                f"[{CHALLENGE_NAME}][{uid}] Distribution score {miner['distribution_score']}"
+                f"[{CHALLENGE_NAME}][{uid}] Distribution score {distribution_score}"
             )
 
             # Compute final score
-            miner["score"] = rewards[idx] = (
-                (AVAILABILITY_WEIGHT * miner["availability_score"])
-                + (LATENCY_WEIGHT * miner["latency_score"])
-                + (RELIABILLITY_WEIGHT * miner["reliability_score"])
-                + (DISTRIBUTION_WEIGHT * miner["distribution_score"])
-            ) / (
-                AVAILABILITY_WEIGHT
-                + LATENCY_WEIGHT
-                + RELIABILLITY_WEIGHT
-                + DISTRIBUTION_WEIGHT
-            )
+            rewards[idx] = (
+                (AVAILABILITY_WEIGHT * availability_score)
+                + (LATENCY_WEIGHT * latency_score)
+                + (RELIABILLITY_WEIGHT * reliability_score)
+                + (DISTRIBUTION_WEIGHT * distribution_score)
+            ) / 6.0
         else:
             # More than 1 miner running in the axon machine
             # Someone is trying to hack => Penalize all the miners on the axon machine
-            miner["process_time"] = 0
-            miner["availability_score"] = 0
-            miner["latency_score"] = 0
-            miner["reliability_score"] = 0
-            miner["distribution_score"] = 0
-            miner["score"] = rewards[idx] = 0
+            rewards[idx] = 0
             bt.logging.warning(
                 f"[{CHALLENGE_NAME}][{uid}] Number of miners on same IP {number_of_miners}"
             )
 
         bt.logging.info(f"[{CHALLENGE_NAME}][{uid}] Final score {rewards[idx]}")
 
+        # Log the event data for this specific challenge
+        event.uids.append(uid)
+        event.countries.append(country)
+        event.successful.append(verified)
+        event.completion_times.append(process_time)
+        event.rewards.append(rewards[idx].item())
+        event.availability_scores.append(availability_score)
+        event.latency_scores.append(latency_score)
+        event.reliability_scores.append(reliability_score)
+        event.distribution_scores.append(distribution_score)
+
         # Send the score details to the miner
-        response = await self.dendrite(
+        await self.dendrite(
             axons=[self.metagraph.axons[uid]],
             synapse=protocol.Score(
                 validator_uid=self.uid,
                 count=number_of_miners,
-                availability=miner["availability_score"],
-                latency=miner["latency_score"],
-                reliability=miner["reliability_score"],
-                distribution=miner["distribution_score"],
+                availability=availability_score,
+                latency=latency_score,
+                reliability=reliability_score,
+                distribution=distribution_score,
                 score=rewards[idx],
             ),
             deserialize=True,
             timeout=5,
         )
-
-        # Set the miner version
-        miner["version"] = (
-            response[0] if len(response[0]) > 0 and response[0] != "" else "0.0.0"
-        )
-
-    # Update statistics in database
-    await update_statistics(self, miners)
 
     # Compute forward pass rewards
     scattered_rewards: torch.FloatTensor = (
@@ -265,13 +253,19 @@ async def challenge_data(self):
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)
-    bt.logging.trace(
-        f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
-    )
+    event.moving_averaged_scores = self.moving_averaged_scores.tolist()
+    bt.logging.trace(f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}")
 
-    # Display step time in seconds
+    # Display step time
     forward_time = time.time() - start_time
+    event.step_length = forward_time
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")
 
+    # Determine the best UID based on rewards
+    if event.rewards:
+        best_index = max(range(len(event.rewards)), key=event.rewards.__getitem__)
+        event.best_uid = event.uids[best_index]
+        event.best_hotkey = self.metagraph.hotkeys[event.best_uid]
+
     # Log event
-    log_event(self, uids, miners, forward_time, self.moving_averaged_scores.tolist())
+    log_event(self, event)

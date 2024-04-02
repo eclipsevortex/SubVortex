@@ -28,12 +28,6 @@ class Score(bt.Synapse):
     score: float
     count: typing.Optional[int] = 0
 
-    # Output properties
-    version: typing.Optional[str] = ""
-
-    def deserialize(self) -> typing.Optional[str]:
-        return self.version
-
 class IsAlive(bt.Synapse):
     # Returns
     answer: typing.Optional[str] = None

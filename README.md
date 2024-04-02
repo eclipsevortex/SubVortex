@@ -48,7 +48,7 @@
 - [Registering your wallet](#registering-your-wallet)
 - [Running a Miner](#running-a-miner)
 - [Running a Validator](#running-a-validator)
-- [Releases](#releases)
+- [New Releases](#new-releases)
 - [Troubleshooting](#troubleshooting)
   - [Troubleshooting Subtensor](#troubleshooting-subtensor)
 - [License](#license)
@@ -352,9 +352,6 @@ pm2 start neurons/miner.py \
 
 ### Running a Validator
 
-> **MINIMUM 1000 TAO REQUIRED TO SET WEIGHTS** <br />
-A validate function will blacklist set-weights transactions from keys with less than 1000 TAO. This is designed to reduce chain bloat and make it easier for validators and root network participants to set weights on the chain.
-
 > IMPORTANT: Before running a validator, be sure you have a redis up and running. Please see the [Redis guide](./scripts/redis/README.md) for more details.
 
 > IMPORTANT: By default wandb is enabled when running a validator. It is **HIGHLY RECOMMANDED** to not disable it as it enables everyone to access various statistics for better performance on the subnet but if you want to do it, just add `--wandb.off` to the followed pm2 command. If you want to keep wandb enabled, please refer to the [Wandb guide](./docs/wandb/wandb.md) for more details as there are some manually steps to go throught before running the validator.
@@ -375,9 +372,28 @@ pm2 start neurons/validator.py \
 
 > NOTE: to access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
 
-## Releases
+## New Releases
 
-- [Release-2.1.0](./scripts/release/release-2.1.0/RELEASE-2.1.0.md)
+When a new version of the subnet is released, each miner/validatior have to be updated.
+
+> Be sure you are in the SubVortex directory
+
+Get the lastest version of the subnet
+
+```
+git pull
+```
+
+Install the dependencies
+
+```
+pip install -r requirements.txt
+pip install -e .
+```
+
+Restart miners/validators if running them in your base environment or restart pm2 by executing `pm2 restart all` if you are using pm2 as process manager.
+
+> NOTE: to access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
 
 ## Troubleshooting
 

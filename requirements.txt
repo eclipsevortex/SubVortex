@@ -3,4 +3,3 @@ torch==2.0.1
 redis==5.0.1
 aioredis==2.0.1
 wandb==0.16.5
-substrate-interface==1.7.5

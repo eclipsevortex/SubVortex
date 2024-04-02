@@ -1,9 +1,5 @@
 # Changelog
 
-## 2.1.0 / 2024-03-30
-
-**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.0.0...v2.1.0
-
 ## 2.0.0 / 2024-03-28
 
 ## What's Changed

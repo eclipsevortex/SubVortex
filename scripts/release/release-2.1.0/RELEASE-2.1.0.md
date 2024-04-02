@@ -96,7 +96,27 @@ Previous Release: 2.0.0
    2024-03-30 13:12:25.940 |       INFO       | Rollout checked successfully
    ```
 
-6. **Restart validator**: Restart your validator to take the new version
+6. **Restart validator**: Restart your validator to take the new version and use wandb
+   If you were not using wandb before, please delete the validator
+
+   ```bash
+   pm2 delete validator-92
+   ```
+
+   Then, run the following command by chaing all the variable **$XXX**
+
+   ```bash
+   pm2 start neurons/validator.py \
+    --name validator-92 \
+    --interpreter python3 -- \
+    --netuid 92 \
+    --wallet.name $WALLET_NAME \
+    --wallet.hotkey $HOTKEY_NAME \
+    --subtensor.chain_endpoint ws://$SUBTENSOR_IP:9944 \
+    --logging.debug
+   ```
+
+   If you were using wandb before, please restart the validator
 
    ```bash
    pm2 restart validator-92
@@ -200,6 +220,20 @@ If any issues arise during or after the rollout, follow these steps to perform a
    ```bash
    pm2 restart validator-92
    ```
+
+   If you have any issue with wandb, please check you are logged in
+
+   ```bash
+   wandb login
+   ```
+
+   You have to see something like
+
+   ```bash
+   wandb: Currently logged in as: eclipsevortext. Use `wandb login --relogin` to force relogin
+   ```
+
+   If not, please login by following the [Wandb guide](../../../docs/wandb/wandb.md)
 
 5. **Check logs**: Check the validator logs to see if you see some `New Block`
    ```bash

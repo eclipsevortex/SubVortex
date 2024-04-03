@@ -183,9 +183,6 @@ class Validator:
         load_state(self)
         checkpoint(self)
 
-        bt.logging.info("starting subscription handler")
-        self.run_subscription_thread()
-
         try:
             while 1:
                 start_epoch = time.time()
@@ -239,6 +236,7 @@ class Validator:
                 # Set the weights on chain.
                 bt.logging.info("Checking if should set weights")
                 validator_should_set_weights = should_set_weights(
+                    self,
                     get_current_block(self.subtensor),
                     prev_set_weights_block,
                     360,  # tempo
@@ -274,95 +272,16 @@ class Validator:
             bt.logging.error("Error in training loop", str(err))
             bt.logging.debug(print_exception(type(err), err, err.__traceback__))
 
+            if self.wandb is not None:
+                self.wandb.finish()
+                assert self.wandb.run is None
+                bt.logging.debug("Finishing wandb run")
+
         # After all we have to ensure subtensor connection is closed properly
         finally:
             if hasattr(self, "subtensor"):
                 bt.logging.debug("Closing subtensor connection")
                 self.subtensor.close()
-                self.stop_subscription_thread()
-
-            if self.wandb is not None:
-                bt.logging.debug("Finishing wandb run")
-                self.wandb.finish()
-
-    # TODO: After investigation done and decision taken, remove or change it
-    def start_event_subscription(self):
-        """
-        Starts the subscription handler in a background thread.
-        """
-        substrate = SubstrateInterface(
-            ss58_format=bt.__ss58_format__,
-            use_remote_preset=True,
-            url=self.subtensor.chain_endpoint,
-            type_registry=bt.__type_registry__,
-        )
-        self.subscription_substrate = substrate
-
-        def neuron_registered_subscription_handler(obj, update_nr, subscription_id):
-            block_no = obj["header"]["number"]
-            block_hash = substrate.get_block_hash(block_id=block_no)
-            bt.logging.debug(f"subscription block hash: {block_hash}")
-            events = substrate.get_events(block_hash)
-
-            for event in events:
-                event_dict = event["event"].decode()
-                if event_dict["event_id"] == "NeuronRegistered":
-                    netuid, uid, hotkey = event_dict["attributes"]
-                    if int(netuid) == 21:
-                        self.log(
-                            f"NeuronRegistered Event {uid}! Rebalancing data...\n"
-                            f"{pformat(event_dict)}\n"
-                        )
-
-                        self.last_registered_block = block_no
-                        self.rebalance_queue.append(hotkey)
-
-            # If we have some hotkeys deregistered, and it's been 5 blocks since we've caught a registration: rebalance
-            if (
-                len(self.rebalance_queue) > 0
-                and self.last_registered_block + 5 <= block_no
-            ):
-                hotkeys = deepcopy(self.rebalance_queue)
-                self.rebalance_queue.clear()
-                self.log(f"Running rebalance in separate process on hotkeys {hotkeys}")
-
-                # Fire off the script
-                hotkeys_str = ",".join(map(str, hotkeys))
-                hotkeys_arg = quote(hotkeys_str)
-                # subprocess.Popen(
-                #     [
-                #         self.rebalance_script_path,
-                #         hotkeys_arg,
-                #         self.subtensor.chain_endpoint,
-                #         str(self.config.database.index),
-                #     ]
-                # )
-
-        substrate.subscribe_block_headers(neuron_registered_subscription_handler)
-
-    def run_subscription_thread(self):
-        """
-        Start the block header subscription handler in a separate thread.
-        """
-        if not self.subscription_is_running:
-            self.subscription_thread = threading.Thread(
-                target=self.start_event_subscription, daemon=True
-            )
-            self.subscription_thread.start()
-            self.subscription_is_running = True
-            bt.logging.debug("Started subscription handler.")
-
-    def stop_subscription_thread(self):
-        """
-        Stops the subscription handler that is running in the background thread.
-        """
-        if self.subscription_is_running:
-            bt.logging.debug("Stopping subscription in background thread.")
-            self.should_exit = True
-            self.subscription_thread.join(5)
-            self.subscription_is_running = False
-            self.subscription_substrate.close()
-            bt.logging.debug("Stopped subscription handler.")
 
 
 if __name__ == "__main__":

@@ -23,13 +23,14 @@ import wandb
 from wandb.apis import public
 import shutil
 import bittensor as bt
+from typing import List
 from datetime import datetime
-from dataclasses import asdict
 
 from subnet import __spec_version__ as THIS_SPEC_VERSION
 from subnet import __version__ as THIS_VERSION
+
 import subnet.validator as validator
-from subnet.validator.event import EventSchema
+from subnet.validator.miner import Miner, resync_miners
 
 
 def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
@@ -37,11 +38,14 @@ def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
     return current_block - prev_step_block >= checkpoint_block_length
 
 
-def checkpoint(self):
+async def resync_metagraph_and_miners(self):
     """Checkpoints the training process."""
     bt.logging.info("checkpoint()")
-    resync_metagraph(self)
-    save_state(self)
+    resynched = resync_metagraph(self)
+
+    if resynched:
+        await resync_miners(self)
+        save_state(self)
 
 
 def resync_metagraph(self: "validator.neuron.neuron"):
@@ -58,30 +62,32 @@ def resync_metagraph(self: "validator.neuron.neuron"):
     metagraph_axon_info_updated = previous_metagraph.axons != self.metagraph.axons
     bt.logging.debug(f"metagraph_axon_info_updated: {metagraph_axon_info_updated}")
 
-    if metagraph_axon_info_updated:
-        bt.logging.info(
-            "resync_metagraph() Metagraph updated, re-syncing moving averages"
-        )
+    if not metagraph_axon_info_updated:
+        return False
 
-        # Zero out all hotkeys that have been replaced.
-        for uid, hotkey in enumerate(previous_metagraph.hotkeys):
-            if hotkey != self.metagraph.hotkeys[uid]:
-                bt.logging.debug(
-                    f"resync_metagraph() old hotkey {hotkey} | uid {uid} has been replaced by {self.metagraph.hotkeys[uid]}"
-                )
-                self.moving_averaged_scores[uid] = 0  # hotkey has been replaced
+    bt.logging.info("resync_metagraph() Metagraph updated, re-syncing moving averages")
 
-        # Check to see if the metagraph has changed size.
-        # If so, we need to add new hotkeys and moving averages.
-        if len(self.moving_averaged_scores) < len(self.metagraph.hotkeys):
-            bt.logging.info(
-                "resync_metagraph() Metagraph has grown, adding new hotkeys and moving averages"
+    # Zero out all hotkeys that have been replaced.
+    for uid, hotkey in enumerate(previous_metagraph.hotkeys):
+        if hotkey != self.metagraph.hotkeys[uid]:
+            bt.logging.debug(
+                f"resync_metagraph() old hotkey {hotkey} | uid {uid} has been replaced by {self.metagraph.hotkeys[uid]}"
             )
-            # Update the size of the moving average scores.
-            new_moving_average = torch.zeros((self.metagraph.n)).to(self.device)
-            min_len = min(len(self.metagraph.hotkeys), len(self.moving_averaged_scores))
-            new_moving_average[:min_len] = self.moving_averaged_scores[:min_len]
-            self.moving_averaged_scores = new_moving_average
+            self.moving_averaged_scores[uid] = 0  # hotkey has been replaced
+
+    # Check to see if the metagraph has changed size.
+    # If so, we need to add new hotkeys and moving averages.
+    if len(self.moving_averaged_scores) < len(self.metagraph.hotkeys):
+        bt.logging.info(
+            "resync_metagraph() Metagraph has grown, adding new hotkeys and moving averages"
+        )
+        # Update the size of the moving average scores.
+        new_moving_average = torch.zeros((self.metagraph.n)).to(self.device)
+        min_len = min(len(self.metagraph.hotkeys), len(self.moving_averaged_scores))
+        new_moving_average[:min_len] = self.moving_averaged_scores[:min_len]
+        self.moving_averaged_scores = new_moving_average
+
+    return True
 
 
 def save_state(self):
@@ -90,7 +96,6 @@ def save_state(self):
     try:
         neuron_state_dict = {
             "neuron_weights": self.moving_averaged_scores.to("cpu").tolist(),
-            "last_purged_epoch": self.last_purged_epoch,
         }
         torch.save(neuron_state_dict, f"{self.config.neuron.full_path}/model.torch")
         bt.logging.success(
@@ -110,8 +115,6 @@ def load_state(self):
     try:
         state_dict = torch.load(f"{self.config.neuron.full_path}/model.torch")
         neuron_weights = torch.tensor(state_dict["neuron_weights"])
-        self.last_purged_epoch = state_dict.get("last_purged_epoch", 0)
-        bt.logging.info(f"Loaded last_purged_epoch: {self.last_purged_epoch}")
         # Check to ensure that the size of the neruon weights matches the metagraph size.
         if neuron_weights.shape != (self.metagraph.n,):
             bt.logging.warning(
@@ -132,21 +135,25 @@ def load_state(self):
         bt.logging.warning(f"Failed to load model with error: {e}")
 
 
-def log_miners_table(self, event: EventSchema, commit=False):
+def log_miners_table(self, miners: List[Miner], commit=False):
     # Build the dataset
     # We convert any number into string to have a better style in wandb UI
     data = []
-    for idx, (uid) in enumerate(event.uids):
+    for miner in miners:
+        miner_uid = miner.uid
+        if miner_uid == -1:
+            continue
+
         data.append(
             [
-                str(uid),
-                "0.2.4",
-                event.countries[idx],
-                str(event.rewards[idx]),
-                str(event.availability_scores[idx]),
-                str(event.latency_scores[idx]),
-                str(event.reliability_scores[idx]),
-                str(event.distribution_scores[idx]),
+                miner_uid,
+                miner.version,
+                miner.country,
+                miner.score,
+                miner.availability_score,
+                miner.latency_score,
+                miner.reliability_score,
+                miner.distribution_score,
             ]
         )
 
@@ -166,94 +173,125 @@ def log_miners_table(self, event: EventSchema, commit=False):
     )
 
     self.wandb.log({"02. Miners/miners": miners}, commit=commit)
+    bt.logging.trace(f"log_miners_table() {len(data)} miners")
 
 
-def log_distribution(self, event: EventSchema, commit=False):
+def log_distribution(miners: List[Miner], verified=True, commit=False):
     # Build the data for the metric
     country_counts = {}
-    for code in event.countries:
-        country_counts[code] = country_counts.get(code, 0) + 1
+    for miner in miners:
+        if verified and (not miner.verified or miner.has_ip_conflicts):
+            continue
+
+        miner_country = miner.country
+        country_counts[miner_country] = country_counts.get(miner_country, 0) + 1
 
     # Create the graph
     data = [[country, count] for country, count in country_counts.items()]
     table = wandb.Table(data=data, columns=["country", "count"])
+
+    section = "03. Distribution/verified_distribution" if verified else "03. Distribution/distribution"
     wandb.log(
         {
-            "03. Distribution/distribution": wandb.plot.bar(
-                table, "country", "count", title="Miners Distribution"
+            section: wandb.plot.bar(
+                table, "country", "count", title="Verified Miners Distribution" if verified else "Miners Distribution"
             )
         },
         commit=commit,
     )
 
+    if verified:
+        bt.logging.trace(f"log_distribution() {len(data)} verified countries")
+    else:
+        bt.logging.trace(f"log_distribution() {len(data)} countries")
 
-def log_score(self, name: str, event: EventSchema, commit=False):
-    property_name = f"{name}_scores" if name != "final" else "rewards"
-    scores = getattr(event, property_name)
+
+def log_score(self, name: str, uids: List[int], miners: List[Miner], commit=False):
+    property_name = f"{name}_score" if name != "final" else "score"
 
     # Build the data for the metric
     data = {}
-    for idx, (score) in enumerate(scores):
-        data[f"{event.uids[idx]}"] = score
+    for miner in miners:
+        uid = miner.uid
+        if uid not in uids:
+            continue
+
+        data[str(uid)] = getattr(miner, property_name)
 
     # Create the graph
     self.wandb.log({f"04. Scores/{name}_score": data}, commit=commit)
+    bt.logging.trace(f"log_score() {name} {len(data)} scores")
 
 
-def log_moving_averaged_score(self, event: EventSchema, commit=False):
+def log_moving_averaged_score(
+    self, uids: List[int], moving_averaged_scores: List, commit=False
+):
     """
     Create a graph showing the moving score for each miner over time
     """
+    metagraph_uids = self.metagraph.uids.tolist()
+
     # Build the data for the metric
     data = {}
-    for idx, (score) in enumerate(event.moving_averaged_scores):
-        if self.metagraph.uids[idx] not in event.uids:
+    for idx, (score) in enumerate(moving_averaged_scores):
+        uid = metagraph_uids[idx]
+        if uid not in uids:
             continue
 
-        data[f"{self.metagraph.uids[idx]}"] = score
+        data[str(uid)] = score
 
     # Create the graph
     self.wandb.log({"04. Scores/moving_averaged_score": data}, commit=commit)
+    bt.logging.trace(f"log_moving_averaged_score() {len(data)} moving averaged scores")
 
 
-def log_completion_times(self, event: EventSchema, commit=False):
+def log_completion_times(self, uids: List[int], miners: List[Miner], commit=False):
     """
     Create a graph showing the time to process the challenge over time
     """
     # Build the data for the metric
     data = {}
-    for idx, (time) in enumerate(event.completion_times):
-        data[f"{event.uids[idx]}"] = time
+    for miner in miners:
+        uid = miner.uid
+        if uid not in uids:
+            continue
+
+        data[str(uid)] = miner.process_time or 0
 
     # Create the graph
     self.wandb.log({"05. Miscellaneous/completion_times": data}, commit=commit)
+    bt.logging.trace(f"log_completion_times() {len(data)} completion times")
 
 
-def log_event(self, event: EventSchema):
-    # Log the event to wandb
-    if not self.config.wandb.off and self.wandb is not None:
-        # Add overview metrics
-        self.wandb.log({"01. Overview/best_uid": event.best_uid}, commit=False)
-        self.wandb.log(
-            {"01. Overview/step_process_time": event.step_length}, commit=False
-        )
+def log_event(self, uids: List[int], step_length):
+    if self.config.wandb.off or self.wandb is None:
+        return
 
-        # Add the miner table
-        log_miners_table(self, event)
+    miners: List[Miner] = self.miners
+    moving_averaged_scores = self.moving_averaged_scores.tolist()
 
-        # Add miners distribution
-        log_distribution(self, event)
+    # Add overview metrics
+    best_miner = max(miners, key=lambda item: item.score)
+    self.wandb.log({"01. Overview/best_uid": best_miner.uid}, commit=False)
+    self.wandb.log({"01. Overview/step_process_time": step_length}, commit=False)
 
-        # Add scores
-        log_score(self, "final", event)
-        log_score(self, "availability", event)
-        log_score(self, "latency", event)
-        log_score(self, "reliability", event)
-        log_score(self, "distribution", event)
-        log_moving_averaged_score(self, event)
+    # Add the miner table
+    log_miners_table(self, miners)
 
-        # Add miscellaneous
-        log_completion_times(self, event, True)
+    # Add miners distribution
+    log_distribution(miners)
+    log_distribution(miners, False)
+
+    # Add scores
+    log_score(self, "final", uids, miners)
+    log_score(self, "availability", uids, miners)
+    log_score(self, "latency", uids, miners)
+    log_score(self, "reliability", uids, miners)
+    log_score(self, "distribution", uids, miners)
+    log_moving_averaged_score(self, uids, moving_averaged_scores)
+
+    # Add miscellaneous
+    log_completion_times(self, uids, miners, True)
 
 
 def init_wandb(self, reinit=False):
@@ -321,10 +359,10 @@ def init_wandb(self, reinit=False):
 
     bt.logging.debug(f"[Wandb] {len(runs)} run(s) exist")
 
-    # Remove old runs - We keep only one archive + the new run
-    if len(runs) >= 2:
-        bt.logging.debug(f"[Wandb] Removing the {len(runs) - 1} oldest run(s)")
-        for i in range(1, len(runs)):
+    # Remove old runs - We keep only the new run
+    if len(runs) >= 1:
+        bt.logging.debug(f"[Wandb] Removing the {len(runs)} oldest run(s)")
+        for i in range(0, len(runs)):
             run: public.Run = runs[i]
 
             wandb_base = wandb.run.settings.wandb_dir

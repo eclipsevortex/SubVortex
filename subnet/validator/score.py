@@ -1,51 +1,97 @@
 import numpy as np
 import bittensor as bt
+from typing import List
 
+from subnet.validator.miner import Miner
 from subnet.validator.bonding import wilson_score_interval
 from subnet.validator.localisation import (
     compute_localisation_distance,
     get_localisation,
 )
+from subnet.constants import (
+    AVAILABILITY_FAILURE_REWARD,
+    LATENCY_FAILURE_REWARD,
+    DISTRIBUTION_FAILURE_REWARD,
+    AVAILABILITY_WEIGHT,
+    LATENCY_WEIGHT,
+    RELIABILLITY_WEIGHT,
+    DISTRIBUTION_WEIGHT,
+)
 
-# Controls how quickly the tolerance decreases with distance.
-SIGMA = 20
 # Longest distance between any two places on Earth is 20,010 kilometers
 MAX_DISTANCE = 20010
 
 
-async def compute_reliability_score(uid, database, hotkey: str):
-    stats_key = f"stats:{hotkey}"
+def check_multiple_miners_on_same_ip(miner: Miner, miners: List[Miner]):
+    """
+    Check if there is more than one miner per ip
+    """
+    count = sum(1 for item in miners if item.ip == miner.ip)
+    if count > 1:
+        bt.logging.warning(
+            f"[{miner.uid}][Score][Multiple Ip] {count} miner(s) associated with the ip"
+        )
 
-    # Step 1: Retrieve statistics
-    challenge_successes = int(
-        await database.hget(stats_key, "challenge_successes") or 0
+    return count
+
+
+def compute_availability_score(miner: Miner):
+    """
+    Compute the availability score of the uid
+    """
+
+    score = (
+        1.0
+        if miner.verified and not miner.has_ip_conflicts
+        else AVAILABILITY_FAILURE_REWARD
     )
-    challenge_attempts = int(await database.hget(stats_key, "challenge_attempts") or 0)
-    bt.logging.trace(f"[{uid}][Score][Reliability] # challenge attempts {challenge_attempts}")
-    bt.logging.trace(f"[{uid}][Score][Reliability] # challenge succeeded {challenge_successes}")
+
+    return score
+
+
+async def compute_reliability_score(miner: Miner):
+    """
+    Compute the reliaiblity score of the uid based on the the ratio challenge_successes/challenge_attempts
+    """
+    # Step 1: Retrieve statistics
+    is_successful = miner.verified and not miner.has_ip_conflicts
+    miner.challenge_successes = miner.challenge_successes + int(is_successful)
+    miner.challenge_attempts = miner.challenge_attempts + 1
+    bt.logging.trace(
+        f"[{miner.uid}][Score][Reliability] # challenge attempts {miner.challenge_attempts}"
+    )
+    bt.logging.trace(
+        f"[{miner.uid}][Score][Reliability] # challenge succeeded {miner.challenge_successes}"
+    )
 
     # Step 2: Normalization
-    normalized_score = wilson_score_interval(challenge_successes, challenge_attempts)
+    score = wilson_score_interval(miner.challenge_successes, miner.challenge_attempts)
 
-    return normalized_score
+    return score
 
 
-def compute_latency_score(idx, uid, validator_country, responses):
-    initial_process_times = [response[2] for response in responses]
-    bt.logging.trace(f"[{uid}][Score][Latency] Process times {initial_process_times}")
-    bt.logging.trace(f"[{uid}][Score][Latency] Process time {initial_process_times[idx]}")
+def compute_latency_score(validator_country: str, miner: Miner, miners: List[Miner]):
+    """
+    Compute the latency score of the uid based on the process time of all uids
+    """
+    if not miner.verified or miner.has_ip_conflicts:
+        return LATENCY_FAILURE_REWARD
+
+    bt.logging.trace(f"[{miner.uid}][Score][Latency] Process time {miner.process_time}")
 
     # Step 1: Get the localisation of the validator
     validator_localisation = get_localisation(validator_country)
 
     # Step 2: Compute the miners process times by adding a tolerance
+    miner_index = -1
     process_times = []
-    for response in responses:
-        country = response[1]
-        process_time = response[2]
+    for item in miners:
+        if not item.verified or item.has_ip_conflicts:
+            # Exclude miners not verifed to not alterate the computation
+            continue
 
         distance = 0
-        location = get_localisation(country)
+        location = get_localisation(item.country)
         if location is not None:
             distance = compute_localisation_distance(
                 validator_localisation["latitude"],
@@ -57,15 +103,18 @@ def compute_latency_score(idx, uid, validator_country, responses):
         scaled_distance = distance / MAX_DISTANCE
         tolerance = 1 - scaled_distance
 
-        process_time = process_time * tolerance if process_time else 5
+        process_time = item.process_time * tolerance
         process_times.append(process_time)
+
+        if miner_index == -1 and item.uid == miner.uid:
+            miner_index = len(process_times) - 1
     bt.logging.trace(
-        f"[{uid}][Score][Latency] Process times with tolerange {process_times}"
+        f"[{miner.uid}][Score][Latency] Process times with tolerance {process_times}"
     )
 
     # Step 3: Baseline Latency Calculation
     baseline_latency = np.mean(process_times)
-    bt.logging.trace(f"[{uid}][Score][Latency] Base latency {baseline_latency}")
+    bt.logging.trace(f"[{miner.uid}][Score][Latency] Base latency {baseline_latency}")
 
     # Step 4: Relative Latency Score Calculation
     relative_latency_scores = []
@@ -73,33 +122,73 @@ def compute_latency_score(idx, uid, validator_country, responses):
         relative_latency_score = 1 - (process_time / baseline_latency)
         relative_latency_scores.append(relative_latency_score)
     bt.logging.trace(
-        f"[{uid}][Score][Latency] Relative scores {relative_latency_scores}"
+        f"[{miner.uid}][Score][Latency] Relative scores {relative_latency_scores}"
     )
 
     # Step 5: Normalization
     min_score = min(relative_latency_scores)
-    bt.logging.trace(f"[{uid}][Score][Latency] Minimum relative score {min_score}")
+    bt.logging.trace(
+        f"[{miner.uid}][Score][Latency] Minimum relative score {min_score}"
+    )
     max_score = max(relative_latency_scores)
-    bt.logging.trace(f"[{uid}][Score][Latency] Maximum relative score {max_score}")
-    score = relative_latency_scores[idx]
-    bt.logging.trace(f"[{uid}][Score][Latency] Relative score {score}")
+    bt.logging.trace(
+        f"[{miner.uid}][Score][Latency] Maximum relative score {max_score}"
+    )
+    score = relative_latency_scores[miner_index]
+    bt.logging.trace(f"[{miner.uid}][Score][Latency] Relative score {score}")
 
-    normalized_score = (score - min_score) / (max_score - min_score)
+    if min_score == max_score == score:
+        # Only one uid with process time
+        return 1
 
-    return normalized_score
+    score = (score - min_score) / (max_score - min_score)
+
+    return score
 
 
-def compute_distribution_score(idx, responses):
+def compute_distribution_score(miner: Miner, miners: List[Miner]):
+    """
+    Compute the distribution score of the uid based on the country of all uids
+    """
+    if not miner.verified or miner.has_ip_conflicts:
+        return DISTRIBUTION_FAILURE_REWARD
+
     # Step 1: Country of the requested response
-    country = responses[idx][1]
+    country = miner.country
 
-    # Step 1: Country the number of miners in the country
+    # Step 2; Exclude miners not verified or with ip conflicts
+    conform_miners = [
+        miner for miner in miners if miner.verified and not miner.has_ip_conflicts
+    ]
+
+    # Step 3: Country the number of miners in the country
     count = 0
-    for response in responses:
-        if response[1] == country:
+    for item in conform_miners:
+        if item.country == country:
             count = count + 1
+    bt.logging.trace(f"[{miner.uid}][Score][Distribution] {count} uids in {country}")
 
-    # Step 2: Compute the score
-    score = 1 / count
+    # Step 4: Compute the score
+    score = 1 / count if count > 0 else 0
+
+    return score
+
+
+def compute_final_score(miner: Miner):
+    """
+    Compute the final score based on the different scores (availability, reliability, latency and distribution)
+    """
+    numerator = (
+        (AVAILABILITY_WEIGHT * miner.availability_score)
+        + (LATENCY_WEIGHT * miner.latency_score)
+        + (RELIABILLITY_WEIGHT * miner.reliability_score)
+        + (DISTRIBUTION_WEIGHT * miner.distribution_score)
+    )
+
+    denominator = (
+        AVAILABILITY_WEIGHT + LATENCY_WEIGHT + RELIABILLITY_WEIGHT + DISTRIBUTION_WEIGHT
+    )
+
+    score = numerator / denominator if denominator != 0 else 0
 
     return score

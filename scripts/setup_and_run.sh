@@ -93,7 +93,7 @@ if [[ $ACTION_ON_HOTKEY == "yes" ]]; then
     read -p "Enter the hotkey name: " HOTKEY_NAME
 
     if [[ $NEW_HOTKEY == 'no' ]]; then
-        read -p "Enter mnemonic, seed, or json file location for the coldkey? " HOTKEY_MNEMONIC
+        read -p "Enter mnemonic, seed, or json file location for the hotkey? " HOTKEY_MNEMONIC
     fi
 else
     read -p "Enter the hotkey name: " HOTKEY_NAME
@@ -113,6 +113,14 @@ if [[ "$TYPE" == "validator" ]]; then
     # Check the value entered
     if [ "$VALIDATOR_EXEC_TYPE" != "process" ] && [ "$VALIDATOR_EXEC_TYPE" != "docker" ]; then
         echo -e "\\e[31mThe possible choices are 'process' or 'docker'.\\e[0m"
+        exit 1
+    fi
+
+    read -p "Do you want to install wandb - it is highly recommended to expose statics to users (yes/no)? " WANDB
+    
+    # Check the value entered
+    if [ "$WANDB" != "yes" ] && [ "$WANDB" != "no" ]; then
+        echo -e "\\e[31mThe possible choices are 'yes' or 'no'.\\e[0m"
         exit 1
     fi
 fi
@@ -205,15 +213,18 @@ fi
 if [[ "$TYPE" == "validator" ]]; then
     # Get subtensor option
     OPTIONS=$([[ "$SUBTENSOR" == "ws://"* ]] && echo "--subtensor.chain_endpoint $SUBTENSOR" || echo "--subtensor.network $SUBTENSOR")
+    OPTIONS+=$([[ "$WANDB" == "no" ]] && echo " --wandb.off" || echo "")
 
     # Stop and delete validator if up and running
     process=$(pm2 list | grep "validator-$NETUID" &> /dev/null;)
     if [[ ! -z $process ]]; then
-        pm2 stop validator-$NETUID && pm2 validator miner-$NETUID
+        pm2 stop validator-$NETUID && pm2 delete validator-$NETUID
     fi
 
     # Set the redis password
-    export REDIS_PASSWORD=$(docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
+    if [[ $VALIDATOR_EXEC_TYPE == "docker" ]]; then
+        export REDIS_PASSWORD=$(docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
+    fi
 
     # Run the validator
     pm2 start $HOME/SubVortex/neurons/validator.py -f \

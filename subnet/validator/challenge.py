@@ -1,7 +1,9 @@
+import wandb
 import torch
 import time
 import asyncio
 import bittensor as bt
+import random
 
 from subnet import protocol
 from subnet.constants import (
@@ -14,9 +16,11 @@ from subnet.constants import (
     DISTRIBUTION_WEIGHT,
 )
 from subnet.shared.subtensor import get_current_block
-from subnet.validator.utils import ping_and_retry_uids, get_available_query_miners
+from subnet.validator.event import EventSchema
+from subnet.validator.utils import ping_and_retry_uids
 from subnet.validator.localisation import get_country
 from subnet.validator.bonding import update_statistics
+from subnet.validator.state import log_event
 from subnet.validator.score import (
     compute_reliability_score,
     compute_latency_score,
@@ -63,7 +67,9 @@ async def handle_synapse(self, uid: int):
         # Check both blocks are the same
         verified = miner_block == validator_block or miner_block is not None
 
-        bt.logging.trace(f"[{CHALLENGE_NAME}][{uid}] Verified ? {verified} - val: {validator_block}, miner:{miner_block}")
+        bt.logging.trace(
+            f"[{CHALLENGE_NAME}][{uid}] Verified ? {verified} - val: {validator_block}, miner:{miner_block}"
+        )
     except Exception as err:
         verified = False
         process_time = 5 if process_time is None else process_time
@@ -75,6 +81,23 @@ async def handle_synapse(self, uid: int):
 async def challenge_data(self):
     start_time = time.time()
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
+
+    event = EventSchema(
+        successful=[],
+        completion_times=[],
+        availability_scores=[],
+        latency_scores=[],
+        reliability_scores=[],
+        distribution_scores=[],
+        moving_averaged_scores=[],
+        countries=[],
+        block=self.subtensor.get_current_block(),
+        uids=[],
+        step_length=0.0,
+        best_uid=-1,
+        best_hotkey="",
+        rewards=[],
+    )
 
     # Select the miners
     uids, _ = await ping_and_retry_uids(self, k=10)
@@ -92,8 +115,16 @@ async def challenge_data(self):
         tasks.append(asyncio.create_task(handle_synapse(self, uid)))
         responses = await asyncio.gather(*tasks)
 
+    # Init wandb table data
+    availability_scores = []
+    latency_scores = []
+    reliability_scores = []
+    distribution_scores = []
+
     # Compute the score
-    for idx, (uid, (verified, _, _)) in enumerate(zip(uids, responses)):
+    for idx, (uid, (verified, country, process_time)) in enumerate(
+        zip(uids, responses)
+    ):
         # Get the hotkey
         hotkey = self.metagraph.hotkeys[uid]
 
@@ -126,6 +157,7 @@ async def challenge_data(self):
             availability_score = (
                 1.0 if verified and number_of_miners else AVAILABILITY_FAILURE_REWARD
             )
+            availability_scores.append(availability_score)
             bt.logging.debug(
                 f"[{CHALLENGE_NAME}][{uid}] Availability score {availability_score}"
             )
@@ -136,10 +168,14 @@ async def challenge_data(self):
                 if verified
                 else LATENCY_FAILURE_REWARD
             )
+            latency_scores.append(latency_score)
             bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Latency score {latency_score}")
 
             # Compute score for reliability
-            reliability_score = await compute_reliability_score(uid, self.database, hotkey)
+            reliability_score = await compute_reliability_score(
+                uid, self.database, hotkey
+            )
+            reliability_scores.append(reliability_score)
             bt.logging.debug(
                 f"[{CHALLENGE_NAME}][{uid}] Reliability score {reliability_score}"
             )
@@ -150,6 +186,7 @@ async def challenge_data(self):
                 if responses[idx][2] is not None
                 else DISTRIBUTION_FAILURE_REWARD
             )
+            distribution_scores.append((uid, distribution_score))
             bt.logging.debug(
                 f"[{CHALLENGE_NAME}][{uid}] Distribution score {distribution_score}"
             )
@@ -170,6 +207,17 @@ async def challenge_data(self):
             )
 
         bt.logging.info(f"[{CHALLENGE_NAME}][{uid}] Final score {rewards[idx]}")
+
+        # Log the event data for this specific challenge
+        event.uids.append(uid)
+        event.countries.append(country)
+        event.successful.append(verified)
+        event.completion_times.append(process_time)
+        event.rewards.append(rewards[idx].item())
+        event.availability_scores.append(availability_score)
+        event.latency_scores.append(latency_score)
+        event.reliability_scores.append(reliability_score)
+        event.distribution_scores.append(distribution_score)
 
         # Send the score details to the miner
         await self.dendrite(
@@ -197,7 +245,7 @@ async def challenge_data(self):
         )
         .to(self.device)
     )
-    bt.logging.trace(f"Scattered rewards: {scattered_rewards}")
+    bt.logging.trace(f"[{CHALLENGE_NAME}] Scattered rewards: {scattered_rewards}")
 
     # Update moving_averaged_scores with rewards produced by this step.
     # alpha of 0.2 means that each new score replaces 20% of the weight of the previous weights
@@ -205,8 +253,19 @@ async def challenge_data(self):
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)
-    bt.logging.trace(f"Updated moving avg scores: {self.moving_averaged_scores}")
+    event.moving_averaged_scores = self.moving_averaged_scores.tolist()
+    bt.logging.trace(f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}")
 
     # Display step time
     forward_time = time.time() - start_time
+    event.step_length = forward_time
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")
+
+    # Determine the best UID based on rewards
+    if event.rewards:
+        best_index = max(range(len(event.rewards)), key=event.rewards.__getitem__)
+        event.best_uid = event.uids[best_index]
+        event.best_hotkey = self.metagraph.hotkeys[event.best_uid]
+
+    # Log event
+    log_event(self, event)

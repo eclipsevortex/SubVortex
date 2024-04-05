@@ -1,6 +1,5 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-# Copyright © 2023 philanthrope
+# Copyright © 2024 Eclipse Vortex
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -22,7 +21,6 @@ import asyncio
 from redis import asyncio as aioredis
 import threading
 import bittensor as bt
-import subprocess
 from shlex import quote
 from copy import deepcopy
 from pprint import pformat
@@ -42,10 +40,14 @@ from subnet.validator.state import (
     should_checkpoint,
     load_state,
     save_state,
+    init_wandb,
+    reinit_wandb,
+    should_reinit_wandb,
 )
 from subnet.validator.weights import (
     set_weights_for_validator,
 )
+
 
 def MockDendrite():
     pass
@@ -124,7 +126,6 @@ class Validator:
         # Setup database
         bt.logging.info(f"loading database")
         redis_password = get_redis_password(self.config.database.redis_password)
-        print(f"[RD] password {redis_password}")
         self.database = aioredis.StrictRedis(
             host=self.config.database.host,
             port=self.config.database.port,
@@ -138,9 +139,7 @@ class Validator:
         self.moving_averaged_scores = torch.zeros((self.metagraph.n)).to(self.device)
         bt.logging.debug(str(self.moving_averaged_scores))
 
-        self.uid = self.metagraph.hotkeys.index(
-            self.wallet.hotkey.ss58_address
-        )
+        self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         bt.logging.info(f"Running validator on uid: {self.uid}")
 
         # Dendrite pool for querying the network.
@@ -154,8 +153,15 @@ class Validator:
         # Get the validator country
         self.country = get_country(self.dendrite.external_ip)
         country_localisation = get_localisation(self.country)
-        country_name = country_localisation['country'] if country_localisation else 'None'
-        bt.logging.debug(F"Validator based in {country_name}")
+        country_name = (
+            country_localisation["country"] if country_localisation else "None"
+        )
+        bt.logging.debug(f"Validator based in {country_name}")
+
+        # Init wandb.
+        if not self.config.wandb.off:
+            bt.logging.debug("loading wandb")
+            init_wandb(self)
 
         # Init the event loop.
         self.loop = asyncio.get_event_loop()
@@ -171,24 +177,18 @@ class Validator:
         self.rebalance_queue = []
         self.last_purged_epoch = 0
 
-
     def run(self):
         bt.logging.info("run()")
 
         load_state(self)
         checkpoint(self)
 
-        bt.logging.info("starting subscription handler")
-        self.run_subscription_thread()
-
         try:
             while 1:
                 start_epoch = time.time()
 
                 self.metagraph.sync(subtensor=self.subtensor)
-                prev_set_weights_block = self.metagraph.last_update[
-                    self.uid
-                ].item()
+                prev_set_weights_block = self.metagraph.last_update[self.uid].item()
 
                 # --- Wait until next step epoch.
                 current_block = self.subtensor.get_current_block()
@@ -202,7 +202,7 @@ class Validator:
                     raise Exception(
                         f"Validator is not registered - hotkey {self.wallet.hotkey.ss58_address} not in metagraph"
                     )
-                
+
                 bt.logging.info(
                     f"step({self.step}) block({get_current_block(self.subtensor)})"
                 )
@@ -236,6 +236,7 @@ class Validator:
                 # Set the weights on chain.
                 bt.logging.info("Checking if should set weights")
                 validator_should_set_weights = should_set_weights(
+                    self,
                     get_current_block(self.subtensor),
                     prev_set_weights_block,
                     360,  # tempo
@@ -256,6 +257,11 @@ class Validator:
                     prev_set_weights_block = get_current_block(self.subtensor)
                     save_state(self)
 
+                # Rollover wandb to a new run.
+                if should_reinit_wandb(self):
+                    bt.logging.info("Reinitializing wandb")
+                    reinit_wandb(self)
+
                 self.prev_step_block = get_current_block(self.subtensor)
                 if self.config.neuron.verbose:
                     bt.logging.debug(f"block at end of step: {self.prev_step_block}")
@@ -266,94 +272,16 @@ class Validator:
             bt.logging.error("Error in training loop", str(err))
             bt.logging.debug(print_exception(type(err), err, err.__traceback__))
 
+            if self.wandb is not None:
+                self.wandb.finish()
+                assert self.wandb.run is None
+                bt.logging.debug("Finishing wandb run")
+
         # After all we have to ensure subtensor connection is closed properly
         finally:
             if hasattr(self, "subtensor"):
                 bt.logging.debug("Closing subtensor connection")
                 self.subtensor.close()
-                self.stop_subscription_thread()
-
-
-    # TODO: After investigation done and decision taken, remove or change it
-    def start_event_subscription(self):
-        """
-        Starts the subscription handler in a background thread.
-        """
-        substrate = SubstrateInterface(
-            ss58_format=bt.__ss58_format__,
-            use_remote_preset=True,
-            url=self.subtensor.chain_endpoint,
-            type_registry=bt.__type_registry__,
-        )
-        self.subscription_substrate = substrate
-
-        def neuron_registered_subscription_handler(obj, update_nr, subscription_id):
-            block_no = obj["header"]["number"]
-            block_hash = substrate.get_block_hash(block_id=block_no)
-            bt.logging.debug(f"subscription block hash: {block_hash}")
-            events = substrate.get_events(block_hash)
-
-            for event in events:
-                event_dict = event["event"].decode()
-                if event_dict["event_id"] == "NeuronRegistered":
-                    netuid, uid, hotkey = event_dict["attributes"]
-                    if int(netuid) == 21:
-                        self.log(
-                            f"NeuronRegistered Event {uid}! Rebalancing data...\n"
-                            f"{pformat(event_dict)}\n"
-                        )
-
-                        self.last_registered_block = block_no
-                        self.rebalance_queue.append(hotkey)
-
-            # If we have some hotkeys deregistered, and it's been 5 blocks since we've caught a registration: rebalance
-            if (
-                len(self.rebalance_queue) > 0
-                and self.last_registered_block + 5 <= block_no
-            ):
-                hotkeys = deepcopy(self.rebalance_queue)
-                self.rebalance_queue.clear()
-                self.log(f"Running rebalance in separate process on hotkeys {hotkeys}")
-
-                # Fire off the script
-                hotkeys_str = ",".join(map(str, hotkeys))
-                hotkeys_arg = quote(hotkeys_str)
-                # subprocess.Popen(
-                #     [
-                #         self.rebalance_script_path,
-                #         hotkeys_arg,
-                #         self.subtensor.chain_endpoint,
-                #         str(self.config.database.index),
-                #     ]
-                # )
-
-        substrate.subscribe_block_headers(neuron_registered_subscription_handler)
-
-
-    def run_subscription_thread(self):
-        """
-        Start the block header subscription handler in a separate thread.
-        """
-        if not self.subscription_is_running:
-            self.subscription_thread = threading.Thread(
-                target=self.start_event_subscription, daemon=True
-            )
-            self.subscription_thread.start()
-            self.subscription_is_running = True
-            bt.logging.debug("Started subscription handler.")
-
-
-    def stop_subscription_thread(self):
-        """
-        Stops the subscription handler that is running in the background thread.
-        """
-        if self.subscription_is_running:
-            bt.logging.debug("Stopping subscription in background thread.")
-            self.should_exit = True
-            self.subscription_thread.join(5)
-            self.subscription_is_running = False
-            self.subscription_substrate.close()
-            bt.logging.debug("Stopped subscription handler.")
 
 
 if __name__ == "__main__":

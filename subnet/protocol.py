@@ -33,12 +33,3 @@ class Score(bt.Synapse):
 
     def deserialize(self) -> typing.Optional[str]:
         return self.version
-    
-
-class IsAlive(bt.Synapse):
-    # Returns
-    answer: typing.Optional[str] = None
-
-    def deserialize(self) -> typing.Optional[str]:
-        return self.answer
-    

@@ -28,6 +28,7 @@ from subnet.protocol import Score
 
 from subnet.shared.checks import check_registration
 
+from subnet import __version__ as THIS_VERSION
 from subnet.miner import run
 from subnet.miner.config import (
     config,
@@ -181,6 +182,9 @@ class Miner:
         bt.logging.info(f"[{validator_uid}] Reliability score {synapse.reliability}")
         bt.logging.info(f"[{validator_uid}] Distribution score {synapse.distribution}")
         bt.logging.success(f"[{validator_uid}] Score {synapse.score}")
+
+        synapse.version = THIS_VERSION
+        
         return synapse
 
     def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:

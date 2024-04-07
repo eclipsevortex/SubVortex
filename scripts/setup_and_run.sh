@@ -58,6 +58,12 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# We change the default value of the subnet if testnet network is choosen
+# and no subtensor is provided
+if [[ $NETWORK == "testnet" ]] && [[ $SUBTENSOR == "finney" ]]; then 
+    SUBTENSOR='test'
+fi
+
 # Static variables
 REPOSITORY_NAME=SubVortex
 NETUID=$([[ $NETWORK == "testnet" ]] && echo 92 || echo 7)

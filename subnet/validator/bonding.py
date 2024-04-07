@@ -19,7 +19,7 @@ import math
 import bittensor as bt
 
 from subnet.constants import *
-from subnet.validator.miner import Miner
+from subnet.validator.models import Miner
 from subnet.validator.database import update_hotkey_statistics
 
 

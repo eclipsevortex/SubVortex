@@ -59,7 +59,7 @@ def compute_localisation_distance(lat1, lon1, lat2, lon2):
         return distance
     except Exception as err:
         bt.logging.error(
-            f"Could compute the distance from {lat1}/{lon1} to {lat2}/{lon2}: {err}"
+            f"Could not compute the distance from {lat1}/{lon1} to {lat2}/{lon2}: {err}"
         )
 
     return distance

@@ -23,11 +23,7 @@ from redis import asyncio as aioredis
 import threading
 import bittensor as bt
 from typing import List
-from shlex import quote
-from copy import deepcopy
-from pprint import pformat
 from traceback import print_exception
-from substrateinterface.base import SubstrateInterface
 
 from subnet.shared.checks import check_registration
 from subnet.shared.utils import get_redis_password
@@ -38,7 +34,8 @@ from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
 from subnet.validator.config import config, check_config, add_args
 from subnet.validator.localisation import get_country, get_localisation
 from subnet.validator.forward import forward
-from subnet.validator.miner import Miner, get_all_miners
+from subnet.validator.models import Miner
+from subnet.validator.miner import get_all_miners
 from subnet.validator.state import (
     resync_metagraph_and_miners,
     load_state,
@@ -106,8 +103,8 @@ class Validator:
         # Init subtensor
         bt.logging.debug("loading subtensor")
         self.subtensor = (
-            MockSubtensor(self.config.netuid, wallet=self.wallet) 
-            if self.config.mock 
+            MockSubtensor(self.config.netuid, wallet=self.wallet)
+            if self.config.mock
             else bt.subtensor(config=self.config)
         )
         bt.logging.debug(str(self.subtensor))
@@ -190,6 +187,7 @@ class Validator:
         self.miners = await get_all_miners(self)
         bt.logging.debug(f"Miners loaded {len(self.miners)}")
 
+        # Load the state
         load_state(self)
 
         try:
@@ -220,7 +218,7 @@ class Validator:
                 async def run_forward():
                     coroutines = [
                         forward(self)
-                        for _ in range(self.config.neuron.num_concurrent_forwards)
+                        for _ in range(1) # IMPORTANT: do not change it. we are going to work to make it concurrent tasks asap!
                     ]
                     await asyncio.gather(*coroutines)
 

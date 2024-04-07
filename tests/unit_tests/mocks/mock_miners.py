@@ -1,4 +1,21 @@
-from subnet.validator.miner import Miner
+from subnet.validator.models import Miner
+
+miner_default = Miner(
+    uid=0,
+    hotkey="5GhDs7dTbrGauKnMnUrgWSVmwvX2VdqSnVoqVbEEXrd1Vd81",
+    ip="192.168.10.1",
+    version="0.0.0",
+    country="DE",
+    verified=False,
+    score=0.6851191898108059,
+    availability_score=0.0,
+    latency_score=0.0,
+    reliability_score=0.9996040277537239,
+    distribution_score=0.0,
+    challenge_attempts=574,
+    challenge_successes=574,
+    process_time=5.0,
+)
 
 miner_not_verified_1 = Miner(
     uid=1,
@@ -274,6 +291,24 @@ miner_not_verified_and_ip_conflicts_2 = Miner(
     country="DE",
     verified=False,
     ip_occurences=2,
+    score=0.6851191898108059,
+    availability_score=0.0,
+    latency_score=0.0,
+    reliability_score=0.9996040277537239,
+    distribution_score=0.0,
+    challenge_attempts=574,
+    challenge_successes=574,
+    process_time=5.0,
+)
+
+miner_not_verified_and_ip_conflicts_3 = Miner(
+    uid=17,
+    hotkey="5GhDs7dTbrGauKnMnUrgWSVmwvX2VdqSnVoqVbEEXrd1Vd81",
+    ip="192.168.10.1",
+    version="0.0.0",
+    country="RO",
+    verified=False,
+    ip_occurences=3,
     score=0.6851191898108059,
     availability_score=0.0,
     latency_score=0.0,

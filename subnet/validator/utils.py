@@ -20,6 +20,10 @@ import random as pyrandom
 from typing import List
 from Crypto.Random import random
 
+from subnet.constants import DEFAULT_CHUNK_SIZE
+from subnet.validator.selection import select_uids
+from subnet.validator.database import get_selected_miners
+
 
 def current_block_hash(self):
     """
@@ -112,7 +116,7 @@ def get_pseudorandom_uids(self, uids, k):
     """
     block_seed = get_block_seed(self)
     pyrandom.seed(block_seed)
-    
+
     # Ensure k is not larger than the number of uids
     k = min(k, len(uids))
 
@@ -232,26 +236,26 @@ async def ping_and_retry_uids(
     return list(successful_uids)[:k], failed_uids
 
 
-async def get_next_uids(self, ss58_address: str, k: int = 4):
+async def get_next_uids(self, ss58_address: str, k: int = DEFAULT_CHUNK_SIZE):
     # Get the list of uids already selected
-    uids_already_selected = await get_selected_miners(self, ss58_address)
+    uids_already_selected = await get_selected_miners(ss58_address, self.database)
     bt.logging.debug(f"get_next_uids() uids already selected: {uids_already_selected}")
 
     # Get the list of available uids
-    uids = get_available_query_miners(self, k=k, exclude=uids_already_selected)
-    bt.logging.debug(f"get_next_uids() uids:{uids}")
-
-    # Get the k uids requested
-    uids_selected = list(set(uids) - set(uids_already_selected))
+    uids_selected = get_available_query_miners(self, k=k, exclude=uids_already_selected)
 
     # If no uids available we start again
     if len(uids_selected) < k:
         uids_already_selected = []
+        bt.logging.debug(f"get_next_uids() not enough uids selected: {uids_selected}")
 
         # Complete the selection with k - len(uids_selected) elements
         # We always to have k miners selected
-        new_uids_selected = get_available_query_miners(self, k=k)
-        uids_selected = uids_selected + new_uids_selected[: k - len(uids_selected)]
+        new_uids_selected = get_available_query_miners(self, k=k, exclude=uids_selected)
+        new_uids_selected = new_uids_selected[: k - len(uids_selected)]
+        bt.logging.debug(f"get_next_uids() extra uids selected: {new_uids_selected}")
+
+        uids_selected = uids_selected + new_uids_selected
 
     bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
 
@@ -264,17 +268,44 @@ async def get_next_uids(self, ss58_address: str, k: int = 4):
     return uids_selected
 
 
-async def get_selected_miners(self, ss58_address: str):
-    selection_key = f"selection:{ss58_address}"
+def is_validator(self, uid):
+    """
+    True if the UID is a validator, false otherwise
+    """
+    return (
+        self.metagraph.validator_permit[uid]
+        and self.metagraph.S[uid] > self.config.neuron.vpermit_tao_limit
+    )
 
-    # Get the uids selection
-    value = await self.database.get(selection_key)
-    if value is None:
-        bt.logging.debug(f"get_selected_miners() no uids")
-        return []
 
-    # Get the uids already selected
-    uids_str = value.decode("utf-8") if isinstance(value, bytes) else value
-    uids = [int(uid) for uid in uids_str.split(",")]
+def get_validators_uid(self, default=[]):
+    """
+    Return the list of validators uid
+    """
+    validators = []
 
+    for uid in range(self.metagraph.n.item()):
+        uid_is_available = check_uid_availability(
+            self.metagraph, uid, self.config.neuron.vpermit_tao_limit
+        )
+        if not uid_is_available or not is_validator(self, uid):
+            continue
+
+        validators.append(uid)
+
+    if len(validators) == 0:
+        validators = default
+
+    bt.logging.debug(f"get_uids_selection() # of validators {len(validators)}")
+
+    return validators
+
+
+def get_uids_selection(self, k=DEFAULT_CHUNK_SIZE):
+    """
+    Return the selection of uids for the current block and validator
+    """
+    vuids = get_validators_uid(self, [self.uid])
+    block_seed = get_block_seed(self)
+    uids = select_uids(self.uid, self.selection_step, block_seed, self.miners, vuids, k)
     return uids

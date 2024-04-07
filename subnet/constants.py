@@ -12,3 +12,12 @@ DISTRIBUTION_WEIGHT = 1.0
 
 # Reset config
 RELIABILLITY_RESET = 1080 # Reset challenge statistics every 3 epochs
+
+DEFAULT_PROCESS_TIME = 5
+
+# UID Subnet 
+TESTNET_SUBNET_UID = 92
+MAIN_SUBNET_UID = 7
+
+# Selectiom
+DEFAULT_CHUNK_SIZE = 10

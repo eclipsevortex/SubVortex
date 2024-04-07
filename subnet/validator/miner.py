@@ -1,110 +1,21 @@
 import bittensor as bt
 from typing import List
 
+from subnet.validator.models import Miner
+from subnet.validator.score import (
+    compute_distribution_score,
+    compute_availability_score,
+    compute_latency_score,
+    compute_final_score,
+)
 from subnet.validator.utils import get_available_uids, check_uid_availability
 from subnet.validator.localisation import get_country
 from subnet.validator.database import (
     get_hotkey_statistics,
     remove_hotkey_stastitics,
     get_field_value,
+    update_hotkey_statistics,
 )
-
-
-class Miner:
-    uid: int = -1
-    hotkey: str = None
-    ip: str = ("0.0.0.0",)
-    ip_occurences: int = 1
-    version: str = "0.0.0"
-    country: str = None
-    score: float = 0
-    availability_score: float = 0
-    reliability_score: float = 0
-    latency_score: float = 0
-    distribution_score: float = 0
-    challenge_successes: int = 0
-    challenge_attempts: int = 0
-    process_time: float = 0
-    verified: bool = False
-
-    def __init__(
-        self,
-        uid,
-        ip,
-        hotkey,
-        country,
-        version="0.0.0",
-        verified=False,
-        score=0,
-        availability_score=0,
-        latency_score=0,
-        reliability_score=0,
-        distribution_score=0,
-        challenge_successes=0,
-        challenge_attempts=0,
-        process_time=0,
-        ip_occurences=1,
-    ):
-        self.uid = int(uid or -1)
-        self.hotkey = hotkey
-        self.ip = ip or "0.0.0.0"
-        self.ip_occurences = ip_occurences
-        self.version = version or "0.0.0"
-        self.country = country or ""
-        self.verified = verified or False
-        self.score = float(score or 0)
-        self.availability_score = float(availability_score or 0)
-        self.reliability_score = float(reliability_score or 0)
-        self.latency_score = float(latency_score or 0)
-        self.distribution_score = float(distribution_score or 0)
-        self.challenge_successes = int(challenge_successes or 0)
-        self.challenge_attempts = int(challenge_attempts or 0)
-        self.process_time = float(process_time or 0)
-
-    def reset(self, ip, hotkey, country):
-        self.hotkey = hotkey
-        self.ip = ip
-        self.version = "0.0.0"
-        self.country = country or ""
-        self.verified = False
-        self.score = 0
-        self.availability_score = 0
-        self.reliability_score = 0
-        self.latency_score = 0
-        self.distribution_score = 0
-        self.challenge_successes = 0
-        self.challenge_attempts = 0
-        self.process_time = 0
-
-    @property
-    def has_ip_conflicts(self):
-        return self.ip_occurences != 1
-
-    @property
-    def snapshot(self):
-        # index and ip are not stored in redis database
-        # index because we do not need
-        # ip/hotkey because we do not to keep a track of them
-        return {
-            "uid": self.uid,
-            "version": self.version,
-            "country": self.country,
-            "verified": int(self.verified),
-            "score": self.score,
-            "availability_score": self.availability_score,
-            "latency_score": self.latency_score,
-            "reliability_score": self.reliability_score,
-            "distribution_score": self.distribution_score,
-            "challenge_successes": self.challenge_successes,
-            "challenge_attempts": self.challenge_attempts,
-            "process_time": self.process_time,
-        }
-
-    def __str__(self):
-        return f"Miner(uid={self.uid}, hotkey={self.hotkey}, ip={self.ip}, ip_occurences={self.ip_occurences}, version={self.version}, country={self.country}, verified={self.verified}, score={self.score}, availability_score={self.availability_score}, latency_score={self.latency_score}, reliability_score={self.reliability_score}, distribution_score={self.distribution_score}, challenge_attempts={self.challenge_attempts}, challenge_successes={self.challenge_successes}, process_time={self.process_time})"
-
-    def __repr__(self):
-        return f"Miner(uid={self.uid}, hotkey={self.hotkey}, ip={self.ip}, ip_occurences={self.ip_occurences}, version={self.version}, country={self.country}, verified={self.verified}, score={self.score}, availability_score={self.availability_score}, latency_score={self.latency_score}, reliability_score={self.reliability_score}, distribution_score={self.distribution_score}, challenge_attempts={self.challenge_attempts}, challenge_successes={self.challenge_successes}, process_time={self.process_time})"
 
 
 def get_miner_ip_occurences(ip: str, ips: List[str]):
@@ -139,6 +50,7 @@ async def get_all_miners(self) -> List[Miner]:
                 country=get_country(axon.ip),
                 ip_occurences=ip_occurences,
             )
+            await update_hotkey_statistics(axon.hotkey, miner.snapshot, self.database)
         else:
             # In hash set everything is stored as a string to the verified need to be manage differently
             version = get_field_value(statistics.get(b"version"), "0.0.0")
@@ -205,7 +117,7 @@ async def replace_old_miner(self, ip: str, hotkey: str, miner: Miner):
     # Remove the old hotkey statistics
     await remove_hotkey_stastitics(miner.hotkey, self.database)
 
-    # Update the new hotkey statistics
+    # Reset the new miner
     miner.reset(ip, hotkey, get_country(ip))
 
     return old_hotkey
@@ -213,12 +125,12 @@ async def replace_old_miner(self, ip: str, hotkey: str, miner: Miner):
 
 def move_miner(ip: str, miner: Miner):
     """
-    Add a new miner
+    Move an existing miner from a host to another one
     """
     previous_ip = miner.ip
 
-    miner.ip = ip
-    miner.country = get_country(ip)
+    # Reset the miner as it changed ip so everything has to be re-evaluated
+    miner.reset(ip, miner.hotkey, get_country(ip))
 
     return previous_ip
 
@@ -227,8 +139,9 @@ async def resync_miners(self):
     """
     Resync the miners following a metagraph resynchronisation
     """
-    bt.logging.info("resync_miners()")
 
+    # Focus on the changes in the metagraph
+    bt.logging.info("resync_miners() processing metagraph changes")
     for uid, axon in enumerate(self.metagraph.axons):
         # Get details
         ip = axon.ip
@@ -238,6 +151,13 @@ async def resync_miners(self):
             self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
         if not is_available:
+            miners = [miner for miner in self.miners if miner.uid != uid]
+            if len(miners) < len(self.miners):
+                bt.logging.success(
+                    f"[{miner.uid}] Miner {hotkey} hase been removed from the list."
+                )
+                self.miners = miners
+
             continue
 
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
@@ -261,9 +181,36 @@ async def resync_miners(self):
                 f"[{miner.uid}] Miner moved from {previous_ip} to {miner.ip}"
             )
 
-        # Refresh the miners ip occurrences of the impacted miners
-        ips = [miner.ip for miner in self.miners]
-        for item in self.miners:
-            item.ip_occurences = get_miner_ip_occurences(item.ip, ips)
+    # Focus on impacts resulting of these changes
+    bt.logging.debug("resync_miners() refreshing ip occurences")
+    ips = [miner.ip for miner in self.miners]
+    for miner in self.miners:
+        # Refresh the miners ip occurrences
+        miner.ip_occurences = get_miner_ip_occurences(miner.ip, ips)
 
-            
+    bt.logging.debug("resync_miners() refreshing scores")
+    for miner in self.miners:
+        # Refresh the availability score
+        miner.availability_score = compute_availability_score(miner)
+
+        # Refresh latency score
+        miner.latency_score = compute_latency_score(self.country, miner, self.miners)
+
+        # Refresh the distribution score
+        miner.distribution_score = compute_distribution_score(miner, self.miners)
+
+        # Refresh the final score
+        miner.score = compute_final_score(miner)
+
+        # Update the miner in the database
+        await update_hotkey_statistics(miner.hotkey, miner.snapshot, self.database)
+
+
+async def reset_reliability_score(self, miners: List[Miner]):
+    bt.logging.info("reset_reliability_score() reset reliability statistics.")
+
+    for miner in miners:
+        miner.challenge_attempts = 0
+        miner.challenge_successes = 0
+
+        await update_hotkey_statistics(miner.hotkey, miner.snapshot, self.database)

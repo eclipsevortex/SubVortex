@@ -2,7 +2,7 @@ import numpy as np
 import bittensor as bt
 from typing import List
 
-from subnet.validator.miner import Miner
+from subnet.validator.models import Miner
 from subnet.validator.bonding import wilson_score_interval
 from subnet.validator.localisation import (
     compute_localisation_distance,
@@ -100,7 +100,9 @@ def compute_latency_score(validator_country: str, miner: Miner, miners: List[Min
                 location["longitude"],
             )
         else:
-            bt.logging.warning(f"The country '{item.country}' is unknown.")
+            bt.logging.warning(
+                f"[{miner.uid}][Score][Latency] The country '{item.country}' could not be found. No tolerance applied."
+            )
 
         scaled_distance = distance / MAX_DISTANCE
         tolerance = 1 - scaled_distance

@@ -80,7 +80,7 @@ run_remote_subtensor() {
 }
 
 # Go to the subtensor directory
-cd subtensor
+cd $HOME/subtensor
 
 if [[ $NETWORK == "localnet" ]]; then
     run_local_subtensor

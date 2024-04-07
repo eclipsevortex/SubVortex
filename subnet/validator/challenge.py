@@ -2,13 +2,15 @@ import torch
 import time
 import asyncio
 import bittensor as bt
-from typing import List
 
-from subnet import protocol
-from subnet.constants import RELIABILLITY_RESET
+from subnet.constants import DEFAULT_PROCESS_TIME
 from subnet.shared.subtensor import get_current_block
-from subnet.validator.miner import Miner
-from subnet.validator.utils import get_available_query_miners, ping_uid
+from subnet.validator.models import Miner
+from subnet.validator.synapse import send_scope
+from subnet.validator.utils import (
+    get_next_uids,
+    ping_uid,
+)
 from subnet.validator.bonding import update_statistics
 from subnet.validator.state import log_event
 from subnet.validator.score import (
@@ -22,7 +24,6 @@ from substrateinterface.base import SubstrateInterface
 
 
 CHALLENGE_NAME = "Challenge"
-DEFAULT_PROCESS_TIME = 5
 
 
 async def handle_synapse(self, uid: int):
@@ -65,7 +66,9 @@ async def handle_synapse(self, uid: int):
         validator_block = get_current_block(self.subtensor)
 
         # Check both blocks are the same
-        verified = miner_block == validator_block or (validator_block - miner_block) <= 1
+        verified = (
+            miner_block == validator_block or (validator_block - miner_block) <= 1
+        )
 
         bt.logging.trace(
             f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified ? {verified} - val: {validator_block}, miner:{miner_block}"
@@ -87,12 +90,13 @@ async def challenge_data(self):
     bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
     # Select the miners
-    uids = get_available_query_miners(self, k=10)
+    val_hotkey = self.metagraph.hotkeys[self.uid]
+    uids = await get_next_uids(self, val_hotkey)
     bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
     # Execute the challenges
     tasks = []
-    for idx, (uid) in enumerate(uids):
+    for uid in uids:
         tasks.append(asyncio.create_task(handle_synapse(self, uid)))
         await asyncio.gather(*tasks)
 
@@ -107,12 +111,8 @@ async def challenge_data(self):
     for idx, (uid) in enumerate(uids):
         # Get the miner
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
-        bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
 
-        if get_current_block(self.subtensor) % RELIABILLITY_RESET == 0:
-            # Reliability score - reset challenge stats every 3 epochs
-            miner.challenge_attempts = 0
-            miner.challenge_successes = 0
+        bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
 
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
         if miner.ip_occurences != 1:
@@ -150,25 +150,7 @@ async def challenge_data(self):
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Final score {miner.score}")
 
         # Send the score details to the miner
-        response: List[protocol.Score] = await self.dendrite(
-            axons=[self.metagraph.axons[miner.uid]],
-            synapse=protocol.Score(
-                validator_uid=self.uid,
-                count=miner.ip_occurences,
-                availability=miner.availability_score,
-                latency=miner.latency_score,
-                reliability=miner.reliability_score,
-                distribution=miner.distribution_score,
-                score=miner.score,
-            ),
-            deserialize=True,
-            timeout=DEFAULT_PROCESS_TIME,
-        )
-
-        # Update the miner version
-        version = next((version for version in response if version is not None), None)
-        if version is not None:
-            miner.version = version
+        miner.version = await send_scope(self, miner)
 
         # Save miner snapshot in database
         await update_statistics(self, miner)
@@ -188,8 +170,8 @@ async def challenge_data(self):
     bt.logging.trace(f"[{CHALLENGE_NAME}] Scattered rewards: {scattered_rewards}")
 
     # Update moving_averaged_scores with rewards produced by this step.
-    # alpha of 0.2 means that each new score replaces 20% of the weight of the previous weights
-    alpha: float = 0.2
+    # alpha of 0.05 means that each new score replaces 5% of the weight of the previous weights
+    alpha: float = 0.05
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)

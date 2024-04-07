@@ -30,7 +30,9 @@ from subnet import __spec_version__ as THIS_SPEC_VERSION
 from subnet import __version__ as THIS_VERSION
 
 import subnet.validator as validator
-from subnet.validator.miner import Miner, resync_miners
+from subnet.constants import TESTNET_SUBNET_UID, MAIN_SUBNET_UID
+from subnet.validator.models import Miner
+from subnet.validator.miner import resync_miners
 
 
 def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
@@ -44,7 +46,13 @@ async def resync_metagraph_and_miners(self):
     resynched = resync_metagraph(self)
 
     if resynched:
+        # Resync miners list
         await resync_miners(self)
+
+        # Send refresh data to wandb for global graphs
+        log_event(self, [miner.uid for miner in self.miners])
+
+        # Save state
         save_state(self)
 
 
@@ -190,11 +198,22 @@ def log_distribution(miners: List[Miner], verified=True, commit=False):
     data = [[country, count] for country, count in country_counts.items()]
     table = wandb.Table(data=data, columns=["country", "count"])
 
-    section = "03. Distribution/verified_distribution" if verified else "03. Distribution/distribution"
+    section = (
+        "03. Distribution/verified_distribution"
+        if verified
+        else "03. Distribution/distribution"
+    )
     wandb.log(
         {
             section: wandb.plot.bar(
-                table, "country", "count", title="Verified Miners Distribution" if verified else "Miners Distribution"
+                table,
+                "country",
+                "count",
+                title=(
+                    "Verified Miners Distribution"
+                    if verified
+                    else "Miners Distribution"
+                ),
             )
         },
         commit=commit,
@@ -263,35 +282,43 @@ def log_completion_times(self, uids: List[int], miners: List[Miner], commit=Fals
     bt.logging.trace(f"log_completion_times() {len(data)} completion times")
 
 
-def log_event(self, uids: List[int], step_length):
+def log_event(self, uids: List[int], step_length=None):
     if self.config.wandb.off or self.wandb is None:
         return
 
-    miners: List[Miner] = self.miners
-    moving_averaged_scores = self.moving_averaged_scores.tolist()
+    bt.logging.info("log_event()")
 
-    # Add overview metrics
-    best_miner = max(miners, key=lambda item: item.score)
-    self.wandb.log({"01. Overview/best_uid": best_miner.uid}, commit=False)
-    self.wandb.log({"01. Overview/step_process_time": step_length}, commit=False)
+    try:
+        miners: List[Miner] = self.miners
+        moving_averaged_scores = self.moving_averaged_scores.tolist()
 
-    # Add the miner table
-    log_miners_table(self, miners)
+        # Add overview metrics
+        best_miner = max(miners, key=lambda item: item.score)
+        self.wandb.log({"01. Overview/best_uid": best_miner.uid}, commit=False)
+        if step_length:
+            self.wandb.log(
+                {"01. Overview/step_process_time": step_length}, commit=False
+            )
 
-    # Add miners distribution
-    log_distribution(miners)
-    log_distribution(miners, False)
+        # Add the miner table
+        log_miners_table(self, miners)
 
-    # Add scores
-    log_score(self, "final", uids, miners)
-    log_score(self, "availability", uids, miners)
-    log_score(self, "latency", uids, miners)
-    log_score(self, "reliability", uids, miners)
-    log_score(self, "distribution", uids, miners)
-    log_moving_averaged_score(self, uids, moving_averaged_scores)
+        # Add miners distribution
+        log_distribution(miners)
+        log_distribution(miners, False)
 
-    # Add miscellaneous
-    log_completion_times(self, uids, miners, True)
+        # Add scores
+        log_score(self, "final", uids, miners)
+        log_score(self, "availability", uids, miners)
+        log_score(self, "latency", uids, miners)
+        log_score(self, "reliability", uids, miners)
+        log_score(self, "distribution", uids, miners)
+        log_moving_averaged_score(self, uids, moving_averaged_scores)
+
+        # Add miscellaneous
+        log_completion_times(self, uids, miners, True)
+    except Exception as err:
+        bt.logging.warning(f"log_event() send data to wandb failed: {err}")
 
 
 def init_wandb(self, reinit=False):
@@ -320,9 +347,13 @@ def init_wandb(self, reinit=False):
     # Ensure "subvortex-team" and "test-subvortex-team" are used with the right subnet UID
     # If user provide its own project name we keep it
     project_name = self.config.wandb.project_name
-    if self.config.netuid == 7 and project_name.endswith("subvortex-team"):
+    if self.config.netuid == MAIN_SUBNET_UID and project_name.endswith(
+        "subvortex-team"
+    ):
         project_name = "subvortex-team"
-    elif self.config.netuid == 92 and project_name.endswith("subvortex-team"):
+    elif self.config.netuid == TESTNET_SUBNET_UID and project_name.endswith(
+        "subvortex-team"
+    ):
         project_name = "test-subvortex-team"
     bt.logging.debug(
         f"Wandb project {project_name} used for Subnet {self.config.netuid}"

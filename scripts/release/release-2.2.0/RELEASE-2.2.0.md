@@ -1,4 +1,4 @@
-This guide provides step-by-step instructions for the release 2.1.0.
+This guide provides step-by-step instructions for the release 2.2.0.
 
 Previous Release: 2.0.0
 
@@ -13,6 +13,7 @@ Previous Release: 2.0.0
   - [Rollout Process](#miner-rollout-process)
   - [Rollback Process](#miner-rollback-process)
 - [Additional Resources](#additional-resources)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -83,7 +84,7 @@ Previous Release: 2.0.0
 5. **Rollout Redis**: Rollout redis by running in **SubVortex** directory
 
    ```bash
-   python3 ./scripts/release/release-2.1.0/migration.py
+   python3 ./scripts/release/release-2.2.0/migration.py
    ```
 
    You will see
@@ -152,7 +153,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
 2. **Rollback Redis**: Rollback redis by running in **SubVortex** directory
 
    ```bash
-   python3 ./scripts/release/release-2.1.0/migration.py --run-type rollback
+   python3 ./scripts/release/release-2.2.0/migration.py --run-type rollback
    ```
 
    You should see
@@ -165,7 +166,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
    2024-03-30 13:12:20.962 |       INFO       | Rollback checked successfully
    ```
 
-   If any issue, restore your backup database using the [Backup Guide](../../migrations/backup.md#restore-a-dump).
+   If any issue, restore your backup database using the [Backup Guide](../../redis/docs/redis-backup.md#restore-a-dump).
 
 3. **Downgrade Subnet**: Get the tags
 
@@ -367,3 +368,68 @@ If any issues arise during or after the rollout, follow these steps to perform a
 <br />
 
 For any further assistance or inquiries, please contact [**SubVortex Team**](https://discord.com/channels/799672011265015819/1215311984799653918)
+
+# Troubleshooting
+
+## Divergent branches
+
+Sometimes when switchingg between branches, you may face the following message
+
+```
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint:
+hint:   git config pull.rebase false  # merge (the default strategy)
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint:
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+```
+
+To resolve, let's check if you have at least another branch you can switch on
+
+```bash
+git branch -vvv
+```
+
+You have to see something like
+
+```bash
+  main          047e804 [origin/main] Merge pull request #25 from eclipsevortex/revert-23-release/2.2.0
+* release/2.2.0 fc0868b [origin/release/2.2.0: ahead 1, behind 1] fix last details
+```
+
+The `*` tells you which branch is your active one. In my case, release/2.0.0 is my current one.
+
+If there is no other branche available, please remove the SubrVortex directory and reinstall it by following the [Subnet guide](../../subnet/README.md)
+
+If there are other barnches, switch to it
+
+```bash
+git switch <BRANCH_NAME>
+```
+
+Delete the branch in issue
+
+```bash
+git delete -D <BRANCH_NAME>
+```
+
+Check the branch has been removed
+
+```bash
+git branch -vvv
+```
+
+You have to see something like
+
+```bash
+* main          047e804 [origin/main] Merge pull request #25 from eclipsevortex/revert-23-release/2.2.0
+```
+
+From there, you can restart from the point **Upgrade Subnet** or **Downgrade Subnet** of the Validator or Miner depending on the action you were doing originally.

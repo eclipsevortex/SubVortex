@@ -16,11 +16,13 @@
 # DEALINGS IN THE SOFTWARE.
 
 import time
+import copy
 import torch
 import asyncio
 from redis import asyncio as aioredis
 import threading
 import bittensor as bt
+from typing import List
 from shlex import quote
 from copy import deepcopy
 from pprint import pformat
@@ -31,13 +33,14 @@ from subnet.shared.checks import check_registration
 from subnet.shared.utils import get_redis_password
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
+from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
 
 from subnet.validator.config import config, check_config, add_args
 from subnet.validator.localisation import get_country, get_localisation
 from subnet.validator.forward import forward
+from subnet.validator.miner import Miner, get_all_miners
 from subnet.validator.state import (
-    checkpoint,
-    should_checkpoint,
+    resync_metagraph_and_miners,
     load_state,
     save_state,
     init_wandb,
@@ -47,10 +50,6 @@ from subnet.validator.state import (
 from subnet.validator.weights import (
     set_weights_for_validator,
 )
-
-
-def MockDendrite():
-    pass
 
 
 class Validator:
@@ -83,8 +82,10 @@ class Validator:
     wallet: "bt.wallet"
     metagraph: "bt.metagraph"
 
-    def __init__(self):
+    def __init__(self, config=None):
+        base_config = copy.deepcopy(config or Validator.config())
         self.config = Validator.config()
+        self.config.merge(base_config)
         self.check_config(self.config)
         bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
 
@@ -93,19 +94,23 @@ class Validator:
         self.device = torch.device(self.config.neuron.device)
         bt.logging.debug(str(self.device))
 
+        # Init validator wallet.
+        bt.logging.debug("loading wallet")
+        self.wallet = (
+            bt.MockWallet(config=self.config)
+            if self.config.mock
+            else bt.wallet(config=self.config)
+        )
+        self.wallet.create_if_non_existent()
+
         # Init subtensor
         bt.logging.debug("loading subtensor")
         self.subtensor = (
-            bt.MockSubtensor()
-            if self.config.neuron.mock_subtensor
+            MockSubtensor(self.config.netuid, wallet=self.wallet) 
+            if self.config.mock 
             else bt.subtensor(config=self.config)
         )
         bt.logging.debug(str(self.subtensor))
-
-        # Init validator wallet.
-        bt.logging.debug("loading wallet")
-        self.wallet = bt.wallet(config=self.config)
-        self.wallet.create_if_non_existent()
 
         # Check registration
         check_registration(self.subtensor, self.wallet, self.config.netuid)
@@ -114,14 +119,15 @@ class Validator:
 
         # Init metagraph.
         bt.logging.debug("loading metagraph")
-        self.metagraph = bt.metagraph(
-            netuid=self.config.netuid, network=self.subtensor.network, sync=False
-        )  # Make sure not to sync without passing subtensor
+        self.metagraph = (
+            MockMetagraph(self.config.netuid, subtensor=self.subtensor)
+            if self.config.mock
+            else bt.metagraph(
+                netuid=self.config.netuid, network=self.subtensor.network, sync=False
+            )
+        )
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
         bt.logging.debug(str(self.metagraph))
-
-        # Get initial block
-        self.current_block = self.subtensor.get_current_block()
 
         # Setup database
         bt.logging.info(f"loading database")
@@ -145,7 +151,7 @@ class Validator:
         # Dendrite pool for querying the network.
         bt.logging.debug("loading dendrite_pool")
         if self.config.neuron.mock_dendrite_pool:
-            self.dendrite = MockDendrite()
+            self.dendrite = MockDendrite(wallet=self.wallet)
         else:
             self.dendrite = bt.dendrite(wallet=self.wallet)
         bt.logging.debug(str(self.dendrite))
@@ -175,19 +181,22 @@ class Validator:
         self.subscription_thread: threading.Thread = None
         self.last_registered_block = 0
         self.rebalance_queue = []
-        self.last_purged_epoch = 0
+        self.miners: List[Miner] = []
 
-    def run(self):
+    async def run(self):
         bt.logging.info("run()")
 
+        # Init miners
+        self.miners = await get_all_miners(self)
+        bt.logging.debug(f"Miners loaded {len(self.miners)}")
+
         load_state(self)
-        checkpoint(self)
 
         try:
             while 1:
                 start_epoch = time.time()
 
-                self.metagraph.sync(subtensor=self.subtensor)
+                await resync_metagraph_and_miners(self)
                 prev_set_weights_block = self.metagraph.last_update[self.uid].item()
 
                 # --- Wait until next step epoch.
@@ -216,22 +225,6 @@ class Validator:
                     await asyncio.gather(*coroutines)
 
                 self.loop.run_until_complete(run_forward())
-
-                # Resync the network state
-                bt.logging.info("Checking if should checkpoint")
-                current_block = get_current_block(self.subtensor)
-                should_checkpoint_validator = should_checkpoint(
-                    current_block,
-                    self.prev_step_block,
-                    self.config.neuron.checkpoint_block_length,
-                )
-                bt.logging.debug(
-                    f"should_checkpoint() params: (current block) {current_block} (prev block) {self.prev_step_block} (checkpoint_block_length) {self.config.neuron.checkpoint_block_length}"
-                )
-                bt.logging.debug(f"should checkpoint ? {should_checkpoint_validator}")
-                if should_checkpoint_validator:
-                    bt.logging.info("Checkpointing...")
-                    checkpoint(self)
 
                 # Set the weights on chain.
                 bt.logging.info("Checking if should set weights")
@@ -285,4 +278,4 @@ class Validator:
 
 
 if __name__ == "__main__":
-    Validator().run()
+    asyncio.run(Validator().run())

@@ -77,7 +77,10 @@ wandb: Paste an API key from your profile and hit enter, or press ctrl+c to quit
 
 The default configuration is enough to have a good user experience so there is no real need to update it.
 
-The default configuration will create a maximum of 2 runs (active + one archive) containing 360 steps of data. We chose 360, which corresponds to an epoch, and we believe it is sufficient to understand the trend and adjust the subtensor accordingly.
+The default configuration will create a maximum of 1 run (active) containing 360 steps of data. We chose 360, which corresponds to an epoch, and we believe it is sufficient to understand the trend and adjust the subtensor accordingly. 
+
+> IMPORTAMT <br />
+For now, we choose to have one active run per validator in order to stay in the free plan as this dahsboard will be replaced by our own Frontend at some point.
 
 Options
 
@@ -132,7 +135,10 @@ From that table, you can get a quick overview of how you are competing with othe
 
 ![distribution](wandb-distribution.png)
 
-The histogram gives you the number of subtensors per country. Based on how the distribution score is computed, you can easily identify a country where there are no subtensors or a very small number, in order to maximize it.
+These historgras gives you the number of subtensors per country
+
+- `Verified Miners Distribution` - number of verified subtensor per country - A subtensor is considered verified when 1) the miner is up and running 2) the subtensor is up and running and 3) there is only one miner associated to the subtensor. This histogram is used to check the distribution score your miner is getting.
+- `Miners Distribution` - number of subtensor (verified or not) per country - This histogram can be used to determine which countries do not have any subtensors yet, in order to set up one and attain the maximum associated score.
 
 ## Scores
 

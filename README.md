@@ -48,7 +48,7 @@
 - [Registering your wallet](#registering-your-wallet)
 - [Running a Miner](#running-a-miner)
 - [Running a Validator](#running-a-validator)
-- [New Releases](#new-releases)
+- [Releases](#releases)
 - [Troubleshooting](#troubleshooting)
   - [Troubleshooting Subtensor](#troubleshooting-subtensor)
 - [License](#license)
@@ -356,6 +356,8 @@ pm2 start neurons/miner.py \
 
 > IMPORTANT: By default wandb is enabled when running a validator. It is **HIGHLY RECOMMANDED** to not disable it as it enables everyone to access various statistics for better performance on the subnet but if you want to do it, just add `--wandb.off` to the followed pm2 command. If you want to keep wandb enabled, please refer to the [Wandb guide](./docs/wandb/wandb.md) for more details as there are some manually steps to go throught before running the validator.
 
+> Please use `--database.index <INDEX>`if you have multiple subnet sharing the same redis instance and the index 1 (default value) is already taken by another subnet
+
 Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
 
 ```
@@ -372,28 +374,9 @@ pm2 start neurons/validator.py \
 
 > NOTE: to access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
 
-## New Releases
+## Releases
 
-When a new version of the subnet is released, each miner/validatior have to be updated.
-
-> Be sure you are in the SubVortex directory
-
-Get the lastest version of the subnet
-
-```
-git pull
-```
-
-Install the dependencies
-
-```
-pip install -r requirements.txt
-pip install -e .
-```
-
-Restart miners/validators if running them in your base environment or restart pm2 by executing `pm2 restart all` if you are using pm2 as process manager.
-
-> NOTE: to access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
+- [Release-2.2.0](./scripts/release/release-2.2.0/RELEASE-2.2.0.md)
 
 ## Troubleshooting
 

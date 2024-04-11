@@ -14,107 +14,85 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
-import json
 import bittensor as bt
-from typing import Any
 from redis import asyncio as aioredis
-from typing import Dict, Optional
 
 
-async def get_metadata_for_hotkey_and_hash(
-    ss58_address: str, data_hash: str, database: aioredis.Redis, verbose: bool = False
-) -> Optional[Dict[str, Any]]:
+def get_field_value(value, default_value=None):
     """
-    Retrieves specific metadata from a hash in Redis for the given field_key.
-
-    Parameters:
-        ss58_address (str): The hotkey assoicated.
-        data_hash (str): The data hash associated.
-        databse (aioredis.Redis): The Redis client instance.
-
-    Returns:
-        The deserialized metadata as a dictionary, or None if not found.
+    Returned the decoded value of the field
     """
-    # Get the JSON string from Redis
-    metadata_json = await database.hget(f"hotkey:{ss58_address}", data_hash)
-    if verbose:
-        bt.logging.trace(
-            f"hotkey {ss58_address[:16]} | data_hash {data_hash[:16]} | metadata_json {metadata_json}"
-        )
-    if metadata_json:
-        # Deserialize the JSON string to a Python dictionary
-        metadata = json.loads(metadata_json)
-        return metadata
-    else:
-        bt.logging.trace(f"No metadata found for {data_hash} in hash {ss58_address}.")
-        return None
+    field_value = value.decode("utf-8") if isinstance(value, bytes) else value
+    return field_value or default_value
 
 
-async def total_hotkey_storage(
-    hotkey: str, database: aioredis.Redis, verbose: bool = False
-) -> int:
+async def get_hotkey_statistics(ss58_address: str, database: aioredis.Redis):
     """
-    Calculates the total storage used by a hotkey in the database.
-
-    Parameters:
-        database (aioredis.Redis): The Redis client instance.
-        hotkey (str): The key representing the hotkey.
-
-    Returns:
-        The total storage used by the hotkey in bytes.
+    Return the stastistics metadata for the hotkey from the database
     """
-    total_storage = 0
-    keys = await database.hkeys(f"hotkey:{hotkey}")
-    for data_hash in keys:
-        if data_hash.startswith(b"ttl:"):
-            continue
-        # Get the metadata for the current data hash
-        metadata = await get_metadata_for_hotkey_and_hash(
-            hotkey, data_hash, database, verbose
-        )
-        if metadata:
-            # Add the size of the data to the total storage
-            total_storage += metadata["size"]
-    return total_storage
-
-
-async def hotkey_at_capacity(
-    hotkey: str, database: aioredis.Redis, verbose: bool = False
-) -> bool:
-    """
-    Checks if the hotkey is at capacity.
-
-    Parameters:
-        database (aioredis.Redis): The Redis client instance.
-        hotkey (str): The key representing the hotkey.
-
-    Returns:
-        True if the hotkey is at capacity, False otherwise.
-    """
-    # Get the total storage used by the hotkey
-    total_storage = await total_hotkey_storage(hotkey, database, verbose)
-    # Check if the hotkey is at capacity
-    byte_limit = await database.hget(f"stats:{hotkey}", "storage_limit")
-    if byte_limit is None:
-        if verbose:
-            bt.logging.trace(f"Could not find storage limit for {hotkey}.")
-        return False
     try:
-        limit = int(byte_limit)
-    except Exception as e:
-        if verbose:
-            bt.logging.trace(f"Could not parse storage limit for {hotkey} | {e}.")
-        return False
-    if total_storage >= limit:
-        if verbose:
-            bt.logging.trace(
-                f"Hotkey {hotkey} is at max capacity {limit // 1024**3} GB."
-            )
-        return True
-    else:
-        if verbose:
-            bt.logging.trace(
-                f"Hotkey {hotkey} has {(limit - total_storage) // 1024**3} GB free."
-            )
-        return False
+        statistics = await database.hgetall(f"stats:{ss58_address}")
+        if statistics is None:
+            bt.logging.trace(f"No statistics metadata found in hash {ss58_address}.")
+            return None
+
+        return statistics
+    except Exception as ex:
+        bt.logging.error(
+            f"Failed to execute get_hotkey_statistics() on {ss58_address}: {ex}"
+        )
+
+    return None
+
+
+async def update_hotkey_statistics(
+    ss58_address: str, mapping, database: aioredis.Redis
+):
+    """
+    Update the stastitics key from the database
+    """
+    try:
+        await database.hmset(f"stats:{ss58_address}", mapping)
+    except Exception as ex:
+        bt.logging.error(
+            f"Failed to execute update_hotkey_statistics() on {ss58_address}: {ex}, {mapping}"
+        )
+
+
+async def remove_hotkey_stastitics(ss58_address: str, database: aioredis.Redis):
+    """
+    Remove the stastitics key from the database
+    """
+    try:
+        if not database.exists(f"stats:{ss58_address}"):
+            return
+
+        await database.hdel(f"stats:{ss58_address}")
+    except Exception as ex:
+        bt.logging.error(
+            f"Failed to execute remove_hotkey_stastitics() on {ss58_address}: {ex}"
+        )
+        bt.logging.info("Use redis_clean_old_key.py script to clean them.")
+
+
+async def get_selected_miners(ss58_address: str, database: aioredis.Redis):
+    try:
+        selection_key = f"selection:{ss58_address}"
+
+        # Get the uids selection
+        value = await database.get(selection_key)
+        if value is None:
+            bt.logging.debug(f"get_selected_miners() no uids")
+            return []
+
+        # Get the uids already selected
+        uids_str = value.decode("utf-8") if isinstance(value, bytes) else value
+        uids = [int(uid) for uid in uids_str.split(",")]
+
+        return uids
+    except Exception as err:
+        bt.logging.error(
+            f"Failed to execute get_selected_miners() on {ss58_address}: {err}"
+        )
+
+    return []

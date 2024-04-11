@@ -84,6 +84,12 @@ echo -e '\e[32mRust and Cargo installed\e[0m'
 source "$HOME/.cargo/env"
 echo -e '\e[32mRust and Cargo added to the path\e[0m'
 
+# Save the current directory
+CURRENT_DIRECTORY=$(pwd)
+
+# Go to home directory
+cd $HOME
+
 # Clone subtensor and enter the directory
 if [ ! -d "subtensor" ]; then
     git clone https://github.com/opentensor/subtensor.git
@@ -111,3 +117,6 @@ if [[ $NETWORK == "testnet" ]]; then
     cargo build --release --features runtime-benchmarks --locked
     echo -e "\e[32mSubtensor on network $NETWORK is compiled\e[0m"
 fi
+
+# Go back to the current directory
+cd $CURRENT_DIRECTORY

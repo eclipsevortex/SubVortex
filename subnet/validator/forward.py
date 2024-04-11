@@ -18,7 +18,10 @@
 import time
 import bittensor as bt
 
+from subnet.constants import RELIABILLITY_RESET
+from subnet.shared.subtensor import get_current_block
 from subnet.validator.challenge import challenge_data
+from subnet.validator.miner import reset_reliability_score
 
 
 async def forward(self):
@@ -30,6 +33,10 @@ async def forward(self):
     # Send synapse to get challenge
     bt.logging.info("initiating challenge")
     await challenge_data(self)
+
+    # Reset reliability statistics every 3 epochs
+    if get_current_block(self.subtensor) % RELIABILLITY_RESET == 0 and self.step > 0:
+        await reset_reliability_score(self, self.miners)
 
     # Display step time
     forward_time = time.time() - start

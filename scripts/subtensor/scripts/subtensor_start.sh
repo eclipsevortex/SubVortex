@@ -52,14 +52,12 @@ function run_command()
         --rpc-max-response-size 2048 \
         --rpc-external \
         --rpc-cors all \
-        --ws-external \
         --no-mdns \
-        --ws-max-connections 16000 \
+        --rpc-max-connections 16000 \
         --in-peers 8000 \
         --out-peers 8000 \
         --prometheus-external \
-        --rpc-port 9933 \
-        --ws-port 9944 \
+        --rpc-port 9944 \
         --port 30333 \
         $SPECIFIC_OPTIONS
 }

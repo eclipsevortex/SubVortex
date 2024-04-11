@@ -1,8 +1,11 @@
+import bittensor as bt
 from bittensor import logging as bt_logging
 from bittensor import subtensor
 from bittensor import wallet
 from torch import Tensor
 from typing import Tuple
+
+from subnet.shared.substrate import get_weights_min_stake
 
 
 def should_wait_to_set_weights(current_block, last_epoch_block, tempo):
@@ -11,6 +14,7 @@ def should_wait_to_set_weights(current_block, last_epoch_block, tempo):
 
 
 def should_set_weights(
+    self,
     current_block,
     prev_step_block,
     tempo,
@@ -18,6 +22,16 @@ def should_set_weights(
 ) -> bool:
     # Check if enough epoch blocks have elapsed since the last epoch.
     if disable_set_weights:
+        return False
+    
+    # Check validator has enough state to set weight
+    validator_stake = self.metagraph.S[self.uid]
+    weight_min_stake = get_weights_min_stake(self.subtensor.substrate)
+    has_enough_stake = validator_stake > weight_min_stake
+    if has_enough_stake == False:
+        bt.logging.warning(
+            f"Not enough stake t{validator_stake} to set weight, require a minimum of t{weight_min_stake}. Please stake more if you do not want to be de-registered!"
+        )
         return False
 
     return not should_wait_to_set_weights(current_block, prev_step_block, tempo)

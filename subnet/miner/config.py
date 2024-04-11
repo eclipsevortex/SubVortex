@@ -133,6 +133,24 @@ def add_args(cls, parser):
         default=False,
     )
 
+    # Blacklist.
+    parser.add_argument(
+        "--blacklist.blacklist_hotkeys",
+        type=str,
+        required=False,
+        nargs="*",
+        help="Blacklist certain hotkeys",
+        default=[],
+    )
+    parser.add_argument(
+        "--blacklist.whitelist_hotkeys",
+        type=str,
+        required=False,
+        nargs="*",
+        help="Whitelist certain hotkeys",
+        default=[],
+    )
+
 
 def config(cls):
     parser = argparse.ArgumentParser()

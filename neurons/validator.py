@@ -16,28 +16,28 @@
 # DEALINGS IN THE SOFTWARE.
 
 import time
+import copy
 import torch
 import asyncio
 from redis import asyncio as aioredis
 import threading
 import bittensor as bt
-from shlex import quote
-from copy import deepcopy
-from pprint import pformat
+from typing import List
 from traceback import print_exception
-from substrateinterface.base import SubstrateInterface
 
 from subnet.shared.checks import check_registration
 from subnet.shared.utils import get_redis_password
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
+from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
 
 from subnet.validator.config import config, check_config, add_args
 from subnet.validator.localisation import get_country, get_localisation
 from subnet.validator.forward import forward
+from subnet.validator.models import Miner
+from subnet.validator.miner import get_all_miners
 from subnet.validator.state import (
-    checkpoint,
-    should_checkpoint,
+    resync_metagraph_and_miners,
     load_state,
     save_state,
     init_wandb,
@@ -47,10 +47,6 @@ from subnet.validator.state import (
 from subnet.validator.weights import (
     set_weights_for_validator,
 )
-
-
-def MockDendrite():
-    pass
 
 
 class Validator:
@@ -83,8 +79,10 @@ class Validator:
     wallet: "bt.wallet"
     metagraph: "bt.metagraph"
 
-    def __init__(self):
+    def __init__(self, config=None):
+        base_config = copy.deepcopy(config or Validator.config())
         self.config = Validator.config()
+        self.config.merge(base_config)
         self.check_config(self.config)
         bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
 
@@ -93,19 +91,23 @@ class Validator:
         self.device = torch.device(self.config.neuron.device)
         bt.logging.debug(str(self.device))
 
+        # Init validator wallet.
+        bt.logging.debug("loading wallet")
+        self.wallet = (
+            bt.MockWallet(config=self.config)
+            if self.config.mock
+            else bt.wallet(config=self.config)
+        )
+        self.wallet.create_if_non_existent()
+
         # Init subtensor
         bt.logging.debug("loading subtensor")
         self.subtensor = (
-            bt.MockSubtensor()
-            if self.config.neuron.mock_subtensor
+            MockSubtensor(self.config.netuid, wallet=self.wallet)
+            if self.config.mock
             else bt.subtensor(config=self.config)
         )
         bt.logging.debug(str(self.subtensor))
-
-        # Init validator wallet.
-        bt.logging.debug("loading wallet")
-        self.wallet = bt.wallet(config=self.config)
-        self.wallet.create_if_non_existent()
 
         # Check registration
         check_registration(self.subtensor, self.wallet, self.config.netuid)
@@ -114,14 +116,15 @@ class Validator:
 
         # Init metagraph.
         bt.logging.debug("loading metagraph")
-        self.metagraph = bt.metagraph(
-            netuid=self.config.netuid, network=self.subtensor.network, sync=False
-        )  # Make sure not to sync without passing subtensor
+        self.metagraph = (
+            MockMetagraph(self.config.netuid, subtensor=self.subtensor)
+            if self.config.mock
+            else bt.metagraph(
+                netuid=self.config.netuid, network=self.subtensor.network, sync=False
+            )
+        )
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
         bt.logging.debug(str(self.metagraph))
-
-        # Get initial block
-        self.current_block = self.subtensor.get_current_block()
 
         # Setup database
         bt.logging.info(f"loading database")
@@ -145,7 +148,7 @@ class Validator:
         # Dendrite pool for querying the network.
         bt.logging.debug("loading dendrite_pool")
         if self.config.neuron.mock_dendrite_pool:
-            self.dendrite = MockDendrite()
+            self.dendrite = MockDendrite(wallet=self.wallet)
         else:
             self.dendrite = bt.dendrite(wallet=self.wallet)
         bt.logging.debug(str(self.dendrite))
@@ -175,22 +178,23 @@ class Validator:
         self.subscription_thread: threading.Thread = None
         self.last_registered_block = 0
         self.rebalance_queue = []
-        self.last_purged_epoch = 0
+        self.miners: List[Miner] = []
 
-    def run(self):
+    async def run(self):
         bt.logging.info("run()")
 
-        load_state(self)
-        checkpoint(self)
+        # Init miners
+        self.miners = await get_all_miners(self)
+        bt.logging.debug(f"Miners loaded {len(self.miners)}")
 
-        bt.logging.info("starting subscription handler")
-        self.run_subscription_thread()
+        # Load the state
+        load_state(self)
 
         try:
             while 1:
                 start_epoch = time.time()
 
-                self.metagraph.sync(subtensor=self.subtensor)
+                await resync_metagraph_and_miners(self)
                 prev_set_weights_block = self.metagraph.last_update[self.uid].item()
 
                 # --- Wait until next step epoch.
@@ -214,31 +218,16 @@ class Validator:
                 async def run_forward():
                     coroutines = [
                         forward(self)
-                        for _ in range(self.config.neuron.num_concurrent_forwards)
+                        for _ in range(1) # IMPORTANT: do not change it. we are going to work to make it concurrent tasks asap!
                     ]
                     await asyncio.gather(*coroutines)
 
                 self.loop.run_until_complete(run_forward())
 
-                # Resync the network state
-                bt.logging.info("Checking if should checkpoint")
-                current_block = get_current_block(self.subtensor)
-                should_checkpoint_validator = should_checkpoint(
-                    current_block,
-                    self.prev_step_block,
-                    self.config.neuron.checkpoint_block_length,
-                )
-                bt.logging.debug(
-                    f"should_checkpoint() params: (current block) {current_block} (prev block) {self.prev_step_block} (checkpoint_block_length) {self.config.neuron.checkpoint_block_length}"
-                )
-                bt.logging.debug(f"should checkpoint ? {should_checkpoint_validator}")
-                if should_checkpoint_validator:
-                    bt.logging.info("Checkpointing...")
-                    checkpoint(self)
-
                 # Set the weights on chain.
                 bt.logging.info("Checking if should set weights")
                 validator_should_set_weights = should_set_weights(
+                    self,
                     get_current_block(self.subtensor),
                     prev_set_weights_block,
                     360,  # tempo
@@ -274,96 +263,17 @@ class Validator:
             bt.logging.error("Error in training loop", str(err))
             bt.logging.debug(print_exception(type(err), err, err.__traceback__))
 
+            if self.wandb is not None:
+                self.wandb.finish()
+                assert self.wandb.run is None
+                bt.logging.debug("Finishing wandb run")
+
         # After all we have to ensure subtensor connection is closed properly
         finally:
             if hasattr(self, "subtensor"):
                 bt.logging.debug("Closing subtensor connection")
                 self.subtensor.close()
-                self.stop_subscription_thread()
-
-            if self.wandb is not None:
-                bt.logging.debug("Finishing wandb run")
-                self.wandb.finish()
-
-    # TODO: After investigation done and decision taken, remove or change it
-    def start_event_subscription(self):
-        """
-        Starts the subscription handler in a background thread.
-        """
-        substrate = SubstrateInterface(
-            ss58_format=bt.__ss58_format__,
-            use_remote_preset=True,
-            url=self.subtensor.chain_endpoint,
-            type_registry=bt.__type_registry__,
-        )
-        self.subscription_substrate = substrate
-
-        def neuron_registered_subscription_handler(obj, update_nr, subscription_id):
-            block_no = obj["header"]["number"]
-            block_hash = substrate.get_block_hash(block_id=block_no)
-            bt.logging.debug(f"subscription block hash: {block_hash}")
-            events = substrate.get_events(block_hash)
-
-            for event in events:
-                event_dict = event["event"].decode()
-                if event_dict["event_id"] == "NeuronRegistered":
-                    netuid, uid, hotkey = event_dict["attributes"]
-                    if int(netuid) == 21:
-                        self.log(
-                            f"NeuronRegistered Event {uid}! Rebalancing data...\n"
-                            f"{pformat(event_dict)}\n"
-                        )
-
-                        self.last_registered_block = block_no
-                        self.rebalance_queue.append(hotkey)
-
-            # If we have some hotkeys deregistered, and it's been 5 blocks since we've caught a registration: rebalance
-            if (
-                len(self.rebalance_queue) > 0
-                and self.last_registered_block + 5 <= block_no
-            ):
-                hotkeys = deepcopy(self.rebalance_queue)
-                self.rebalance_queue.clear()
-                self.log(f"Running rebalance in separate process on hotkeys {hotkeys}")
-
-                # Fire off the script
-                hotkeys_str = ",".join(map(str, hotkeys))
-                hotkeys_arg = quote(hotkeys_str)
-                # subprocess.Popen(
-                #     [
-                #         self.rebalance_script_path,
-                #         hotkeys_arg,
-                #         self.subtensor.chain_endpoint,
-                #         str(self.config.database.index),
-                #     ]
-                # )
-
-        substrate.subscribe_block_headers(neuron_registered_subscription_handler)
-
-    def run_subscription_thread(self):
-        """
-        Start the block header subscription handler in a separate thread.
-        """
-        if not self.subscription_is_running:
-            self.subscription_thread = threading.Thread(
-                target=self.start_event_subscription, daemon=True
-            )
-            self.subscription_thread.start()
-            self.subscription_is_running = True
-            bt.logging.debug("Started subscription handler.")
-
-    def stop_subscription_thread(self):
-        """
-        Stops the subscription handler that is running in the background thread.
-        """
-        if self.subscription_is_running:
-            bt.logging.debug("Stopping subscription in background thread.")
-            self.should_exit = True
-            self.subscription_thread.join(5)
-            self.subscription_is_running = False
-            self.subscription_substrate.close()
-            bt.logging.debug("Stopped subscription handler.")
 
 
 if __name__ == "__main__":
-    Validator().run()
+    asyncio.run(Validator().run())

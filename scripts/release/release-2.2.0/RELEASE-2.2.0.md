@@ -83,6 +83,9 @@ Previous Release: 2.0.0
 
 5. **Rollout Redis**: Rollout redis by running in **SubVortex** directory
 
+   > IMPORTANT <br />
+   > Please use `--database_index <INDEX>`if you have multiple subnet sharing the same redis instance and the index 1 (default value) is already taken by another subnet
+
    ```bash
    python3 ./scripts/release/release-2.2.0/migration.py
    ```
@@ -105,6 +108,9 @@ Previous Release: 2.0.0
    ```
 
    Then, run the following command by chaing all the variable **$XXX**
+
+   > IMPORTANT <br />
+   > Please use `--database.index <INDEX>`if you have multiple subnet sharing the same redis instance and the index 1 (default value) is already taken by another subnet
 
    ```bash
    pm2 start neurons/validator.py \
@@ -151,6 +157,9 @@ If any issues arise during or after the rollout, follow these steps to perform a
    ```
 
 2. **Rollback Redis**: Rollback redis by running in **SubVortex** directory
+
+   > IMPORTANT <br />
+   > Please use `--database_index <INDEX>`if you have multiple subnet sharing the same redis instance and the index 1 (default value) is already taken by another subnet
 
    ```bash
    python3 ./scripts/release/release-2.2.0/migration.py --run-type rollback

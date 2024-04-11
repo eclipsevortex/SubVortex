@@ -17,6 +17,7 @@
 
 # Utils for checkpointing and saving the model.
 import os
+import re
 import torch
 import copy
 import wandb
@@ -396,19 +397,40 @@ def init_wandb(self, reinit=False):
         for i in range(0, len(runs)):
             run: public.Run = runs[i]
 
+            # Remove remote run
+            run.delete(True)
+            bt.logging.debug(f"[Wandb] Run {run.name} removed remotely")
+
+            # Remove local run
             wandb_base = wandb.run.settings.wandb_dir
 
-            # Get the run started at time
-            startedAt = run.metadata["startedAt"]
+            if run.metadata is None:
+                pattern = r"run-\d{8}_\d{6}-" + re.escape(run.id)
 
-            # Parse input datetime string into a datetime object
-            input_datetime = datetime.strptime(startedAt, "%Y-%m-%dT%H:%M:%S.%f")
+                # matches = re.match(pattern, wandb_base)
+                matches = [
+                    subdir
+                    for subdir in os.listdir(wandb_base)
+                    if re.match(pattern, subdir)
+                ]
+                if len(matches) == 0:
+                    continue
 
-            # Format the datetime object into the desired string format
-            output_datetime_str = input_datetime.strftime("%Y%m%d_%H%M%S")
+                run_local_path = f"{wandb_base}{matches[0]}"
+                bt.logging.debug("[Wandb] Local path computed")
+            else:
+                # Get the run started at time
+                startedAt = run.metadata["startedAt"]
 
-            # Local path to the run files
-            run_local_path = f"{wandb_base}run-{output_datetime_str}-{run.id}"
+                # Parse input datetime string into a datetime object
+                input_datetime = datetime.strptime(startedAt, "%Y-%m-%dT%H:%M:%S.%f")
+
+                # Format the datetime object into the desired string format
+                output_datetime_str = input_datetime.strftime("%Y%m%d_%H%M%S")
+
+                # Local path to the run files
+                run_local_path = f"{wandb_base}run-{output_datetime_str}-{run.id}"
+                bt.logging.debug("[Wandb] Local path retrieve from metadata")
 
             # Remove local run
             if os.path.exists(run_local_path):
@@ -420,10 +442,6 @@ def init_wandb(self, reinit=False):
                 bt.logging.warning(
                     f"[Wandb] Run local directory {run_local_path} does not exist. Please check it has been removed."
                 )
-
-            # Remove remote run
-            run.delete(True)
-            bt.logging.debug(f"[Wandb] Run {run.name} removed remotely")
 
     bt.logging.success(
         prefix="Started a new wandb run",

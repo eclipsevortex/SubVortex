@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.0 / 2024-04-11
+
+## What's Changed
+* enhance the uids selection process by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/20
+* UI wandb improvement by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/24
+* Release/2.1.0 by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/23
+* Revert Release/2.1.0 by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/25
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.0.0...v2.2.0
+
 ## 2.0.0 / 2024-03-28
 
 ## What's Changed

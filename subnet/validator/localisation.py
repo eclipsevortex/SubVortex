@@ -4,7 +4,9 @@ import requests
 import bittensor as bt
 from math import radians, sin, cos, sqrt, atan2
 
-LOCLISATION_API = "https://api.country.is"
+COUNTRY_IS_BASE_URL = "https://api.country.is"
+IP_API_BASE_URL = "http://ip-api.com/json"
+IPINFO_IO_BASE_URL = "https://ipinfo.io"
 
 countries = {}
 
@@ -24,20 +26,77 @@ def get_localisation(country_code: str):
     return countries.get(country_code)
 
 
-def get_country(ip: str):
+def get_country_by_country_is(ip: str):
     """
     Get the country code of the ip
+    Reference: https://country.is/
     """
-    url = f"{LOCLISATION_API}/{ip}"
+    url = f"{COUNTRY_IS_BASE_URL}/{ip}"
 
     response = requests.get(url)
 
     if response.status_code != 200:
-        return None
+        return None, response.reason
 
     data = response.json()
 
-    return data["country"]
+    return data["country"], None
+
+
+def get_country_by_ip_api(ip: str):
+    """
+    Get the country code of the ip
+    Reference: https://ip-api.com/
+    """
+    url = f"{IP_API_BASE_URL}/{ip}"
+
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        return None, response.reason
+
+    data = response.json()
+
+    return data["countryCode"], None
+
+
+def get_country_by_ipinfo_io(ip: str):
+    """
+    Get the country code of the ip
+    Reference: https://ipinfo.io/
+    """
+    url = f"{IPINFO_IO_BASE_URL}/{ip}"
+
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        return None, response.reason
+
+    data = response.json()
+
+    return data["country"], None
+
+
+def get_country(ip: str):
+    """
+    Get the country code of the ip
+    """
+    country, reason1 = get_country_by_country_is(ip)
+    if country:
+        return country
+
+    country, reason2 = get_country_by_ip_api(ip)
+    if country:
+        return country
+
+    country, reason3 = get_country_by_ipinfo_io(ip)
+    if country:
+        return country
+
+    bt.logging.warning(
+        f"Could not get the country of the ip {ip}: Api 1: {reason1} / Api 2: {reason2} / Api 3: {reason3}"
+    )
+    return None
 
 
 def compute_localisation_distance(lat1, lon1, lat2, lon2):

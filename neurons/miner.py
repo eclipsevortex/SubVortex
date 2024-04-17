@@ -20,12 +20,13 @@ import typing
 import time
 import torch
 import asyncio
-import bittensor as bt
 import threading
 import traceback
+import bittensor as bt
 
 from subnet.protocol import Score
 
+from subnet.shared.subtensor import publish_metadata, retrieve_metadata
 from subnet.shared.checks import check_registration
 
 from subnet import __version__ as THIS_VERSION
@@ -122,11 +123,12 @@ class Miner:
         bt.logging.info(f"Running miner on uid: {self.my_subnet_uid}")
 
         # The axon handles request processing, allowing validators to send this process requests.
+        axon_ip = bt.net.get_external_ip()
         self.axon = bt.axon(
-            wallet=self.wallet, config=self.config, external_ip=bt.net.get_external_ip()
+            wallet=self.wallet, config=self.config, external_ip=axon_ip
         )
         bt.logging.info(f"Axon {self.axon}")
-        
+
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward functions to axon.")
         self.axon.attach(
@@ -134,18 +136,25 @@ class Miner:
             blacklist_fn=self.blacklist_score,
         )
 
+        # Commit the ip on the blockchain to allow validator to check my identity
+        bt.logging.info("Checking metadata on the chain")
+        ip, _ = retrieve_metadata(self, self.wallet.hotkey.ss58_address)
+        if ip != axon_ip:
+            bt.logging.info("Sending metadata to the chain")
+            publish_metadata(self)
+
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip have changed.
         bt.logging.info(
             f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
         self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
-        
+
         # Check there is not another miner running on the machine
         number_of_miners = len(
             [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]
         )
-        if number_of_miners > 1:
+        if False and number_of_miners > 1:
             bt.logging.error(
                 "At least one miner is already running on this machine. If you run more than one miner you will penalise all of your miners until you get de-registered or start each miner on a unique machine"
             )
@@ -172,10 +181,17 @@ class Miner:
     def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
-        if synapse.count > 1:
+        if synapse.primary:
+            bt.logging.info(f"[{validator_uid}] Miner flagged as primary")
+        elif synapse.primary == False:
             bt.logging.error(
-                f"[{validator_uid}] {synapse.count} miners are running on this machine"
+                f"[{validator_uid}] Miner flagged as secondary"
             )
+
+        if synapse.verified:
+            bt.logging.info(f"[{validator_uid}] Miner/Subtensor verified")
+        elif synapse.verified == False:
+            bt.logging.error(f"[{validator_uid}] {synapse.reason}")
 
         bt.logging.info(f"[{validator_uid}] Availability score {synapse.availability}")
         bt.logging.info(f"[{validator_uid}] Latency score {synapse.latency}")
@@ -184,7 +200,7 @@ class Miner:
         bt.logging.success(f"[{validator_uid}] Score {synapse.score}")
 
         synapse.version = THIS_VERSION
-        
+
         return synapse
 
     def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:

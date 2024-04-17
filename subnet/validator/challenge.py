@@ -29,18 +29,20 @@ CHALLENGE_NAME = "Challenge"
 async def handle_synapse(self, uid: int):
     # Get the miner
     miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
+    miner.primary = True
 
     # Check the miner is available
     available = await ping_uid(self, miner.uid)
-    if available == False:
+    if available != 1:
         miner.verified = False
+        miner.primary = available != 2
         miner.process_time = DEFAULT_PROCESS_TIME
-        bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is not reachable")
-        return
+        return f"Miner is not reachable"
 
     bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
 
     verified = False
+    reason = None
     process_time: float = DEFAULT_PROCESS_TIME
     try:
         # Create a subtensor with the ip return by the synapse
@@ -69,20 +71,22 @@ async def handle_synapse(self, uid: int):
         verified = (
             miner_block == validator_block or (validator_block - miner_block) <= 1
         )
+        if not verified:
+            reason = "Subtensor is desynchronised"
 
         bt.logging.trace(
             f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified ? {verified} - val: {validator_block}, miner:{miner_block}"
         )
     except Exception as ex:
         verified = False
-        bt.logging.warning(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor not verified: {ex}"
-        )
+        reason = "Subtensor is not reachable"
 
     # Update the miner object
     finally:
         miner.verified = verified
         miner.process_time = process_time
+    
+    return reason
 
 
 async def challenge_data(self):
@@ -96,9 +100,10 @@ async def challenge_data(self):
 
     # Execute the challenges
     tasks = []
+    reasons = []
     for uid in uids:
         tasks.append(asyncio.create_task(handle_synapse(self, uid)))
-        await asyncio.gather(*tasks)
+        reasons = await asyncio.gather(*tasks)
 
     # Initialise the rewards object
     rewards: torch.FloatTensor = torch.zeros(len(uids), dtype=torch.float32).to(
@@ -114,11 +119,12 @@ async def challenge_data(self):
 
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
 
-        # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
-        if miner.ip_occurences != 1:
-            bt.logging.warning(
-                f"[{CHALLENGE_NAME}][{miner.uid}] {miner.ip_occurences} miner(s) associated with the ip"
-            )
+        if not miner.primary:
+            primary_uid = next((x.uid for x in self.miners if x.primary and x.ip == miner.ip), None)
+            bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner flagged as secondary (Primary: {primary_uid})")
+
+        if not miner.verified:
+            bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] {reasons[idx]}")
 
         # Compute score for availability
         miner.availability_score = compute_availability_score(miner)
@@ -150,7 +156,7 @@ async def challenge_data(self):
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Final score {miner.score}")
 
         # Send the score details to the miner
-        miner.version = await send_scope(self, miner)
+        miner.version = await send_scope(self, miner, reasons[idx])
 
         # Save miner snapshot in database
         await update_statistics(self, miner)

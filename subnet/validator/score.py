@@ -42,7 +42,7 @@ def compute_availability_score(miner: Miner):
 
     score = (
         1.0
-        if miner.verified and not miner.has_ip_conflicts
+        if miner.verified and miner.primary
         else AVAILABILITY_FAILURE_REWARD
     )
 
@@ -53,8 +53,11 @@ async def compute_reliability_score(miner: Miner):
     """
     Compute the reliaiblity score of the uid based on the the ratio challenge_successes/challenge_attempts
     """
+    if not miner.primary:
+        return 0
+
     # Step 1: Retrieve statistics
-    is_successful = miner.verified and not miner.has_ip_conflicts
+    is_successful = miner.verified and miner.primary
     miner.challenge_successes = miner.challenge_successes + int(is_successful)
     miner.challenge_attempts = miner.challenge_attempts + 1
     bt.logging.trace(
@@ -74,7 +77,7 @@ def compute_latency_score(validator_country: str, miner: Miner, miners: List[Min
     """
     Compute the latency score of the uid based on the process time of all uids
     """
-    if not miner.verified or miner.has_ip_conflicts:
+    if not miner.verified or not miner.primary:
         return LATENCY_FAILURE_REWARD
 
     bt.logging.trace(f"[{miner.uid}][Score][Latency] Process time {miner.process_time}")
@@ -86,7 +89,7 @@ def compute_latency_score(validator_country: str, miner: Miner, miners: List[Min
     miner_index = -1
     process_times = []
     for item in miners:
-        if not item.verified or item.has_ip_conflicts:
+        if not item.verified or not item.primary:
             # Exclude miners not verifed to not alterate the computation
             continue
 
@@ -154,7 +157,7 @@ def compute_distribution_score(miner: Miner, miners: List[Miner]):
     """
     Compute the distribution score of the uid based on the country of all uids
     """
-    if not miner.verified or miner.has_ip_conflicts:
+    if not miner.verified or not miner.primary:
         return DISTRIBUTION_FAILURE_REWARD
 
     # Step 1: Country of the requested response
@@ -162,7 +165,7 @@ def compute_distribution_score(miner: Miner, miners: List[Miner]):
 
     # Step 2; Exclude miners not verified or with ip conflicts
     conform_miners = [
-        miner for miner in miners if miner.verified and not miner.has_ip_conflicts
+        miner for miner in miners if miner.verified and miner.primary
     ]
 
     # Step 3: Country the number of miners in the country

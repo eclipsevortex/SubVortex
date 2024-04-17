@@ -40,7 +40,7 @@ def get_country_by_country_is(ip: str):
 
     data = response.json()
 
-    return data["country"], None
+    return data.get("country"), None
 
 
 def get_country_by_ip_api(ip: str):
@@ -57,7 +57,7 @@ def get_country_by_ip_api(ip: str):
 
     data = response.json()
 
-    return data["countryCode"], None
+    return data.get("countryCode"), None
 
 
 def get_country_by_ipinfo_io(ip: str):
@@ -74,7 +74,7 @@ def get_country_by_ipinfo_io(ip: str):
 
     data = response.json()
 
-    return data["country"], None
+    return data.get("country"), None
 
 
 def get_country(ip: str):

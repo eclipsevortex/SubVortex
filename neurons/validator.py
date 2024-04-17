@@ -265,7 +265,6 @@ class Validator:
 
             if self.wandb is not None:
                 self.wandb.finish()
-                assert self.wandb.run is None
                 bt.logging.debug("Finishing wandb run")
 
         # After all we have to ensure subtensor connection is closed properly

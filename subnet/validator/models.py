@@ -1,3 +1,5 @@
+from enum import Enum
+
 class Miner:
     uid: int = -1
     hotkey: str = None
@@ -14,6 +16,7 @@ class Miner:
     challenge_attempts: int = 0
     process_time: float = 0
     verified: bool = False
+    primary: bool = False
 
     def __init__(
         self,
@@ -32,6 +35,7 @@ class Miner:
         challenge_attempts=0,
         process_time=0,
         ip_occurences=1,
+        identified=False,
     ):
         self.uid = int(uid) if uid is not None else -1
         self.hotkey = hotkey
@@ -48,10 +52,12 @@ class Miner:
         self.challenge_successes = int(challenge_successes or 0)
         self.challenge_attempts = int(challenge_attempts or 0)
         self.process_time = float(process_time or 0)
+        self.primary = identified or False
 
     def reset(self, ip, hotkey, country):
         self.hotkey = hotkey
         self.ip = ip
+        self.primary = False
         self.version = "0.0.0"
         self.country = country or ""
         self.verified = False
@@ -63,6 +69,7 @@ class Miner:
         self.challenge_successes = 0
         self.challenge_attempts = 0
         self.process_time = 0
+        self.primary = False
 
     @property
     def has_ip_conflicts(self):
@@ -89,7 +96,7 @@ class Miner:
         }
 
     def __str__(self):
-        return f"Miner(uid={self.uid}, hotkey={self.hotkey}, ip={self.ip}, ip_occurences={self.ip_occurences}, version={self.version}, country={self.country}, verified={self.verified}, score={self.score}, availability_score={self.availability_score}, latency_score={self.latency_score}, reliability_score={self.reliability_score}, distribution_score={self.distribution_score}, challenge_attempts={self.challenge_attempts}, challenge_successes={self.challenge_successes}, process_time={self.process_time})"
+        return f"Miner(uid={self.uid}, hotkey={self.hotkey}, ip={self.ip}, ip_occurences={self.ip_occurences}, version={self.version}, country={self.country}, verified={self.verified}, primary={self.primary}, score={self.score}, availability_score={self.availability_score}, latency_score={self.latency_score}, reliability_score={self.reliability_score}, distribution_score={self.distribution_score}, challenge_attempts={self.challenge_attempts}, challenge_successes={self.challenge_successes}, process_time={self.process_time})"
 
     def __repr__(self):
-        return f"Miner(uid={self.uid}, hotkey={self.hotkey}, ip={self.ip}, ip_occurences={self.ip_occurences}, version={self.version}, country={self.country}, verified={self.verified}, score={self.score}, availability_score={self.availability_score}, latency_score={self.latency_score}, reliability_score={self.reliability_score}, distribution_score={self.distribution_score}, challenge_attempts={self.challenge_attempts}, challenge_successes={self.challenge_successes}, process_time={self.process_time})"
+        return f"Miner(uid={self.uid}, hotkey={self.hotkey}, ip={self.ip}, ip_occurences={self.ip_occurences}, version={self.version}, country={self.country}, verified={self.verified}, primary={self.primary}, score={self.score}, availability_score={self.availability_score}, latency_score={self.latency_score}, reliability_score={self.reliability_score}, distribution_score={self.distribution_score}, challenge_attempts={self.challenge_attempts}, challenge_successes={self.challenge_successes}, process_time={self.process_time})"

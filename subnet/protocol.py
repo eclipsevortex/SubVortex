@@ -21,11 +21,19 @@ import bittensor as bt
 
 class Score(bt.Synapse):
     validator_uid: typing.Optional[int]
+    # True if the miner is the primary, false otherwise 
+    primary: typing.Optional[bool]
+    # True if the miner/subtensor are up, false otherwise
+    verified: typing.Optional[bool]
+    # Reason of the why it is not verified
+    reason: typing.Optional[str]
     availability: float
     latency: float
     reliability: float
     distribution: float
     score: float
+
+    # Deprecated - wont be send by validators anymore
     count: typing.Optional[int] = 0
 
     # Returns

@@ -25,6 +25,8 @@ import bittensor as bt
 from typing import List
 from traceback import print_exception
 
+from subnet.monitor.monitor import Monitor
+
 from subnet.shared.checks import check_registration
 from subnet.shared.utils import get_redis_password
 from subnet.shared.subtensor import get_current_block
@@ -190,6 +192,10 @@ class Validator:
         # Load the state
         load_state(self)
 
+        # Monitor miners
+        self.monitor = Monitor()
+        self.monitor.start()
+
         try:
             while 1:
                 start_epoch = time.time()
@@ -218,7 +224,9 @@ class Validator:
                 async def run_forward():
                     coroutines = [
                         forward(self)
-                        for _ in range(1) # IMPORTANT: do not change it. we are going to work to make it concurrent tasks asap!
+                        for _ in range(
+                            1
+                        )  # IMPORTANT: do not change it. we are going to work to make it concurrent tasks asap!
                     ]
                     await asyncio.gather(*coroutines)
 
@@ -230,7 +238,7 @@ class Validator:
                     self,
                     get_current_block(self.subtensor),
                     prev_set_weights_block,
-                    360,  # tempo
+                    self.config.neuron.epoch_length,
                     self.config.neuron.disable_set_weights,
                 )
                 bt.logging.debug(
@@ -270,6 +278,9 @@ class Validator:
 
         # After all we have to ensure subtensor connection is closed properly
         finally:
+            if self.monitor:
+                self.monitor.stop()
+
             if hasattr(self, "subtensor"):
                 bt.logging.debug("Closing subtensor connection")
                 self.subtensor.close()

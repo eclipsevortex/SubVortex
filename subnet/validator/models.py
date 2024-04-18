@@ -16,6 +16,8 @@ class Miner:
     verified: bool = False
     # True if the miner own the subtensor, false otherwise
     owner: bool = True
+    # True if the miner is suspicious (its weight will be 0), false otherwise
+    suspicious: bool = False
 
     def __init__(
         self,

@@ -31,6 +31,8 @@ from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
 from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
 
+from subnet.monitor.monitor_process import MonitorProcess
+
 from subnet.validator.config import config, check_config, add_args
 from subnet.validator.localisation import get_country, get_localisation
 from subnet.validator.forward import forward
@@ -190,6 +192,13 @@ class Validator:
         # Load the state
         load_state(self)
 
+        # Monitor miners
+        monitor_process = MonitorProcess()
+        monitor_process.start()
+
+        # Get the monitor object
+        self.monitor = monitor_process.monitor
+
         try:
             while 1:
                 start_epoch = time.time()
@@ -218,7 +227,9 @@ class Validator:
                 async def run_forward():
                     coroutines = [
                         forward(self)
-                        for _ in range(1) # IMPORTANT: do not change it. we are going to work to make it concurrent tasks asap!
+                        for _ in range(
+                            1
+                        )  # IMPORTANT: do not change it. we are going to work to make it concurrent tasks asap!
                     ]
                     await asyncio.gather(*coroutines)
 
@@ -270,6 +281,10 @@ class Validator:
 
         # After all we have to ensure subtensor connection is closed properly
         finally:
+            if monitor_process:
+                monitor_process.join()
+                monitor_process = None
+
             if hasattr(self, "subtensor"):
                 bt.logging.debug("Closing subtensor connection")
                 self.subtensor.close()

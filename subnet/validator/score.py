@@ -36,27 +36,44 @@ def check_multiple_miners_on_same_ip(miner: Miner, miners: List[Miner]):
     return count
 
 
+def can_compute_availability_score(miner: Miner):
+    """
+    True if we can compute the availaiblity score, false to get the penalty
+    """
+    return (
+        not miner.suspicious
+        and miner.verified
+        and miner.owner
+        and not miner.has_ip_conflicts
+    )
+
+
 def compute_availability_score(miner: Miner):
     """
     Compute the availability score of the uid
     """
 
     score = (
-        1.0
-        if miner.verified and not miner.has_ip_conflicts and miner.owner
-        else AVAILABILITY_FAILURE_REWARD
+        1.0 if can_compute_availability_score(miner) else AVAILABILITY_FAILURE_REWARD
     )
 
     return score
+
+
+def can_compute_reliability_score(miner: Miner):
+    """
+    True if we can compute the reliability score, false to get the penalty
+    """
+    return not miner.suspicious and miner.owner
 
 
 async def compute_reliability_score(miner: Miner):
     """
     Compute the reliaiblity score of the uid based on the the ratio challenge_successes/challenge_attempts
     """
-    if not miner.owner:
+    if not can_compute_reliability_score(miner):
         return RELIABILLITY_FAILURE_REWARD
-    
+
     # Step 1: Retrieve statistics
     is_successful = miner.verified and not miner.has_ip_conflicts
     miner.challenge_successes = miner.challenge_successes + int(is_successful)
@@ -74,11 +91,23 @@ async def compute_reliability_score(miner: Miner):
     return score
 
 
+def can_compute_latency_score(miner: Miner):
+    """
+    True if we can compute the latency score, false to get the penalty
+    """
+    return (
+        not miner.suspicious
+        and miner.verified
+        and miner.owner
+        and not miner.has_ip_conflicts
+    )
+
+
 def compute_latency_score(validator_country: str, miner: Miner, miners: List[Miner]):
     """
     Compute the latency score of the uid based on the process time of all uids
     """
-    if not miner.verified or miner.has_ip_conflicts or not miner.owner:
+    if not can_compute_latency_score(miner):
         return LATENCY_FAILURE_REWARD
 
     bt.logging.trace(f"[{miner.uid}][Score][Latency] Process time {miner.process_time}")
@@ -154,11 +183,23 @@ def compute_latency_score(validator_country: str, miner: Miner, miners: List[Min
     return score
 
 
+def can_compute_distribution_score(miner: Miner):
+    """
+    True if we can compute the distribution score, false to get the penalty
+    """
+    return (
+        not miner.suspicious
+        and miner.verified
+        and miner.owner
+        and not miner.has_ip_conflicts
+    )
+
+
 def compute_distribution_score(miner: Miner, miners: List[Miner]):
     """
     Compute the distribution score of the uid based on the country of all uids
     """
-    if not miner.verified or miner.has_ip_conflicts or not miner.owner:
+    if not can_compute_distribution_score(miner):
         return DISTRIBUTION_FAILURE_REWARD
 
     # Step 1: Country of the requested response

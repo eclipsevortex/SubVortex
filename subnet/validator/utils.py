@@ -155,7 +155,6 @@ async def ping_uid(self, uid):
             timeout=5,
         )
 
-
         dendrite: bt.synapse = response.dendrite
 
         result = int(dendrite.status_code == 200)
@@ -321,3 +320,17 @@ def get_uids_selection(self, k=DEFAULT_CHUNK_SIZE):
     block_seed = get_block_seed(self)
     uids = select_uids(self.uid, self.selection_step, block_seed, self.miners, vuids, k)
     return uids
+
+
+def deregister_suspicious_uid(self):
+    """
+    Deregister all miners that are either
+    - suspicious from the load balancer
+    - does not own their subtensor
+    """
+    for miner in self.miners:
+        if not miner.suspicious:
+            continue
+
+        # Set the weight to 0 on the chain
+        self.moving_averaged_scores[miner.uid] = 0

@@ -1,3 +1,4 @@
+import re
 import torch
 import time
 import asyncio
@@ -11,10 +12,7 @@ from subnet.shared.substrate import (
 )
 from subnet.validator.models import Miner
 from subnet.validator.synapse import send_scope
-from subnet.validator.utils import (
-    get_next_uids,
-    ping_uid,
-)
+from subnet.validator.utils import get_next_uids, ping_uid, deregister_suspicious_uid
 from subnet.validator.bonding import update_statistics
 from subnet.validator.state import log_event
 from subnet.validator.score import (
@@ -45,51 +43,58 @@ async def handle_synapse(self, uid: int):
 
     verified = False
     reason = None
-    primary = True
+    owner = True
     process_time: float = DEFAULT_PROCESS_TIME
     try:
-        # Start the timer
-        start_time = time.time()
-
         # Get the peer id of the subtensor
+        first_start_time = time.time()
         request_id = self.subtensor.substrate.request_id + 1
         peer_id = get_node_peer_id(miner.ip, request_id)
+        first_process_time = time.time() - first_start_time
         bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor peer id {peer_id}")
 
         # Get the listen addresses
+        second_start_time = time.time()
         request_id = self.subtensor.substrate.request_id + 1
         addresses = get_listen_addresses(miner.ip, request_id)
-        bt.logging.trace(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor listen addresses {addresses}"
-        )
+        second_process_time = time.time() - second_start_time
+        bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor listen addresses: {addresses}")
 
         # Check the ownership of the subtensor
         address = f"/ip4/{miner.ip}/tcp/30333/ws/p2p/{peer_id}"
         owner = address in addresses
-        if not primary:
-            bt.logging.debug(
-                f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor is own by someone else"
+        if not owner:
+            print(addresses)
+            ip_pattern = r"/ip4/(\d+\.\d+\.\d+\.\d+)/"
+            ips = [re.search(ip_pattern, address).group(1) for address in addresses]
+            owner_uid = next(
+                (miner.uid for miner in self.miners if miner.ip in ips), None
+            )
+            copyright = f" {owner_uid}" if owner_uid else ""
+            reason = (
+                f"Subtensor is not verified - subtensor owned by another uid{copyright}"
             )
 
         # Check the state of the subtensor
+        third_start_time = time.time()
         request_id = self.subtensor.substrate.request_id + 1
         state = get_sync_state(miner.ip, request_id)
+        third_process_time = time.time() - third_start_time
         bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor state {state}")
+
         is_sync = state.get("currentBlock") == state.get("highestBlock")
         if not is_sync:
-            bt.logging.debug(
-                f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor is desynchronised"
-            )
+            reason = "Subtensor is not verified - it is desynchronised"
 
         # Compute the process time
-        process_time = time.time() - start_time
+        process_time = (
+            first_process_time + second_process_time + third_process_time
+        ) / 3
 
         # Check if subtensor is verified
         verified = owner and is_sync
         if verified:
             bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
-        else:
-            reason = "Subtensor is not verified"
     except Exception as ex:
         verified = False
         bt.logging.warning(
@@ -116,6 +121,10 @@ async def challenge_data(self):
     uids = uids[:-2] + [28, 66]
     bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
+    # Get the misbehavior miners
+    suspicious_uids = self.monitor.get_suspicious_uids()
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Suspicious uids {suspicious_uids}")
+
     # Execute the challenges
     tasks = []
     reasons = []
@@ -137,19 +146,26 @@ async def challenge_data(self):
 
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
 
-        if not miner.owner:
-            primary_uid = next(
-                (x.uid for x in self.miners if x.primary and x.ip == miner.ip), None
-            )
-            bt.logging.error(
-                f"[{CHALLENGE_NAME}][{miner.uid}] Miner is using the subtenosr of the uid {primary_uid}"
-            )
+        # Check if the miner is suspicious
+        miner.suspicious = miner.uid in suspicious_uids and miner.verified
+        if miner.suspicious:
+            bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is suspicious")
 
+        # Check if the miner owns the subtensor
+        # if not miner.owner:
+        #     primary_uid = next(
+        #         (x.uid for x in self.miners if x.owner and x.ip == miner.ip), None
+        #     )
+        #     bt.logging.error(
+        #         f"[{CHALLENGE_NAME}][{miner.uid}] Miner is using the subtenosr of the uid {primary_uid}"
+        #     )
+
+        # Check if the miner/subtensor are verified
         if not miner.verified:
             bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] {reasons[idx]}")
 
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
-        if miner.ip_occurences != 1:
+        if miner.has_ip_conflicts:
             bt.logging.warning(
                 f"[{CHALLENGE_NAME}][{miner.uid}] {miner.ip_occurences} miner(s) associated with the ip"
             )
@@ -212,6 +228,9 @@ async def challenge_data(self):
     bt.logging.trace(
         f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
     )
+
+    # Suspicious miners - moving weight to 0 for deregistration
+    deregister_suspicious_uid(self)
 
     # Display step time
     forward_time = time.time() - start_time

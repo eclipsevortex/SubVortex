@@ -10,6 +10,7 @@ from subnet.validator.localisation import (
 )
 from subnet.constants import (
     AVAILABILITY_FAILURE_REWARD,
+    RELIABILLITY_FAILURE_REWARD,
     LATENCY_FAILURE_REWARD,
     DISTRIBUTION_FAILURE_REWARD,
     AVAILABILITY_WEIGHT,
@@ -42,7 +43,7 @@ def compute_availability_score(miner: Miner):
 
     score = (
         1.0
-        if miner.verified and not miner.has_ip_conflicts
+        if miner.verified and not miner.has_ip_conflicts and miner.owner
         else AVAILABILITY_FAILURE_REWARD
     )
 
@@ -53,6 +54,9 @@ async def compute_reliability_score(miner: Miner):
     """
     Compute the reliaiblity score of the uid based on the the ratio challenge_successes/challenge_attempts
     """
+    if not miner.owner:
+        return RELIABILLITY_FAILURE_REWARD
+    
     # Step 1: Retrieve statistics
     is_successful = miner.verified and not miner.has_ip_conflicts
     miner.challenge_successes = miner.challenge_successes + int(is_successful)
@@ -74,7 +78,7 @@ def compute_latency_score(validator_country: str, miner: Miner, miners: List[Min
     """
     Compute the latency score of the uid based on the process time of all uids
     """
-    if not miner.verified or miner.has_ip_conflicts:
+    if not miner.verified or miner.has_ip_conflicts or not miner.owner:
         return LATENCY_FAILURE_REWARD
 
     bt.logging.trace(f"[{miner.uid}][Score][Latency] Process time {miner.process_time}")
@@ -154,7 +158,7 @@ def compute_distribution_score(miner: Miner, miners: List[Miner]):
     """
     Compute the distribution score of the uid based on the country of all uids
     """
-    if not miner.verified or miner.has_ip_conflicts:
+    if not miner.verified or miner.has_ip_conflicts or not miner.owner:
         return DISTRIBUTION_FAILURE_REWARD
 
     # Step 1: Country of the requested response

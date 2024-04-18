@@ -126,7 +126,7 @@ class Miner:
             wallet=self.wallet, config=self.config, external_ip=bt.net.get_external_ip()
         )
         bt.logging.info(f"Axon {self.axon}")
-        
+
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward functions to axon.")
         self.axon.attach(
@@ -140,7 +140,7 @@ class Miner:
             f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
         self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
-        
+
         # Check there is not another miner running on the machine
         number_of_miners = len(
             [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]
@@ -172,6 +172,16 @@ class Miner:
     def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
+        if synapse.owner:
+            bt.logging.info(f"[{validator_uid}] Miner owns the subtensor")
+        elif synapse.owner == False:
+            bt.logging.error(f"[{validator_uid}] Miner does not own the subtensor")
+
+        if synapse.verified:
+            bt.logging.info(f"[{validator_uid}] Miner/Subtensor verified")
+        elif synapse.verified == False:
+            bt.logging.error(f"[{validator_uid}] {synapse.reason or 'unknown'}")
+
         if synapse.count > 1:
             bt.logging.error(
                 f"[{validator_uid}] {synapse.count} miners are running on this machine"
@@ -184,7 +194,7 @@ class Miner:
         bt.logging.success(f"[{validator_uid}] Score {synapse.score}")
 
         synapse.version = THIS_VERSION
-        
+
         return synapse
 
     def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:

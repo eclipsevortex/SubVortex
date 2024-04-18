@@ -142,10 +142,12 @@ async def resync_miners(self):
 
     # Focus on the changes in the metagraph
     bt.logging.info("resync_miners() processing metagraph changes")
-    for uid, axon in enumerate(self.metagraph.axons):
+    uids = get_available_uids(self)
+    for uid in uids:
         # Get details
-        ip = axon.ip
+        axon = self.metagraph.axons[uid]
         hotkey = self.metagraph.hotkeys[uid]
+        ip = axon.ip
 
         is_available = check_uid_availability(
             self.metagraph, uid, self.config.neuron.vpermit_tao_limit

@@ -144,21 +144,33 @@ def get_available_query_miners(self, k, exclude: List[int] = None):
 async def ping_uid(self, uid):
     """
     Ping a UID to check their availability.
-    Returns True if successful, false otherwise
+    Returns 0 if uid down, 1 if up and 2 if malicious
     """
     try:
+        axon = self.metagraph.axons[uid]
         response = await self.dendrite(
-            self.metagraph.axons[uid],
+            axon,
             bt.Synapse(),
             deserialize=False,
             timeout=5,
         )
 
-        return response.dendrite.status_code == 200
+
+        dendrite: bt.synapse = response.dendrite
+
+        result = int(dendrite.status_code == 200)
+
+        if dendrite.status_code == 401:
+            if "Signature mismatch" in dendrite.status_message:
+                # The hotkey on the axon is not the same as the one expected by the miner
+                # A suspspicious person is using a good miner
+                result = 2 if axon.hotkey not in dendrite.status_message else 0
+
+        return result
     except Exception as e:
         bt.logging.error(f"Dendrite ping failed: {e}")
 
-    return False
+    return 0
 
 
 async def ping_uids(self, uids):

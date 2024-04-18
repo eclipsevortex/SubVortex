@@ -4,7 +4,11 @@ import asyncio
 import bittensor as bt
 
 from subnet.constants import DEFAULT_PROCESS_TIME
-from subnet.shared.subtensor import get_current_block
+from subnet.shared.substrate import (
+    get_sync_state,
+    get_node_peer_id,
+    get_listen_addresses,
+)
 from subnet.validator.models import Miner
 from subnet.validator.synapse import send_scope
 from subnet.validator.utils import (
@@ -20,7 +24,6 @@ from subnet.validator.score import (
     compute_distribution_score,
     compute_final_score,
 )
-from substrateinterface.base import SubstrateInterface
 
 
 CHALLENGE_NAME = "Challenge"
@@ -31,58 +34,76 @@ async def handle_synapse(self, uid: int):
     miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
 
     # Check the miner is available
-    available = await ping_uid(self, miner.uid)
-    if available == False:
+    result = await ping_uid(self, miner.uid)
+    if result != 1:
         miner.verified = False
+        miner.owner = result == 0
         miner.process_time = DEFAULT_PROCESS_TIME
-        bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is not reachable")
-        return
+        return "Miner is not verified"
 
     bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
 
     verified = False
+    reason = None
+    primary = True
     process_time: float = DEFAULT_PROCESS_TIME
     try:
-        # Create a subtensor with the ip return by the synapse
-        substrate = SubstrateInterface(
-            ss58_format=bt.__ss58_format__,
-            use_remote_preset=True,
-            url=f"ws://{miner.ip}:9944",
-            type_registry=bt.__type_registry__,
-        )
-
         # Start the timer
         start_time = time.time()
 
-        # Get the current block from the miner subtensor
-        miner_block = substrate.get_block()
-        if miner_block != None:
-            miner_block = miner_block["header"]["number"]
+        # Get the peer id of the subtensor
+        request_id = self.subtensor.substrate.request_id + 1
+        peer_id = get_node_peer_id(miner.ip, request_id)
+        bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor peer id {peer_id}")
+
+        # Get the listen addresses
+        request_id = self.subtensor.substrate.request_id + 1
+        addresses = get_listen_addresses(miner.ip, request_id)
+        bt.logging.trace(
+            f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor listen addresses {addresses}"
+        )
+
+        # Check the ownership of the subtensor
+        address = f"/ip4/{miner.ip}/tcp/30333/ws/p2p/{peer_id}"
+        owner = address in addresses
+        if not primary:
+            bt.logging.debug(
+                f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor is own by someone else"
+            )
+
+        # Check the state of the subtensor
+        request_id = self.subtensor.substrate.request_id + 1
+        state = get_sync_state(miner.ip, request_id)
+        bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor state {state}")
+        is_sync = state.get("currentBlock") == state.get("highestBlock")
+        if not is_sync:
+            bt.logging.debug(
+                f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor is desynchronised"
+            )
 
         # Compute the process time
         process_time = time.time() - start_time
 
-        # Get the current block from the validator subtensor
-        validator_block = get_current_block(self.subtensor)
-
-        # Check both blocks are the same
-        verified = (
-            miner_block == validator_block or (validator_block - miner_block) <= 1
-        )
-
-        bt.logging.trace(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified ? {verified} - val: {validator_block}, miner:{miner_block}"
-        )
+        # Check if subtensor is verified
+        verified = owner and is_sync
+        if verified:
+            bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
+        else:
+            reason = "Subtensor is not verified"
     except Exception as ex:
         verified = False
         bt.logging.warning(
             f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor not verified: {ex}"
         )
+        reason = "Subtensor is not verified"
 
     # Update the miner object
     finally:
         miner.verified = verified
         miner.process_time = process_time
+        miner.owner = owner
+
+    return reason
 
 
 async def challenge_data(self):
@@ -92,13 +113,15 @@ async def challenge_data(self):
     # Select the miners
     val_hotkey = self.metagraph.hotkeys[self.uid]
     uids = await get_next_uids(self, val_hotkey)
+    uids = uids[:-2] + [28, 66]
     bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
     # Execute the challenges
     tasks = []
+    reasons = []
     for uid in uids:
         tasks.append(asyncio.create_task(handle_synapse(self, uid)))
-        await asyncio.gather(*tasks)
+        reasons = await asyncio.gather(*tasks)
 
     # Initialise the rewards object
     rewards: torch.FloatTensor = torch.zeros(len(uids), dtype=torch.float32).to(
@@ -113,6 +136,17 @@ async def challenge_data(self):
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
 
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
+
+        if not miner.owner:
+            primary_uid = next(
+                (x.uid for x in self.miners if x.primary and x.ip == miner.ip), None
+            )
+            bt.logging.error(
+                f"[{CHALLENGE_NAME}][{miner.uid}] Miner is using the subtenosr of the uid {primary_uid}"
+            )
+
+        if not miner.verified:
+            bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] {reasons[idx]}")
 
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
         if miner.ip_occurences != 1:
@@ -150,7 +184,7 @@ async def challenge_data(self):
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Final score {miner.score}")
 
         # Send the score details to the miner
-        miner.version = await send_scope(self, miner)
+        miner.version = await send_scope(self, miner, reasons[idx])
 
         # Save miner snapshot in database
         await update_statistics(self, miner)

@@ -6,7 +6,7 @@ from subnet.constants import DEFAULT_PROCESS_TIME
 from subnet.validator.models import Miner
 
 
-async def send_scope(self, miner: Miner):
+async def send_scope(self, miner: Miner, reason: str = None):
     """
     Send the scope synapse to the miner and return the version
     """
@@ -16,6 +16,9 @@ async def send_scope(self, miner: Miner):
             axons=[self.metagraph.axons[miner.uid]],
             synapse=protocol.Score(
                 validator_uid=self.uid,
+                owner=miner.owner,
+                verified=miner.verified,
+                reason=reason,
                 count=miner.ip_occurences,
                 availability=miner.availability_score,
                 latency=miner.latency_score,

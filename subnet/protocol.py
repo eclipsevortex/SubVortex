@@ -27,6 +27,12 @@ class Score(bt.Synapse):
     distribution: float
     score: float
     count: typing.Optional[int] = 0
+    # True if the miner own the subtensor, false otherwise 
+    owner: typing.Optional[bool] = True
+    # True if the miner/subtensor are up, false otherwise
+    verified: typing.Optional[bool] = False
+    # Reason of the why it is not verified
+    reason: typing.Optional[str] = None
 
     # Returns
     version: typing.Optional[str] = None

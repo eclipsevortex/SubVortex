@@ -77,10 +77,8 @@ async def remove_hotkey_stastitics(ss58_address: str, database: aioredis.Redis):
 
 async def get_selected_miners(ss58_address: str, database: aioredis.Redis):
     try:
-        selection_key = f"selection:{ss58_address}"
-
         # Get the uids selection
-        value = await database.get(selection_key)
+        value = await database.get(f"selection:{ss58_address}")
         if value is None:
             bt.logging.debug(f"get_selected_miners() no uids")
             return []

@@ -34,6 +34,34 @@ async def test_a_not_verified_miner_should_return_updated_attempts_and_success_a
 
 
 @pytest.mark.asyncio
+async def test_a_suspicious_miner_should_return_a_lowest_score():
+    # Arrange
+    reliability_score = mocks.miner_suspicious_1.reliability_score
+    miner = mocks.miner_suspicious_1
+
+    # Act
+    result = await compute_reliability_score(miner)
+
+    # Assert
+    assert result < reliability_score
+
+
+@pytest.mark.asyncio
+async def test_a_suspicious_miner_should_return_the_same_attempts_and_success():
+    # Arrange
+    challenge_attempts = mocks.miner_suspicious_1.challenge_attempts
+    challenge_successes = mocks.miner_suspicious_1.challenge_successes
+    miner = mocks.miner_suspicious_1
+
+    # Act
+    await compute_reliability_score(miner)
+
+    # Assert
+    assert miner.challenge_attempts == challenge_attempts
+    assert miner.challenge_successes == challenge_successes
+
+
+@pytest.mark.asyncio
 async def test_an_ip_conflicts_miner_should_return_a_lowest_score():
     # Arrange
     reliability_score = mocks.miner_with_ip_conflicts_1.reliability_score
@@ -78,7 +106,9 @@ async def test_a_not_verified_and_ip_conflicts_miner_should_return_a_lowest_scor
 async def test_a_not_verified_and_ip_conflicts_miner_should_return_updated_attempts_and_success_accordingly():
     # Arrange
     challenge_attempts = mocks.miner_not_verified_and_ip_conflicts_1.challenge_attempts
-    challenge_successes = mocks.miner_not_verified_and_ip_conflicts_1.challenge_successes
+    challenge_successes = (
+        mocks.miner_not_verified_and_ip_conflicts_1.challenge_successes
+    )
     miner = mocks.miner_not_verified_and_ip_conflicts_1
 
     # Act

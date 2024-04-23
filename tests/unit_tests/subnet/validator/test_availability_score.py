@@ -14,6 +14,17 @@ def test_a_not_verified_miner_should_return_a_score_of_zero():
     assert 0.0 == result
 
 
+def test_a_suspicious_miner_should_return_a_score_of_zero():
+    # Arrange
+    miner = mocks.miner_suspicious_1
+
+    # Act
+    result = compute_availability_score(miner)
+
+    # Assert
+    assert 0.0 == result
+
+
 def test_an_ip_conflicts_miner_should_return_a_score_of_zero():
     # Arrange
     miner = mocks.miner_with_ip_conflicts_1

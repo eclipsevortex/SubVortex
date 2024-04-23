@@ -6,10 +6,13 @@ import bittensor as bt
 from subnet.constants import DEFAULT_PROCESS_TIME
 from subnet.shared.subtensor import get_current_block
 from subnet.validator.models import Miner
+from subnet.validator.miner import get_miner_ip_occurences
 from subnet.validator.synapse import send_scope
+from subnet.validator.security import is_miner_suspicious
 from subnet.validator.utils import (
     get_next_uids,
     ping_uid,
+    deregister_suspicious_uid,
 )
 from subnet.validator.bonding import update_statistics
 from subnet.validator.state import log_event
@@ -35,12 +38,12 @@ async def handle_synapse(self, uid: int):
     if available == False:
         miner.verified = False
         miner.process_time = DEFAULT_PROCESS_TIME
-        bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is not reachable")
-        return
+        return "Miner is not verified"
 
     bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
 
     verified = False
+    reason = None
     process_time: float = DEFAULT_PROCESS_TIME
     try:
         # Create a subtensor with the ip return by the synapse
@@ -50,6 +53,9 @@ async def handle_synapse(self, uid: int):
             url=f"ws://{miner.ip}:9944",
             type_registry=bt.__type_registry__,
         )
+
+        # Set the timeout
+        substrate.websocket.timeout = DEFAULT_PROCESS_TIME
 
         # Start the timer
         start_time = time.time()
@@ -65,24 +71,22 @@ async def handle_synapse(self, uid: int):
         # Get the current block from the validator subtensor
         validator_block = get_current_block(self.subtensor)
 
-        # Check both blocks are the same
+        # Check both blocks are the same +/- 1 block
         verified = (
-            miner_block == validator_block or (validator_block - miner_block) <= 1
+            miner_block == validator_block or abs(validator_block - miner_block) <= 1
         )
-
-        bt.logging.trace(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified ? {verified} - val: {validator_block}, miner:{miner_block}"
-        )
+        if not verified:
+            reason = f"Subtensor is not verified - {validator_block}/{miner_block}"
     except Exception as ex:
         verified = False
-        bt.logging.warning(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor not verified: {ex}"
-        )
+        reason = "Subtensor is not verified"
 
     # Update the miner object
     finally:
         miner.verified = verified
         miner.process_time = process_time
+
+    return reason
 
 
 async def challenge_data(self):
@@ -94,11 +98,16 @@ async def challenge_data(self):
     uids = await get_next_uids(self, val_hotkey)
     bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
+    # Get the misbehavior miners
+    suspicious_uids = self.monitor.get_suspicious_uids()
+    bt.logging.debug(f"[{CHALLENGE_NAME}] Suspicious uids {suspicious_uids}")
+
     # Execute the challenges
     tasks = []
+    reasons = []
     for uid in uids:
         tasks.append(asyncio.create_task(handle_synapse(self, uid)))
-        await asyncio.gather(*tasks)
+        reasons = await asyncio.gather(*tasks)
 
     # Initialise the rewards object
     rewards: torch.FloatTensor = torch.zeros(len(uids), dtype=torch.float32).to(
@@ -114,8 +123,17 @@ async def challenge_data(self):
 
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
 
+        # Check if the miner is suspicious
+        miner.suspicious = is_miner_suspicious(miner, suspicious_uids)
+        if miner.suspicious:
+            bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is suspicious")
+
+        # Check if the miner/subtensor are verified
+        if not miner.verified:
+            bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] {reasons[idx]}")
+
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
-        if miner.ip_occurences != 1:
+        if miner.has_ip_conflicts:
             bt.logging.warning(
                 f"[{CHALLENGE_NAME}][{miner.uid}] {miner.ip_occurences} miner(s) associated with the ip"
             )
@@ -171,12 +189,18 @@ async def challenge_data(self):
 
     # Update moving_averaged_scores with rewards produced by this step.
     # alpha of 0.05 means that each new score replaces 5% of the weight of the previous weights
-    alpha: float = 0.05
+    alpha: float = 0.1
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)
     bt.logging.trace(
         f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
+    )
+
+    # Suspicious miners - moving weight to 0 for deregistration
+    deregister_suspicious_uid(self)
+    bt.logging.trace(
+        f"[{CHALLENGE_NAME}] Deregistered moving avg scores: {self.moving_averaged_scores}"
     )
 
     # Display step time

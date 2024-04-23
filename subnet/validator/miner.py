@@ -32,9 +32,14 @@ async def get_all_miners(self) -> List[Miner]:
     """
     miners: List[Miner] = []
 
-    ips = [axon.ip for axon in self.metagraph.axons]
+    # Get all the ipds from the miners
 
+    bt.logging.debug("get_all_miners() load miners")
     uids = get_available_uids(self)
+
+    # Get all the ips from available miners
+    ips = [self.metagraph.axons[uid].ip for uid in uids]
+    
     for uid in uids:
         axon = self.metagraph.axons[uid]
 
@@ -135,6 +140,17 @@ def move_miner(ip: str, miner: Miner):
     return previous_ip
 
 
+async def remove_miner(self, uid: int, hotkey: str):
+    """
+    Remove a miner that is not available anymore
+    """
+    # Remove the statistics
+    await remove_hotkey_stastitics(hotkey, self.database)
+
+    # Remove the miner
+    self.miners = [miner for miner in self.miners if miner.uid != uid]
+
+
 async def resync_miners(self):
     """
     Resync the miners following a metagraph resynchronisation
@@ -144,20 +160,16 @@ async def resync_miners(self):
     bt.logging.info("resync_miners() processing metagraph changes")
     for uid, axon in enumerate(self.metagraph.axons):
         # Get details
-        ip = axon.ip
         hotkey = self.metagraph.hotkeys[uid]
+        ip = axon.ip
 
+        # Check the miner is unavailable
         is_available = check_uid_availability(
             self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
         if not is_available:
-            miners = [miner for miner in self.miners if miner.uid != uid]
-            if len(miners) < len(self.miners):
-                bt.logging.success(
-                    f"[{miner.uid}] Miner {hotkey} hase been removed from the list."
-                )
-                self.miners = miners
-
+            await remove_miner(self, uid, hotkey)
+            bt.logging.success(f"[{uid}] Miner {hotkey} has been removed from the list")
             continue
 
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
@@ -165,13 +177,13 @@ async def resync_miners(self):
         # Check a new miner registered to the subnet
         if miner is None:
             miner = await add_new_miner(self, uid, ip, hotkey)
-            bt.logging.success(f"[{miner.uid}] New miner {hotkey} added to the list.")
+            bt.logging.success(f"[{miner.uid}] New miner {hotkey} added to the list")
 
         # Check a new miner is replacing an old one
         if miner.hotkey != hotkey:
             old_hotkey = await replace_old_miner(self, ip, hotkey, miner)
             bt.logging.success(
-                f"[{miner.uid}] Old miner {old_hotkey} has been replaced by the miner {hotkey}."
+                f"[{miner.uid}] Old miner {old_hotkey} has been replaced by the miner {hotkey}"
             )
 
         # Check the miner has been moved to another VPS

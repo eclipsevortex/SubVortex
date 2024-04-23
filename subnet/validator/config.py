@@ -129,6 +129,12 @@ def add_args(cls, parser):
         default="cuda" if torch.cuda.is_available() else "cpu",
     )
     parser.add_argument(
+        "--neuron.epoch_length",
+        type=int,
+        help="The default epoch length (how often we set weights, measured in 12 second blocks).",
+        default=100,
+    )
+    parser.add_argument(
         "--neuron.disable_log_rewards",
         action="store_true",
         help="Disable all reward logging, suppresses reward functions and their values from being logged to wandb.",

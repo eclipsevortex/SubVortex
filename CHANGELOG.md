@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.1 / 2024-04-23
+
+## What's Changed
+* First security fixes by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/34
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.0...v2.2.1
+
 ## 2.2.0 / 2024-04-11
 
 ## What's Changed

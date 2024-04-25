@@ -144,11 +144,17 @@ async def remove_miner(self, uid: int, hotkey: str):
     """
     Remove a miner that is not available anymore
     """
+    miners = [miner for miner in self.miners if miner.uid != uid]
+    if len(miners) >= len(self.miners):
+        return False
+        
     # Remove the statistics
     await remove_hotkey_stastitics(hotkey, self.database)
 
     # Remove the miner
-    self.miners = [miner for miner in self.miners if miner.uid != uid]
+    self.miners = miners
+
+    return True
 
 
 async def resync_miners(self):
@@ -168,8 +174,9 @@ async def resync_miners(self):
             self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
         if not is_available:
-            await remove_miner(self, uid, hotkey)
-            bt.logging.success(f"[{uid}] Miner {hotkey} has been removed from the list")
+            removed = await remove_miner(self, uid, hotkey)
+            if removed:
+                bt.logging.success(f"[{uid}] Miner {hotkey} has been removed from the list")
             continue
 
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)

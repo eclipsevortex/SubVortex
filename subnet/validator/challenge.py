@@ -43,6 +43,7 @@ async def handle_synapse(self, uid: int):
     bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
 
     verified = False
+    sync = False
     reason = None
     process_time: float = DEFAULT_PROCESS_TIME
     try:
@@ -71,19 +72,24 @@ async def handle_synapse(self, uid: int):
         # Get the current block from the validator subtensor
         validator_block = get_current_block(self.subtensor)
 
-        # Check both blocks are the same +/- 1 block
-        verified = (
-            miner_block == validator_block or abs(validator_block - miner_block) <= 1
-        )
+        # Sync with the diff between blocks are not more than 1 block
+        # If the validator is behind we do not want to penalise miners!
+        sync = abs(validator_block - miner_block) <= 1 or validator_block <= miner_block
+
+        # Verified if there is block returned
+        verified = miner_block is not None
         if not verified:
-            reason = f"Subtensor is not verified - {validator_block}/{miner_block}"
-    except Exception as ex:
+            reason = f"Subtensor is not verified"
+        elif not sync:
+            reason = f"Subtensor is desync - {validator_block}/{miner_block}"
+    except Exception:
         verified = False
         reason = "Subtensor is not verified"
 
     # Update the miner object
     finally:
         miner.verified = verified
+        miner.sync = sync
         miner.process_time = process_time
 
     return reason
@@ -129,7 +135,7 @@ async def challenge_data(self):
             bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is suspicious")
 
         # Check if the miner/subtensor are verified
-        if not miner.verified:
+        if not miner.verified or not miner.sync:
             bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] {reasons[idx]}")
 
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)

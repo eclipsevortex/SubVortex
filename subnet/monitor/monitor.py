@@ -1,11 +1,15 @@
+import time
 import requests
 import threading
 import bittensor as bt
 from datetime import datetime
 from typing import List
 
-from subnet.shared import logging as sv
-from subnet.monitor.monitor_constants import MONITOR_URL, LOGGING_NAME, LOGGING_DELTA
+from subnet.monitor.monitor_constants import (
+    MONITOR_URL,
+    LOGGING_NAME,
+    MONITOR_SLEEP,
+)
 
 
 class Monitor(threading.Thread):
@@ -18,6 +22,9 @@ class Monitor(threading.Thread):
         self.last_modified = None
         self.show_not_found = True
         self.hash = None
+
+        # Allow us to not display multiple time the same errors
+        self.error_message = None
 
     def get_suspicious_uids(self) -> List[int]:
         with self._lock:
@@ -35,21 +42,27 @@ class Monitor(threading.Thread):
 
     def run(self):
         while not self.stop_flag.is_set():
+            response = None
             try:
+                # Sleep before requesting again
+                time.sleep(MONITOR_SLEEP)
+
                 response = requests.get(MONITOR_URL)
                 if response.status_code != 200:
                     if response.status_code == 404 and not self.show_not_found:
                         continue
 
                     self.show_not_found = response.status_code != 404
-                    sv.logging.warn(
-                        f"[{LOGGING_NAME}] Could not get the monitored file {response.status_code}: {response.reason}",
-                        silence_period=LOGGING_DELTA,
-                    )
+
+                    error_message = f"[{LOGGING_NAME}] Could not get the monitored file {response.status_code}: {response.reason}"
+                    if error_message != self.error_message:
+                        bt.logging.warning(error_message)
+                        self.error_message = error_message
+
                     continue
 
                 # Load the data
-                data = response.json()
+                data = response.json() or {}
 
                 # Check is date can be retrieved
                 remote_last_modified = data.get("last-modified")
@@ -72,8 +85,10 @@ class Monitor(threading.Thread):
                 bt.logging.success(
                     f"[{LOGGING_NAME}] Monitored file proceed successfully",
                 )
+                self.error_message = None
             except Exception as err:
-                sv.logging.error(
-                    f"[{LOGGING_NAME}] An error during monitoring: {err} {type(err)}",
-                    silence_period=LOGGING_DELTA,
-                )
+                content = response.content if response else ""
+                error_message = f"[{LOGGING_NAME}] An error during monitoring: {err} {type(err)} {content}"
+                if error_message != self.error_message:
+                    bt.logging.error(error_message)
+                    self.error_message = error_message

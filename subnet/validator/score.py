@@ -40,11 +40,7 @@ def can_compute_availability_score(miner: Miner):
     """
     True if we can compute the availaiblity score, false to get the penalty
     """
-    return (
-        not miner.suspicious
-        and miner.verified
-        and not miner.has_ip_conflicts
-    )
+    return not miner.suspicious and miner.verified and not miner.has_ip_conflicts
 
 
 def compute_availability_score(miner: Miner):
@@ -94,11 +90,7 @@ def can_compute_latency_score(miner: Miner):
     """
     True if we can compute the latency score, false to get the penalty
     """
-    return (
-        not miner.suspicious
-        and miner.verified
-        and not miner.has_ip_conflicts
-    )
+    return not miner.suspicious and miner.verified and not miner.has_ip_conflicts
 
 
 def compute_latency_score(validator_country: str, miner: Miner, miners: List[Miner]):
@@ -185,11 +177,7 @@ def can_compute_distribution_score(miner: Miner):
     """
     True if we can compute the distribution score, false to get the penalty
     """
-    return (
-        not miner.suspicious
-        and miner.verified
-        and not miner.has_ip_conflicts
-    )
+    return not miner.suspicious and miner.verified and not miner.has_ip_conflicts
 
 
 def compute_distribution_score(miner: Miner, miners: List[Miner]):
@@ -224,15 +212,20 @@ def compute_final_score(miner: Miner):
     """
     Compute the final score based on the different scores (availability, reliability, latency and distribution)
     """
+    # Use a smaller weight if the subtensor is available but desync (miner block < validator block - 1)
+    availability_weight = (
+        1 if miner.verified and not miner.sync else AVAILABILITY_WEIGHT
+    )
+
     numerator = (
-        (AVAILABILITY_WEIGHT * miner.availability_score)
+        (availability_weight * miner.availability_score)
         + (LATENCY_WEIGHT * miner.latency_score)
         + (RELIABILLITY_WEIGHT * miner.reliability_score)
         + (DISTRIBUTION_WEIGHT * miner.distribution_score)
     )
 
     denominator = (
-        AVAILABILITY_WEIGHT + LATENCY_WEIGHT + RELIABILLITY_WEIGHT + DISTRIBUTION_WEIGHT
+        availability_weight + LATENCY_WEIGHT + RELIABILLITY_WEIGHT + DISTRIBUTION_WEIGHT
     )
 
     score = numerator / denominator if denominator != 0 else 0

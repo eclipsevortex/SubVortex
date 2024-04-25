@@ -64,10 +64,11 @@ async def remove_hotkey_stastitics(ss58_address: str, database: aioredis.Redis):
     Remove the stastitics key from the database
     """
     try:
-        if not database.exists(f"stats:{ss58_address}"):
+        exists = await database.exists(f"stats:{ss58_address}")
+        if not exists:
             return
 
-        await database.hdel(f"stats:{ss58_address}")
+        await database.delete(f"stats:{ss58_address}")
     except Exception as ex:
         bt.logging.error(
             f"Failed to execute remove_hotkey_stastitics() on {ss58_address}: {ex}"

@@ -70,7 +70,7 @@ async def handle_synapse(self, uid: int):
         process_time = time.time() - start_time
 
         # Get the current block from the validator subtensor
-        validator_block = self.subtensor.get_current_block()
+        validator_block = get_current_block(self.subtensor)
 
         # Sync with the diff between blocks are not more than 1 block
         # If the validator is behind we do not want to penalise miners!

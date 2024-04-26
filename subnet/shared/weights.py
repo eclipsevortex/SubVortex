@@ -10,7 +10,7 @@ from subnet.shared.substrate import get_weights_min_stake
 
 def should_wait_to_set_weights(current_block, last_epoch_block, tempo):
     diff_blocks = current_block - last_epoch_block
-    return diff_blocks <= tempo
+    return diff_blocks <= tempo / 2
 
 
 def should_set_weights(

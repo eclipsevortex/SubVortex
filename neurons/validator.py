@@ -238,7 +238,7 @@ class Validator:
                     self,
                     get_current_block(self.subtensor),
                     prev_set_weights_block,
-                    self.config.neuron.epoch_length,
+                    360,
                     self.config.neuron.disable_set_weights,
                 )
                 bt.logging.debug(

@@ -1,6 +1,6 @@
 from subnet.validator.utils import get_available_query_miners
 
-from tests.unit_tests.utils import generate_random_ip
+from tests.unit_tests.utils.utils import generate_random_ip
 
 
 def test_querying_3_miners_without_exclusion_should_return_a_list_of_3_miners(

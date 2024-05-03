@@ -1,6 +1,6 @@
 from subnet.validator.utils import get_available_uids
 
-from tests.unit_tests.utils import generate_random_ip
+from tests.unit_tests.utils.utils import generate_random_ip
 
 
 def test_given_a_list_of_uids_without_exclusion_when_all_uids_are_available_should_return_all_the_uids(

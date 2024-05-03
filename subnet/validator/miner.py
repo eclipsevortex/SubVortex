@@ -39,7 +39,7 @@ async def get_all_miners(self) -> List[Miner]:
 
     # Get all the ips from available miners
     ips = [self.metagraph.axons[uid].ip for uid in uids]
-    
+
     for uid in uids:
         axon = self.metagraph.axons[uid]
 
@@ -147,7 +147,7 @@ async def remove_miner(self, uid: int, hotkey: str):
     miners = [miner for miner in self.miners if miner.uid != uid]
     if len(miners) >= len(self.miners):
         return False
-        
+
     # Remove the statistics
     await remove_hotkey_stastitics(hotkey, self.database)
 
@@ -176,7 +176,9 @@ async def resync_miners(self):
         if not is_available:
             removed = await remove_miner(self, uid, hotkey)
             if removed:
-                bt.logging.success(f"[{uid}] Miner {hotkey} has been removed from the list")
+                bt.logging.success(
+                    f"[{uid}] Miner {hotkey} has been removed from the list"
+                )
             continue
 
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)

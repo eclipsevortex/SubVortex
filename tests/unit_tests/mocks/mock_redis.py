@@ -14,3 +14,16 @@ def mock_get_selection(hoktkey: str, selection: List[int] = None):
     )
 
     return mocked_redis
+
+
+def mock_get_statistics(hoktkeys: List[str]):
+    # Mock the redis instance
+    mocked_redis = AsyncMock()
+
+    # Set the return value for redis.get
+    selection_keys = [f"stats:{hotkey}" for hotkey in hoktkeys]
+    mocked_redis.hgetall = AsyncMock(
+        side_effect=lambda key: (None if key in selection_keys else None)
+    )
+
+    return mocked_redis

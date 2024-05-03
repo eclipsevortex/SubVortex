@@ -114,7 +114,7 @@ def check_config(cls, config: "bt.Config"):
 
 def add_args(cls, parser):
     # Netuid Arg
-    parser.add_argument("--netuid", type=int, help="Storage network netuid", default=21)
+    parser.add_argument("--netuid", type=int, help="Subvortex network netuid", default=7)
 
     parser.add_argument(
         "--neuron.name",

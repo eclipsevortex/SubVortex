@@ -3,8 +3,8 @@ import pytest
 from subnet.constants import DEFAULT_CHUNK_SIZE
 from subnet.validator.utils import get_next_uids
 from tests.unit_tests.mocks import mock_redis
-from tests.unit_tests.utils import generate_random_ip
-from tests.unit_tests.utils import count_non_unique, count_unique
+from tests.unit_tests.utils.utils import generate_random_ip
+from tests.unit_tests.utils.utils import count_non_unique, count_unique
 
 
 @pytest.mark.asyncio

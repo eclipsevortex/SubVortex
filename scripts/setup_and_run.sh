@@ -212,7 +212,8 @@ if [[ "$TYPE" == "miner" ]]; then
     --subtensor.network local \
     --wallet.name $WALLET_NAME \
     --wallet.hotkey $HOTKEY_NAME \
-    --logging.debug
+    --logging.debug \
+    --auto-update
 fi
 
 # Run validator
@@ -239,6 +240,7 @@ if [[ "$TYPE" == "validator" ]]; then
     --netuid $NETUID \
     --wallet.name $WALLET_NAME \
     --wallet.hotkey $HOTKEY_NAME \
-    --logging.debug \
+    --logging.debug  \
+    --auto-update \
     $OPTIONS
 fi

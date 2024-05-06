@@ -8,15 +8,16 @@ here = path.abspath(path.dirname(__file__))
 
 
 class Redis:
-    def __init__(self, database):
+    def __init__(self, database, dump_path: str):
         self.database = database
+        self.dump_path = dump_path
 
     async def get_version(self):
         version = await _get_version(self.database)
         return version
 
     def get_latest_version(self):
-        migration = get_migrations(True)
+        migration = get_migrations(force_new=True, reverse=True)
         return migration[0][1] if len(migration) > 0 else None
 
     async def rollout(self, from_version: str, to_version: str):
@@ -27,13 +28,9 @@ class Redis:
         lower_version = int(from_version.replace(".", ""))
 
         # List all the migration to execute
-        migration_scripts = get_migrations()
-        migrations = [
-            x
-            for x in migration_scripts
-            if x[0] > lower_version and x[0] <= upper_version
-        ]
-        migrations = sorted(migrations, key=lambda x: x[0])
+        migrations = get_migrations(
+            filter_lambda=lambda x: x[0] > lower_version and x[0] <= upper_version
+        )
 
         version = None
         try:
@@ -51,14 +48,13 @@ class Redis:
                 # Rollout the migration
                 await module.rollout(self.database)
 
-                # Update the version in the database
-                new_version = await self.get_version()
-                if new_version:
-                    bt.logging.success(f"[Redis] Rollout to {new_version} successful")
-                else:
-                    bt.logging.success(f"[Redis] Rollout successful")
+                # Log to keep track
+                bt.logging.debug(f"[Redis] Rollout to {version} successful")
 
-                return True
+            # Update the version in the database
+            bt.logging.success(f"[Redis] Rollout to {to_version} successful")
+
+            return True
         except Exception as err:
             bt.logging.error(f"[Redis] Failed to upgrade to {version}: {err}")
 
@@ -69,13 +65,10 @@ class Redis:
         lower_version = int(to_version.replace(".", ""))
 
         # List all the migration to execute
-        migration_scripts = get_migrations()
-        migrations = [
-            x
-            for x in migration_scripts
-            if x[0] > lower_version and x[0] <= upper_version
-        ]
-        migrations = sorted(migrations, key=lambda x: x[0])
+        migrations = get_migrations(
+            reverse=True,
+            filter_lambda=lambda x: x[0] > lower_version and x[0] <= upper_version,
+        )
 
         version = None
         try:
@@ -93,12 +86,14 @@ class Redis:
                 # Rollback the migration
                 await module.rollback(self.database)
 
-                # Update the version in the database
-                new_version = await self.get_version()
-                if new_version:
-                    bt.logging.success(f"[Redis] Rollback to {new_version} successful")
+                # Log to keep track
+                if version:
+                    bt.logging.debug(f"[Redis] Rollback from {version} successful")
                 else:
-                    bt.logging.success(f"[Redis] Rollback successful")
+                    bt.logging.debug("[Redis] Rollback successful")
+
+            # Update the version in the database
+            bt.logging.success(f"[Redis] Rollback to {to_version} successful")
 
             return True
         except Exception as err:

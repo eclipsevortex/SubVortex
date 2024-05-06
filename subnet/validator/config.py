@@ -213,6 +213,12 @@ def add_args(cls, parser):
         help="Redis configuration path.",
         default="/etc/redis/redis.conf",
     )
+    parser.add_argument(
+        "--database.redis_dump_path",
+        type=str,
+        help="Redis directory where to store dumps.",
+        default="/etc/redis/",
+    )
 
     # Auto update
     parser.add_argument(

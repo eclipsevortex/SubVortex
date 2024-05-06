@@ -72,7 +72,7 @@ To uprade the Subnet manually, you can use the python script `subnet_upgrade.py`
 For example, if you are on tag v2.2.2 and want to migrate to the tag v2.2.3, you can run in `SubVortex`
 
 ```
-python3 ./scripts/subnet/subnet_upgrade.py --tag v2.2.3
+python3 ./scripts/subnet/utils/subnet_upgrade.py --tag v2.2.3
 ```
 
 ## Downgrade <a id="migration-downgrade"></a>
@@ -82,5 +82,5 @@ To downgrade the Subnet manually, you can use the python script `subnet_upgrade.
 For example, if you are on tag v2.2.3 and want to downgrade to the tag v2.2.2, you can run in `SubVortex`
 
 ```
-python3 ./scripts/subnet/subnet_upgrade.py --tag v2.2.2
+python3 ./scripts/subnet/utils/subnet_upgrade.py --tag v2.2.2
 ```

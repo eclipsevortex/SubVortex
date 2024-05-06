@@ -11,11 +11,13 @@ from subnet.validator.database import (
     set_version,
 )
 
+LAST_VERSION_BEFORE_AUTO_UPDATE = "2.2.0"
+
 
 class VersionControl(BaseVersionControl):
-    def __init__(self, database):
+    def __init__(self, database, dump_path: str):
         super().__init__()
-        self.redis = Redis(database)
+        self.redis = Redis(database, dump_path)
 
     def restart(self):
         bt.logging.info(f"Restarting validator...")
@@ -39,7 +41,7 @@ class VersionControl(BaseVersionControl):
 
             # Get the local version
             active_version = await self.redis.get_version()
-            local_version = active_version or remote_version
+            local_version = active_version or LAST_VERSION_BEFORE_AUTO_UPDATE
             bt.logging.info(f"[Redis] Local version: {local_version}")
 
             # Check if the subnet has to be upgraded
@@ -53,7 +55,8 @@ class VersionControl(BaseVersionControl):
             self.must_restart = True
 
             # Dump the database
-            dump_name = f"redis-dump-{local_version}"
+            dump_path = self.redis.dump_path
+            dump_name = os.path.join(dump_path, f"redis-dump-{local_version}")
             await create_dump(dump_name, self.redis.database)
             bt.logging.info(f"[Redis] Dump {dump_name} created")
 
@@ -82,7 +85,8 @@ class VersionControl(BaseVersionControl):
                     remote_version, local_version
                 )
                 if not success_rollback:
-                    dump_name = f"redis-dump-{local_version}"
+                    dump_path = self.redis.dump_path
+                    dump_name = os.path.join(dump_path, f"redis-dump-{local_version}")
                     await restore_dump(dump_name, self.redis.database)
                     bt.logging.info(f"[Redis] Dump {dump_name} restored")
 

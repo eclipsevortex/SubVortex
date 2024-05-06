@@ -27,7 +27,7 @@ def extract_number(s):
     return None
 
 
-def get_migrations(force_new=False):
+def get_migrations(force_new=False, reverse=False, filter_lambda = None):
     """
     List all the migrations available
     """
@@ -55,8 +55,12 @@ def get_migrations(force_new=False):
                 (int(f"{major}{minor}{patch}"), f"{major}.{minor}.{patch}", file)
             )
 
+        # Filter the migrations
+        if filter_lambda:
+            migrations = filter(filter_lambda, migrations)
+
         # Sort migration per version
-        migrations = sorted(migrations, key=lambda x: x[0], reverse=True)
+        migrations = sorted(migrations, key=lambda x: x[0], reverse=reverse)
 
     except Exception as ex:
         bt.logging.error(f"Could not load the migrations: {ex}")

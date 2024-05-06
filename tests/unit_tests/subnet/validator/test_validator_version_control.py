@@ -31,6 +31,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.database = AsyncMock(aioredis.Redis)
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.0.0"
+        mock_redis_class.dump_path = "/etc/redis"
         mock_redis.return_value = mock_redis_class
 
         mock_github_class = MagicMock()
@@ -41,7 +42,9 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_interpreter_class = MagicMock()
         mock_interpreter.return_value = mock_interpreter_class
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(
+            mock_redis.database, mock_redis_class.dump_path
+        )
 
         # Act
         must_restart = await vc.upgrade()
@@ -79,6 +82,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.database = AsyncMock(aioredis.Redis)
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.0.0"
+        mock_redis_class.dump_path = "/etc/redis"
         mock_redis.return_value = mock_redis_class
 
         mock_github_class = MagicMock()
@@ -89,7 +93,9 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_interpreter_class = MagicMock()
         mock_interpreter.return_value = mock_interpreter_class
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(
+            mock_redis.database, mock_redis_class.dump_path
+        )
 
         # Act
         must_restart = await vc.upgrade()
@@ -127,6 +133,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.database = AsyncMock(aioredis.Redis)
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.0.0"
+        mock_redis_class.dump_path = "/etc/redis"
         mock_redis.return_value = mock_redis_class
 
         mock_github_class = MagicMock()
@@ -141,7 +148,9 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         )
         mock_interpreter.return_value = mock_interpreter_class
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(
+            mock_redis.database, mock_redis_class.dump_path
+        )
 
         # Act
         must_restart = await vc.upgrade()
@@ -179,6 +188,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.database = AsyncMock(aioredis.Redis)
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.0.0"
+        mock_redis_class.dump_path = "/etc/redis"
         mock_redis.return_value = mock_redis_class
 
         mock_github_class = MagicMock()
@@ -189,7 +199,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_interpreter_class = MagicMock()
         mock_interpreter.return_value = mock_interpreter_class
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(mock_redis.database, mock_redis_class.dump_path)
 
         # Act
         must_restart = await vc.upgrade()
@@ -226,6 +236,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class = MagicMock()
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.1.0"
+        mock_redis_class.dump_path = "/etc/redis"
         mock_redis_class.rollout = AsyncMock()
         mock_redis.return_value = mock_redis_class
 
@@ -239,7 +250,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
 
         mock_create_dump.return_value = AsyncMock()
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(mock_redis.database, mock_redis_class.dump_path)
 
         # Act
         must_restart = await vc.upgrade()
@@ -250,7 +261,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.rollout.assert_called_once_with("2.0.0", "2.1.0")
         mock_redis_class.rollback.assert_not_called()
         mock_create_dump.assert_called_once_with(
-            "redis-dump-2.0.0", mock_redis_class.database
+            "/etc/redis/redis-dump-2.0.0", mock_redis_class.database
         )
         mock_restore_dump.assert_not_called()
         more_create_dump_migrations.assert_called_once()
@@ -278,6 +289,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class = MagicMock()
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.1.0"
+        mock_redis_class.dump_path = "/etc/redis"
         rollout_side_effect.called = False
         mock_redis_class.rollout.side_effect = rollout_side_effect
         mock_redis_class.rollback = AsyncMock()
@@ -293,7 +305,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
 
         mock_create_dump.return_value = AsyncMock()
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(mock_redis.database, mock_redis_class.dump_path)
 
         # Act
         must_restart = await vc.upgrade()
@@ -304,7 +316,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.rollout.assert_called_once_with("2.0.0", "2.1.0")
         mock_redis_class.rollback.assert_called_once_with("2.1.0", "2.0.0")
         mock_create_dump.assert_called_once_with(
-            "redis-dump-2.0.0", mock_redis_class.database
+            "/etc/redis/redis-dump-2.0.0", mock_redis_class.database
         )
         mock_restore_dump.assert_not_called()
         more_create_dump_migrations.assert_called_once()
@@ -332,6 +344,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class = MagicMock()
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.1.0"
+        mock_redis_class.dump_path = "/etc/redis"
         rollout_side_effect.called = False
         mock_redis_class.rollout.side_effect = rollout_side_effect
         mock_redis_class.rollback = AsyncMock(return_value=False)
@@ -347,7 +360,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
 
         mock_create_dump.return_value = AsyncMock()
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(mock_redis.database, mock_redis_class.dump_path)
 
         # Act
         must_restart = await vc.upgrade()
@@ -358,10 +371,10 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.rollout.assert_called_once_with("2.0.0", "2.1.0")
         mock_redis_class.rollback.assert_called_once_with("2.1.0", "2.0.0")
         mock_create_dump.assert_called_once_with(
-            "redis-dump-2.0.0", mock_redis_class.database
+            "/etc/redis/redis-dump-2.0.0", mock_redis_class.database
         )
         mock_restore_dump.assert_called_once_with(
-            "redis-dump-2.0.0", mock_redis_class.database
+            "/etc/redis/redis-dump-2.0.0", mock_redis_class.database
         )
         more_create_dump_migrations.assert_called_once()
         more_remove_dump_migrations.assert_has_calls([call(), call()])
@@ -389,6 +402,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.database = AsyncMock(aioredis.Redis)
         mock_redis_class.get_version = AsyncMock(return_value="2.1.0")
         mock_redis_class.get_latest_version.return_value = "2.0.0"
+        mock_redis_class.dump_path = "/etc/redis"
         mock_redis_class.rollout = AsyncMock()
         mock_redis_class.rollback = AsyncMock()
         mock_redis.return_value = mock_redis_class
@@ -403,7 +417,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
 
         mock_create_dump.return_value = AsyncMock()
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(mock_redis.database, mock_redis_class.dump_path)
 
         # Act
         must_restart = await vc.upgrade()
@@ -414,7 +428,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.rollout.assert_not_called()
         mock_redis_class.rollback.assert_called_once_with("2.1.0", "2.0.0")
         mock_create_dump.assert_called_once_with(
-            "redis-dump-2.1.0", mock_redis_class.database
+            "/etc/redis/redis-dump-2.1.0", mock_redis_class.database
         )
         mock_restore_dump.assert_not_called()
         more_create_dump_migrations.assert_called_once()
@@ -442,6 +456,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class = MagicMock()
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.1.0"
+        mock_redis_class.dump_path = "/etc/redis"
         mock_redis_class.rollout = AsyncMock()
         mock_redis.return_value = mock_redis_class
 
@@ -455,7 +470,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
 
         mock_create_dump.return_value = AsyncMock()
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(mock_redis.database, mock_redis_class.dump_path)
 
         # Act
         must_restart = await vc.upgrade()
@@ -465,7 +480,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_interpreter_class.upgrade_dependencies.assert_called_once()
         mock_redis_class.rollout.assert_called_once_with("2.0.0", "2.1.0")
         mock_create_dump.assert_called_once_with(
-            "redis-dump-2.0.0", mock_redis_class.database
+            "/etc/redis/redis-dump-2.0.0", mock_redis_class.database
         )
         mock_restore_dump.assert_not_called()
         more_create_dump_migrations.assert_called_once()
@@ -493,6 +508,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class = MagicMock()
         mock_redis_class.get_version = AsyncMock(return_value="2.0.0")
         mock_redis_class.get_latest_version.return_value = "2.1.0"
+        mock_redis_class.dump_path = "/etc/redis"
         mock_redis_class.rollout = AsyncMock()
         rollout_side_effect.called = False
         mock_redis_class.rollout.side_effect = rollout_side_effect
@@ -509,7 +525,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
 
         mock_create_dump.return_value = AsyncMock()
 
-        vc = VersionControl(mock_redis.database)
+        vc = VersionControl(mock_redis.database, mock_redis_class.dump_path)
 
         # Act
         must_restart = await vc.upgrade()
@@ -520,7 +536,7 @@ class TestValidatorVersionControl(unittest.IsolatedAsyncioTestCase):
         mock_redis_class.rollout.assert_called_once_with("2.0.0", "2.1.0")
         mock_redis_class.rollback.assert_called_once_with("2.1.0", "2.0.0")
         mock_create_dump.assert_called_once_with(
-            "redis-dump-2.0.0", mock_redis_class.database
+            "/etc/redis/redis-dump-2.0.0", mock_redis_class.database
         )
         mock_restore_dump.assert_not_called()
         more_create_dump_migrations.assert_called_once()

@@ -7,6 +7,7 @@ from subnet.shared.utils import should_upgrade
 
 from subnet.miner.version import VersionControl
 
+
 def run(self):
     """
     Initiates and manages the main loop for the miner on the Bittensor network.
@@ -41,7 +42,7 @@ def run(self):
 
     netuid = self.config.netuid
 
-    version_control = VersionControl()
+    self.version_control = VersionControl()
 
     # Keep a track of last upgrade check
     self.last_upgrade_check = 0
@@ -63,11 +64,11 @@ def run(self):
 
         if should_upgrade(self.config.auto_update, self.last_upgrade_check):
             bt.logging.debug("Checking upgrade")
-            must_restart = version_control.upgrade()
+            must_restart = self.version_control.upgrade()
             if must_restart:
                 self.version_control.restart()
                 return
-            
+
             self.last_upgrade_check = time.time()
 
         bt.logging.debug(

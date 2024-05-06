@@ -296,7 +296,7 @@ To create a Redis dump manually, you can use the python script `redis_dump.py`.
 For example, if you want to create the dump in the `subVortex` directory, you can run
 
 ```
-python3 ./scripts/redis/utils/redis_dump.py --run-type create
+python3 ./scripts/redis/utils/redis_dump.py --run-type create --dump-path redis-dump-2.0.0.json
 ```
 
 If you want to create the dump in another location and/or name, you can use the argument `--dump-path`
@@ -312,11 +312,11 @@ To restore a Redis dump manually, you can use the python script `redis_dump.py`.
 For example, if you want to create in `subVortex` directory, you can run
 
 ```
-python3 ./scripts/redis/utils/redis_dump.py --run-type restore
+python3 ./scripts/redis/utils/redis_dump.py --run-type restore --dump-path redis-dump-2.0.0.json
 ```
 
 If you want to restore a dump in another location, you can use the argument `--dump-path`
 
 ```
-python3 ./scripts/redis/utils/redis_dump.py --run-type restore --dump-path /tmp/redis
+python3 ./scripts/redis/utils/redis_dump.py --run-type restore --dump-path /tmp/redis/redis-dump-2.0.0.json
 ```

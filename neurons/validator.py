@@ -193,7 +193,8 @@ class Validator:
         bt.logging.info("run()")
 
         # Initi versioin control
-        self.version_control = VersionControl(self.database)
+        dump_path = self.config.database.redis_dump_path
+        self.version_control = VersionControl(self.database, dump_path)
 
         # Init miners
         self.miners = await get_all_miners(self)
@@ -208,6 +209,17 @@ class Validator:
 
         try:
             while 1:
+                # Start the upgrade process every 10 minutes
+                if should_upgrade(self.config.auto_update, self.last_upgrade_check):
+                    bt.logging.debug("Checking upgrade")
+                    must_restart = await self.version_control.upgrade()
+                    if must_restart:
+                        finish_wandb()
+                        self.version_control.restart()
+                        return
+
+                    self.last_upgrade_check = time.time()
+
                 start_epoch = time.time()
 
                 await resync_metagraph_and_miners(self)
@@ -265,17 +277,6 @@ class Validator:
                     )
                     prev_set_weights_block = get_current_block(self.subtensor)
                     save_state(self)
-
-                # Start the upgrade process every 10 minutes
-                if should_upgrade(self.config.auto_update, self.last_upgrade_check):
-                    bt.logging.debug("Checking upgrade")
-                    must_restart = await self.version_control.upgrade()
-                    if must_restart:
-                        finish_wandb()
-                        self.version_control.restart()
-                        return
-
-                    self.last_upgrade_check = time.time()
 
                 # Rollover wandb to a new run.
                 if should_reinit_wandb(self):

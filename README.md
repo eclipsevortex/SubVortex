@@ -376,6 +376,8 @@ pm2 start neurons/validator.py \
 
 > NOTE: to access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
 
+> NOTE: by default the dumps created by the auto-update will be stored in /etc/redis. If you want to change the location, please use `--database.redis_dump_path`.
+
 ## Releases
 
 - [Release-2.2.0](./scripts/release/release-2.2.0/RELEASE-2.2.0.md)

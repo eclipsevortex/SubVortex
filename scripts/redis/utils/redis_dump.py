@@ -71,7 +71,7 @@ if __name__ == "__main__":
         parser.add_argument(
             "--dump-path",
             type=str,
-            default="",
+            default="/tmp/redis",
             help="Dump file (with path) to create or restore",
         )
         parser.add_argument(

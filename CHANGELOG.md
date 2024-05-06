@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.3 / 2024-05-06
+
+## What's Changed
+* Release/2.2.2 by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/36
+* Add unit tests for resync miners by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/38
+* implement auto upgrade by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/40
+* isolate wandb by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/41
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.2...v2.2.3
+
 ## 2.2.2 / 2024-04-25
 
 **Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.1...v2.2.2

@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import os
+import time
 import subprocess
 import bittensor as bt
 
@@ -43,3 +44,12 @@ def get_redis_password(
         exit(1)
 
     return redis_password
+
+
+def should_upgrade(auto_update: bool, last_upgrade_check: float):
+    """
+    True if it is sime to upgrade, false otherwise
+    For now, upgrading evering 60 seconds
+    """
+    time_since_last_update = time.time() - last_upgrade_check
+    return time_since_last_update >= 60 and auto_update

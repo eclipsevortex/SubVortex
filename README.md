@@ -345,7 +345,8 @@ pm2 start neurons/miner.py \
   --subtensor.network local \
   --wallet.name YOUR_WALLET_NAME \
   --wallet.hotkey YOUR_HOTKEY_NAME \
-  --logging.debug
+  --logging.debug \
+  --auto-update
 ```
 
 > IMPORTANT: Do not run more than one miner per machine. Running multiple miners will result in the loss of incentive and emissions on all miners.
@@ -367,7 +368,8 @@ pm2 start neurons/validator.py \
   --netuid <SUBNET_UID> \
   --wallet.name YOUR_WALLET_NAME \
   --wallet.hotkey YOUR_HOTKEY_NAME \
-  --logging.debug
+  --logging.debug \
+  --auto-update
 ```
 
 > NOTE: if you run a validator in testnet do not forget to add the argument `--subtensor.network test` or `--subtensor.chain_endpoint ws://<LOCAL_SUBTENSOR_IP>:9944` (the local subtensor has to target the network testnet)

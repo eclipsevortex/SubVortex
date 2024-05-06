@@ -322,7 +322,7 @@ def log_event(self, uids: List[int], step_length=None):
         bt.logging.warning(f"log_event() send data to wandb failed: {err}")
 
 
-def init_wandb(self, reinit=False):
+def init_wandb(self):
     """Starts a new wandb run."""
     tags = [
         self.wallet.hotkey.ss58_address,
@@ -378,7 +378,7 @@ def init_wandb(self, reinit=False):
     # Create a new run
     self.wandb = wandb.init(
         anonymous="allow",
-        reinit=reinit,
+        reinit=True,
         project=project_name,
         entity=self.config.wandb.entity,
         config=wandb_config,
@@ -449,13 +449,6 @@ def init_wandb(self, reinit=False):
     )
 
 
-def reinit_wandb(self):
-    """Reinitializes wandb, rolling over the run."""
-    if self.wandb is not None:
-        self.wandb.finish()
-    init_wandb(self, reinit=True)
-
-
 def should_reinit_wandb(self):
     """Check if wandb run needs to be rolled over."""
     return (
@@ -463,3 +456,12 @@ def should_reinit_wandb(self):
         and self.step
         and self.step % self.config.wandb.run_step_length == 0
     )
+
+
+def finish_wandb():
+    """
+    Finish the current wandb run
+    """
+    bt.logging.debug("Finishing wandb run")
+    wandb.finish()
+    assert wandb.run is None

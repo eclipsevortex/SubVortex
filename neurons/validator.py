@@ -25,10 +25,12 @@ import bittensor as bt
 from typing import List
 from traceback import print_exception
 
+from subnet import __version__ as THIS_VERSION
+
 from subnet.monitor.monitor import Monitor
 
 from subnet.shared.checks import check_registration
-from subnet.shared.utils import get_redis_password
+from subnet.shared.utils import get_redis_password, should_upgrade
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
 from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
@@ -37,13 +39,14 @@ from subnet.validator.config import config, check_config, add_args
 from subnet.validator.localisation import get_country, get_localisation
 from subnet.validator.forward import forward
 from subnet.validator.models import Miner
+from subnet.validator.version import VersionControl
 from subnet.validator.miner import get_all_miners
 from subnet.validator.state import (
     resync_metagraph_and_miners,
     load_state,
     save_state,
     init_wandb,
-    reinit_wandb,
+    finish_wandb,
     should_reinit_wandb,
 )
 from subnet.validator.weights import (
@@ -87,6 +90,9 @@ class Validator:
         self.config.merge(base_config)
         self.check_config(self.config)
         bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
+
+        # Show miner version
+        bt.logging.debug(f"validator version {THIS_VERSION}")
 
         # Init device.
         bt.logging.debug("loading device")
@@ -181,9 +187,13 @@ class Validator:
         self.last_registered_block = 0
         self.rebalance_queue = []
         self.miners: List[Miner] = []
+        self.last_upgrade_check = 0
 
     async def run(self):
         bt.logging.info("run()")
+
+        # Initi versioin control
+        self.version_control = VersionControl(self.database)
 
         # Init miners
         self.miners = await get_all_miners(self)
@@ -256,10 +266,22 @@ class Validator:
                     prev_set_weights_block = get_current_block(self.subtensor)
                     save_state(self)
 
+                # Start the upgrade process every 10 minutes
+                if should_upgrade(self.config.auto_update, self.last_upgrade_check):
+                    bt.logging.debug("Checking upgrade")
+                    must_restart = await self.version_control.upgrade()
+                    if must_restart:
+                        finish_wandb()
+                        self.version_control.restart()
+                        return
+
+                    self.last_upgrade_check = time.time()
+
                 # Rollover wandb to a new run.
                 if should_reinit_wandb(self):
                     bt.logging.info("Reinitializing wandb")
-                    reinit_wandb(self)
+                    finish_wandb()
+                    init_wandb(self)
 
                 self.prev_step_block = get_current_block(self.subtensor)
                 if self.config.neuron.verbose:

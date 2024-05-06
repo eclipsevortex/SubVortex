@@ -86,6 +86,9 @@ class Miner:
         bt.logging(config=self.config, logging_dir=self.config.miner.full_path)
         bt.logging.info(f"{self.config}")
 
+        # Show miner version
+        bt.logging.debug(f"miner version {THIS_VERSION}")
+
         # Init device.
         bt.logging.debug("loading device")
         self.device = torch.device(self.config.miner.device)

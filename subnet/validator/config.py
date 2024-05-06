@@ -220,6 +220,14 @@ def add_args(cls, parser):
         default="/etc/redis/redis.conf",
     )
 
+    # Auto update
+    parser.add_argument(
+        "--auto-update",
+        action="store_true", 
+        help="True if the miner can be auto updated, false otherwise",
+        default=True,
+    )
+
     # Wandb args
     parser.add_argument(
         "--wandb.off", action="store_true", help="Turn off wandb.", default=False

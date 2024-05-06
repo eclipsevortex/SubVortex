@@ -1,7 +1,11 @@
+import time
 import bittensor as bt
 from substrateinterface import SubstrateInterface
-from subnet.shared.checks import check_registration
 
+from subnet.shared.checks import check_registration
+from subnet.shared.utils import should_upgrade
+
+from subnet.miner.version import VersionControl
 
 def run(self):
     """
@@ -37,6 +41,11 @@ def run(self):
 
     netuid = self.config.netuid
 
+    version_control = VersionControl()
+
+    # Keep a track of last upgrade check
+    self.last_upgrade_check = 0
+
     # --- Check for registration.
     check_registration(self.subtensor, self.wallet, netuid)
 
@@ -51,6 +60,15 @@ def run(self):
         # --- Check for registration every 100 blocks (20 minutes).
         if current_block % 100 == 0:
             check_registration(self.subtensor, self.wallet, netuid)
+
+        if should_upgrade(self.config.auto_update, self.last_upgrade_check):
+            bt.logging.debug("Checking upgrade")
+            must_restart = version_control.upgrade()
+            if must_restart:
+                self.version_control.restart()
+                return
+            
+            self.last_upgrade_check = time.time()
 
         bt.logging.debug(
             f"Blocks since epoch: {(current_block + netuid + 1) % (tempo + 1)}"

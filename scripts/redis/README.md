@@ -12,6 +12,12 @@ This document explains how to install and uninstall a redis.
 - [Uninstallation](#uninstallation)
   - [As process](#uninstallation-as-process)
   - [As docker container](#uninstallation-as-container)
+- [Migration](#migration)
+  - [Rollout](#migration-rollout)
+  - [Rollback](#migration-rollback)
+- [Dump](#migration)
+  - [Creation](#dump-creation)
+  - [Restoration](#dump-restoration)
 
 ---
 
@@ -251,4 +257,66 @@ You shoud have something similar (or at least list that does not container `subv
 
 ```
 CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
+
+# Migration
+
+## Rollout <a id="migration-rollout"></a>
+
+To rollout any Redis migration manually, you can use the python script `redis_migration.py`.
+
+For example, if you want to rollout the version 2.2.1, you can run in `SubVortex`
+
+```
+python3 ./scripts/redis/utils/redis_migration.py --run-type rollout --version 2.2.1
+```
+
+> IMPORTANT <br />
+> If you have to rollout multiple versions, execute them one by one from your current version to the targeted one.
+
+## Rollback <a id="migration-rollback"></a>
+
+To rollback any Redis migration manually, you can use the python script `redis_migration.py`.
+
+For example, if you want to rollback the version 2.2.1, you can run in `SubVortex`
+
+```
+python3 ./scripts/redis/utils/redis_migration.py --run-type rollback --version 2.2.1
+```
+
+> IMPORTANT <br />
+> If you have to rollback multiple versions, execute them one by one from your current version to the targeted one.
+
+# Dump
+
+## Creation <a id="dump-creation"></a>
+
+To create a Redis dump manually, you can use the python script `redis_dump.py`.
+
+For example, if you want to create the dump in the `subVortex` directory, you can run
+
+```
+python3 ./scripts/redis/utils/redis_dump.py --run-type create
+```
+
+If you want to create the dump in another location and/or name, you can use the argument `--dump-path`
+
+```
+python3 ./scripts/redis/utils/redis_dump.py --run-type create --dump-path /tmp/redis/redis-dump-2.0.0.json
+```
+
+## Restoration <a id="dump-restoration"></a>
+
+To restore a Redis dump manually, you can use the python script `redis_dump.py`.
+
+For example, if you want to create in `subVortex` directory, you can run
+
+```
+python3 ./scripts/redis/utils/redis_dump.py --run-type restore
+```
+
+If you want to restore a dump in another location, you can use the argument `--dump-path`
+
+```
+python3 ./scripts/redis/utils/redis_dump.py --run-type restore --dump-path /tmp/redis
 ```

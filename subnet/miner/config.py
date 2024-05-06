@@ -104,12 +104,12 @@ def check_config(cls, config: "bt.Config"):
 
 
 def add_args(cls, parser):
-    parser.add_argument("--netuid", type=int, default=21, help="The chain subnet uid.")
+    parser.add_argument("--netuid", type=int, help="Subvortex network netuid", default=7)
     parser.add_argument(
         "--miner.name",
         type=str,
         help="Trials for this miner go in miner.root / (wallet_cold - wallet_hot) / miner.name. ",
-        default="core_storage_miner",
+        default="subvortex_miner",
     )
     parser.add_argument(
         "--miner.device",
@@ -123,6 +123,14 @@ def add_args(cls, parser):
         type=str,
         help="Name of the request log file",
         default="requests_log.json",
+    )
+
+    # Auto update
+    parser.add_argument(
+        "--auto-update",
+        action="store_true", 
+        help="True if the miner can be auto updated, false otherwise",
+        default=True,
     )
 
     # Mocks.

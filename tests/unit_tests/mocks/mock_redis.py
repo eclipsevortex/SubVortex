@@ -27,3 +27,13 @@ def mock_get_statistics(hoktkeys: List[str]):
     )
 
     return mocked_redis
+
+
+def rollout_side_effect(*args, **kwargs):
+    if rollout_side_effect.called:
+        # Do nothing on subsequent calls
+        return True
+    else:
+        # Raise an error on the first call
+        rollout_side_effect.called = True
+        raise ValueError("Simulated error")

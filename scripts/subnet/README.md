@@ -2,6 +2,20 @@
 
 This document explains how to install and uninstall the subnet SubVortex.
 
+<br />
+
+---
+
+- [Installation](#intasllation)
+- [Uninstallation](#uninstallation)
+- [Migration](#migration)
+  - [Migrate](#migration-migrate)
+  - [Downgrade](#migration-downgrade)
+
+---
+
+<br />
+
 # Installation
 
 Before installing the subnet, you have to install some prerequisites
@@ -48,3 +62,25 @@ To uninstall the subnet, you can run
 ```
 
 Be sure you are in the **SubVortex's** parent directory
+
+# Migration
+
+## Migrate <a id="migration-migrate"></a>
+
+To uprade the Subnet manually, you can use the python script `subnet_upgrade.py`.
+
+For example, if you are on tag v2.2.2 and want to migrate to the tag v2.2.3, you can run in `SubVortex`
+
+```
+python3 ./scripts/subnet/subnet_upgrade.py --tag v2.2.3
+```
+
+## Downgrade <a id="migration-downgrade"></a>
+
+To downgrade the Subnet manually, you can use the python script `subnet_upgrade.py`.
+
+For example, if you are on tag v2.2.3 and want to downgrade to the tag v2.2.2, you can run in `SubVortex`
+
+```
+python3 ./scripts/subnet/subnet_upgrade.py --tag v2.2.2
+```

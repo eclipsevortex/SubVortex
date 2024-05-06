@@ -135,12 +135,6 @@ def add_args(cls, parser):
         default=100,
     )
     parser.add_argument(
-        "--neuron.disable_log_rewards",
-        action="store_true",
-        help="Disable all reward logging, suppresses reward functions and their values from being logged to wandb.",
-        default=False,
-    )
-    parser.add_argument(
         "--neuron.subscription_logging_path",
         type=str,
         help="The path to save subscription logs.",
@@ -251,22 +245,10 @@ def add_args(cls, parser):
         default=False,
     )
     parser.add_argument(
-        "--wandb.weights_step_length",
-        type=int,
-        help="How many steps before we log the weights.",
-        default=10,
-    )
-    parser.add_argument(
         "--wandb.run_step_length",
         type=int,
         help="How many steps before we rollover to a new run.",
         default=360,
-    )
-    parser.add_argument(
-        "--wandb.notes",
-        type=str,
-        help="Notes to add to the wandb run.",
-        default="",
     )
 
     # Mocks

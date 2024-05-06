@@ -287,16 +287,13 @@ class Validator:
                 if self.config.neuron.verbose:
                     bt.logging.debug(f"block at end of step: {self.prev_step_block}")
                     bt.logging.debug(f"Step took {time.time() - start_epoch} seconds")
+
                 self.step += 1
 
         except Exception as err:
             bt.logging.error("Error in training loop", str(err))
             bt.logging.debug(print_exception(type(err), err, err.__traceback__))
-
-            if self.wandb is not None:
-                self.wandb.finish()
-                assert self.wandb.run is None
-                bt.logging.debug("Finishing wandb run")
+            finish_wandb()
 
         # After all we have to ensure subtensor connection is closed properly
         finally:

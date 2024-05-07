@@ -16,8 +16,13 @@
 # DEALINGS IN THE SOFTWARE.
 
 import os
+import time
 import subprocess
 import bittensor as bt
+
+# Check if there is an update every 5 minutes
+# Github Rate Limit 60 requests per hour / per ip (Reference: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28)
+CHECK_UPDATE_FREQUENCY = 5 * 60
 
 
 def get_redis_password(
@@ -43,3 +48,11 @@ def get_redis_password(
         exit(1)
 
     return redis_password
+
+
+def should_upgrade(auto_update: bool, last_upgrade_check: float):
+    """
+    True if it is time to upgrade, false otherwise
+    """
+    time_since_last_update = time.time() - last_upgrade_check
+    return time_since_last_update >= CHECK_UPDATE_FREQUENCY and auto_update

@@ -22,7 +22,7 @@ from Crypto.Random import random
 
 from subnet.constants import DEFAULT_CHUNK_SIZE
 from subnet.validator.selection import select_uids
-from subnet.validator.database import get_selected_miners
+from subnet.validator.database import get_selected_miners, set_selection
 
 
 def current_block_hash(self):
@@ -260,9 +260,8 @@ async def get_next_uids(self, ss58_address: str, k: int = DEFAULT_CHUNK_SIZE):
     bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
 
     # Store the new selection in the database
-    selection_key = f"selection:{ss58_address}"
     selection = ",".join(str(uid) for uid in uids_already_selected + uids_selected)
-    await self.database.set(selection_key, selection)
+    await set_selection(ss58_address, selection, self.database)
     bt.logging.debug(f"get_next_uids() new uids selection stored: {selection}")
 
     return uids_selected

@@ -181,7 +181,7 @@ def log_miners_table(self, miners: List[Miner], commit=False):
         data=data,
     )
 
-    self.wandb.log({"02. Miners/miners": miners}, commit=commit)
+    wandb.run.log({"02. Miners/miners": miners}, commit=commit)
     bt.logging.trace(f"log_miners_table() {len(data)} miners")
 
 
@@ -239,7 +239,7 @@ def log_score(self, name: str, uids: List[int], miners: List[Miner], commit=Fals
         data[str(uid)] = getattr(miner, property_name)
 
     # Create the graph
-    self.wandb.log({f"04. Scores/{name}_score": data}, commit=commit)
+    wandb.run.log({f"04. Scores/{name}_score": data}, commit=commit)
     bt.logging.trace(f"log_score() {name} {len(data)} scores")
 
 
@@ -261,7 +261,7 @@ def log_moving_averaged_score(
         data[str(uid)] = score
 
     # Create the graph
-    self.wandb.log({"04. Scores/moving_averaged_score": data}, commit=commit)
+    wandb.run.log({"04. Scores/moving_averaged_score": data}, commit=commit)
     bt.logging.trace(f"log_moving_averaged_score() {len(data)} moving averaged scores")
 
 
@@ -279,12 +279,12 @@ def log_completion_times(self, uids: List[int], miners: List[Miner], commit=Fals
         data[str(uid)] = miner.process_time or 0
 
     # Create the graph
-    self.wandb.log({"05. Miscellaneous/completion_times": data}, commit=commit)
+    wandb.run.log({"05. Miscellaneous/completion_times": data}, commit=commit)
     bt.logging.trace(f"log_completion_times() {len(data)} completion times")
 
 
 def log_event(self, uids: List[int], step_length=None):
-    if self.config.wandb.off or self.wandb is None:
+    if self.config.wandb.off or wandb.run is None:
         return
 
     bt.logging.info("log_event()")
@@ -295,11 +295,9 @@ def log_event(self, uids: List[int], step_length=None):
 
         # Add overview metrics
         best_miner = max(miners, key=lambda item: item.score)
-        self.wandb.log({"01. Overview/best_uid": best_miner.uid}, commit=False)
+        wandb.run.log({"01. Overview/best_uid": best_miner.uid}, commit=False)
         if step_length:
-            self.wandb.log(
-                {"01. Overview/step_process_time": step_length}, commit=False
-            )
+            wandb.run.log({"01. Overview/step_process_time": step_length}, commit=False)
 
         # Add the miner table
         log_miners_table(self, miners)
@@ -322,138 +320,133 @@ def log_event(self, uids: List[int], step_length=None):
         bt.logging.warning(f"log_event() send data to wandb failed: {err}")
 
 
-def init_wandb(self, reinit=False):
+def init_wandb(self):
     """Starts a new wandb run."""
-    tags = [
-        self.wallet.hotkey.ss58_address,
-        THIS_VERSION,
-        str(THIS_SPEC_VERSION),
-        f"netuid_{self.metagraph.netuid}",
-        self.country,
-    ]
+    try:
+        tags = [
+            self.wallet.hotkey.ss58_address,
+            THIS_VERSION,
+            str(THIS_SPEC_VERSION),
+            f"netuid_{self.metagraph.netuid}",
+            self.country,
+        ]
 
-    if self.config.mock:
-        tags.append("mock")
-    if self.config.neuron.disable_set_weights:
-        tags.append("disable_set_weights")
-    if self.config.neuron.disable_log_rewards:
-        tags.append("disable_log_rewards")
+        if self.config.mock:
+            tags.append("mock")
+        if self.config.neuron.disable_set_weights:
+            tags.append("disable_set_weights")
 
-    wandb_config = {
-        key: copy.deepcopy(self.config.get(key, None))
-        for key in ("neuron", "reward", "netuid", "wandb")
-    }
-    wandb_config["neuron"].pop("full_path", None)
+        wandb_config = {
+            key: copy.deepcopy(self.config.get(key, None))
+            for key in ("neuron", "reward", "netuid", "wandb")
+        }
+        wandb_config["neuron"].pop("full_path", None)
 
-    # Ensure "subvortex-team" and "test-subvortex-team" are used with the right subnet UID
-    # If user provide its own project name we keep it
-    project_name = self.config.wandb.project_name
-    if self.config.netuid == MAIN_SUBNET_UID and project_name.endswith(
-        "subvortex-team"
-    ):
-        project_name = "subvortex-team"
-    elif self.config.netuid == TESTNET_SUBNET_UID and project_name.endswith(
-        "subvortex-team"
-    ):
-        project_name = "test-subvortex-team"
-    bt.logging.debug(
-        f"Wandb project {project_name} used for Subnet {self.config.netuid}"
-    )
+        # Ensure "subvortex-team" and "test-subvortex-team" are used with the right subnet UID
+        # If user provide its own project name we keep it
+        project_name = self.config.wandb.project_name
+        if self.config.netuid == MAIN_SUBNET_UID and project_name.endswith(
+            "subvortex-team"
+        ):
+            project_name = "subvortex-team"
+        elif self.config.netuid == TESTNET_SUBNET_UID and project_name.endswith(
+            "subvortex-team"
+        ):
+            project_name = "test-subvortex-team"
+        bt.logging.debug(
+            f"Wandb project {project_name} used for Subnet {self.config.netuid}"
+        )
 
-    # Get the list of current runs for the validator
-    api = wandb.Api()
-    runs = api.runs(
-        f"{self.config.wandb.entity}/{project_name}",
-        order="-created_at",
-        filters={"display_name": {"$regex": f"^validator-{self.uid}"}},
-    )
+        # Get the list of current runs for the validator
+        api = wandb.Api()
+        runs = api.runs(
+            f"{self.config.wandb.entity}/{project_name}",
+            order="-created_at",
+            filters={"display_name": {"$regex": f"^validator-{self.uid}"}},
+        )
 
-    name = f"validator-{self.uid}-1"
-    if len(runs) > 0:
-        # Take the first run as it will be the most recent one
-        last_number = runs[0].name.split("-")[-1]
-        next_number = (int(last_number) % 10000) + 1
-        name = f"validator-{self.uid}-{next_number}"
+        name = f"validator-{self.uid}-1"
+        if len(runs) > 0:
+            # Take the first run as it will be the most recent one
+            last_number = runs[0].name.split("-")[-1]
+            next_number = (int(last_number) % 10000) + 1
+            name = f"validator-{self.uid}-{next_number}"
 
-    # Create a new run
-    self.wandb = wandb.init(
-        anonymous="allow",
-        reinit=reinit,
-        project=project_name,
-        entity=self.config.wandb.entity,
-        config=wandb_config,
-        mode="offline" if self.config.wandb.offline else "online",
-        dir=self.config.neuron.full_path,
-        tags=tags,
-        notes=self.config.wandb.notes,
-        name=name,
-    )
+        # Create a new run
+        wandb.init(
+            anonymous="allow",
+            reinit=True,
+            project=project_name,
+            entity=self.config.wandb.entity,
+            config=wandb_config,
+            mode="offline" if self.config.wandb.offline else "online",
+            dir=self.config.neuron.full_path,
+            tags=tags,
+            name=name,
+        )
 
-    bt.logging.debug(f"[Wandb] {len(runs)} run(s) exist")
+        bt.logging.debug(f"[Wandb] {len(runs)} run(s) exist")
 
-    # Remove old runs - We keep only the new run
-    if len(runs) >= 1:
-        bt.logging.debug(f"[Wandb] Removing the {len(runs)} oldest run(s)")
-        for i in range(0, len(runs)):
-            run: public.Run = runs[i]
+        # Remove old runs - We keep only the new run
+        if len(runs) >= 1:
+            bt.logging.debug(f"[Wandb] Removing the {len(runs)} oldest run(s)")
+            for i in range(0, len(runs)):
+                run: public.Run = runs[i]
 
-            # Remove remote run
-            run.delete(True)
-            bt.logging.debug(f"[Wandb] Run {run.name} removed remotely")
+                # Remove remote run
+                run.delete(True)
+                bt.logging.debug(f"[Wandb] Run {run.name} removed remotely")
 
-            # Remove local run
-            wandb_base = wandb.run.settings.wandb_dir
+                # Remove local run
+                wandb_base = wandb.run.settings.wandb_dir
 
-            if run.metadata is None:
-                pattern = r"run-\d{8}_\d{6}-" + re.escape(run.id)
+                if run.metadata is None:
+                    pattern = r"run-\d{8}_\d{6}-" + re.escape(run.id)
 
-                # matches = re.match(pattern, wandb_base)
-                matches = [
-                    subdir
-                    for subdir in os.listdir(wandb_base)
-                    if re.match(pattern, subdir)
-                ]
-                if len(matches) == 0:
-                    continue
+                    # matches = re.match(pattern, wandb_base)
+                    matches = [
+                        subdir
+                        for subdir in os.listdir(wandb_base)
+                        if re.match(pattern, subdir)
+                    ]
+                    if len(matches) == 0:
+                        continue
 
-                run_local_path = f"{wandb_base}{matches[0]}"
-                bt.logging.debug("[Wandb] Local path computed")
-            else:
-                # Get the run started at time
-                startedAt = run.metadata["startedAt"]
+                    run_local_path = f"{wandb_base}{matches[0]}"
+                    bt.logging.debug("[Wandb] Local path computed")
+                else:
+                    # Get the run started at time
+                    startedAt = run.metadata["startedAt"]
 
-                # Parse input datetime string into a datetime object
-                input_datetime = datetime.strptime(startedAt, "%Y-%m-%dT%H:%M:%S.%f")
+                    # Parse input datetime string into a datetime object
+                    input_datetime = datetime.strptime(
+                        startedAt, "%Y-%m-%dT%H:%M:%S.%f"
+                    )
 
-                # Format the datetime object into the desired string format
-                output_datetime_str = input_datetime.strftime("%Y%m%d_%H%M%S")
+                    # Format the datetime object into the desired string format
+                    output_datetime_str = input_datetime.strftime("%Y%m%d_%H%M%S")
 
-                # Local path to the run files
-                run_local_path = f"{wandb_base}run-{output_datetime_str}-{run.id}"
-                bt.logging.debug("[Wandb] Local path retrieve from metadata")
+                    # Local path to the run files
+                    run_local_path = f"{wandb_base}run-{output_datetime_str}-{run.id}"
+                    bt.logging.debug("[Wandb] Local path retrieve from metadata")
 
-            # Remove local run
-            if os.path.exists(run_local_path):
-                shutil.rmtree(run_local_path)
-                bt.logging.debug(
-                    f"[Wandb] Run {run.name} removed locally {run_local_path}"
-                )
-            else:
-                bt.logging.warning(
-                    f"[Wandb] Run local directory {run_local_path} does not exist. Please check it has been removed."
-                )
+                # Remove local run
+                if os.path.exists(run_local_path):
+                    shutil.rmtree(run_local_path)
+                    bt.logging.debug(
+                        f"[Wandb] Run {run.name} removed locally {run_local_path}"
+                    )
+                else:
+                    bt.logging.warning(
+                        f"[Wandb] Run local directory {run_local_path} does not exist. Please check it has been removed."
+                    )
 
-    bt.logging.success(
-        prefix="Started a new wandb run",
-        sufix=f"<blue> {self.wandb.name} </blue>",
-    )
-
-
-def reinit_wandb(self):
-    """Reinitializes wandb, rolling over the run."""
-    if self.wandb is not None:
-        self.wandb.finish()
-    init_wandb(self, reinit=True)
+        bt.logging.success(
+            prefix="Started a new wandb run",
+            sufix=f"<blue> {wandb.run.name} </blue>",
+        )
+    except Exception as err:
+        bt.logging.warning(f"init_wandb() initialising wandb failed: {err}")
 
 
 def should_reinit_wandb(self):
@@ -463,3 +456,15 @@ def should_reinit_wandb(self):
         and self.step
         and self.step % self.config.wandb.run_step_length == 0
     )
+
+
+def finish_wandb():
+    """
+    Finish the current wandb run
+    """
+    try:
+        bt.logging.debug("Finishing wandb run")
+        wandb.finish()
+        assert wandb.run is None
+    except Exception as err:
+        bt.logging.warning(f"finish_wandb() finishing wandb failed: {err}")

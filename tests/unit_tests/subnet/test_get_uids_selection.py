@@ -1,6 +1,6 @@
 from subnet.validator.selection import select_uids
 from tests.unit_tests.mocks import mock_miners
-from tests.unit_tests.utils import count_non_unique, count_unique
+from tests.unit_tests.utils.utils import count_non_unique, count_unique
 
 # List of 18 miners from uid 0 to 17
 miners = sorted(

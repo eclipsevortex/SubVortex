@@ -114,7 +114,7 @@ def check_config(cls, config: "bt.Config"):
 
 def add_args(cls, parser):
     # Netuid Arg
-    parser.add_argument("--netuid", type=int, help="Storage network netuid", default=21)
+    parser.add_argument("--netuid", type=int, help="Subvortex network netuid", default=7)
 
     parser.add_argument(
         "--neuron.name",
@@ -133,12 +133,6 @@ def add_args(cls, parser):
         type=int,
         help="The default epoch length (how often we set weights, measured in 12 second blocks).",
         default=100,
-    )
-    parser.add_argument(
-        "--neuron.disable_log_rewards",
-        action="store_true",
-        help="Disable all reward logging, suppresses reward functions and their values from being logged to wandb.",
-        default=False,
     )
     parser.add_argument(
         "--neuron.subscription_logging_path",
@@ -219,6 +213,20 @@ def add_args(cls, parser):
         help="Redis configuration path.",
         default="/etc/redis/redis.conf",
     )
+    parser.add_argument(
+        "--database.redis_dump_path",
+        type=str,
+        help="Redis directory where to store dumps.",
+        default="/etc/redis/",
+    )
+
+    # Auto update
+    parser.add_argument(
+        "--auto-update",
+        action="store_true", 
+        help="True if the miner can be auto updated, false otherwise",
+        default=True,
+    )
 
     # Wandb args
     parser.add_argument(
@@ -243,22 +251,10 @@ def add_args(cls, parser):
         default=False,
     )
     parser.add_argument(
-        "--wandb.weights_step_length",
-        type=int,
-        help="How many steps before we log the weights.",
-        default=10,
-    )
-    parser.add_argument(
         "--wandb.run_step_length",
         type=int,
         help="How many steps before we rollover to a new run.",
         default=360,
-    )
-    parser.add_argument(
-        "--wandb.notes",
-        type=str,
-        help="Notes to add to the wandb run.",
-        default="",
     )
 
     # Mocks

@@ -9,3 +9,94 @@ services:
     extends:
       file: ./scripts/redis/docker/scripts/docker-compose.yml
       service: redis
+    networks:
+      subvortex:
+        ipv4_address: 172.22.0.2
+
+  subtensor:
+    extends:
+      file: ./scripts/subtensor/docker/scripts/docker-compose.yml
+      service: subtensor
+    networks:
+      subvortex:
+        ipv4_address: 172.22.0.3
+
+  miner-1:
+    extends:
+      file: ./scripts/subnet/docker/miner/docker-compose.yml
+      service: miner
+    container_name: "subvortex-miner-1"
+    build:
+      args:
+        WALLET_HOTKEY: "miner-1-1"
+    networks:
+      miner-mx:
+        ipv4_address: 216.238.82.2
+      subvortex:
+        ipv4_address: 172.22.0.5
+
+  miner-2:
+    extends:
+      file: ./scripts/subnet/docker/miner/docker-compose.yml
+      service: miner
+    container_name: "subvortex-miner-2"
+    build:
+      args:
+        WALLET_HOTKEY: "miner-1-2"
+    networks:
+      miner-hg:
+        ipv4_address: 34.96.192.2
+      subvortex:
+        ipv4_address: 172.22.0.6
+
+  validator-1:
+    extends:
+      file: ./scripts/subnet/docker/validator/docker-compose.yml
+      service: validator
+    container_name: "subvortex-validator-1"
+    networks:
+      subvortex:
+        ipv4_address: 172.22.0.4
+      miner-mx:
+        ipv4_address: 216.238.82.3
+      miner-hg:
+        ipv4_address: 34.96.192.3
+    build:
+      args:
+        SUBTENSOR_CHAIN_ENDPOINT: "ws://172.22.0.3:9944"
+        DABASE_INDEX: 0
+
+  validator-2:
+    extends:
+      file: ./scripts/subnet/docker/validator/docker-compose.yml
+      service: validator
+    container_name: "subvortex-validator-2"
+    networks:
+      subvortex:
+        ipv4_address: 172.22.0.7
+      miner-mx:
+        ipv4_address: 216.238.82.4
+      miner-hg:
+        ipv4_address: 34.96.192.4
+    build:
+      args:
+        SUBTENSOR_CHAIN_ENDPOINT: "ws://172.22.0.3:9944"
+        DABASE_INDEX: 1
+        WALLET_HOTKEY: "validator-1-2"
+
+networks:
+  subvortex:
+    name: subvortex
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
+  miner-mx:
+    name: miner-mx
+    ipam:
+      config:
+        - subnet: 216.238.82.0/24
+  miner-hg:
+    name: miner-hg
+    ipam:
+      config:
+        - subnet: 34.96.192.0/24

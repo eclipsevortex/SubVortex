@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  subtensor:
+    build:
+      context: ../../../../
+      dockerfile: ./scripts/subtensor/docker/scripts/Dockerfile
+    container_name: subvortex-subnet
+    image: subvortex-subnet:latest
+    restart: always
+    ports:
+      - "30334:30334"
+      - "30335:30335"
+      - "9945:9945"
+      - "9946:9946"
+      - "9944:9944"

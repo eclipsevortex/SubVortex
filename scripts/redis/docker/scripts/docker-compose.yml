@@ -11,15 +11,16 @@ services:
       dockerfile: ./scripts/Dockerfile
     container_name: subvortex-redis
     image: subvortex-redis:latest
+    networks:
+      - subvortex
+      # subvortex:
+      #   ipv4_address: 192.168.0.2
     restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--raw", "incr", "ping"]
       interval: 1s
       timeout: 3s
       retries: 5
-    command:
-      - redis-server
-      - /etc/redis/redis.conf
     ports:
       - ${REDIS_PORT:-6379}:6379
     volumes:

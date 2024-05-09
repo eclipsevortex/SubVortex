@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  subtensor:
+    build:
+      context: ../../../../
+      dockerfile: ./scripts/subtensor/docker/scripts/Dockerfile
+    container_name: subvortex-miner-subnet
+    image: subvortex-subnet:latest
+    restart: always
+
+  miner:
+    build:
+      context: ../../../../
+      dockerfile: ./scripts/subnet/docker/miner/Dockerfile
+    container_name: subvortex-miner
+    image: subvortex-miner:latest
+    restart: always
+    volumes:
+      - ~/.bittensor/wallets:/.bittensor/wallets
+    depends_on:
+      - subtensor

@@ -124,13 +124,19 @@ def add_args(cls, parser):
         help="Name of the request log file",
         default="requests_log.json",
     )
+    parser.add_argument(
+        "--miner.epoch_length",
+        type=int,
+        help="The default epoch length (measured in 12 second blocks).",
+        default=100,
+    )
 
     # Auto update
     parser.add_argument(
         "--auto-update",
         action="store_true", 
         help="True if the miner can be auto updated, false otherwise",
-        default=True,
+        default=False,
     )
 
     # Mocks.
@@ -138,6 +144,14 @@ def add_args(cls, parser):
         "--miner.mock_subtensor",
         action="store_true",
         help="If True, the miner will allow non-registered hotkeys to mine.",
+        default=False,
+    )
+
+    # Local blockchain
+    parser.add_argument(
+        "--miner.local",
+        action="store_true",
+        help="If True, the miner run in subnet with a local blockchain.",
         default=False,
     )
 

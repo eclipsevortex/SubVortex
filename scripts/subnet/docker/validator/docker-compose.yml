@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  validator:
+    build:
+      context: ../../../../
+      dockerfile: ./scripts/subnet/docker/validator/Dockerfile
+    container_name: subvortex-validator
+    image: subvortex-validator:latest
+    networks:
+      - subvortex
+    restart: always
+    volumes:
+      - ~/.bittensor/wallets:/.bittensor/wallets

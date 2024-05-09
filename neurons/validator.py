@@ -89,7 +89,14 @@ class Validator:
         self.config = Validator.config()
         self.config.merge(base_config)
         self.check_config(self.config)
-        bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
+        bt.logging(
+            config=self.config,
+            logging_dir=self.config.neuron.full_path,
+            debug=True,
+        )
+        bt.logging.set_trace(self.config.logging.trace)
+        bt.logging._stream_formatter.set_trace(self.config.logging.trace)
+        bt.logging.info(f"{self.config}")
 
         # Show miner version
         bt.logging.debug(f"validator version {THIS_VERSION}")
@@ -101,6 +108,7 @@ class Validator:
 
         # Init validator wallet.
         bt.logging.debug("loading wallet")
+        bt.logging.info(f"{self.config.wallet.name} {self.config.wallet.hotkey}")
         self.wallet = (
             bt.MockWallet(config=self.config)
             if self.config.mock
@@ -136,12 +144,12 @@ class Validator:
 
         # Setup database
         bt.logging.info(f"loading database")
-        redis_password = get_redis_password(self.config.database.redis_password)
+        # redis_password = get_redis_password(self.config.database.redis_password)
         self.database = aioredis.StrictRedis(
             host=self.config.database.host,
             port=self.config.database.port,
             db=self.config.database.index,
-            password=redis_password,
+            # password=redis_password,
         )
         self.db_semaphore = asyncio.Semaphore()
 

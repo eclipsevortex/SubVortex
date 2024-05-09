@@ -35,7 +35,7 @@ from subnet.miner.config import (
     check_config,
     add_args,
 )
-from subnet.miner.utils import load_request_log
+from subnet.miner.utils import load_request_log, get_external_ip
 
 
 class Miner:
@@ -83,7 +83,13 @@ class Miner:
     def __init__(self):
         self.config = Miner.config()
         self.check_config(self.config)
-        bt.logging(config=self.config, logging_dir=self.config.miner.full_path)
+        bt.logging(
+            config=self.config,
+            logging_dir=self.config.miner.full_path,
+            debug=True,
+        )
+        bt.logging.set_trace(self.config.logging.trace)
+        bt.logging._stream_formatter.set_trace(self.config.logging.trace)
         bt.logging.info(f"{self.config}")
 
         # Show miner version
@@ -99,7 +105,7 @@ class Miner:
         self.subtensor = (
             bt.MockSubtensor()
             if self.config.miner.mock_subtensor
-            else bt.subtensor(config=self.config, network="local")
+            else bt.subtensor(config=self.config)  # , network="local")
         )
         bt.logging.debug(str(self.subtensor))
         self.current_block = self.subtensor.get_current_block()
@@ -126,10 +132,12 @@ class Miner:
 
         # The axon handles request processing, allowing validators to send this process requests.
         self.axon = bt.axon(
-            wallet=self.wallet, config=self.config, external_ip=bt.net.get_external_ip()
+            wallet=self.wallet,
+            config=self.config,
+            external_ip=get_external_ip(self.config),
         )
         bt.logging.info(f"Axon {self.axon}")
-        
+
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward functions to axon.")
         self.axon.attach(
@@ -143,7 +151,7 @@ class Miner:
             f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
         self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
-        
+
         # Check there is not another miner running on the machine
         number_of_miners = len(
             [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]
@@ -167,6 +175,7 @@ class Miner:
         self.thread: threading.Thread = None
         self.lock = asyncio.Lock()
         self.request_timestamps: typing.Dict = {}
+        self.previous_last_updates = []
 
         self.step = 0
 
@@ -187,7 +196,7 @@ class Miner:
         bt.logging.success(f"[{validator_uid}] Score {synapse.score}")
 
         synapse.version = THIS_VERSION
-        
+
         return synapse
 
     def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
@@ -253,6 +262,20 @@ class Miner:
                        None if the context was exited without an exception.
         """
         self.stop_run_thread()
+
+    def should_sync_metagraph(self):
+        last_updates = self.subtensor.substrate.query(
+            module="SubtensorModule",
+            storage_function="LastUpdate",
+            params=[self.config.netuid],
+        )
+        if self.previous_last_updates == last_updates:
+            return False
+
+        # Save the new updates
+        self.previous_last_updates = last_updates
+
+        return True
 
 
 def run_miner():

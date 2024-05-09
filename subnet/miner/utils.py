@@ -118,3 +118,17 @@ def get_directory_size(path):
             if not os.path.islink(fp):
                 total_size += os.path.getsize(fp)
     return total_size
+
+
+def get_external_ip(config):
+    if config.miner.local:
+        try:
+            process = os.popen("ifconfig eth0 | grep 'inet ' | awk '{print $2}' | tr -d '\n'")
+            external_ip = process.readline()
+            process.close()
+            assert isinstance(bt.utils.networking.ip_to_int(external_ip), int)
+            return str(external_ip)
+        except Exception:
+            pass
+
+    return bt.utils.networking.get_external_ip()

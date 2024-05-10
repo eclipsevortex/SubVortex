@@ -9,7 +9,7 @@ The final score used to set the weight is an average of all these scores and wil
 
 To better understand the following, you need to grasp a few concepts:
 
-- A miner is flagged as suspicious if it appears in the suspicious UID file. A penalty factor may be provided to adjust the scores accordingly.
+- A miner is flagged as suspicious if it appears in the suspicious UID file. A penalty factor between ]0,1[ may be provided to adjust the scores accordingly depending on the use cases.
 - A miner is considered verified if both the miner and subtensor are operational and accessible.
 
 <br />
@@ -22,8 +22,8 @@ To assign a score for each miner, we will establish a connection with the subten
 
 The score will be computed based on these rules:
 
-- If the miner is flagged as suspicious with no penalise factor, the score will be 0.
-- If the miner is flagged as suspicious with penalise factor, the score will be the penalise factor.
+- If the miner is flagged as suspicious with no penalty factor, the score will be 0.
+- If the miner is flagged as suspicious with penalty factor, the score will be the penalty factor.
 - If the miner is not verified, the score will be 0.
 - If there are more than one miner on the same IP, the score will be 0.
 - Otherwise, the score will be 1.
@@ -40,8 +40,8 @@ The validator can be in a different country than the miner, so we will incorpora
 
 The score will be computed based on these rules:
 
-- If the miner is flagged as suspicious with no penalise factor, the score will be 0.
-- If the miner is flagged as suspicious with penalise factor, the score will be the penalise factor.
+- If the miner is flagged as suspicious with no penalty factor, the score will be 0.
+- If the miner is flagged as suspicious with penalty factor, the score will be the penalty factor.
 - If the miner is not verified, the score will be 0.
 - If there are more than one miner on the same IP, the score will be 0.
 - Otherwise, the score will be computed based on the time taken to request directly the subtensor, adding a tolerance based on the distance between validator/miner and normalise it against other miners. So the best miner will receive 1 and the worst will receive 0.
@@ -56,9 +56,9 @@ To assign a score to each miner, we will establish a connection with the subtens
 
 The score will be computed based on these rules:
 
-- If the miner is flagged as suspicious with no penalise factor, the score will be 0.
-- If the miner is flagged as suspicious with penalise factor, the score will be the penalise factor.
-- Otherwise the score will be # of attemps / # of success normalised with wilson.
+- If the miner is flagged as suspicious with no penalty factor, the score will be 0.
+- If the miner is flagged as suspicious with penalty factor, the score will be the penalty factor.
+- Otherwise the score will be # of attempts / # of success normalised with wilson.
 
 <br />
 
@@ -68,8 +68,8 @@ This reward incentivizes miners to effectively distribute subtensors across diff
 
 The score will be computed based on these rules:
 
-- If the miner is flagged as suspicious with no penalise factor, the score will be 0.
-- If the miner is flagged as suspicious with penalise factor, the score will be the penalise factor.
+- If the miner is flagged as suspicious with no penalty factor, the score will be 0.
+- If the miner is flagged as suspicious with penalty factor, the score will be the penalty factor.
 - If the miner is not verified, the score will be 0.
 - If there are more than one miner on the same IP, the score will be 0.
 - Otherwise, the score will be 1 / # of miners in that location (your miner included)
@@ -117,5 +117,7 @@ average moving score = 0.1 * score * 0.9 previous average moving score
 
 The average moving score can be overrided with
 
-- 0 if the miner is suspicious with no penalise factor provided
-- penalise factor if the miner is suspicious with penalise factor provided
+- 0 if the miner is suspicious with no penalty factor provided
+- penalty factor if the miner is suspicious with penalty factor provided
+
+122 lines | 942 words | 5384 chars

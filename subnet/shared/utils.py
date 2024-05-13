@@ -22,7 +22,7 @@ import bittensor as bt
 
 # Check if there is an update every 5 minutes
 # Github Rate Limit 60 requests per hour / per ip (Reference: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28)
-CHECK_UPDATE_FREQUENCY = 5 * 60
+CHECK_UPDATE_FREQUENCY = 1 * 60
 
 
 def get_redis_password(

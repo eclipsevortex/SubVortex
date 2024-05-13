@@ -14,5 +14,8 @@ class Interpreter:
         bt.logging.info(f"Source installed successfully")
 
     def upgrade_dependencies(self):
-        subprocess.run(["pip", "install", "-r", "requirements.txt", "--upgrade"])
+        subprocess.run(["pip", "install", "--upgrade", "SubVortex"])
         bt.logging.info(f"Dependencies installed successfully")
+
+        subprocess.run(["pip", "install", "-e", "."])
+        bt.logging.info(f"Source installed successfully")

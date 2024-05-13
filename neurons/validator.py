@@ -89,7 +89,13 @@ class Validator:
         self.config = Validator.config()
         self.config.merge(base_config)
         self.check_config(self.config)
-        bt.logging(config=self.config, logging_dir=self.config.neuron.full_path)
+        bt.logging(
+            config=self.config,
+            logging_dir=self.config.neuron.full_path,
+            debug=self.config.logging.debug,
+        )
+        bt.logging._stream_formatter.set_trace(self.config.logging.trace)
+        bt.logging.info(f"{self.config}")
 
         # Show miner version
         bt.logging.debug(f"validator version {THIS_VERSION}")

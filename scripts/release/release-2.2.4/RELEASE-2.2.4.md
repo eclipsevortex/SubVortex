@@ -1,4 +1,4 @@
-This guide provides step-by-step instructions for the release 2.2.4.
+release/2.2.4This guide provides step-by-step instructions for the release 2.2.4.
 
 Previous Release: 2.2.3
 
@@ -104,7 +104,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
    Finally, install the dependencies
 
    ```bash
-   pip install -r requirements.txt
+   pip install --upgrade SubVortex
    pip install -e .
    ```
 
@@ -130,7 +130,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
    Then, install the dependencies
 
    ```bash
-   pip install -r requirements.txt
+   pip install --upgrade SubVortex
    pip install -e .
    ```
 

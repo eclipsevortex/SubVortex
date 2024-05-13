@@ -96,38 +96,7 @@ Running subtensors locally offers advantages in speed, reliability, and control 
 
 ## Incentive Mechanism
 
-SubVortex's incentive mechanism will score miners based on multiple criteria of their subtensor node:
-
-- **Availability** - Subtensor nodes must be reliable to ensure good uptime.
-- **Latency** - Subtensor nodes must be efficient to ensure good performance.
-- **Reliability** and Stability - Subtensor nodes must be efficient to ensure good service quality.
-- **Global distribution** - Subtensor nodes must be worldwide to ensure a good reach.
-
-The final score used to set the weight is an average of all these scores and will replace 5% of the weight of the previous weights.
-
-### Availability
-
-This reward incentivizes miners to maintain high levels of uptime and accessibility.
-
-To assign a score for each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by the success of getting that block.
-
-### Latency
-
-This reward incentivizes miners to low-latency services and minimizes response times.
-
-To assign a score to each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by the time taken to process that request, using a normalized method as part of the reward system.
-
-The validator can be in a different country than the miner, so we will incorporate a distance-based weighting factor into the scoring formula.
-
-### Reliability and Stability
-
-This reward incentivizes miners to have high levels of reliability and minimize the occurrence and impact of failures.
-
-To assign a score to each miner, we will establish a connection with the subtensor and retrieve the current block. The score will be determined by computing the ratio of successes/attempts, using a normalized method as part of the reward system.
-
-### Global Distribution
-
-This reward incentivizes miners to effectively distribute subtensors across different geographical locations to optimize performance and reduce latency for a better subnet experience.
+To understand the incentive mechanism, refer to the [Incentive Mechanism guide](./docs//features/incentive_mechanism.md)
 
 ## Value Proposition
 

@@ -355,3 +355,23 @@ miner_suspicious_1 = Miner(
     challenge_successes=574,
     process_time=5.0,
 )
+
+miner_suspicious_2 = Miner(
+    uid=19,
+    hotkey="5GhDs7dTbrGauKnMnUrgWSVmwvX2VdqSnVoqVbEEXrd1Vd81",
+    ip="192.168.10.1",
+    version="0.0.0",
+    country="DE",
+    verified=True,
+    sync=True,
+    suspicious=True,
+    penalise_factor=0.3,
+    score=0.6851191898108059,
+    availability_score=0.0,
+    latency_score=0.0,
+    reliability_score=0.9996040277537239,
+    distribution_score=0.0,
+    challenge_attempts=574,
+    challenge_successes=574,
+    process_time=5.0,
+)

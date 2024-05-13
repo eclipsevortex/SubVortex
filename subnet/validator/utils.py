@@ -21,6 +21,7 @@ from typing import List
 from Crypto.Random import random
 
 from subnet.constants import DEFAULT_CHUNK_SIZE
+from subnet.validator.models import Miner
 from subnet.validator.selection import select_uids
 from subnet.validator.database import get_selected_miners, set_selection
 
@@ -310,15 +311,19 @@ def get_uids_selection(self, k=DEFAULT_CHUNK_SIZE):
     return uids
 
 
-def deregister_suspicious_uid(self):
+def deregister_suspicious_uid(miners: List[Miner], moving_averaged_scores):
     """
     Deregister all miners that are either
     - suspicious from the load balancer
     - does not own their subtensor
     """
-    for miner in self.miners:
+    for miner in miners:
         if not miner.suspicious:
             continue
 
-        # Set the weight to 0 on the chain
-        self.moving_averaged_scores[miner.uid] = 0
+        # Set the weight to 0 on the chain if there is no penalise factor
+        # Set the weight to penalise factor if provided
+        penalise_factor = miner.penalise_factor or 0
+        moving_averaged_scores[miner.uid] = (
+            moving_averaged_scores[miner.uid] * penalise_factor
+        )

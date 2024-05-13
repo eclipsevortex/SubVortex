@@ -14,7 +14,7 @@ def test_a_not_verified_miner_should_return_a_score_of_zero():
     assert 0.0 == result
 
 
-def test_a_suspicious_miner_should_return_a_score_of_zero():
+def test_a_suspicious_miner_with_no_penalise_factor_should_return_a_score_of_zero():
     # Arrange
     miner = mocks.miner_suspicious_1
 
@@ -23,6 +23,17 @@ def test_a_suspicious_miner_should_return_a_score_of_zero():
 
     # Assert
     assert 0.0 == result
+
+
+def test_a_suspicious_miner_with_a_penalise_factor_should_return_a_penalised_of_zero():
+    # Arrange
+    miner = mocks.miner_suspicious_2
+
+    # Act
+    result = compute_latency_score(miner.country, miner, [miner])
+
+    # Assert
+    assert 0.3 == result
 
 
 def test_an_ip_conflicts_miner_should_return_a_score_of_zero():

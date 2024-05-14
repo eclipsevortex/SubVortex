@@ -34,7 +34,7 @@ async def test_a_not_verified_miner_should_return_updated_attempts_and_success_a
 
 
 @pytest.mark.asyncio
-async def test_a_suspicious_miner_should_return_a_lowest_score():
+async def test_a_suspicious_miner_with_no_penalty_factor_should_return_a_lowest_score():
     # Arrange
     reliability_score = mocks.miner_suspicious_1.reliability_score
     miner = mocks.miner_suspicious_1
@@ -44,14 +44,44 @@ async def test_a_suspicious_miner_should_return_a_lowest_score():
 
     # Assert
     assert result < reliability_score
+    assert 0 == result
 
 
 @pytest.mark.asyncio
-async def test_a_suspicious_miner_should_return_the_same_attempts_and_success():
+async def test_a_suspicious_miner_with_no_penalty_factor_should_return_the_same_attempts_and_success():
     # Arrange
     challenge_attempts = mocks.miner_suspicious_1.challenge_attempts
     challenge_successes = mocks.miner_suspicious_1.challenge_successes
     miner = mocks.miner_suspicious_1
+
+    # Act
+    await compute_reliability_score(miner)
+
+    # Assert
+    assert miner.challenge_attempts == challenge_attempts
+    assert miner.challenge_successes == challenge_successes
+
+
+@pytest.mark.asyncio
+async def test_a_suspicious_miner_with_a_penalty_factor_should_return_a_lowest_score():
+    # Arrange
+    reliability_score = mocks.miner_suspicious_2.reliability_score
+    miner = mocks.miner_suspicious_2
+
+    # Act
+    result = await compute_reliability_score(miner)
+
+    # Assert
+    assert result < reliability_score
+    assert 0.3 == result
+
+
+@pytest.mark.asyncio
+async def test_a_suspicious_miner_with_a_penalty_factor_should_return_the_same_attempts_and_success():
+    # Arrange
+    challenge_attempts = mocks.miner_suspicious_2.challenge_attempts
+    challenge_successes = mocks.miner_suspicious_2.challenge_successes
+    miner = mocks.miner_suspicious_2
 
     # Act
     await compute_reliability_score(miner)

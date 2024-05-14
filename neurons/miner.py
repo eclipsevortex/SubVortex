@@ -145,6 +145,7 @@ class Miner:
         self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
         
         # Check there is not another miner running on the machine
+        bt.logging.debug(f"Checking number of miners on same ip")
         number_of_miners = len(
             [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]
         )

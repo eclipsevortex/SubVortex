@@ -204,7 +204,7 @@ class Validator:
         load_state(self)
 
         # Monitor miners
-        self.monitor = Monitor()
+        self.monitor = Monitor(self.config.netuid)
         self.monitor.start()
 
         try:
@@ -226,6 +226,7 @@ class Validator:
                 prev_set_weights_block = self.metagraph.last_update[self.uid].item()
 
                 # --- Wait until next step epoch.
+                bt.logging.debug("Wait until next step epoch")
                 current_block = self.subtensor.get_current_block()
                 while current_block - self.prev_step_block < 3:
                     # --- Wait for next block.

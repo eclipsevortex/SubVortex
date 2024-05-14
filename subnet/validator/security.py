@@ -11,7 +11,7 @@ def is_miner_suspicious(miner: Miner, suspicious_uids: List[int]):
         (
             (
                 suspicious is not None,
-                (suspicious.get("penalise_factor") if suspicious else None) or 0,
+                (suspicious.get("penalty_factor") if suspicious else None) or 0,
             )
             for suspicious in suspicious_uids
             if suspicious.get("uid") == miner.uid

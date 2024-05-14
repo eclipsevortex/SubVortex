@@ -130,7 +130,7 @@ async def challenge_data(self):
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
 
         # Check if the miner is suspicious
-        miner.suspicious, miner.penalise_factor = is_miner_suspicious(
+        miner.suspicious, miner.penalty_factor = is_miner_suspicious(
             miner, suspicious_uids
         )
         if miner.suspicious:

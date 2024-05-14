@@ -23,7 +23,7 @@ class TestDeregisterSuspiciousUid(unittest.TestCase):
         # Assert
         assert 0.5 == moving_averaged_scores[miner.uid]
 
-    def test_a_suspicious_miner_without_penalise_factor_should_return_a_score_of_zero(
+    def test_a_suspicious_miner_without_penalty_factor_should_return_a_score_of_zero(
         self,
     ):
         # Arrange
@@ -41,7 +41,7 @@ class TestDeregisterSuspiciousUid(unittest.TestCase):
         # Assert
         assert 0 == moving_averaged_scores[miner.uid]
 
-    def test_a_suspicious_miner_witht_penalise_factor_should_return_a_penalised_score(
+    def test_a_suspicious_miner_with_penalty_factor_should_return_a_penalised_score(
         self,
     ):
         # Arrange
@@ -52,7 +52,7 @@ class TestDeregisterSuspiciousUid(unittest.TestCase):
         moving_averaged_scores = [0.5]
 
         miners[miner.uid].suspicious = True
-        miners[miner.uid].penalise_factor = 0.3
+        miners[miner.uid].penalty_factor = 0.3
 
         # Act
         deregister_suspicious_uid(miners, moving_averaged_scores)

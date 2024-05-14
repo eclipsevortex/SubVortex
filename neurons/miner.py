@@ -270,10 +270,11 @@ def run_miner():
     This function initializes and runs the neuron. It handles the main loop, state management, and interaction
     with the Bittensor network.
     """
-
-    Miner().run_in_background_thread()
-
+    miner = None
     try:
+        miner = Miner()
+        miner.run_in_background_thread()
+
         while 1:
             time.sleep(1)
     except KeyboardInterrupt:
@@ -283,6 +284,10 @@ def run_miner():
         bt.logging.error(traceback.format_exc())
         bt.logging.error(f"Unhandled exception: {e}")
         sys.exit(1)
+    finally:
+        if miner:
+            bt.logging.info("Stopping axon")
+            miner.axon.stop()
 
 
 if __name__ == "__main__":

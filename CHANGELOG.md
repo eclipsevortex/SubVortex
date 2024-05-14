@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.4 / 2024-05-14
+
+## What's Changed
+* Penalise factor by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/51
+* fix subtensor scripts by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/53
+* upgrade bittensor by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/54
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.3...v2.2.4
+
 ## 2.2.3 / 2024-05-06
 
 ## What's Changed

@@ -25,7 +25,7 @@ def test_a_suspicious_miner_with_no_penalise_factor_should_return_a_score_of_zer
     assert 0.0 == result
 
 
-def test_a_suspicious_miner_with_a_penalise_factor_should_return_a_penalised_score():
+def test_a_suspicious_miner_with_a_penalty_factor_should_return_a_penalised_score():
     # Arrange
     miner = mocks.miner_suspicious_2
 

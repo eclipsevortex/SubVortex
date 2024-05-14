@@ -323,7 +323,7 @@ def deregister_suspicious_uid(miners: List[Miner], moving_averaged_scores):
 
         # Set the weight to 0 on the chain if there is no penalise factor
         # Set the weight to penalise factor if provided
-        penalise_factor = miner.penalise_factor or 0
+        penalise_factor = miner.penalty_factor or 0
         moving_averaged_scores[miner.uid] = (
             moving_averaged_scores[miner.uid] * penalise_factor
         )

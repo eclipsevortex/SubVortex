@@ -63,7 +63,7 @@ async def test_a_suspicious_miner_with_no_penalise_factor_should_return_the_same
 
 
 @pytest.mark.asyncio
-async def test_a_suspicious_miner_with_a_penalise_factor_should_return_a_lowest_score():
+async def test_a_suspicious_miner_with_a_penalty_factor_should_return_a_lowest_score():
     # Arrange
     reliability_score = mocks.miner_suspicious_2.reliability_score
     miner = mocks.miner_suspicious_2
@@ -77,7 +77,7 @@ async def test_a_suspicious_miner_with_a_penalise_factor_should_return_a_lowest_
 
 
 @pytest.mark.asyncio
-async def test_a_suspicious_miner_with_a_penalise_factor_should_return_the_same_attempts_and_success():
+async def test_a_suspicious_miner_with_a_penalty_factor_should_return_the_same_attempts_and_success():
     # Arrange
     challenge_attempts = mocks.miner_suspicious_2.challenge_attempts
     challenge_successes = mocks.miner_suspicious_2.challenge_successes

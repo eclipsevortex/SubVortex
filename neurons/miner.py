@@ -86,9 +86,9 @@ class Miner:
         bt.logging(
             config=self.config,
             logging_dir=self.config.miner.full_path,
-            debug=self.config.logging.debug,
+            debug=True,
         )
-        bt.logging._stream_formatter.set_trace(self.config.logging.trace)
+        bt.logging.set_trace(self.config.logging.trace)
         bt.logging.info(f"{self.config}")
 
         # Show miner version
@@ -270,10 +270,11 @@ def run_miner():
     This function initializes and runs the neuron. It handles the main loop, state management, and interaction
     with the Bittensor network.
     """
-
-    Miner().run_in_background_thread()
-
+    miner = None
     try:
+        miner = Miner()
+        miner.run_in_background_thread()
+
         while 1:
             time.sleep(1)
     except KeyboardInterrupt:
@@ -283,6 +284,10 @@ def run_miner():
         bt.logging.error(traceback.format_exc())
         bt.logging.error(f"Unhandled exception: {e}")
         sys.exit(1)
+    finally:
+        if miner:
+            bt.logging.info("Stopping axon")
+            miner.axon.stop()
 
 
 if __name__ == "__main__":

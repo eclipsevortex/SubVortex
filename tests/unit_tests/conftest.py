@@ -1,6 +1,7 @@
 import pytest
 import aioredis
 from unittest.mock import AsyncMock
+import bittensor as bt
 
 from neurons.validator import Validator
 
@@ -12,6 +13,7 @@ def validator():
     config.wandb.off = True
     config.neuron.dont_save_events = True
     validator = Validator(config)
+    bt.logging.off()
 
     mock = AsyncMock(aioredis.Redis)
     mock_instance = mock.return_value

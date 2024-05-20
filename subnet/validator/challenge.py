@@ -23,10 +23,8 @@ from subnet.validator.score import (
     compute_distribution_score,
     compute_final_score,
 )
+from subnet.validator.constants import CHALLENGE_NAME
 from substrateinterface.base import SubstrateInterface
-
-
-CHALLENGE_NAME = "Challenge"
 
 
 async def handle_synapse(self, uid: int):

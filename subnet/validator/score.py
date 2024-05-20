@@ -8,6 +8,7 @@ from subnet.validator.localisation import (
     compute_localisation_distance,
     get_localisation,
 )
+from subnet.validator.constants import CHALLENGE_NAME
 from subnet.constants import (
     AVAILABILITY_FAILURE_REWARD,
     RELIABILLITY_FAILURE_REWARD,
@@ -232,8 +233,8 @@ def compute_final_score(miner: Miner):
 
     if miner.suspicious:
         penalty_factor = miner.penalty_factor or 0
-        bt.logging.trace(
-            f"Penalty factor of {penalty_factor} applied to the final score {score}"
+        bt.logging.debug(
+            f"[{CHALLENGE_NAME}][{miner.uid}] Applying penalty factor of {penalty_factor}"
         )
         score = penalty_factor * score
 

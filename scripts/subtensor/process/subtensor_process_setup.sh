@@ -62,7 +62,10 @@ function install_linux_dependencies() {
     apt-get update
 
     # Necessary libraries for Rust execution
-    apt-get install -y curl build-essential protobuf-compiler clang git
+    apt install build-essential
+    apt-get install clang curl git make
+    apt install --assume-yes git clang curl libssl-dev protobuf-compiler
+    apt install --assume-yes git clang curl libssl-dev llvm libudev-dev make protobuf-compiler
     rm -rf /var/lib/apt/lists/*
     echo -e '\e[32mRust dependencies installed\e[0m'
 }
@@ -77,7 +80,7 @@ else
 fi
 
 # Install rust and cargo
-curl https://sh.rustup.rs -sSf | sh -s -- -y
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 echo -e '\e[32mRust and Cargo installed\e[0m'
 
 # Update your shell's source to include Cargo's path
@@ -99,12 +102,24 @@ fi
 # Go the repository
 cd subtensor
 
+# Checkout main branch
+git checkout main
+echo -e '\e[32mCheckout main branch\e[0m'
+
+# Remove previous chain state:
+rm -rf /tmp/blockchain 
+echo -e '\e[32mRemove chain state\e[0m'
+
 # Get the latest version
-git pull
+git pull origin main
 echo -e '\e[32mLast version pulled\e[0m'
 
-# Setup subtensor
-./scripts/init.sh
+# Install Rust toolchain
+rustup default stable
+rustup update
+rustup target add wasm32-unknown-unknown
+rustup toolchain install nightly
+rustup target add --toolchain nightly wasm32-unknown-unknown
 echo -e '\e[32mWASM buils environment initialized\e[0m'
 
 # Compile the subtensor binary

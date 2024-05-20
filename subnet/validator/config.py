@@ -225,7 +225,7 @@ def add_args(cls, parser):
         "--auto-update",
         action="store_true", 
         help="True if the miner can be auto updated, false otherwise",
-        default=True,
+        default=False,
     )
 
     # Wandb args

@@ -6,19 +6,20 @@ from datetime import datetime
 from typing import List
 
 from subnet.monitor.monitor_constants import (
-    MONITOR_URL,
+    MONITOR_URLS,
     LOGGING_NAME,
     MONITOR_SLEEP,
 )
 
 
 class Monitor(threading.Thread):
-    def __init__(self):
+    def __init__(self, netuid: int):
         super().__init__()
         self.stop_flag = threading.Event()
         self._lock = threading.Lock()
         self._data = {}
 
+        self.netuid = netuid
         self.last_modified = None
         self.show_not_found = True
         self.hash = None
@@ -47,7 +48,13 @@ class Monitor(threading.Thread):
                 # Sleep before requesting again
                 time.sleep(MONITOR_SLEEP)
 
-                response = requests.get(MONITOR_URL)
+                url = MONITOR_URLS.get(self.netuid)
+                if not url:
+                    bt.logging.warning(
+                        f"Could not find the monitoring file for the subnet {self.netuid}"
+                    )
+
+                response = requests.get(url)
                 if response.status_code != 200:
                     if response.status_code == 404 and not self.show_not_found:
                         continue

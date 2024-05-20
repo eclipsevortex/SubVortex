@@ -210,7 +210,7 @@ class Validator:
         load_state(self)
 
         # Monitor miners
-        self.monitor = Monitor()
+        self.monitor = Monitor(self.config.netuid)
         self.monitor.start()
 
         try:

@@ -4,6 +4,7 @@ import requests
 import bittensor as bt
 from math import radians, sin, cos, sqrt, atan2
 
+MY_API_BASE_URL = "http://api.ip-from.com"
 COUNTRY_IS_BASE_URL = "https://api.country.is"
 IP_API_BASE_URL = "http://ip-api.com/json"
 IPINFO_IO_BASE_URL = "https://ipinfo.io"
@@ -24,6 +25,29 @@ def get_localisation(country_code: str):
             countries = json.load(f)
 
     return countries.get(country_code)
+
+
+def get_country_by_my_api(ip: str):
+    """
+    Get the country code of the ip
+    Reference: http://api.ip-from.com
+    """
+    url = f"{MY_API_BASE_URL}/{ip}"
+
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        return None, response.reason
+
+    data = response.json()
+
+    maxmind_country = data.get("maxmind_country")
+    ipinfo_country = data.get("ipinfo_country")
+
+    if maxmind_country == ipinfo_country:
+        return maxmind_country, None
+
+    return maxmind_country, None
 
 
 def get_country_by_country_is(ip: str):
@@ -81,20 +105,24 @@ def get_country(ip: str):
     """
     Get the country code of the ip
     """
-    country, reason1 = get_country_by_country_is(ip)
+    country, reason1 = get_country_by_my_api(ip)
     if country:
         return country
 
-    country, reason2 = get_country_by_ip_api(ip)
+    country, reason2 = get_country_by_country_is(ip)
     if country:
         return country
 
-    country, reason3 = get_country_by_ipinfo_io(ip)
+    country, reason3 = get_country_by_ip_api(ip)
+    if country:
+        return country
+
+    country, reason4 = get_country_by_ipinfo_io(ip)
     if country:
         return country
 
     bt.logging.warning(
-        f"Could not get the country of the ip {ip}: Api 1: {reason1} / Api 2: {reason2} / Api 3: {reason3}"
+        f"Could not get the country of the ip {ip}: Api 1: {reason1} / Api 2: {reason2} / Api 3: {reason3} / Api 4: {reason4}"
     )
     return None
 

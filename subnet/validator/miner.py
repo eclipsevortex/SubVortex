@@ -55,13 +55,13 @@ async def get_all_miners(self) -> List[Miner]:
                 country=get_country(axon.ip),
                 ip_occurences=ip_occurences,
             )
-            await update_hotkey_statistics(axon.hotkey, miner.snapshot, self.database)
         else:
             # In hash set everything is stored as a string to the verified need to be manage differently
+            country = get_country(axon.ip)
+            if country == None:
+                country = get_field_value(statistics.get(b"country"))
+
             version = get_field_value(statistics.get(b"version"), "0.0.0")
-            country = get_field_value(statistics.get(b"country")) or get_country(
-                axon.ip
-            )
             verified = get_field_value(statistics.get(b"verified"), "0")
             score = get_field_value(statistics.get(b"score"), 0)
             availability_score = get_field_value(
@@ -97,6 +97,9 @@ async def get_all_miners(self) -> List[Miner]:
                 challenge_attempts=challenge_attempts,
                 process_time=process_time,
             )
+
+        # Update the database just to be sure we have the right country
+        await update_hotkey_statistics(axon.hotkey, miner.snapshot, self.database)
 
         miners.append(miner)
 

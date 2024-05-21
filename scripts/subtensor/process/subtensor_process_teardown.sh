@@ -8,8 +8,8 @@ if [[ ! -z $process ]]; then
 fi
 
 # Remove subtensor
-if [ -d "subtensor" ]; then
-    rm -rf subtensor
+if [ -d "$HOME/subtensor" ]; then
+    rm -rf $HOME/subtensor
 fi
 
 echo -e '\e[32mSubtensor removed\e[0m'

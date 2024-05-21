@@ -8,6 +8,7 @@ from subnet.validator.localisation import (
     compute_localisation_distance,
     get_localisation,
 )
+from subnet.validator.constants import CHALLENGE_NAME
 from subnet.constants import (
     AVAILABILITY_FAILURE_REWARD,
     RELIABILLITY_FAILURE_REWARD,
@@ -40,7 +41,7 @@ def can_compute_availability_score(miner: Miner):
     """
     True if we can compute the availaiblity score, false to get the penalty
     """
-    return not miner.suspicious and miner.verified and not miner.has_ip_conflicts
+    return miner.verified and not miner.has_ip_conflicts
 
 
 def compute_availability_score(miner: Miner):
@@ -59,7 +60,7 @@ def can_compute_reliability_score(miner: Miner):
     """
     True if we can compute the reliability score, false to get the penalty
     """
-    return not miner.suspicious
+    return True
 
 
 async def compute_reliability_score(miner: Miner):
@@ -90,7 +91,7 @@ def can_compute_latency_score(miner: Miner):
     """
     True if we can compute the latency score, false to get the penalty
     """
-    return not miner.suspicious and miner.verified and not miner.has_ip_conflicts
+    return miner.verified and not miner.has_ip_conflicts
 
 
 def compute_latency_score(validator_country: str, miner: Miner, miners: List[Miner]):
@@ -177,7 +178,7 @@ def can_compute_distribution_score(miner: Miner):
     """
     True if we can compute the distribution score, false to get the penalty
     """
-    return not miner.suspicious and miner.verified and not miner.has_ip_conflicts
+    return miner.verified and not miner.has_ip_conflicts
 
 
 def compute_distribution_score(miner: Miner, miners: List[Miner]):
@@ -229,5 +230,12 @@ def compute_final_score(miner: Miner):
     )
 
     score = numerator / denominator if denominator != 0 else 0
+
+    if miner.suspicious:
+        penalty_factor = miner.penalty_factor or 0
+        bt.logging.debug(
+            f"[{CHALLENGE_NAME}][{miner.uid}] Applying penalty factor of {penalty_factor}"
+        )
+        score = penalty_factor * score
 
     return score

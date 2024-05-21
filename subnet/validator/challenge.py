@@ -23,10 +23,8 @@ from subnet.validator.score import (
     compute_distribution_score,
     compute_final_score,
 )
+from subnet.validator.constants import CHALLENGE_NAME
 from substrateinterface.base import SubstrateInterface
-
-
-CHALLENGE_NAME = "Challenge"
 
 
 async def handle_synapse(self, uid: int):
@@ -130,7 +128,9 @@ async def challenge_data(self):
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
 
         # Check if the miner is suspicious
-        miner.suspicious = is_miner_suspicious(miner, suspicious_uids)
+        miner.suspicious, miner.penalty_factor = is_miner_suspicious(
+            miner, suspicious_uids
+        )
         if miner.suspicious:
             bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is suspicious")
 
@@ -204,7 +204,7 @@ async def challenge_data(self):
     )
 
     # Suspicious miners - moving weight to 0 for deregistration
-    deregister_suspicious_uid(self)
+    deregister_suspicious_uid(self.miners, self.moving_averaged_scores)
     bt.logging.trace(
         f"[{CHALLENGE_NAME}] Deregistered moving avg scores: {self.moving_averaged_scores}"
     )

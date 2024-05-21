@@ -83,7 +83,13 @@ class Miner:
     def __init__(self):
         self.config = Miner.config()
         self.check_config(self.config)
-        bt.logging(config=self.config, logging_dir=self.config.miner.full_path)
+        bt.logging(
+            config=self.config,
+            logging_dir=self.config.miner.full_path,
+            debug=True,
+        )
+        bt.logging.set_trace(self.config.logging.trace)
+        bt.logging._stream_formatter.set_trace(self.config.logging.trace)
         bt.logging.info(f"{self.config}")
 
         # Show miner version
@@ -126,10 +132,12 @@ class Miner:
 
         # The axon handles request processing, allowing validators to send this process requests.
         self.axon = bt.axon(
-            wallet=self.wallet, config=self.config, external_ip=bt.net.get_external_ip()
+            wallet=self.wallet,
+            config=self.config,
+            external_ip=bt.utils.networking.get_external_ip(),
         )
         bt.logging.info(f"Axon {self.axon}")
-        
+
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward functions to axon.")
         self.axon.attach(
@@ -143,8 +151,9 @@ class Miner:
             f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
         self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
-        
+
         # Check there is not another miner running on the machine
+        bt.logging.debug(f"Checking number of miners on same ip")
         number_of_miners = len(
             [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]
         )
@@ -187,7 +196,7 @@ class Miner:
         bt.logging.success(f"[{validator_uid}] Score {synapse.score}")
 
         synapse.version = THIS_VERSION
-        
+
         return synapse
 
     def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
@@ -262,10 +271,11 @@ def run_miner():
     This function initializes and runs the neuron. It handles the main loop, state management, and interaction
     with the Bittensor network.
     """
-
-    Miner().run_in_background_thread()
-
+    miner = None
     try:
+        miner = Miner()
+        miner.run_in_background_thread()
+
         while 1:
             time.sleep(1)
     except KeyboardInterrupt:
@@ -275,6 +285,10 @@ def run_miner():
         bt.logging.error(traceback.format_exc())
         bt.logging.error(f"Unhandled exception: {e}")
         sys.exit(1)
+    finally:
+        if miner:
+            bt.logging.info("Stopping axon")
+            miner.axon.stop()
 
 
 if __name__ == "__main__":

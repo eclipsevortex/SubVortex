@@ -1,9 +1,8 @@
-import json
-import os
 import requests
 import bittensor as bt
 from math import radians, sin, cos, sqrt, atan2
 
+MY_API_BASE_URL = "http://api.ip-from.com"
 COUNTRY_IS_BASE_URL = "https://api.country.is"
 IP_API_BASE_URL = "http://ip-api.com/json"
 IPINFO_IO_BASE_URL = "https://ipinfo.io"
@@ -11,19 +10,24 @@ IPINFO_IO_BASE_URL = "https://ipinfo.io"
 countries = {}
 
 
-def get_localisation(country_code: str):
+def get_country_by_my_api(ip: str):
     """
-    Get the longitude and latitude of the country
+    Get the country code of the ip (use Maxwind and IpInfo)
+    Reference: http://api.ip-from.com
     """
-    global countries
-    if len(countries) == 0:
-        current_dir = os.path.dirname(os.path.realpath(__file__))
-        file_path = os.path.join(current_dir, "..", "localisation.json")
+    url = f"{MY_API_BASE_URL}/{ip}"
 
-        with open(file_path, "r") as f:
-            countries = json.load(f)
+    response = requests.get(url)
 
-    return countries.get(country_code)
+    if response.status_code != 200:
+        return None, response.reason
+
+    data = response.json()
+
+    maxmind_country = data.get("maxmind_country")
+    ipinfo_country = data.get("ipinfo_country")
+
+    return (maxmind_country, None) if maxmind_country else (ipinfo_country, None)
 
 
 def get_country_by_country_is(ip: str):
@@ -75,28 +79,6 @@ def get_country_by_ipinfo_io(ip: str):
     data = response.json()
 
     return data.get("country"), None
-
-
-def get_country(ip: str):
-    """
-    Get the country code of the ip
-    """
-    country, reason1 = get_country_by_country_is(ip)
-    if country:
-        return country
-
-    country, reason2 = get_country_by_ip_api(ip)
-    if country:
-        return country
-
-    country, reason3 = get_country_by_ipinfo_io(ip)
-    if country:
-        return country
-
-    bt.logging.warning(
-        f"Could not get the country of the ip {ip}: Api 1: {reason1} / Api 2: {reason2} / Api 3: {reason3}"
-    )
-    return None
 
 
 def compute_localisation_distance(lat1, lon1, lat2, lon2):

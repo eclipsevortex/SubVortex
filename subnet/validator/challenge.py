@@ -6,7 +6,6 @@ import bittensor as bt
 from subnet.constants import DEFAULT_PROCESS_TIME
 from subnet.shared.subtensor import get_current_block
 from subnet.validator.models import Miner
-from subnet.validator.miner import get_miner_ip_occurences
 from subnet.validator.synapse import send_scope
 from subnet.validator.security import is_miner_suspicious
 from subnet.validator.utils import (
@@ -106,6 +105,9 @@ async def challenge_data(self):
     suspicious_uids = self.monitor.get_suspicious_uids()
     bt.logging.debug(f"[{CHALLENGE_NAME}] Suspicious uids {suspicious_uids}")
 
+    # Get the locations
+    locations = self.country_service.get_locations()
+
     # Execute the challenges
     tasks = []
     reasons = []
@@ -126,6 +128,7 @@ async def challenge_data(self):
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
 
         bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
+        bt.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Country {miner.country}")
 
         # Check if the miner is suspicious
         miner.suspicious, miner.penalty_factor = is_miner_suspicious(
@@ -151,7 +154,9 @@ async def challenge_data(self):
         )
 
         # Compute score for latency
-        miner.latency_score = compute_latency_score(self.country, miner, self.miners)
+        miner.latency_score = compute_latency_score(
+            self.country_code, miner, self.miners, locations
+        )
         bt.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Latency score {miner.latency_score}"
         )

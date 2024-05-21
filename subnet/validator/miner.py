@@ -9,7 +9,6 @@ from subnet.validator.score import (
     compute_final_score,
 )
 from subnet.validator.utils import get_available_uids, check_uid_availability
-from subnet.validator.localisation import get_country
 from subnet.validator.database import (
     get_hotkey_statistics,
     remove_hotkey_stastitics,
@@ -52,16 +51,16 @@ async def get_all_miners(self) -> List[Miner]:
                 uid=uid,
                 ip=axon.ip,
                 hotkey=axon.hotkey,
-                country=get_country(axon.ip),
+                country=self.country_service.get_country(axon.ip),
                 ip_occurences=ip_occurences,
             )
-            await update_hotkey_statistics(axon.hotkey, miner.snapshot, self.database)
         else:
             # In hash set everything is stored as a string to the verified need to be manage differently
+            country = self.country_service.get_country(axon.ip)
+            if country == None:
+                country = get_field_value(statistics.get(b"country"))
+
             version = get_field_value(statistics.get(b"version"), "0.0.0")
-            country = get_field_value(statistics.get(b"country")) or get_country(
-                axon.ip
-            )
             verified = get_field_value(statistics.get(b"verified"), "0")
             score = get_field_value(statistics.get(b"score"), 0)
             availability_score = get_field_value(
@@ -98,6 +97,9 @@ async def get_all_miners(self) -> List[Miner]:
                 process_time=process_time,
             )
 
+        # Update the database just to be sure we have the right country
+        await update_hotkey_statistics(axon.hotkey, miner.snapshot, self.database)
+
         miners.append(miner)
 
     return miners
@@ -107,7 +109,9 @@ async def add_new_miner(self, uid: int, ip: str, hotkey: str):
     """
     Add a new miner
     """
-    miner = Miner(uid=uid, ip=ip, hotkey=hotkey, country=get_country(ip))
+    miner = Miner(
+        uid=uid, ip=ip, hotkey=hotkey, country=self.country_service.get_country(ip)
+    )
     self.miners.append(miner)
 
     return miner
@@ -123,19 +127,19 @@ async def replace_old_miner(self, ip: str, hotkey: str, miner: Miner):
     await remove_hotkey_stastitics(miner.hotkey, self.database)
 
     # Reset the new miner
-    miner.reset(ip, hotkey, get_country(ip))
+    miner.reset(ip, hotkey, self.country_service.get_country(ip))
 
     return old_hotkey
 
 
-def move_miner(ip: str, miner: Miner):
+def move_miner(self, ip: str, miner: Miner):
     """
     Move an existing miner from a host to another one
     """
     previous_ip = miner.ip
 
     # Reset the miner as it changed ip so everything has to be re-evaluated
-    miner.reset(ip, miner.hotkey, get_country(ip))
+    miner.reset(ip, miner.hotkey, self.country_service.get_country(ip))
 
     return previous_ip
 
@@ -197,9 +201,18 @@ async def resync_miners(self):
 
         # Check the miner has been moved to another VPS
         if miner.ip != ip:
-            previous_ip = move_miner(ip, miner)
+            previous_ip = move_miner(self, ip, miner)
             bt.logging.success(
                 f"[{miner.uid}] Miner moved from {previous_ip} to {miner.ip}"
+            )
+
+        # Check if the country has been overrided
+        country_overrided = self.country_service.get_country(miner.ip)
+        if country_overrided and miner.country != country_overrided:
+            previous_country = miner.country
+            miner.country = country_overrided
+            bt.logging.success(
+                f"[{miner.uid}][{previous_country}] Miner's country overrided by {miner.country}"
             )
 
     # Focus on impacts resulting of these changes
@@ -210,12 +223,15 @@ async def resync_miners(self):
         miner.ip_occurences = get_miner_ip_occurences(miner.ip, ips)
 
     bt.logging.debug("resync_miners() refreshing scores")
+    locations = self.country_service.get_locations()
     for miner in self.miners:
         # Refresh the availability score
         miner.availability_score = compute_availability_score(miner)
 
         # Refresh latency score
-        miner.latency_score = compute_latency_score(self.country, miner, self.miners)
+        miner.latency_score = compute_latency_score(
+            self.country_code, miner, self.miners, locations
+        )
 
         # Refresh the distribution score
         miner.distribution_score = compute_distribution_score(miner, self.miners)

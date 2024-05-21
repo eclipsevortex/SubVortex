@@ -1,7 +1,7 @@
 import copy
 import pytest
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tests.unit_tests.mocks import mock_redis, mock_country
 from tests.unit_tests.utils.metagraph import (
@@ -34,6 +34,15 @@ default_axons_details = [
     {"ip": "9.91.241.48", "country": "ES"},
 ]
 
+locations = {
+    "US": {"country": "United States", "latitude": 37.09024, "longitude": -95.712891},
+    "SG": {"country": "Singapore", "latitude": 1.352083, "longitude": 103.819836},
+    "BR": {"country": "Brazil", "latitude": -14.235004, "longitude": -51.92528},
+    "ES": {"country": "Spain", "latitude": 40.463667, "longitude": -3.74922},
+    "KR": {"country": "South Korea", "latitude": 35.907757, "longitude": 127.766922},
+    "IR": {"country": "Iran", "latitude": 32.427908, "longitude": 53.688046},
+}
+
 
 class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
     @pytest.fixture(autouse=True)
@@ -47,10 +56,8 @@ class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
         self.validator.subtensor.chain_state = self.chain_state
         sync_metagraph(self.validator, default_axons_details)
 
-    @patch("subnet.validator.miner.get_country")
     async def test_given_a_metagraph_when_no_change_should_return_the_same_list_of_miners(
         self,
-        mock_get_country,
     ):
         # Arrange
         axons_details = copy.deepcopy(default_axons_details)
@@ -59,7 +66,11 @@ class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
         for idx, axon in enumerate(axons):
             axon.ip = axons_details[idx]["ip"]
 
-        mock_country.mock_get_country(mock_get_country, axons_details)
+        self.validator.country_service = MagicMock()
+        mock_country.mock_get_country(
+            self.validator.country_service.get_country, axons_details
+        )
+
         self.validator.database = mock_redis.mock_get_statistics(
             self.validator.metagraph.hotkeys
         )
@@ -74,17 +85,18 @@ class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
         # Assert
         assert miners == self.validator.miners
 
-    @patch("subnet.validator.miner.get_country")
     async def test_given_a_partially_full_metagraph_when_a_new_neuron_is_added_should_be_added_to_the_list(
         self,
-        mock_get_country,
     ):
         # Arrange
         axons_details = copy.deepcopy(default_axons_details) + [
             {"ip": "19.91.241.48", "country": "US"}
         ]
 
-        mock_country.mock_get_country(mock_get_country, axons_details)
+        self.validator.country_service = MagicMock()
+        mock_country.mock_get_country(
+            self.validator.country_service.get_country, axons_details
+        )
         self.validator.database = mock_redis.mock_get_statistics(
             self.validator.metagraph.hotkeys
         )
@@ -125,18 +137,21 @@ class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
         assert False == miner.sync
         assert False == miner.verified
 
-    @patch("subnet.validator.miner.get_country")
     async def test_given_a_full_metagraph_when_a_uid_has_a_new_hotkey_with_same_ip_should_replace_the_old_miner_by_the_new_one_in_the_list(
         self,
-        mock_get_country,
     ):
         # Arrange
         axons_details = copy.deepcopy(default_axons_details)
 
-        mock_country.mock_get_country(mock_get_country, axons_details)
+        self.validator.country_service = MagicMock()
+        mock_country.mock_get_country(
+            self.validator.country_service.get_country, axons_details
+        )
         self.validator.database = mock_redis.mock_get_statistics(
             self.validator.metagraph.hotkeys
         )
+
+        self.validator.country_service.get_locations.return_value = locations
 
         sync_metagraph(self.validator, axons_details)
         miners = await get_all_miners(self.validator)
@@ -172,18 +187,21 @@ class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
         assert False == miner.sync
         assert False == miner.verified
 
-    @patch("subnet.validator.miner.get_country")
     async def test_given_a_full_metagraph_when_a_uid_has_a_same_hotkey_with_different_ip_should_replace_the_old_miner_by_the_new_one_in_the_list(
         self,
-        mock_get_country,
     ):
         # Arrange
         axons_details = copy.deepcopy(default_axons_details)
 
-        mock_country.mock_get_country(mock_get_country, axons_details)
+        self.validator.country_service = MagicMock()
+        mock_country.mock_get_country(
+            self.validator.country_service.get_country, axons_details
+        )
         self.validator.database = mock_redis.mock_get_statistics(
             self.validator.metagraph.hotkeys
         )
+
+        self.validator.country_service.get_locations.return_value = locations
 
         sync_metagraph(self.validator, axons_details)
         miners = await get_all_miners(self.validator)
@@ -220,18 +238,21 @@ class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
         assert False == miner.sync
         assert False == miner.verified
 
-    @patch("subnet.validator.miner.get_country")
     async def test_given_a_full_metagraph_when_a_uid_has_a_new_hotkey_with_different_ip_should_replace_the_old_miner_by_the_new_one_in_the_list(
         self,
-        mock_get_country,
     ):
         # Arrange
         axons_details = copy.deepcopy(default_axons_details)
 
-        mock_country.mock_get_country(mock_get_country, axons_details)
+        self.validator.country_service = MagicMock()
+        mock_country.mock_get_country(
+            self.validator.country_service.get_country, axons_details
+        )
         self.validator.database = mock_redis.mock_get_statistics(
             self.validator.metagraph.hotkeys
         )
+
+        self.validator.country_service.get_locations.return_value = locations
 
         sync_metagraph(self.validator, axons_details)
         miners = await get_all_miners(self.validator)
@@ -267,18 +288,21 @@ class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
         assert False == miner.sync
         assert False == miner.verified
 
-    @patch("subnet.validator.miner.get_country")
     async def test_given_a_metagraph_when_a_uid_is_not_running_should_be_removed_from_the_list(
         self,
-        mock_get_country,
     ):
         # Arrange
         axons_details = copy.deepcopy(default_axons_details)
 
-        mock_country.mock_get_country(mock_get_country, axons_details)
+        self.validator.country_service = MagicMock()
+        mock_country.mock_get_country(
+            self.validator.country_service.get_country, axons_details
+        )
         self.validator.database = mock_redis.mock_get_statistics(
             self.validator.metagraph.hotkeys
         )
+
+        self.validator.country_service.get_locations.return_value = locations
 
         sync_metagraph(self.validator, axons_details)
         miners = await get_all_miners(self.validator)

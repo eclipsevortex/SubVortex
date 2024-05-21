@@ -41,12 +41,12 @@ def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
     return current_block - prev_step_block >= checkpoint_block_length
 
 
-async def resync_metagraph_and_miners(self):
+async def resync_metagraph_and_miners(self, force_refresh = False):
     """Checkpoints the training process."""
     bt.logging.info("checkpoint()")
     resynched = resync_metagraph(self)
 
-    if resynched:
+    if resynched or force_refresh:
         # Resync miners list
         await resync_miners(self)
 
@@ -328,7 +328,7 @@ def init_wandb(self):
             THIS_VERSION,
             str(THIS_SPEC_VERSION),
             f"netuid_{self.metagraph.netuid}",
-            self.country,
+            self.country_code,
         ]
 
         if self.config.mock:

@@ -95,6 +95,7 @@ class Validator:
             debug=True,
         )
         bt.logging.set_trace(self.config.logging.trace)
+        bt.logging._stream_formatter.set_trace(self.config.logging.trace)
         bt.logging.info(f"{self.config}")
 
         # Show miner version

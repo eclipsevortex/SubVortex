@@ -7,11 +7,10 @@ touch /var/log/alice.log /var/log/bob.log /var/log/miner.log
 ## Alice node - use the bootnode from the subvortex-subnet
 cd subtensor && ./target/release/node-subtensor \
 --base-path /tmp/alice \
---chain="raw_localspec.json" \
+--chain "raw_localspec.json" \
 --alice \
 --port 30334 \
 --rpc-port 9946 \
---validator \
 --rpc-cors all \
 --allow-private-ipv4 \
 --discover-local \
@@ -20,17 +19,18 @@ cd subtensor && ./target/release/node-subtensor \
 --bootnodes $SUBTENSOR_NODE_ID \
 > /var/log/alice.log 2>&1 &
 
+sleep 5
+
 ## Bob node - use the bootnode from the subvortex-subnet
 cd subtensor && ./target/release/node-subtensor \
 --base-path /tmp/bob \
---chain="raw_localspec.json" \
+--chain "raw_localspec.json" \
 --bob \
 --port 30335 \
 --rpc-port 9945 \
---ws-port 9943 \
---validator \
 --allow-private-ipv4 \
 --discover-local \
+--bootnodes $SUBTENSOR_NODE_ID \
 > /var/log/bob.log 2>&1 &
 
 # Sleep to let time for the subtensor to be sync

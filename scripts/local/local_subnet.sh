@@ -8,6 +8,9 @@ docker-compose down redis
 docker-compose build redis
 docker-compose up redis -d
 
+Tomorow 25/05/2024
+TODO: Create sudo wallet and add in the subnet subtensor that use a plain_localspec (remove --raw) instead of raw_localspec
+
 # Build/Run a subtensor with local chain
 docker-compose down subtensor
 docker-compose build subtensor
@@ -44,7 +47,7 @@ if [[ -z $netuid ]]; then
     else
         owner_balance=0
     fi
-
+    
     if [[ -z $owner_balance ]]; then
         owner_balance=0
     fi
@@ -66,7 +69,7 @@ if [[ -z $netuid ]]; then
     --wallet.hotkey "owner-1-1" \
     --subtensor.network $SUBTENSOR_NETWORK \
     --no_prompt
-
+    
     echo -e "\\033[32mSubnet has been created.\\033[0m"
 else
     echo -e "\\033[37mSubnet $netuid already created.\\033[0m"

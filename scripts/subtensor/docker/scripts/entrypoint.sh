@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# Define the command with common arguments
-command="./target/release/node-subtensor --base-path /tmp/alice --chain="$CHAIN_SPEC" --alice --port 30334 --rpc-port 9946 --validator --rpc-cors all --allow-private-ipv4 --discover-local --unsafe-ws-external"
-
-# Execute the command
+# Start Alice node
+command="./target/release/node-subtensor --base-path /tmp/alice --chain "$CHAIN_SPEC" --alice --port 30334 --rpc-port 9946 --rpc-cors all --allow-private-ipv4 --discover-local --ws-port 9944 --unsafe-ws-external"
 exec $command &
 
 sleep 5
 
-command="./target/release/node-subtensor --base-path /tmp/bob --chain="$CHAIN_SPEC" --bob --port 30335 --rpc-port 9945 --validator --allow-private-ipv4 --discover-local"
-
+# Start bob node
+command="./target/release/node-subtensor --base-path /tmp/bob --chain "$CHAIN_SPEC" --bob --port 30335 --rpc-port 9945 --allow-private-ipv4 --discover-local"
 exec $command &
 
-wait 
+sleep 5
+
+wait
 

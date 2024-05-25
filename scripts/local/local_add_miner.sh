@@ -64,7 +64,7 @@ fi
 # Get the subtensor node id
 subtensor_node_id=$(python3 scripts/subtensor/utils/subtensor_get_bootnode.py --subtensor.network $SUBTENSOR_NETWORK | grep -o 'get_bootnode() [^ ]*' | awk '{print $2}')
 
-## Build/Run miner
-docker-compose down miner-$INDEX
-docker-compose build --build-arg SUBTENSOR_NODE_ID="$subtensor_node_id" miner-$INDEX
-docker-compose up miner-$INDEX -d
+# ## Build/Run miner
+# docker-compose down miner-$INDEX
+# docker-compose build --build-arg SUBTENSOR_NODE_ID="$subtensor_node_id" miner-$INDEX
+# docker-compose up miner-$INDEX -d

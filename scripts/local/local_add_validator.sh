@@ -12,7 +12,7 @@ hotkey_exist=$(find $WALLET_PATH -type f -name "validator-1-$INDEX" | wc -l)
 if [ $hotkey_exist -eq 0 ]; then
     ./scripts/wallet/wallet_setup.sh -n localnet -t validator -a gen -k hotkey
 else
-    echo -e "\\033[37mHotkey validator-1-1 already created\\033[0m"
+    echo -e "\\033[37mHotkey validator-1-$INDEX already created\\033[0m"
 fi
 
 ## Get the ss58 address of the coldkey/hotkey
@@ -61,9 +61,9 @@ if [[ "$is_registered" == "False" ]]; then
     --wallet.hotkey validator-1-$INDEX \
     --no_prompt
     
-    echo -e "\\033[32mHotkey validator-1-1 has been registered.\\033[0m"
+    echo -e "\\033[32mHotkey validator-1-$INDEX has been registered.\\033[0m"
 else
-    echo -e "\\033[37mHotkey validator-1-1 already registered\\033[0m"
+    echo -e "\\033[37mHotkey validator-1-$INDEX already registered\\033[0m"
 fi
 
 ## Build/Run validator

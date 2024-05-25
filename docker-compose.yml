@@ -26,28 +26,28 @@ services:
       file: ./scripts/subnet/docker/miner/docker-compose.yml
       service: miner
     container_name: "subvortex-miner-1"
-    build:
-      args:
-        WALLET_HOTKEY: "miner-1-1"
     networks:
       miner-mx:
         ipv4_address: 216.238.82.2
       subvortex:
         ipv4_address: 172.22.0.5
+    build:
+      args:
+        WALLET_HOTKEY: "miner-1-1"
 
   miner-2:
     extends:
       file: ./scripts/subnet/docker/miner/docker-compose.yml
       service: miner
     container_name: "subvortex-miner-2"
-    build:
-      args:
-        WALLET_HOTKEY: "miner-1-2"
     networks:
       miner-hg:
         ipv4_address: 34.96.192.2
       subvortex:
         ipv4_address: 172.22.0.6
+    build:
+      args:
+        WALLET_HOTKEY: "miner-1-2"
 
   validator-1:
     extends:
@@ -65,6 +65,7 @@ services:
       args:
         SUBTENSOR_CHAIN_ENDPOINT: "ws://172.22.0.3:9944"
         DABASE_INDEX: 0
+        WALLET_HOTKEY: "validator-1-1"
 
   validator-2:
     extends:

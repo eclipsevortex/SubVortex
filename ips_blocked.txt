@@ -1,0 +1,22 @@
+[]{"ip": "192.168.0.1", "port": 8091, "reason": "DoS attack detected: 2 packets in 30 seconds"}
+{"ip": "192.168.0.2", "port": 8091, "reason": "Block ip 192.168.0.2"}
+{"ip": "192.168.0.1", "port": 8091, "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8092, "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "reason": "DDoS attack detected: 2 packets in 30 seconds"}
+{"ip": "192.168.0.1", "port": 8091, "reason": "DoS attack detected: 2 packets in 30 seconds"}
+{"ip": "192.168.0.1", "port": 8091, "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 53, "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.2", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.2"}
+{"ip": "192.168.0.2", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.2"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8092, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 8091, "protocol": "protocol", "reason": "Block ip 192.168.0.1"}
+{"ip": "192.168.0.1", "port": 53, "protocol": "udp", "reason": "Block ip 192.168.0.1"}

@@ -104,7 +104,9 @@ def check_config(cls, config: "bt.Config"):
 
 
 def add_args(cls, parser):
-    parser.add_argument("--netuid", type=int, help="Subvortex network netuid", default=7)
+    parser.add_argument(
+        "--netuid", type=int, help="Subvortex network netuid", default=7
+    )
     parser.add_argument(
         "--miner.name",
         type=str,
@@ -128,7 +130,7 @@ def add_args(cls, parser):
     # Auto update
     parser.add_argument(
         "--auto-update",
-        action="store_true", 
+        action="store_true",
         help="True if the miner can be auto updated, false otherwise",
         default=False,
     )
@@ -139,6 +141,28 @@ def add_args(cls, parser):
         action="store_true",
         help="If True, the miner will allow non-registered hotkeys to mine.",
         default=False,
+    )
+
+    # Firewall
+    parser.add_argument(
+        "--firewall.on",
+        action="store_true",
+        help="True to enable the firewall feature, False otherwise",
+        default=False,
+    )
+    parser.add_argument(
+        "--firewall.interface",
+        type=str,
+        required=False,
+        help="Interface to listen the traffic to (default eth0)",
+        default="eth0",
+    )
+    parser.add_argument(
+        "--firewall.config",
+        type=str,
+        required=False,
+        help="List of ports to forward but not to sniff",
+        default="firewall.json",
     )
 
     # Blacklist.

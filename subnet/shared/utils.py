@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import os
+import json
 import time
 import subprocess
 import bittensor as bt
@@ -56,3 +57,15 @@ def should_upgrade(auto_update: bool, last_upgrade_check: float):
     """
     time_since_last_update = time.time() - last_upgrade_check
     return time_since_last_update >= CHECK_UPDATE_FREQUENCY and auto_update
+
+
+def load_json_file(file_path):
+    try:
+        if not os.path.exists(file_path):
+            return None
+
+        with open(file_path, "r") as file:
+            config = json.load(file)
+        return config
+    except Exception:
+        bt.logging.warning(f"Could not load the json file {file_path}")

@@ -1,0 +1,40 @@
+[
+    {
+        "port": 8091,
+        "protocol": "tcp",
+        "type": "detect-dos",
+        "configuration": {
+            "time_window": 600,
+            "packet_threshold": 1
+        }
+    },
+    {
+        "port": 8091,
+        "protocol": "tcp",
+        "type": "detect-ddos",
+        "configuration": {
+            "time_window": 300,
+            "packet_threshold": 20
+        }
+    },
+    {
+        "port": 22,
+        "protocol": "tcp",
+        "type": "allow"
+    },
+    {
+        "port": 9944,
+        "protocol": "tcp",
+        "type": "allow"
+    },
+    {
+        "port": 9933,
+        "protocol": "tcp",
+        "type": "allow"
+    },
+    {
+        "port": 30333,
+        "protocol": "tcp",
+        "type": "allow"
+    }
+]

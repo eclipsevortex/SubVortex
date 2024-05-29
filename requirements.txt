@@ -4,3 +4,4 @@ redis==5.0.1
 aioredis==2.0.1
 wandb==0.16.5
 loguru==0.7.0
+scapy==2.5.0

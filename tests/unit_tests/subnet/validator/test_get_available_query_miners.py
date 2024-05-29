@@ -1,8 +1,11 @@
+import pytest
+
 from subnet.validator.utils import get_available_query_miners
 
 from tests.unit_tests.utils.utils import generate_random_ip
 
 
+@pytest.mark.usefixtures("validator")
 def test_querying_3_miners_without_exclusion_should_return_a_list_of_3_miners(
     validator,
 ):
@@ -18,6 +21,7 @@ def test_querying_3_miners_without_exclusion_should_return_a_list_of_3_miners(
     assert 3 == len(result)
 
 
+@pytest.mark.usefixtures("validator")
 def test_querying_3_miners_without_exclusion_twice_should_return_the_same_list_of_3_miners(
     validator,
 ):
@@ -36,6 +40,7 @@ def test_querying_3_miners_without_exclusion_twice_should_return_the_same_list_o
     assert first_result == second_result
 
 
+@pytest.mark.usefixtures("validator")
 def test_querying_3_miners_with_exclusion_should_return_a_list_of_3_miners(
     validator,
 ):
@@ -56,6 +61,7 @@ def test_querying_3_miners_with_exclusion_should_return_a_list_of_3_miners(
     assert selection[2] == result[2]
 
 
+@pytest.mark.usefixtures("validator")
 def test_querying_3_miners_with_exclusion_twice_should_return_the_same_list_of_3_miners(
     validator,
 ):

@@ -16,13 +16,19 @@
 # DEALINGS IN THE SOFTWARE.
 
 import os
+import re
+import json
 import time
+import codecs
 import subprocess
 import bittensor as bt
+from os import path
 
 # Check if there is an update every 5 minutes
 # Github Rate Limit 60 requests per hour / per ip (Reference: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28)
 CHECK_UPDATE_FREQUENCY = 5 * 60
+
+here = path.abspath(path.dirname(__file__))
 
 
 def get_redis_password(
@@ -56,3 +62,45 @@ def should_upgrade(auto_update: bool, last_upgrade_check: float):
     """
     time_since_last_update = time.time() - last_upgrade_check
     return time_since_last_update >= CHECK_UPDATE_FREQUENCY and auto_update
+
+
+def load_json_file(file_path):
+    try:
+        if not os.path.exists(file_path):
+            return None
+
+        with open(file_path, "r") as file:
+            config = json.load(file)
+        return config
+    except Exception:
+        bt.logging.warning(f"Could not load the json file {file_path}")
+
+
+def get_version() -> str:
+    """
+    Get the current version of the neuron
+    """
+    with codecs.open(
+        os.path.join(here, "../__init__.py"), encoding="utf-8"
+    ) as init_file:
+        version_match = re.search(
+            r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
+        )
+        version_string = version_match.group(1)
+        return version_string
+
+
+def version2number(version: str):
+    """
+    Convert a string version to an int version
+    E.g 2.2.5 -> 225
+    """
+    try:
+        if version and type(version) is str:
+            version = version.split(".")
+            return (
+                (100 * int(version[0])) + (10 * int(version[1])) + (1 * int(version[2]))
+            )
+    except Exception as _:
+        pass
+    return 0

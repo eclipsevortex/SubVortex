@@ -1,0 +1,4 @@
+#!/bin/bash
+
+SUBSTRATE_NODE_NAME="Substrate Node"
+SUBSTRATE_PORT=9615

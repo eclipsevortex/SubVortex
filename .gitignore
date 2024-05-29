@@ -164,3 +164,7 @@ cython_debug/
 #.idea/
 
 testing/
+ips_blocked.json
+*-skip*
+
+firewall-events.json

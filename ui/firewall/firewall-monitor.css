@@ -1,0 +1,233 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+.header {
+  padding: 20px 10px 10px 10px;
+}
+
+.header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.header-main > h1 {
+  margin: 0;
+}
+
+.header-requests {
+  display: flex;
+  align-items: center;
+}
+
+.header-requests > span {
+  font-weight: bold;
+  margin-left: 5px;
+}
+
+.table-container {
+  height: calc(100% - 108px);
+  padding: 0px 10px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.table {
+  position: relative;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table > thead {
+  position: fixed;
+  z-index: 999;
+  width: calc(100% - 20px);
+}
+
+.table > tbody {
+  margin-top: 72px;
+  width: calc(100% - 20px);
+}
+
+td, tr {
+  height: 60px; /* Set the height of the cells */
+  overflow: hidden; /* Hide overflow content */
+  white-space: nowrap; /* Prevent text from wrapping */
+  text-overflow: ellipsis; /* Add ellipsis for overflowing text */
+  max-height: 60px; /* Ensure max height is fixed */
+  line-height: 60px; /* Vertically align text within the cell */
+}
+
+td {
+  line-height: unset;
+}
+
+.table th {
+  background-color: #009578;
+  color: #ffffff;
+  text-align: left;
+  position: sticky;
+  top: 0;
+}
+
+.table th,
+.table td {
+  padding: 6px 8px;
+  font-weight: normal;
+}
+
+.table thead th {
+  text-align: center;
+}
+
+tr.row-background {
+  background-color: #e6f7f3;
+}
+
+#spacer {
+  height: 0;
+}
+
+.symbol {
+  cursor: pointer;
+}
+
+.timestamp {
+}
+
+.process-time {
+  text-align: center;
+}
+
+.request-id {
+}
+
+.previous-id {
+}
+
+.ip-address {
+}
+
+.port {
+  text-align: center;
+}
+
+.protocol {
+  text-align: center;
+}
+
+.packets {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.action {
+  text-align: center;
+}
+
+.notify {
+  text-align: center;
+}
+
+.reason {
+  max-width: 400px;
+  overflow-y: scroll;
+}
+
+.copy {
+  text-align: center;
+}
+
+.details {
+  display: none;
+  background-color: #f9f9f9;
+  border-top: 1px solid #ccc;
+}
+
+.sub-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sub-table th,
+.sub-table td {
+  border: 1px solid #ddd;
+  padding: 6px 8px;
+  font-weight: normal;
+}
+
+.collapse-symbol {
+  cursor: pointer;
+  user-select: none;
+}
+
+.col-1 {
+  width: calc(100% / 12);
+}
+.col-2 {
+  width: calc((100% / 12) * 2);
+}
+.col-3 {
+  width: calc((100% / 12) * 3);
+}
+.col-4 {
+  width: calc((100% / 12) * 4);
+}
+.col-5 {
+  width: calc((100% / 12) * 5);
+}
+.col-6 {
+  width: calc((100% / 12) * 6);
+}
+.col-7 {
+  width: calc((100% / 12) * 7);
+}
+.col-8 {
+  width: calc((100% / 12) * 8);
+}
+.col-9 {
+  width: calc((100% / 12) * 9);
+}
+.col-10 {
+  width: calc((100% / 12) * 10);
+}
+.col-11 {
+  width: calc((100% / 12) * 11);
+}
+.col-12 {
+  width: calc(100%);
+}
+
+#table {}
+
+#spacer {
+  height: 0;
+  visibility: hidden;
+
+}
+
+.notification-bar {
+  color: #ffeb3b;
+  text-align: center;
+  font-weight: bold;
+  display: none;
+  float: right;
+}
+
+.notification-bar.up {
+  color: #4caf50;
+}
+
+.notification-bar.down {
+  color: #f44336;
+}

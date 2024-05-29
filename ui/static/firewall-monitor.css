@@ -1,0 +1,148 @@
+.body {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  background-color: #009578;
+  color: #ffffff;
+  text-align: left;
+  position: sticky;
+  top: 0;
+}
+
+.table th,
+.table td {
+  padding: 6px 8px;
+  font-weight: normal;
+}
+
+.table thead th {
+  text-align: center;
+}
+
+tr.row-background {
+  background-color: #e6f7f3;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.symbol {
+  cursor: pointer;
+}
+
+.timestamp {
+}
+
+.process-time {
+  text-align: center;
+}
+
+.request-id {
+}
+
+.previous-id {
+}
+
+.ip-address {
+}
+
+.port {
+  text-align: center;
+}
+
+.protocol {
+  text-align: center;
+}
+
+.packets {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.action {
+  text-align: center;
+}
+
+.notify {
+  text-align: center;
+}
+
+.reason {
+  max-width: 400px;
+  overflow-y: scroll;
+}
+
+.copy {
+  text-align: center;
+}
+
+.details {
+  display: none;
+  background-color: #f9f9f9;
+  border-top: 1px solid #ccc;
+}
+
+.sub-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sub-table th,
+.sub-table td {
+  border: 1px solid #ddd;
+  padding: 6px 8px;
+  font-weight: normal;
+}
+
+.collapse-symbol {
+  cursor: pointer;
+  user-select: none;
+}
+
+.col-1 {
+  width: calc(100% / 12);
+}
+.col-2 {
+  width: calc((100% / 12) * 2);
+}
+.col-3 {
+  width: calc((100% / 12) * 3);
+}
+.col-4 {
+  width: calc((100% / 12) * 4);
+}
+.col-5 {
+  width: calc((100% / 12) * 5);
+}
+.col-6 {
+  width: calc((100% / 12) * 6);
+}
+.col-7 {
+  width: calc((100% / 12) * 7);
+}
+.col-8 {
+  width: calc((100% / 12) * 8);
+}
+.col-9 {
+  width: calc((100% / 12) * 9);
+}
+.col-10 {
+  width: calc((100% / 12) * 10);
+}
+.col-11 {
+  width: calc((100% / 12) * 11);
+}
+.col-12 {
+  width: calc(100%);
+}

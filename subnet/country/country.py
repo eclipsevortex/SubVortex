@@ -1,17 +1,17 @@
-import time
 import copy
-import requests
+import time
 import threading
 import ipaddress
 import bittensor as bt
-from datetime import datetime
 from typing import List
 
 from subnet.country.country_constants import (
     COUNTRY_URL,
-    LOGGING_NAME,
+    COUNTRY_LOGGING_NAME,
     COUNTRY_SLEEP,
+    COUNTRY_ATTEMPTS
 )
+from subnet.file.file_google_drive_monitor import FileGoogleDriveMonitor
 from subnet.validator.localisation import (
     get_country_by_country_is,
     get_country_by_ip_api,
@@ -20,31 +20,30 @@ from subnet.validator.localisation import (
 )
 
 
-class CountryService(threading.Thread):
+class CountryService:
     def __init__(self, netuid: int):
-        super().__init__()
-        self.stop_flag = threading.Event()
         self._lock = threading.Lock()
         self._data = {}
-        self.netuid = netuid
-        self.last_modified = None
-        self.show_not_found = True
         self.first_try = True
 
-        # Allow us to not display multiple time the same errors
-        self.error_message = None
+        self.provider = FileGoogleDriveMonitor(
+            logger_name=COUNTRY_LOGGING_NAME,
+            file_url=COUNTRY_URL.get(netuid),
+            check_interval=COUNTRY_SLEEP,
+            callback=self.run,
+        )
 
     def _is_custom_api_enabled(self):
         with self._lock:
-            return self._data.get("enable_custom_api") or True
+            return self._data.get("enable_custom_api", True)
 
     def get_last_modified(self):
         with self._lock:
-            return self.last_modified
+            return self._data.get("last-modified")
 
     def get_locations(self) -> List[str]:
         with self._lock:
-            localisations = self._data.get("localisations") or {}
+            localisations = self._data.get("localisations", {})
             return copy.deepcopy(localisations)
 
     def get_ipv4(self, ip):
@@ -104,82 +103,22 @@ class CountryService(threading.Thread):
         )
         return None
 
-    def start(self):
-        super().start()
-        bt.logging.debug(f"Country started")
-
-    def stop(self):
-        self.stop_flag.set()
-        super().join()
-        bt.logging.debug(f"Country stopped")
-
     def wait(self):
         """
         Wait until we have execute the run method at least one
         """
-        attempt = 0
-        while self.first_try or attempt > 5:
+        attempt = 1
+        while self.first_try and attempt <= COUNTRY_ATTEMPTS:
+            bt.logging.debug(f"[{COUNTRY_LOGGING_NAME}][{attempt}] Waiting file to be process...")
             time.sleep(1)
             attempt += 1
 
-    def run(self):
-        while not self.stop_flag.is_set():
-            response = None
-            try:
-                # Sleep before requesting again
-                if not self.first_try:
-                    time.sleep(COUNTRY_SLEEP)
+    def run(self, data):
+        with self._lock:
+            self._data = data
 
-                url = COUNTRY_URL.get(self.netuid)
-                if not url:
-                    bt.logging.warning(
-                        f"Could not find the country file for the subnet {self.netuid}"
-                    )
+        self.first_try = False
 
-                response = requests.get(url)
-                if response.status_code != 200:
-                    if response.status_code == 404 and not self.show_not_found:
-                        continue
-
-                    self.show_not_found = response.status_code != 404
-
-                    error_message = f"[{LOGGING_NAME}] Could not get the country file {response.status_code}: {response.reason}"
-                    if error_message != self.error_message:
-                        bt.logging.warning(error_message)
-                        self.error_message = error_message
-
-                    continue
-
-                # Load the data
-                data = response.json() or {}
-
-                # Check is date can be retrieved
-                remote_last_modified = data.get("last-modified")
-                if remote_last_modified is None:
-                    continue
-
-                # Check if data changed
-                last_modified = datetime.strptime(
-                    remote_last_modified, "%Y-%m-%d %H:%M:%S.%f"
-                )
-                if self.last_modified and last_modified <= self.last_modified:
-                    continue
-
-                if self._data == data:
-                    continue
-
-                with self._lock:
-                    self._data = data
-                    self.last_modified = last_modified
-
-                bt.logging.success(
-                    f"[{LOGGING_NAME}] Country file proceed successfully",
-                )
-            except Exception as err:
-                content = response.content if response else ""
-                error_message = f"[{LOGGING_NAME}] An error during country file processing: {err} {type(err)} {content}"
-                if error_message != self.error_message:
-                    bt.logging.error(error_message)
-                    self.error_message = error_message
-            finally:
-                self.first_try = False
+        bt.logging.success(
+            f"[{COUNTRY_LOGGING_NAME}] File proceed successfully",
+        )

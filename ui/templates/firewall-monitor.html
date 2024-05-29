@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firewall Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='firewall-monitor.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>Firewall Monitor</h1>
+        <button id="toggle-fetch">Pause</button>
+    </div>
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th class="symbol"></th>
+                    <th class="timestamp col-1">Time</th>
+                    <th class="process-time col-1">Process Time</th>
+                    <th class="request-id col-2">Id</th>
+                    <th class="previous-id col-2">Prev Id</th>
+                    <th class="ip-address col-1">IP Address</th>
+                    <th class="port">Port</th>
+                    <th class="protocol">Protocol</th>
+                    <th class="packets"># Packets</th>
+                    <th class="action">Action</th>
+                    <th class="notify">Notified</th>
+                    <th class="reason col-3">Reason</th>
+                </tr>
+            </thead>
+            <tbody id="events-table">
+            </tbody>
+        </table>
+    </div>
+    <script>
+        const toggleStates = {};
+
+        function humanizeDuration(totalSeconds) {
+            const totalMilliseconds = totalSeconds * 1000;
+            const totalMicroseconds = totalMilliseconds * 1000;
+            const totalNanoseconds = totalMicroseconds * 1000;
+
+            const nanoseconds = Math.floor(totalNanoseconds % 1000);
+            const microseconds = Math.floor(totalMicroseconds % 1000);
+            const milliseconds = Math.floor(totalMilliseconds % 1000);
+            const seconds = Math.floor(totalSeconds) % 60;
+            const minutes = Math.floor(totalSeconds / 60) % 60;
+
+            const humanized = [];
+
+            if (minutes > 0) {
+                humanized.push(`${minutes}m`);
+                if (seconds > 0) {
+                    humanized.push(`${seconds}s`);
+                }
+            } else if (seconds > 0) {
+                humanized.push(`${seconds}s`);
+            } else if (milliseconds > 0) {
+                humanized.push(`${milliseconds}ms`);
+            } else if (microseconds > 0) {
+                humanized.push(`${microseconds}µs`);
+            } else {
+                humanized.push(`${nanoseconds}ns`);
+            }
+
+            return humanized.join(', ');
+        }
+
+        function getQueryParams() {
+            const params = {};
+            const queryString = window.location.search.slice(1);
+            const pairs = queryString.split('&');
+
+            for (const pair of pairs) {
+                const [key, value] = pair.split('=');
+                if (key) {
+                    params[decodeURIComponent(key)] = decodeURIComponent(value);
+                }
+            }
+
+            return params;
+        }
+
+        function copyPayload(payload) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(payload).catch(err => {
+                    console.error('Failed to copy: ', err);
+                });
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = payload;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                } catch (err) {
+                    console.error('Failed to copy: ', err);
+                }
+                document.body.removeChild(textarea);
+            }
+        }
+
+        function toggleDetails(event) {
+            const detailsRow = event.currentTarget.parentElement.nextElementSibling;
+            const symbol = event.currentTarget;
+            if (detailsRow && detailsRow.classList.contains('details')) {
+                const isVisible = detailsRow.style.display === 'table-row';
+                detailsRow.style.display = isVisible ? 'none' : 'table-row';
+                symbol.textContent = isVisible ? '[+]' : '[-]';
+
+                // Update the toggle state
+                const requestId = event.currentTarget.parentElement.querySelector('.request-id').textContent;
+                toggleStates[requestId] = !isVisible;
+
+                const detailRows = document.querySelectorAll('tr.details[style*="display: table-row;"]');
+                detailRows.forEach(detailRow => {
+                    const subTableRows = detailRow.querySelectorAll('.sub-table > tbody > tr');
+                    subTableRows.forEach((row, index) => {
+                        if (index % 2 === 0) { 
+                            row.classList.add("row-background");
+                        }
+                    });
+                });
+            }
+        }
+        
+        async function fetchEvents() {
+            const params = getQueryParams();
+            const query = new URLSearchParams(params).toString();
+            const response = await fetch('/requests?' + query);
+            const events = await response.json();
+            const table = document.getElementById('events-table');
+            table.innerHTML = '';
+            events.forEach(event => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="symbol" onclick="toggleDetails(event)">[${toggleStates[event.request_id] ? '-' : '+' }]</td>
+                    <td class="timestamp col-1">${new Date(event.current_time * 1000).toLocaleString()}</td>
+                    <td class="process-time col-1">${humanizeDuration(event.process_time)}</td>
+                    <td class="request-id col-2">${event.request_id}</td>
+                    <td class="previous-id col-2">${event.previous_id || ''}</td>
+                    <td class="ip-address col-1">${event.sip}</td>
+                    <td class="port">${event.dport}</td>
+                    <td class="protocol">${event.protocol}</td>
+                    <td class="packets">${event.packets.length}</td>
+                    <td class="action" style="color: ${event.status === 'allow' ? '#4CAF50' : '#F44336'}">${event.status}</td>
+                    <td class="notify">${event.notified === true ? '✅' : '❌'}</td>
+                    <td class="reason col-3">${event.reason || ''}</td>
+                `;
+
+                table.appendChild(row);
+
+                // Create the subrows to display the different packets
+                const detailsRow = document.createElement('tr');
+                detailsRow.className = 'details';
+                detailsRow.style.display = toggleStates[event.request_id] ? 'table-row' : 'none';
+                detailsRow.innerHTML = `
+                    <td colspan="16">
+                        <table class="sub-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-1">Time</th>
+                                    <th class="col-1">Process Time</th>
+                                    <th>Seq</th>
+                                    <th>Ack</th>
+                                    <th>Flags</th>
+                                    <th class="col-3">Hotkey</th>
+                                    <th>Version</th>
+                                    <th>Neuron Version</th>
+                                    <th>Action</th>
+                                    <th>Payload</th>
+                                </tr>
+                            </thead>
+                            ${event.packets.map(packet => `
+                                <tr>
+                                    <td class="col-1">${new Date(packet.current_time * 1000).toLocaleString()}</td>
+                                    <td class="process-time col-1">${humanizeDuration(packet.process_time)}</td>
+                                    <td>${packet.seq}</td>
+                                    <td>${packet.ack}</td>
+                                    <td>${packet.flags}</td>
+                                    <td class="col-3">${packet.dendrite.hotkey || ''}</td>
+                                    <td>${packet.dendrite.version || ''}</td>
+                                    <td>${packet.dendrite.neuron_version || ''}</td>
+                                    <td class="action" style="color: ${packet.status === 'allow' ? '#4CAF50' : '#F44336'}">${packet.status}</td>
+                                    <td class="copy">${packet.flags.includes('PA') ? `<button onclick="copyPayload('${packet.payload}')">Copy</button>` : ''}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    </td>
+                `;
+
+                table.appendChild(detailsRow);
+                
+            });
+
+            const rows = document.querySelectorAll(".table > tbody > tr:not(.details)");
+            rows.forEach((row, index) => {
+                if (index % 2 === 0) {
+                    row.classList.add("row-background");
+                }
+            });
+
+            // Store events globally for access in copyPayload function
+            window.events = events;
+        }
+
+        let fetchInterval = setInterval(fetchEvents, 1000);
+
+        document.getElementById('toggle-fetch').addEventListener('click', () => {
+            const button = document.getElementById('toggle-fetch');
+            if (fetchInterval) {
+                clearInterval(fetchInterval);
+                fetchInterval = null;
+                button.textContent = 'Resume';
+            } else {
+                fetchEvents(); // Fetch immediately
+                fetchInterval = setInterval(fetchEvents, 1000);
+                button.textContent = 'Pause';
+            }
+        });
+
+        fetchEvents();
+    </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 from subnet.validator.selection import select_uids
+
 from tests.unit_tests.mocks import mock_miners
 from tests.unit_tests.utils.utils import count_non_unique, count_unique
 
@@ -40,7 +41,7 @@ def test_one_active_validator_should_select_all_miners_fairly():
         "0x1c1ad91722bfc017da9087f019f5e8c5265b7aacf9fb813d15445eaada98d1c5",
         miners,
         [20],
-        k = 4
+        k=4,
     )
 
     # Assert
@@ -59,7 +60,7 @@ def test_one_active_validator_should_select_all_miners_fairly():
         "0x1c1ad91722bfc017da9087f019f5e8c5265b7aacf9fb813d15445eaada98d1c6",
         miners,
         [20],
-        k = 4
+        k=4,
     )
 
     # Assert
@@ -78,7 +79,7 @@ def test_one_active_validator_should_select_all_miners_fairly():
         "0x1c1ad91722bfc017da9087f019f5e8c5265b7aacf9fb813d15445eaada98d1c7",
         miners,
         [20],
-        k = 4
+        k=4,
     )
 
     # Assert
@@ -97,7 +98,7 @@ def test_one_active_validator_should_select_all_miners_fairly():
         "0x1c1ad91722bfc017da9087f019f5e8c5265b7aacf9fb813d15445eaada98d1c8",
         miners,
         [20],
-        k = 4
+        k=4,
     )
 
     # Assert
@@ -116,7 +117,7 @@ def test_one_active_validator_should_select_all_miners_fairly():
         "0x1c1ad91722bfc017da9087f019f5e8c5265b7aacf9fb813d15445eaada98d1c9",
         miners,
         [20],
-        k = 4
+        k=4,
     )
 
     # Assert

@@ -4,6 +4,8 @@ from substrateinterface import SubstrateInterface
 
 from subnet.shared.checks import check_registration
 from subnet.shared.utils import should_upgrade
+from subnet.shared.substrate import get_weights_min_stake
+from subnet.shared.subtensor import get_hyperparameter_value
 
 from subnet.miner.version import VersionControl
 
@@ -67,6 +69,9 @@ def run(self):
         if should_sync:
             self.metagraph.sync(subtensor=self.subtensor)
             bt.logging.info("Metagraph resynced")
+
+            if self.firewall:
+                self.update_firewall()
 
         # --- Check for registration every 100 blocks (20 minutes).
         if current_block % 100 == 0:

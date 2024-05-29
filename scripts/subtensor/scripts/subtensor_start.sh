@@ -12,7 +12,7 @@ function run_command()
     
     # Different command options by network and node type
     MAINNET_CHAIN='--chain ./raw_spec.json'
-    TESTNET_CHAIN='--chain ./raw_testspec.json'
+    TESTNET_CHAIN='--chain ./raw_spec_testfinney.json'
     MAINNET_BOOTNODE='--bootnodes /ip4/13.58.175.193/tcp/30333/p2p/12D3KooWDe7g2JbNETiKypcKT1KsCEZJbTzEHCn8hpd4PHZ6pdz5'
     # MAINNET_BOOTNODE='--bootnodes /dns/bootnode.finney.opentensor.ai/tcp/30333/ws/p2p/12D3KooWRwbMb85RWnT8DSXSYMWQtuDwh4LJzndoRrTDotTR5gDC'
     TESTNET_BOOTNODE='--bootnodes /dns/bootnode.test.finney.opentensor.ai/tcp/30333/p2p/12D3KooWPM4mLcKJGtyVtkggqdG84zWrd7Rij6PGQDoijh1X86Vr'
@@ -49,7 +49,7 @@ function run_command()
     --execution wasm \
     --wasm-execution compiled \
     --port 30333 \
-    --max-runtime-instances 64 \
+    --max-runtime-instances 32 \
     --rpc-max-response-size 2048 \
     --rpc-cors all \
     --rpc-port 9944 \

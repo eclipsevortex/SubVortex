@@ -1,8 +1,11 @@
+import pytest
+
 from subnet.validator.utils import get_available_uids
 
 from tests.unit_tests.utils.utils import generate_random_ip
 
 
+@pytest.mark.usefixtures("validator")
 def test_given_a_list_of_uids_without_exclusion_when_all_uids_are_available_should_return_all_the_uids(
     validator,
 ):
@@ -18,6 +21,7 @@ def test_given_a_list_of_uids_without_exclusion_when_all_uids_are_available_shou
     assert len(axons) == len(result)
 
 
+@pytest.mark.usefixtures("validator")
 def test_given_a_list_of_uids_with_exclusion_when_all_uids_are_available_should_return_all_the_uids_without_excluded_ones(
     validator,
 ):
@@ -36,6 +40,7 @@ def test_given_a_list_of_uids_with_exclusion_when_all_uids_are_available_should_
     assert all(uid not in result for uid in exclusions)
 
 
+@pytest.mark.usefixtures("validator")
 def test_given_a_list_of_uids_without_exclusion_when_a_uid_is_unavailable_should_not_be_returned(
     validator,
 ):
@@ -56,6 +61,7 @@ def test_given_a_list_of_uids_without_exclusion_when_a_uid_is_unavailable_should
     assert unaivalable_uid not in result
 
 
+@pytest.mark.usefixtures("validator")
 def test_given_a_list_of_uids_with_exclusion_when_a_uid_is_unavailable_should_return_all_the_uids_without_the_excluded_and_unavailable_ones(
     validator,
 ):

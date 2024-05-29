@@ -1,6 +1,8 @@
-bittensor==6.12.1
+bittensor==7.3.0
 torch==2.0.1
 redis==5.0.1
 aioredis==2.0.1
 wandb==0.16.5
 loguru==0.7.0
+
+netfilterqueue==1.1.0; sys_platform == 'linux'

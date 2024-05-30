@@ -176,6 +176,7 @@ class Miner:
         self.thread: threading.Thread = None
         self.lock = asyncio.Lock()
         self.request_timestamps: typing.Dict = {}
+        self.previous_last_updates = []
 
         self.step = 0
 
@@ -262,6 +263,23 @@ class Miner:
                        None if the context was exited without an exception.
         """
         self.stop_run_thread()
+
+    def should_sync_metagraph(self):
+        """
+        True if the metagraph has been resynced, False otherwise.
+        """
+        last_updates = self.subtensor.substrate.query(
+            module="SubtensorModule",
+            storage_function="LastUpdate",
+            params=[self.config.netuid],
+        )
+        if self.previous_last_updates == last_updates:
+            return False
+
+        # Save the new updates
+        self.previous_last_updates = last_updates
+
+        return True
 
 
 def run_miner():

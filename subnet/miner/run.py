@@ -57,6 +57,16 @@ def run(self):
     def handler(obj, update_nr, subscription_id):
         current_block = obj["header"]["number"]
         bt.logging.debug(f"New block #{current_block}")
+        bt.logging.debug(
+            f"Blocks since epoch: {(current_block + netuid + 1) % (tempo + 1)}"
+        )
+
+        # --- Check to resync the metagraph.
+        should_sync = self.should_sync_metagraph()
+        bt.logging.debug(f"should_sync_metagraph() {should_sync}")
+        if should_sync:
+            self.metagraph.sync(subtensor=self.subtensor)
+            bt.logging.info("Metagraph resynced")
 
         # --- Check for registration every 100 blocks (20 minutes).
         if current_block % 100 == 0:
@@ -70,10 +80,6 @@ def run(self):
                 return
 
             self.last_upgrade_check = time.time()
-
-        bt.logging.debug(
-            f"Blocks since epoch: {(current_block + netuid + 1) % (tempo + 1)}"
-        )
 
         if self.should_exit:
             return True

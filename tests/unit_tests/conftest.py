@@ -13,6 +13,7 @@ def validator():
     config.wandb.off = True
     config.neuron.dont_save_events = True
     validator = Validator(config)
+    validator.country_code = "GB"
     bt.logging.off()
 
     mock = AsyncMock(aioredis.Redis)

@@ -2,13 +2,17 @@ from subnet.validator.score import compute_latency_score
 
 import tests.unit_tests.mocks.mock_miners as mocks
 
+locations = {
+    "DE": {"country": "Germany", "latitude": 51.165691, "longitude": 10.451526},
+}
+
 
 def test_a_not_verified_miner_should_return_a_score_of_zero():
     # Arrange
     miner = mocks.miner_not_verified_1
 
     # Act
-    result = compute_latency_score(miner.country, miner, [miner])
+    result = compute_latency_score(miner.country, miner, [miner], locations)
 
     # Assert
     assert 0.0 == result
@@ -19,7 +23,7 @@ def test_an_ip_conflicts_miner_should_return_a_score_of_zero():
     miner = mocks.miner_with_ip_conflicts_1
 
     # Act
-    result = compute_latency_score(miner.country, miner, [miner])
+    result = compute_latency_score(miner.country, miner, [miner], locations)
 
     # Assert
     assert 0.0 == result
@@ -30,7 +34,7 @@ def test_a_not_verified_and_ip_conflicts_miner_should_return_a_score_of_zero():
     miner = mocks.miner_not_verified_and_ip_conflicts_1
 
     # Act
-    result = compute_latency_score(miner.country, miner, [miner])
+    result = compute_latency_score(miner.country, miner, [miner], locations)
 
     # Assert
     assert 0.0 == result
@@ -43,7 +47,7 @@ def test_a_verified_miner_when_alone_should_return_a_score_of_one():
     miners = [miner]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert 1.0 == result
@@ -60,7 +64,7 @@ def test_a_verified_miner_when_other_miners_are_not_verified_should_return_a_sco
     ]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert 1.0 == result
@@ -73,7 +77,7 @@ def test_a_verified_miner_when_other_miners_have_ip_conflicts_should_return_a_sc
     miners = [miner, mocks.miner_with_ip_conflicts_1, mocks.miner_with_ip_conflicts_2]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert 1.0 == result
@@ -86,7 +90,7 @@ def test_a_verified_miner_when_other_miners_are_not_verified_and_have_ip_conflic
     miners = [miner, mocks.miner_with_ip_conflicts_1, mocks.miner_with_ip_conflicts_2]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert 1.0 == result
@@ -102,7 +106,7 @@ def test_a_verified_miner_when_evaluating_the_best_one_should_return_a_score_of_
     ]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert 1.0 == result
@@ -118,7 +122,7 @@ def test_a_verified_miner_when_evaluating_the_worst_one_should_return_a_score_of
     ]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert 0.0 == result
@@ -134,7 +138,7 @@ def test_a_verified_miner_when_evaluating_a_middle_one_should_return_a_score_bet
     ]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert 0.5 == result
@@ -150,7 +154,7 @@ def test_a_verified_miner_when_evaluating_a_30_percent_close_to_the_best_should_
     ]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert 0.7 == result
@@ -166,7 +170,7 @@ def test_a_verified_miner_when_evaluating_a_30_percent_close_to_the_worst_should
     ]
 
     # Act
-    result = compute_latency_score(miner.country, miner, miners)
+    result = compute_latency_score(miner.country, miner, miners, locations)
 
     # Assert
     assert abs(0.3 - result) < 0.000000000000001

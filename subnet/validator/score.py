@@ -220,7 +220,7 @@ def compute_final_score(miner: Miner):
     """
     # Use a smaller weight if the subtensor is available but desync (miner block < validator block - 1)
     availability_weight = (
-        1 if miner.verified and not miner.sync else AVAILABILITY_WEIGHT
+        3 if miner.verified and not miner.sync else AVAILABILITY_WEIGHT
     )
 
     numerator = (

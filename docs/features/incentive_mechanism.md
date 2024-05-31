@@ -74,10 +74,10 @@ The final score is the score for the current challenge. It will be computed as t
 
 The weight for each score will be as follows:
 
-- Availability: Weight will be **3** if the miner's subtensor is synchronized, and **1** otherwise.
-- Latency: Weight will be **1**.
-- Reliability: Weight will be **1**.
-- Distribution: Weight will be **1**.
+- Availability: Weight will be **8** if the miner's subtensor is synchronized, and **3** otherwise.
+- Latency: Weight will be **7**.
+- Reliability: Weight will be **3**.
+- Distribution: Weight will be **2**.
 
 So, the final formula will be calculated using the following expression
 

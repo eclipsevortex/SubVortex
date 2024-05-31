@@ -2,6 +2,7 @@ import time
 import copy
 import requests
 import threading
+import ipaddress
 import bittensor as bt
 from datetime import datetime
 from typing import List
@@ -46,38 +47,60 @@ class CountryService(threading.Thread):
             localisations = self._data.get("localisations") or {}
             return copy.deepcopy(localisations)
 
+    def get_ipv4(self, ip):
+        try:
+            # First, try to interpret the input as an IPv4 address
+            ipv4 = ipaddress.IPv4Address(ip)
+            return str(ipv4)
+        except ipaddress.AddressValueError:
+            pass
+
+        try:
+            # Next, try to interpret the input as an IPv6 address
+            ipv6 = ipaddress.IPv6Address(ip)
+            if ipv6.ipv4_mapped:
+                return str(ipv6.ipv4_mapped)
+        except ipaddress.AddressValueError:
+            pass
+
+        return ip
+
     def get_country(self, ip: str):
         """
         Get the country code of the ip
         """
+        ip_ipv4 = self.get_ipv4(ip)
+
         country = None
         with self._lock:
             overrides = self._data.get("overrides") or {}
-            country = overrides.get(ip)
+            country = overrides.get(ip_ipv4)
 
         if country:
             return country
 
         country, reason1 = (
-            get_country_by_my_api(ip) if self._is_custom_api_enabled() else (None, None)
+            get_country_by_my_api(ip_ipv4)
+            if self._is_custom_api_enabled()
+            else (None, None)
         )
         if country:
             return country
 
-        country, reason2 = get_country_by_country_is(ip)
+        country, reason2 = get_country_by_country_is(ip_ipv4)
         if country:
             return country
 
-        country, reason3 = get_country_by_ip_api(ip)
+        country, reason3 = get_country_by_ip_api(ip_ipv4)
         if country:
             return country
 
-        country, reason4 = get_country_by_ipinfo_io(ip)
+        country, reason4 = get_country_by_ipinfo_io(ip_ipv4)
         if country:
             return country
 
         bt.logging.warning(
-            f"Could not get the country of the ip {ip}: Api 1: {reason1} / Api 2: {reason2} / Api 3: {reason3} / Api 4: {reason4}"
+            f"Could not get the country of the ip {ip_ipv4}: Api 1: {reason1} / Api 2: {reason2} / Api 3: {reason3} / Api 4: {reason4}"
         )
         return None
 

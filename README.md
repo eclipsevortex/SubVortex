@@ -141,7 +141,7 @@ Team responsabilities
 
 - **EclipseVortex** - Development and technology
 - **Ch3RNØbØG** - Operations and business development
-- **tww9** - Strategy and public relations
+- **CryptoMinedMind** - Strategy and public relations
 - **HcL-CO** - QA Lead and support
 
 Team timezone
@@ -182,6 +182,7 @@ Bittensor technology is still new and promising, and participants are eager to s
 
 - **Bittensor**: for providing a subnet template that enabled us to quickly set up our subnet.
 - **Subtensor**: for their local subtensor, scripts, and invaluable assistance.
+- **andrewoflaherty**: for implementing the country api using MaxMind and IPInfo ([github](https://github.com/OFlahertyAndrew))
 - **Subnet Storage (SN21)**: for their excellent subnet design, which adheres to best practices and simplifies the lives of developers.
 - **Users**: YES!!! Without you, we are nothing, and our vision to advance this new technology would never have materialized.
 - **Others**: undoubtedly, there are many other contributors deserving of recognition, and we look forward to acknowledging them in the future.

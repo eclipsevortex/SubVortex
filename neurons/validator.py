@@ -28,6 +28,7 @@ from traceback import print_exception
 from subnet import __version__ as THIS_VERSION
 
 from subnet.monitor.monitor import Monitor
+from subnet.country.country import CountryService
 
 from subnet.shared.checks import check_registration
 from subnet.shared.utils import get_redis_password, should_upgrade
@@ -36,7 +37,6 @@ from subnet.shared.weights import should_set_weights
 from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
 
 from subnet.validator.config import config, check_config, add_args
-from subnet.validator.localisation import get_country, get_localisation
 from subnet.validator.forward import forward
 from subnet.validator.models import Miner
 from subnet.validator.version import VersionControl
@@ -168,19 +168,6 @@ class Validator:
             self.dendrite = bt.dendrite(wallet=self.wallet)
         bt.logging.debug(str(self.dendrite))
 
-        # Get the validator country
-        self.country = get_country(self.dendrite.external_ip)
-        country_localisation = get_localisation(self.country)
-        country_name = (
-            country_localisation["country"] if country_localisation else "None"
-        )
-        bt.logging.debug(f"Validator based in {country_name}")
-
-        # Init wandb.
-        if not self.config.wandb.off:
-            bt.logging.debug("loading wandb")
-            init_wandb(self)
-
         # Init the event loop.
         self.loop = asyncio.get_event_loop()
 
@@ -195,6 +182,7 @@ class Validator:
         self.rebalance_queue = []
         self.miners: List[Miner] = []
         self.last_upgrade_check = 0
+        self.last_upgrade_country = None
 
     async def run(self):
         bt.logging.info("run()")
@@ -203,16 +191,30 @@ class Validator:
         dump_path = self.config.database.redis_dump_path
         self.version_control = VersionControl(self.database, dump_path)
 
+        # Monitor miners
+        self.monitor = Monitor(self.config.netuid)
+        self.monitor.start()
+
+        # Country service
+        self.country_service = CountryService(self.config.netuid)
+        self.country_service.start()
+        self.country_service.wait()
+
+        # Get the validator country
+        self.country_code = self.country_service.get_country(self.dendrite.external_ip)
+        bt.logging.debug(f"Validator based in {self.country_code}")
+
+        # Init wandb.
+        if not self.config.wandb.off:
+            bt.logging.debug("loading wandb")
+            init_wandb(self)
+
         # Init miners
         self.miners = await get_all_miners(self)
         bt.logging.debug(f"Miners loaded {len(self.miners)}")
 
         # Load the state
         load_state(self)
-
-        # Monitor miners
-        self.monitor = Monitor(self.config.netuid)
-        self.monitor.start()
 
         try:
             while 1:
@@ -229,7 +231,12 @@ class Validator:
 
                 start_epoch = time.time()
 
-                await resync_metagraph_and_miners(self)
+                # Check if the coutry changed
+                last_upgrade_country = self.country_service.get_last_modified()
+                has_country_changed = self.last_upgrade_country != last_upgrade_country
+                self.last_upgrade_country = last_upgrade_country
+
+                await resync_metagraph_and_miners(self, has_country_changed)
                 prev_set_weights_block = self.metagraph.last_update[self.uid].item()
 
                 # --- Wait until next step epoch.
@@ -307,6 +314,9 @@ class Validator:
         finally:
             if self.monitor:
                 self.monitor.stop()
+
+            if self.country_service:
+                self.country_service.stop()
 
             if hasattr(self, "subtensor"):
                 bt.logging.debug("Closing subtensor connection")

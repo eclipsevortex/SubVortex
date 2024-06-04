@@ -4,10 +4,7 @@ from typing import List
 
 from subnet.validator.models import Miner
 from subnet.validator.bonding import wilson_score_interval
-from subnet.validator.localisation import (
-    compute_localisation_distance,
-    get_localisation,
-)
+from subnet.validator.localisation import compute_localisation_distance
 from subnet.validator.constants import CHALLENGE_NAME
 from subnet.constants import (
     AVAILABILITY_FAILURE_REWARD,
@@ -94,7 +91,9 @@ def can_compute_latency_score(miner: Miner):
     return miner.verified and not miner.has_ip_conflicts
 
 
-def compute_latency_score(validator_country: str, miner: Miner, miners: List[Miner]):
+def compute_latency_score(
+    validator_country: str, miner: Miner, miners: List[Miner], locations
+):
     """
     Compute the latency score of the uid based on the process time of all uids
     """
@@ -104,7 +103,7 @@ def compute_latency_score(validator_country: str, miner: Miner, miners: List[Min
     bt.logging.trace(f"[{miner.uid}][Score][Latency] Process time {miner.process_time}")
 
     # Step 1: Get the localisation of the validator
-    validator_localisation = get_localisation(validator_country)
+    validator_localisation = locations.get(validator_country)
 
     # Step 2: Compute the miners process times by adding a tolerance
     miner_index = -1
@@ -115,8 +114,8 @@ def compute_latency_score(validator_country: str, miner: Miner, miners: List[Min
             continue
 
         distance = 0
-        location = get_localisation(item.country)
-        if location is not None:
+        location = locations.get(item.country)
+        if location is not None and validator_localisation is not None:
             distance = compute_localisation_distance(
                 validator_localisation["latitude"],
                 validator_localisation["longitude"],
@@ -124,9 +123,15 @@ def compute_latency_score(validator_country: str, miner: Miner, miners: List[Min
                 location["longitude"],
             )
         else:
-            bt.logging.warning(
-                f"[{miner.uid}][Score][Latency] The country '{item.country}' could not be found. No tolerance applied."
-            )
+            if validator_localisation is None:
+                bt.logging.warning(
+                    f"[{miner.uid}][Score][Latency] The validator's country '{validator_country}' could not be found. No tolerance applied."
+                )
+
+            if location is None:
+                bt.logging.warning(
+                    f"[{miner.uid}][Score][Latency] The country '{item.country}' could not be found. No tolerance applied."
+                )
 
         scaled_distance = distance / MAX_DISTANCE
         tolerance = 1 - scaled_distance
@@ -215,7 +220,7 @@ def compute_final_score(miner: Miner):
     """
     # Use a smaller weight if the subtensor is available but desync (miner block < validator block - 1)
     availability_weight = (
-        1 if miner.verified and not miner.sync else AVAILABILITY_WEIGHT
+        3 if miner.verified and not miner.sync else AVAILABILITY_WEIGHT
     )
 
     numerator = (

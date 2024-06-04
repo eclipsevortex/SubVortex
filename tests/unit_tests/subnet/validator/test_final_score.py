@@ -30,7 +30,7 @@ def test_a_not_sync_miner_should_return_a_score_different_of_zero():
     miner.reliability_score = 0.30
     miner.distribution_score = 0.40
 
-    expected_score = (0.10 + 0.20 + 0.30 + 0.40) / 4
+    expected_score = (0.10 * 3 + 0.20 * 7 + 0.30 * 3 + 0.40 * 2) / 15
 
     # Act
     result = compute_final_score(miner)
@@ -67,7 +67,7 @@ def test_a_suspicious_miner_with_penalty_factor_should_return_a_score_different_
     miner.distribution_score = 0.40
     miner.penalty_factor = 0.4
 
-    expected_score = ((0.10 + 0.20 + 0.30 + 0.40) / 4) * 0.4
+    expected_score = ((0.10 * 3 + 0.20 * 7 + 0.30 * 3 + 0.40 * 2) / 15) * 0.4
 
     # Act
     result = compute_final_score(miner)
@@ -86,7 +86,7 @@ def test_a_verified_and_sync_miner_should_return_a_score_different_of_zero():
     miner.reliability_score = 0.30
     miner.distribution_score = 0.40
 
-    expected_score = (3 * 0.10 + 0.20 + 0.30 + 0.40) / 6
+    expected_score = (0.10 * 8 + 0.20 * 7 + 0.30 * 3 + 0.40 * 2) / 20
 
     # Act
     result = compute_final_score(miner)

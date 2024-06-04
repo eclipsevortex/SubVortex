@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.5 / 2024-05-31
+
+## What's Changed
+* resyn metagraph for miner by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/62
+* fix subtensor by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/65
+* fix country api by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/64
+* adjust weight for the scores by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/66
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.4...v2.2.5
+
 ## 2.2.4 / 2024-05-20
 
 ## What's Changed

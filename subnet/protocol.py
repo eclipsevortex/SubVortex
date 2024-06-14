@@ -17,9 +17,10 @@
 
 import typing
 import bittensor as bt
+from subnet.bittensor.synapse import SubVortexSynapse
 
 
-class Score(bt.Synapse):
+class Score(SubVortexSynapse):
     validator_uid: typing.Optional[int]
     availability: float
     latency: float

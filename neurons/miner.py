@@ -23,13 +23,21 @@ import asyncio
 import bittensor as bt
 import threading
 import traceback
+from typing import Union
 
 from subnet.protocol import Score
 
 from subnet.shared.checks import check_registration
 from subnet.shared.utils import load_json_file
+from subnet.shared.subtensor import get_hyperparameter_value
+from subnet.shared.substrate import get_weights_min_stake
+
+from subnet.bittensor.metagraph import SubVortexMetagraph
+from subnet.bittensor.axon import SubVortexAxon
+from subnet.bittensor.synapse import SubVortexSynapse
 
 from subnet import __version__ as THIS_VERSION
+from subnet.firewall.firewall_factory import create_firewall_tool
 from subnet.miner import run
 from subnet.miner.firewall import Firewall
 from subnet.miner.config import (
@@ -80,7 +88,7 @@ class Miner:
 
     subtensor: "bt.subtensor"
     wallet: "bt.wallet"
-    metagraph: "bt.metagraph"
+    metagraph: SubVortexMetagraph
 
     def __init__(self):
         self.config = Miner.config()
@@ -121,7 +129,7 @@ class Miner:
 
         # Init metagraph.
         bt.logging.debug("loading metagraph")
-        self.metagraph = bt.metagraph(
+        self.metagraph = SubVortexMetagraph(
             netuid=self.config.netuid, network=self.subtensor.network, sync=False
         )  # Make sure not to sync without passing subtensor
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
@@ -133,13 +141,16 @@ class Miner:
         bt.logging.info(f"Running miner on uid: {self.my_subnet_uid}")
 
         # Firewall
+        self.firewall = None
         if self.config.firewall.on:
             bt.logging.debug(
                 f"Starting firewall on interface {self.config.firewall.interface}"
             )
+            firewall_tool = create_firewall_tool(self.config.firewall.tool)
             self.firewall = Firewall(
-                self.config.firewall.interface,
-                (
+                tool=firewall_tool,
+                interface=self.config.firewall.interface,
+                rules=(
                     load_json_file(self.config.firewall.config)
                     if self.config.firewall.config
                     else None
@@ -148,18 +159,20 @@ class Miner:
             self.firewall.start()
 
         # The axon handles request processing, allowing validators to send this process requests.
-        self.axon = bt.axon(
+        self.axon = SubVortexAxon(
             wallet=self.wallet,
             config=self.config,
             external_ip=bt.utils.networking.get_external_ip(),
+            blacklist_fn=self._blacklist,
         )
         bt.logging.info(f"Axon {self.axon}")
+        bt.logging.info(f"Axon version {self.axon.info().version}")
 
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward functions to axon.")
         self.axon.attach(
             forward_fn=self._score,
-            blacklist_fn=self.blacklist_score,
+            blacklist_fn=self._blacklist_score,
         )
 
         # Serve passes the axon information to the network + netuid we are hosting on.
@@ -199,6 +212,43 @@ class Miner:
 
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
+    def _blacklist(self, synapse: SubVortexSynapse) -> typing.Tuple[bool, str]:
+        caller = synapse.dendrite.hotkey
+        caller_version = synapse.dendrite.neuron_version or 0
+        synapse_type = type(synapse).__name__
+
+        # Get the list of all validators
+        validators = self.metagraph.get_validators(0)
+
+        # Get the validator associated to the hotkey
+        validator = next((x for x in validators if x[1] == caller), None)
+
+        # Block hotkeys that are not an active validator hotkey
+        if not validator:
+            bt.logging.debug(
+                f"Blacklisted a {synapse_type} request from a unrecognized hotkey {caller}"
+            )
+            return True, "Unrecognized hotkey"
+
+        # Block hotkeys that do not have the latest version
+        active_version = get_hyperparameter_value(self.subtensor, "weights_version")
+        if caller_version < active_version:
+            bt.logging.debug(
+                f"Blacklisted a {synapse_type} request from a non-updated hotkey {caller}"
+            )
+            return True, "Non-updated hotkey"
+
+        # Block hotkeys that do not have the minimum require stake to set weight
+        weights_min_stake = get_weights_min_stake(self.subtensor.substrate)
+        if validator[2] < weights_min_stake:
+            bt.logging.debug(
+                f"Blacklisted a {synapse_type} request from a not enought stake hotkey {caller}"
+            )
+            return True, "Not enough stake hotkey"
+
+        bt.logging.trace(f"Not Blacklisting recognized hotkey {caller}")
+        return False, "Hotkey recognized!"
+
     def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
@@ -217,20 +267,8 @@ class Miner:
 
         return synapse
 
-    def blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
-        caller = synapse.dendrite.hotkey
-
-        if caller in self.config.blacklist.blacklist_hotkeys:
-            return True, f"Hotkey {caller} in blacklist."
-        elif caller in self.config.blacklist.whitelist_hotkeys:
-            return False, f"Hotkey {caller} in whitelist."
-
-        if caller not in self.metagraph.hotkeys:
-            bt.logging.trace(f"Blacklisting unrecognized hotkey {caller}")
-            return True, "Unrecognized hotkey"
-
-        bt.logging.trace(f"Not Blacklisting recognized hotkey {caller}")
-        return False, "Hotkey recognized!"
+    def _blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
+        return self._blacklist(synapse)
 
     def run(self):
         run(self)

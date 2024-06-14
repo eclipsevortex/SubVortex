@@ -1,4 +1,5 @@
 import os
+import copy
 import json
 import time
 import logging
@@ -6,18 +7,16 @@ import threading
 import bittensor as bt
 from typing import List
 from collections import defaultdict
-from scapy.all import sniff, TCP, UDP, IP, Packet
+from scapy.all import sniff, TCP, UDP, IP, Raw, Packet
 
 from subnet.shared.encoder import EnumEncoder
-from subnet.miner.firewall_models import create_rule, Rule, RuleType, DetectDoSRule, DetectDDoSRule
-from subnet.miner.iptables import (
-    deny_traffic_from_ip,
-    deny_traffic_on_port,
-    deny_traffic_from_ip_and_port,
-    allow_traffic_from_ip,
-    allow_traffic_on_port,
-    allow_traffic_from_ip_and_port,
-    remove_deny_traffic_from_ip_and_port,
+from subnet.firewall.firewall_model import FirewallTool
+from subnet.miner.firewall_models import (
+    create_rule,
+    Rule,
+    RuleType,
+    DetectDoSRule,
+    DetectDDoSRule,
 )
 
 # Disalbe scapy logging
@@ -28,19 +27,27 @@ logging.getLogger("scapy.runtime").setLevel(logging.CRITICAL)
 class Firewall(threading.Thread):
     def __init__(
         self,
+        tool: FirewallTool,
         interface: str,
         rules=[],
     ):
         super().__init__(daemon=True)
 
+        self._whitelist_lock = threading.Lock()
+        self._blacklist_lock = threading.Lock()
+        self._specifications_lock = threading.Lock()
         self.stop_flag = threading.Event()
         self.packet_counts = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
         self.packet_timestamps = defaultdict(
             lambda: defaultdict(lambda: defaultdict(list))
         )
 
+        self.tool = tool
         self.interface = interface
         self.ips_blocked = []
+        self.whitelist_ips = []
+        self.blacklist_ips = []
+        self.specifications = {}
 
         self.rules = [create_rule(x) for x in rules]
 
@@ -52,6 +59,29 @@ class Firewall(threading.Thread):
         self.stop_flag.set()
         super().join()
         bt.logging.debug(f"Firewall stopped")
+
+    def is_whitelisted(self, ip: str):
+        with self._whitelist_lock:
+            return ip in self.whitelist_ips
+
+    def is_blacklisted(self, ip: str):
+        with self._blacklist_lock:
+            return ip in self.blacklist_ips
+
+    def update_whitelist(self, whitelist_ips=[]):
+        with self._whitelist_lock:
+            self.whitelist_ips = list(whitelist_ips)
+
+    def update_blacklist(self, blacklist_ips=[]):
+        with self._blacklist_lock:
+            self.blacklist_ips = list(blacklist_ips)
+
+    def update_specifications(self, specifications):
+        with self._specifications_lock:
+            self.specifications = copy.deepcopy(specifications)
+
+    def update_versions(version):
+        return 225
 
     def block_ip(self, ip, port, protocol, type, reason):
         ip_blocked = next(
@@ -66,7 +96,7 @@ class Firewall(threading.Thread):
             return
 
         # Update the ip tables
-        deny_traffic_from_ip_and_port(ip, port, protocol)
+        self.tool.deny_traffic_from_ip_and_port(ip, port, protocol)
 
         # Update the block ips
         ip_blocked = {
@@ -97,7 +127,7 @@ class Firewall(threading.Thread):
             return
 
         # Update the ip tables
-        remove_deny_traffic_from_ip_and_port(ip, port, protocol)
+        self.tool.remove_deny_traffic_from_ip_and_port(ip, port, protocol)
 
         # Update the block ips
         self.ips_blocked = [
@@ -154,6 +184,55 @@ class Firewall(threading.Thread):
 
         return (False, None)
 
+    def check_specifications(self, payload):
+        """
+        True if the packet is conformed with the expected specifications (neuron synapse, version, etc), false otherwise
+        """
+        content = payload.decode("utf-8")
+
+        # Split the HTTP request data into lines
+        lines = content.split("\n")
+
+        # Set default value
+        name = None
+        neuron_version = 0
+
+        # Get the value for each expected property
+        for line in lines:
+            if "name" in line:
+                # Split the line to get the value
+                _, value = line.split(":", 1)
+                # Strip any extra whitespace and print the value
+                name = value.strip()
+
+            if "bt_header_dendrite_neuron_version" in line:
+                # Split the line to get the value
+                _, value = line.split(":", 1)
+                # Strip any extra whitespace and print the value
+                neuron_version = int(value.strip()) if value else 0
+
+        specifications = {}
+        with self._specifications_lock:
+            specifications = copy.deepcopy(self.specifications)
+
+        # Check if the packet matches an expected synapses
+        synapses = specifications.get("synapses") or []
+        if len(synapses) > 0 and name.lower() not in synapses:
+            return (
+                False,
+                f"Synapse name '{name}' not found",
+            )
+
+        # Check if the neuron version is greater stricly than the one required
+        neuron_version_required = int(specifications.get("neuron_version") or 0)
+        if neuron_version < neuron_version_required:
+            return (
+                False,
+                f"Neuron version {neuron_version} is outdated; version {225} is required.",
+            )
+
+        return (True, None)
+
     def get_rule(self, rules: List[Rule], type: RuleType, ip, port, protocol):
         filtered_rules = [r for r in rules if r.rule_type == type]
 
@@ -162,9 +241,7 @@ class Firewall(threading.Thread):
             (
                 r
                 for r in filtered_rules
-                if r.ip == ip
-                and r.port == port
-                and r.protocol == protocol
+                if r.ip == ip and r.port == port and r.protocol == protocol
             ),
             None,
         )
@@ -214,9 +291,7 @@ class Firewall(threading.Thread):
             return
 
         # Get all rules related to the ip/port
-        rules = [
-            r for r in self.rules if r.ip == ip_src or r.port == port_dest
-        ]
+        rules = [r for r in self.rules if r.ip == ip_src or r.port == port_dest]
 
         # Get the current time
         current_time = time.time()
@@ -227,8 +302,21 @@ class Firewall(threading.Thread):
 
         # Check if a allow rule exist
         allow_rule = self.get_rule(
-            rules=rules, type=RuleType.ALLOW, ip=ip_src, port=port_dest, protocol=protocol
+            rules=rules,
+            type=RuleType.ALLOW,
+            ip=ip_src,
+            port=port_dest,
+            protocol=protocol,
         )
+
+        # Check if ip is whitelisted
+        is_whitelisted = self.is_whitelisted(ip_src)
+
+        # Check if ip is blacklisted
+        is_blacklisted = self.is_blacklisted(ip_src)
+
+        # Check request specs
+        specs_success, specs_reason = self.check_specifications(packet[Raw].load)
 
         # Check if a DoS rule exist
         dos_rule = self.get_rule(
@@ -246,7 +334,7 @@ class Firewall(threading.Thread):
                 dos_rule,
                 current_time,
             )
-            if dos_rule
+            if dos_rule and not is_blacklisted and specs_success
             else (False, None)
         )
 
@@ -264,16 +352,26 @@ class Firewall(threading.Thread):
                 ddos_rule,
                 current_time,
             )
-            if ddos_rule
+            if ddos_rule and not is_blacklisted and specs_success
             else (False, None)
         )
 
         has_detection_rule = dos_rule or ddos_rule
-        attack_detected = dos_detected or ddos_detected
-        attack_type = (dos_detected and RuleType.DETECT_DOS) or (ddos_detected and RuleType.DETECT_DDOS)
-        attack_reason = dos_reason or ddos_reason
+        attack_detected = dos_detected or ddos_detected or not specs_success
+        attack_type = (
+            (dos_detected and RuleType.DETECT_DOS)
+            or (ddos_detected and RuleType.DETECT_DDOS)
+            or (not specs_success and RuleType.SPECIFICATION)
+        )
+        attack_reason = dos_reason or ddos_reason or specs_reason
 
-        if attack_detected or (not has_detection_rule and not allow_rule):
+        print(f"{attack_detected} {attack_reason} {is_blacklisted} {is_whitelisted}")
+
+        if (
+            attack_detected
+            or is_blacklisted
+            or (not has_detection_rule and not allow_rule and not is_whitelisted)
+        ):
             self.block_ip(
                 ip=ip_src,
                 port=port_dest,
@@ -305,18 +403,18 @@ class Firewall(threading.Thread):
 
             if type == RuleType.ALLOW:
                 if ip and port:
-                    allow_traffic_from_ip_and_port(ip, port, protocol)
+                    self.tool.allow_traffic_from_ip_and_port(ip, port, protocol)
                 elif ip:
-                    allow_traffic_from_ip(ip)
+                    self.tool.allow_traffic_from_ip(ip)
                 elif port:
-                    allow_traffic_on_port(port, protocol)
+                    self.tool.allow_traffic_on_port(port, protocol)
             else:
                 if ip and port:
-                    deny_traffic_from_ip_and_port(ip, port, protocol)
+                    self.tool.deny_traffic_from_ip_and_port(ip, port, protocol)
                 elif ip:
-                    deny_traffic_from_ip(ip)
+                    self.tool.deny_traffic_from_ip(ip)
                 elif port:
-                    deny_traffic_on_port(port, protocol)
+                    self.tool.deny_traffic_on_port(port, protocol)
 
         # Start sniffing with the filter
         sniff(

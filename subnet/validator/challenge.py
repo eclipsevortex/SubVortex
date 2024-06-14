@@ -31,11 +31,11 @@ async def handle_synapse(self, uid: int):
     miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
 
     # Check the miner is available
-    available = await ping_uid(self, miner.uid)
+    available, reason = await ping_uid(self, miner.uid)
     if available == False:
         miner.verified = False
         miner.process_time = DEFAULT_PROCESS_TIME
-        return "Miner is not verified"
+        return f"Miner is not verified: {reason}" if reason else "Miner is not verified"
 
     bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
 

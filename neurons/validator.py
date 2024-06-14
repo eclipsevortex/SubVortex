@@ -35,6 +35,7 @@ from subnet.shared.utils import get_redis_password, should_upgrade
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
 from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
+from subnet.bittensor.dendrite import SubVortexDendrite
 
 from subnet.validator.config import config, check_config, add_args
 from subnet.validator.forward import forward
@@ -165,7 +166,7 @@ class Validator:
         if self.config.neuron.mock_dendrite_pool:
             self.dendrite = MockDendrite(wallet=self.wallet)
         else:
-            self.dendrite = bt.dendrite(wallet=self.wallet)
+            self.dendrite = SubVortexDendrite(wallet=self.wallet)
         bt.logging.debug(str(self.dendrite))
 
         # Init the event loop.

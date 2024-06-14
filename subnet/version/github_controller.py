@@ -1,10 +1,8 @@
-import re
-import os
-import codecs
 import requests
 import subprocess
 import bittensor as bt
 from os import path
+from subnet.shared.utils import get_version
 
 
 here = path.abspath(path.dirname(__file__))
@@ -17,14 +15,7 @@ class Github:
         self.latest_version = None
 
     def get_version(self) -> str:
-        with codecs.open(
-            os.path.join(here, "../__init__.py"), encoding="utf-8"
-        ) as init_file:
-            version_match = re.search(
-                r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
-            )
-            version_string = version_match.group(1)
-            return version_string
+        return get_version()
 
     def get_latest_version(self) -> str:
         """

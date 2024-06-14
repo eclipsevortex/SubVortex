@@ -4,6 +4,8 @@ from substrateinterface import SubstrateInterface
 
 from subnet.shared.checks import check_registration
 from subnet.shared.utils import should_upgrade
+from subnet.shared.substrate import get_weights_min_stake
+from subnet.shared.subtensor import get_hyperparameter_value
 
 from subnet.miner.version import VersionControl
 
@@ -67,6 +69,30 @@ def run(self):
         if should_sync:
             self.metagraph.sync(subtensor=self.subtensor)
             bt.logging.info("Metagraph resynced")
+
+            if self.firewall:
+                validators = self.metagraph.get_validators()
+
+                # Get version and min stake
+                version = get_hyperparameter_value(self.subtensor, "weights_version")
+                weights_min_stake = get_weights_min_stake(self.subtensor.substrate)
+
+                # Update the specifications
+                specifications = {
+                    "neuron_version": version,
+                    "synapses": self.axon.forward_class_types,
+                }
+                self.firewall.update_specifications(specifications)
+
+                # Define the validators whitelisted
+                whitelist = [x for x in validators if x[2] >= weights_min_stake]
+                self.firewall.update_whitelist(whitelist)
+                bt.logging.debug("Firewall whitelist ips updated")
+
+                # Define the validators blacklisted
+                blacklist = validators - blacklist
+                self.firewall.update_blacklist(blacklist)
+                bt.logging.debug("Firewall blacklist ips updated")
 
         # --- Check for registration every 100 blocks (20 minutes).
         if current_block % 100 == 0:

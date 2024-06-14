@@ -21,6 +21,7 @@ from typing import List
 from Crypto.Random import random
 
 from subnet.constants import DEFAULT_CHUNK_SIZE
+from subnet.bittensor.synapse import SubVortexSynapse
 from subnet.validator.models import Miner
 from subnet.validator.database import get_selected_miners, set_selection
 
@@ -146,19 +147,25 @@ async def ping_uid(self, uid):
     Ping a UID to check their availability.
     Returns True if successful, false otherwise
     """
+    status_code = None
+    status_message = None
+
     try:
         response = await self.dendrite(
             self.metagraph.axons[uid],
-            bt.Synapse(),
+            SubVortexSynapse(),
             deserialize=False,
             timeout=5,
         )
 
-        return response.dendrite.status_code == 200
+        status_code = response.dendrite.status_code
+        status_message = response.dendrite.status_message
+
+        return status_code == 200, status_message
     except Exception as e:
         bt.logging.error(f"Dendrite ping failed: {e}")
 
-    return False
+    return False, None
 
 
 async def get_next_uids(self, ss58_address: str, k: int = DEFAULT_CHUNK_SIZE):

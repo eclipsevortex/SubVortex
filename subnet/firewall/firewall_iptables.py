@@ -23,7 +23,7 @@ class IptablesFirewall(FirewallTool):
         )
         return result.returncode == 0
 
-    def create_deny_policy():
+    def create_deny_policy(self):
         commands = ["sudo", "iptables", "-P", "INPUT", "DROP"]
 
         subprocess.run(

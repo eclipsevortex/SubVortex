@@ -10,7 +10,7 @@ class FirewallTool(ABC):
         pass
 
     @abstractmethod
-    def create_deny_policy():
+    def create_deny_policy(self):
         pass
 
     @abstractmethod

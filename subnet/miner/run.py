@@ -88,7 +88,7 @@ def run(self):
                 whitelist_hotkeys = [x[1] for x in whitelist]
 
                 # Define the validators blacklisted
-                blacklist = validators - whitelist
+                blacklist = list(set(validators) - set(whitelist))
                 blacklist_hotkeys = [x[1] for x in blacklist]
 
                 self.firewall.update(

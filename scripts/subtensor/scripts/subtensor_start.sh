@@ -49,7 +49,7 @@ function run_command()
     --execution wasm \
     --wasm-execution compiled \
     --port 30333 \
-    --max-runtime-instances 64 \
+    --max-runtime-instances 32 \
     --rpc-max-response-size 2048 \
     --rpc-cors all \
     --rpc-port 9944 \

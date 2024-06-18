@@ -140,25 +140,6 @@ class Miner:
         )
         bt.logging.info(f"Running miner on uid: {self.my_subnet_uid}")
 
-        # Firewall
-        self.firewall = None
-        if self.config.firewall.on:
-            bt.logging.debug(
-                f"Starting firewall on interface {self.config.firewall.interface}"
-            )
-            firewall_tool = create_firewall_tool(self.config.firewall.tool)
-            self.firewall = Firewall(
-                tool=firewall_tool,
-                port=self.axon.external_port,
-                interface=self.config.firewall.interface,
-                rules=(
-                    load_json_file(self.config.firewall.config)
-                    if self.config.firewall.config
-                    else None
-                ),
-            )
-            self.firewall.start()
-
         # The axon handles request processing, allowing validators to send this process requests.
         self.axon = SubVortexAxon(
             wallet=self.wallet,
@@ -193,6 +174,25 @@ class Miner:
                 "At least one miner is already running on this machine. If you run more than one miner you will penalise all of your miners until you get de-registered or start each miner on a unique machine"
             )
             sys.exit(1)
+
+        # Firewall
+        self.firewall = None
+        if self.config.firewall.on:
+            bt.logging.debug(
+                f"Starting firewall on interface {self.config.firewall.interface}"
+            )
+            firewall_tool = create_firewall_tool(self.config.firewall.tool)
+            self.firewall = Firewall(
+                tool=firewall_tool,
+                port=self.axon.external_port,
+                interface=self.config.firewall.interface,
+                rules=(
+                    load_json_file(self.config.firewall.config)
+                    if self.config.firewall.config
+                    else None
+                ),
+            )
+            self.firewall.start()
 
         # Start  starts the miner's axon, making it active on the network.
         bt.logging.info(f"Starting axon server on port: {self.config.axon.port}")

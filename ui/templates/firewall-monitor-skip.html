@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firewall Monitor</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .timestamp { width: 7%; }
+        .request-id { width: 10%; }
+        .previous-id { width: 10%; }
+        .process-time { width: 5%; }
+        .seq { width: 5%; }
+        .ack { width: 5%; }
+        .flags { width: 3%; }
+        .ip-address { width: 8%; }
+        .port { width: 5%; }
+        .protocol { width: 5%; }
+        .hotkey { width: 17%; }
+        .action { width: 5%; }
+        .notify { width: 2; }
+        .reason { width: 20%; max-width: 400px; overflow-y: scroll; }
+        .payload { width: 3%; max-width: 200px; overflow-y: scroll; }
+    </style>
+</head>
+<body>
+    <h1>Firewall Monitor</h1>
+    <table class="table">
+        <tr>
+            <th class="timestamp">Timestamp</th>
+            <th class="process-time">Process Time</th>
+            <th class="request-id">Id</th>
+            <th class="previous-id">Prev Id</th>
+            <th class="seq">Seq</th>
+            <th class="ack">Ack</th>
+            <th class="flags">Flags</th>
+            <th class="ip-address">IP Address</th>
+            <th class="port">Port</th>
+            <th class="protocol">Protocol</th>
+            <th class="hotkey">Hotkey</th>
+            <th class="action">Action</th>
+            <th class="notify">Notified</th>
+            <th class="reason">Reason</th>
+            <th class="payload">Payload</th>
+        </tr>
+        <tbody id="events-table">
+        </tbody>
+    </table>
+    <script>
+        function humanizeDuration(totalSeconds) {
+            const totalMilliseconds = totalSeconds * 1000;
+            const totalMicroseconds = totalMilliseconds * 1000;
+            const totalNanoseconds = totalMicroseconds * 1000;
+
+            const nanoseconds = Math.floor(totalNanoseconds % 1000);
+            const microseconds = Math.floor(totalMicroseconds % 1000);
+            const milliseconds = Math.floor(totalMilliseconds % 1000);
+            const seconds = Math.floor(totalSeconds) % 60;
+            const minutes = Math.floor(totalSeconds / 60) % 60;
+            const hours = Math.floor(totalSeconds / 3600) % 24;
+            const days = Math.floor(totalSeconds / 86400);
+
+            const humanized = [];
+
+            if (days > 0) {
+                humanized.push(`${days}d`);
+            }
+            if (hours > 0) {
+                humanized.push(`${hours}h`);
+            }
+            if (minutes > 0) {
+                humanized.push(`${minutes}m`);
+            }
+            if (seconds > 0) {
+                humanized.push(`${seconds}s`);
+            }
+            if (milliseconds > 0) {
+                humanized.push(`${milliseconds}ms`);
+            }
+            if (microseconds > 0) {
+                humanized.push(`${microseconds}µs`);
+            }
+            if (nanoseconds > 0 || humanized.length === 0) {
+                humanized.push(`${nanoseconds}ns`);
+            }
+
+            return humanized.join(', ');
+        }
+
+        function getQueryParams() {
+            const params = {};
+            const queryString = window.location.search.slice(1);
+            const pairs = queryString.split('&');
+
+            for (const pair of pairs) {
+                const [key, value] = pair.split('=');
+                if (key) {
+                    params[decodeURIComponent(key)] = decodeURIComponent(value);
+                }
+            }
+
+            return params;
+        }
+
+        async function fetchEvents() {
+            const params = getQueryParams();
+            const query = new URLSearchParams(params).toString();
+            const response = await fetch('/events?' + query);
+            const events = await response.json();
+            const table = document.getElementById('events-table');
+            table.innerHTML = '';
+            events.forEach(event => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td class="timestamp">${new Date(event.current_time * 1000).toLocaleString()}</td>
+                                 <td class="process-time">${humanizeDuration(event.process_time)}</td>
+                                 <td class="request-id">${event.request_id}</td>
+                                 <td class="previous-id">${event.previous_id}</td>
+                                 <td class="seq">${event.seq}</td>
+                                 <td class="ack">${event.ack}</td>
+                                 <td class="flags">${event.flags}</td>
+                                 <td class="ip-address">${event.sip}</td>
+                                 <td class="port">${event.dport}</td>
+                                 <td class="protocol">${event.protocol}</td>
+                                 <td class="hotkey">${event.dendrite.hotkey || ""}</td>
+                                 <td class="action">${event.status}</td>
+                                 <td class="notify">${event.notified === true ? '✅' : '❌'}</td>
+                                 <td class="reason">${event.reason || ''}<br />${event.sub_reason || ''}</td>
+                                 <td class="payload">${event.payload || ''}</td>`;
+
+                const actionCell = row.querySelector('.action');
+                if (event.status === 'allow') {
+                    actionCell.style.color = '#4CAF50';
+                } else if (event.status === 'deny') {
+                    actionCell.style.color = '#F44336';
+                }
+                
+                table.appendChild(row);
+            });
+        }
+
+        setInterval(fetchEvents, 1000);
+        fetchEvents();
+    </script>
+</body>
+</html>

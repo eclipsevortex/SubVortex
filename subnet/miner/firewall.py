@@ -368,8 +368,10 @@ class Firewall(threading.Thread):
             # Checks only for miner, not for subtensor
 
             # Extract data from packet content
-            name, neuron_version, hotkey = self.extract_infos(
-                packet[Raw].load if Raw in packet else ("", None, None)
+            name, neuron_version, hotkey = (
+                self.extract_infos(packet[Raw].load)
+                if Raw in packet
+                else ("", None, None)
             )
 
             # Check if the hotkey is blacklisted

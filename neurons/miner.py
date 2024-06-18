@@ -182,15 +182,16 @@ class Miner:
                 f"Starting firewall on interface {self.config.firewall.interface}"
             )
             firewall_tool = create_firewall_tool(self.config.firewall.tool)
+            rules=(
+                    load_json_file(self.config.firewall.config)
+                    if self.config.firewall.config
+                    else None
+                )
             self.firewall = Firewall(
                 tool=firewall_tool,
                 port=self.axon.external_port,
                 interface=self.config.firewall.interface,
-                rules=(
-                    load_json_file(self.config.firewall.config)
-                    if self.config.firewall.config
-                    else None
-                ),
+                rules=rules or [],
             )
             self.firewall.start()
 

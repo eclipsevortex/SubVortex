@@ -149,7 +149,8 @@ class Firewall(threading.Thread):
         with open("ips_blocked.json", "w") as file:
             file.write(json.dumps(self.ips_blocked, cls=EnumEncoder))
 
-        bt.logging.warning(f"Blocking {protocol.upper()} {ip}/{port}: {reason}")
+        protocol_str = protocol.upper() if protocol else None
+        bt.logging.warning(f"Blocking {protocol_str} {ip}/{port}: {reason}")
 
     def unblock_ip(self, ip, port, protocol):
         ip_blocked = next(

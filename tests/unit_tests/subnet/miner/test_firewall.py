@@ -1490,8 +1490,10 @@ class TestCheckSpecificationsRules(TestFirewall):
         }
 
         firewall = Firewall(tool=tool, interface="eth0")
-        firewall.update_specifications(specifications)
-        firewall.update_whitelist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"])
+        firewall.update(
+            specifications=specifications,
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
+        )
 
         # Action
         packet: Packet = TCP(dport=8091) / IP(src="192.168.0.1") / Raw(load=payload)
@@ -1527,8 +1529,10 @@ class TestCheckSpecificationsRules(TestFirewall):
         }
 
         firewall = Firewall(tool=tool, interface="eth0")
-        firewall.update_specifications(specifications)
-        firewall.update_whitelist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"])
+        firewall.update(
+            specifications=specifications,
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
+        )
 
         # Action
         packet: Packet = TCP(dport=8091) / IP(src="192.168.0.1") / Raw(load=payload)
@@ -1564,8 +1568,10 @@ class TestCheckSpecificationsRules(TestFirewall):
         }
 
         firewall = Firewall(tool=tool, interface="eth0")
-        firewall.update_specifications(specifications)
-        firewall.update_whitelist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"])
+        firewall.update(
+            specifications=specifications,
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
+        )
 
         # Action
         packet: Packet = TCP(dport=8091) / IP(src="192.168.0.1") / Raw(load=payload)
@@ -1591,7 +1597,9 @@ class TestWhitelistRules(TestFirewall):
         payload = "b'POST /QnATask HTTP/1.1\r\nHost: 167.86.79.86:8091\r\nname: QnATask\r\ntimeout: 5.0\r\nbt_header_axon_ip: 167.86.79.86\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
 
         firewall = Firewall(tool=tool, interface="eth0")
-        firewall.update_whitelist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Jb"])
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Jb"]
+        )
 
         # Action
         packet: Packet = TCP(dport=8091) / IP(src="192.168.0.1") / Raw(load=payload)
@@ -1624,7 +1632,9 @@ class TestWhitelistRules(TestFirewall):
         payload = "b'POST /QnATask HTTP/1.1\r\nHost: 167.86.79.86:8091\r\nname: QnATask\r\ntimeout: 5.0\r\nbt_header_axon_ip: 167.86.79.86\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
 
         firewall = Firewall(tool=tool, interface="eth0")
-        firewall.update_whitelist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"])
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
 
         # Action
         packet: Packet = TCP(dport=8091) / IP(src="192.168.0.1") / Raw(load=payload)
@@ -1653,7 +1663,9 @@ class TestBlacklistRules(TestFirewall):
         payload = "b'POST /QnATask HTTP/1.1\r\nHost: 167.86.79.86:8091\r\nname: QnATask\r\ntimeout: 5.0\r\nbt_header_axon_ip: 167.86.79.86\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
 
         firewall = Firewall(tool=tool, interface="eth0")
-        firewall.update_blacklist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"])
+        firewall.update(
+            blacklist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
 
         # Action
         packet: Packet = TCP(dport=8091) / IP(src="192.168.0.1") / Raw(load=payload)
@@ -1682,7 +1694,9 @@ class TestBlacklistRules(TestFirewall):
         payload = "b'POST /QnATask HTTP/1.1\r\nHost: 167.86.79.86:8091\r\nname: QnATask\r\ntimeout: 5.0\r\nbt_header_axon_ip: 167.86.79.86\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
 
         firewall = Firewall(tool=tool, interface="eth0")
-        firewall.update_blacklist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Jb"])
+        firewall.update(
+            blacklist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Jb"]
+        )
 
         # Action
         packet: Packet = TCP(dport=8091) / IP(src="192.168.0.1") / Raw(load=payload)
@@ -1715,8 +1729,10 @@ class TestBlacklistRules(TestFirewall):
         payload = "b'POST /QnATask HTTP/1.1\r\nHost: 167.86.79.86:8091\r\nname: QnATask\r\ntimeout: 5.0\r\nbt_header_axon_ip: 167.86.79.86\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
 
         firewall = Firewall(tool=tool, interface="eth0")
-        firewall.update_blacklist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Jb"])
-        firewall.update_whitelist(["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"])
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
+            blacklist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Jb"],
+        )
 
         # Action
         packet: Packet = TCP(dport=8091) / IP(src="192.168.0.1") / Raw(load=payload)
@@ -1727,5 +1743,5 @@ class TestBlacklistRules(TestFirewall):
         # Assets
         assert 0 == len(firewall.ips_blocked)
         tool.create_allow_rule.assert_not_called()
-        tool.create_deny_rule.assert_not_called( )
+        tool.create_deny_rule.assert_not_called()
         tool.remove_rule.assert_not_called()

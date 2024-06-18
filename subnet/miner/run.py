@@ -82,17 +82,21 @@ def run(self):
                     "neuron_version": version,
                     "synapses": self.axon.forward_class_types,
                 }
-                self.firewall.update_specifications(specifications)
 
                 # Define the validators whitelisted
-                whitelist = [x[1] for x in validators if x[2] >= weights_min_stake]
-                self.firewall.update_whitelist(whitelist)
-                bt.logging.debug("Firewall whitelist ips updated")
+                whitelist = [x for x in validators if x[2] >= weights_min_stake]
+                whitelist_hotkeys = [x[1] for x in whitelist]
 
                 # Define the validators blacklisted
-                blacklist = validators - blacklist
-                self.firewall.update_blacklist(blacklist)
-                bt.logging.debug("Firewall blacklist ips updated")
+                blacklist = validators - whitelist
+                blacklist_hotkeys = [x[1] for x in blacklist]
+
+                self.firewall.update(
+                    specifications=specifications,
+                    whitelist_hotkeys=whitelist_hotkeys,
+                    blacklist_hotkeys=blacklist_hotkeys,
+                )
+                bt.logging.debug("Firewall updated")
 
         # --- Check for registration every 100 blocks (20 minutes).
         if current_block % 100 == 0:

@@ -23,7 +23,6 @@ from subnet.firewall.firewall_model import (
 logging.getLogger("scapy.runtime").setLevel(logging.CRITICAL)
 
 
-# User can define a rule wih ip, port (with or without protocol) or ip/port (with or without protocol)
 class Firewall(threading.Thread):
     def __init__(
         self,
@@ -34,9 +33,7 @@ class Firewall(threading.Thread):
     ):
         super().__init__(daemon=True)
 
-        self._whitelist_lock = threading.Lock()
-        self._blacklist_lock = threading.Lock()
-        self._specifications_lock = threading.Lock()
+        self._lock = threading.Lock()
         self.stop_flag = threading.Event()
         self.packet_counts = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
         self.packet_timestamps = defaultdict(
@@ -63,8 +60,11 @@ class Firewall(threading.Thread):
         bt.logging.debug(f"Firewall stopped")
 
     def is_whitelisted(self, hotkey: str):
+        """
+        True if the hotkey is whitelisted, false otherwise
+        """
         is_whitelisted = False
-        with self._whitelist_lock:
+        with self._lock:
             is_whitelisted = hotkey in self.whitelist_hotkeys
 
         if is_whitelisted:
@@ -73,8 +73,11 @@ class Firewall(threading.Thread):
         return (False, RuleType.DENY, f"Hotkey '{hotkey}' is not whitelisted")
 
     def is_blacklisted(self, hotkey: str):
+        """
+        True if the hotkey is blacklisted, false otherwise
+        """
         is_blacklisted = False
-        with self._blacklist_lock:
+        with self._lock:
             is_blacklisted = hotkey in self.blacklist_hotkeys
 
         if is_blacklisted:
@@ -106,20 +109,14 @@ class Firewall(threading.Thread):
 
         return (False, None, None)
 
-    def update_whitelist(self, whitelist_hotkeys=[]):
-        with self._whitelist_lock:
+    def update(self, specifications={}, whitelist_hotkeys=[], blacklist_hotkeys=[]):
+        with self._lock:
+            self.specifications = copy.deepcopy(specifications)
             self.whitelist_hotkeys = list(whitelist_hotkeys)
-
-    def update_blacklist(self, blacklist_hotkeys=[]):
-        with self._blacklist_lock:
             self.blacklist_hotkeys = list(blacklist_hotkeys)
 
-    def update_specifications(self, specifications):
-        with self._specifications_lock:
-            self.specifications = copy.deepcopy(specifications)
-
     def get_specification(self, name: str):
-        with self._specifications_lock:
+        with self._lock:
             specifications = copy.deepcopy(self.specifications)
             return specifications.get(name)
 
@@ -336,13 +333,16 @@ class Firewall(threading.Thread):
         self.packet_timestamps[ip_src][port_dest][protocol].append(current_time)
 
         # Check if a allow rule exist
-        match_allow_rule = self.get_rule(
-            rules=rules,
-            type=RuleType.ALLOW,
-            ip=ip_src,
-            port=port_dest,
-            protocol=protocol,
-        ) is not None
+        match_allow_rule = (
+            self.get_rule(
+                rules=rules,
+                type=RuleType.ALLOW,
+                ip=ip_src,
+                port=port_dest,
+                protocol=protocol,
+            )
+            is not None
+        )
 
         # Initialise variables
         must_deny = False
@@ -414,9 +414,9 @@ class Firewall(threading.Thread):
             else (must_deny, rule_type, reason)
         )
 
-        # By default all traffic is denied, so if there is not allow rule 
+        # By default all traffic is denied, so if there is not allow rule
         # we check if the hotkey is whitelisted
-        if not must_allow: # and not (dos_rule or ddos_rule):
+        if not must_allow:  # and not (dos_rule or ddos_rule):
             # One of the detection has been used, so we use the default behaviour of a detection rule
             # which is allowing the traffic except if detecting something abnormal
             must_allow = dos_rule or ddos_rule

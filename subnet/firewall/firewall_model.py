@@ -10,6 +10,10 @@ class FirewallTool(ABC):
         pass
 
     @abstractmethod
+    def create_deny_policy():
+        pass
+
+    @abstractmethod
     def create_allow_rule(self, ip=None, port=None, protocol="tcp"):
         pass
 

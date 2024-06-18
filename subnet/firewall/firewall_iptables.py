@@ -23,6 +23,17 @@ class IptablesFirewall(FirewallTool):
         )
         return result.returncode == 0
 
+    def create_deny_policy():
+        commands = ["sudo", "iptables", "-P", "INPUT", "DROP"]
+
+        subprocess.run(
+            commands,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        return True
+
     def create_allow_rule(self, ip=None, port=None, protocol="tcp"):
         """
         Create an allow rule in the iptables

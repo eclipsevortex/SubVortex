@@ -218,7 +218,13 @@ class Firewall(threading.Thread):
         """
         True if the packet is conformed with the expected specifications (neuron synapse, version, etc), false otherwise
         """
-        content = payload.decode("utf-8")
+        try:
+            content = payload.decode("utf-8") if isinstance(payload, bytes) else payload
+        except Exception:
+            return (
+                False,
+                f"Synapse unknown",
+            )
 
         # Split the HTTP request data into lines
         lines = content.split("\n")
@@ -349,7 +355,11 @@ class Firewall(threading.Thread):
         )
 
         # Check request specs
-        specs_success, specs_reason = self.check_specifications(packet[Raw].load)
+        specs_success, specs_reason = (
+            self.check_specifications(packet[Raw].load)
+            if Raw in packet
+            else (True, None)
+        )
 
         # Check if a DoS rule exist
         dos_rule = self.get_rule(

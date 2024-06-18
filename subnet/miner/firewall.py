@@ -230,7 +230,7 @@ class Firewall(threading.Thread):
         lines = content.split("\n")
 
         # Set default value
-        name = None
+        name = ""
         neuron_version = 0
 
         # Get the value for each expected property

@@ -1,5 +1,5 @@
 import unittest
-from subnet.miner.firewall_models import AllowRule, DenyRule, DetectDoSRule, DetectDDoSRule
+from subnet.firewall.firewall_model import AllowRule, DenyRule, DetectDoSRule, DetectDDoSRule
 
 
 class TestAllowRule(unittest.TestCase):

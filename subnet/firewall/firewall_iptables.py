@@ -5,148 +5,89 @@ from subnet.firewall.firewall_model import FirewallTool
 
 class IptablesFirewall(FirewallTool):
     def rule_exists(self, ip=None, port=None, protocol="tcp", allow=True):
-        args = ["sudo", "iptables", "-C", "INPUT"]
-        if ip:
-            args.extend(["-s", ip])
-        if port:
-            args.extend(["-p", protocol, "--dport", str(port)])
-        if allow:
-            args.extend(["-j", "ACCEPT"])
-        else:
-            args.extend(["-j", "DROP"])
+        commands = ["sudo", "iptables", "-C", "INPUT"]
+
+        if ip is not None:
+            commands += ["-s", ip]
+
+        if port is not None:
+            commands += ["-p", protocol, "--dport", str(port)]
+
+        commands += ["-j", "ACCEPT" if allow else "DROP"]
 
         result = subprocess.run(
-            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            commands, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         return result.returncode == 0
 
-    def allow_traffic_from_ip(self, ip):
-        if self.rule_exists(ip=ip):
-            return
+    def create_allow_rule(self, ip=None, port=None, protocol="tcp"):
+        """
+        Create an allow rule in the iptables
+        """
+        if self.rule_exists(ip=ip, port=port, protocol=protocol, allow=True):
+            return False
+ 
+        commands = ["sudo", "iptables", "-I", "INPUT"]
+        if ip is not None:
+            commands += ["-s", ip]
+
+        if port is not None:
+            commands += ["-p", protocol, "--dport", str(port)]
+
+        commands += ["-j", "ACCEPT"]
 
         subprocess.run(
-            ["sudo", "iptables", "-I", "INPUT", "-s", ip, "-j", "ACCEPT"],
+            commands,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
 
-    def allow_traffic_on_port(self, port, protocol="tcp"):
-        if self.rule_exists(port=port, protocol=protocol):
-            return
+        return True
 
-        subprocess.run(
-            [
-                "sudo",
-                "iptables",
-                "-I",
-                "INPUT",
-                "-p",
-                protocol,
-                "--dport",
-                str(port),
-                "-j",
-                "ACCEPT",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    def allow_traffic_from_ip_and_port(self, ip, port, protocol="tcp"):
-        if self.rule_exists(ip=ip, port=port, protocol=protocol):
-            return
-
-        subprocess.run(
-            [
-                "sudo",
-                "iptables",
-                "-I",
-                "INPUT",
-                "-s",
-                ip,
-                "-p",
-                protocol,
-                "--dport",
-                str(port),
-                "-j",
-                "ACCEPT",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    def deny_traffic_from_ip(self, ip):
-        if self.rule_exists(ip=ip, allow=False):
-            return
-
-        subprocess.run(
-            ["sudo", "iptables", "-I", "INPUT", "-s", ip, "-j", "DROP"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    def deny_traffic_on_port(self, port, protocol):
-        if self.rule_exists(port=port, protocol=protocol, allow=False):
-            return
-
-        subprocess.run(
-            [
-                "sudo",
-                "iptables",
-                "-I",
-                "INPUT",
-                "-p",
-                protocol,
-                "--dport",
-                str(port),
-                "-j",
-                "DROP",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    def deny_traffic_from_ip_and_port(self, ip, port, protocol="tcp"):
+    def create_deny_rule(self, ip=None, port=None, protocol="tcp"):
+        """
+        Create a deny rule in the iptables
+        """
         if self.rule_exists(ip=ip, port=port, protocol=protocol, allow=False):
-            return
+            return False
+
+        commands = ["sudo", "iptables", "-I", "INPUT"]
+        if ip is not None:
+            commands += ["-s", ip]
+
+        if port is not None:
+            commands += ["-p", protocol, "--dport", str(port)]
+
+        commands += ["-j", "DROP"]
 
         subprocess.run(
-            [
-                "sudo",
-                "iptables",
-                "-I",
-                "INPUT",
-                "-s",
-                ip,
-                "-p",
-                protocol,
-                "--dport",
-                str(port),
-                "-j",
-                "DROP",
-            ],
+            commands,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
 
-    def remove_deny_traffic_from_ip_and_port(self, ip, port, protocol="tcp"):
+        return True
+
+    def remove_rule(self, ip=None, port=None, protocol="tcp", allow=True):
+        """
+        Remove a rule in the iptables
+        """
         if not self.rule_exists(ip=ip, port=port, protocol=protocol, allow=False):
-            return
+            return False
+
+        commands = ["sudo", "iptables", "-D", "INPUT"]
+        if ip is not None:
+            commands += ["-s", ip]
+
+        if port is not None:
+            commands += ["-p", protocol, "--dport", str(port)]
+
+        commands += ["-j", "ACCEPT" if allow else "DROP"]
 
         subprocess.run(
-            [
-                "sudo",
-                "iptables",
-                "-D",
-                "INPUT",
-                "-s",
-                ip,
-                "-p",
-                protocol,
-                "--dport",
-                str(port),
-                "-j",
-                "DROP",
-            ],
+            commands,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+
+        return True

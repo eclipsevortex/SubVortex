@@ -10,10 +10,12 @@ from collections import defaultdict
 from scapy.all import sniff, TCP, UDP, IP, Raw, Packet
 
 from subnet.shared.encoder import EnumEncoder
-from subnet.firewall.firewall_model import FirewallTool
-from subnet.miner.firewall_models import (
+from subnet.firewall.firewall_model import (
+    FirewallTool,
     create_rule,
     Rule,
+    AllowRule,
+    DenyRule,
     RuleType,
     DetectDoSRule,
     DetectDDoSRule,
@@ -29,6 +31,7 @@ class Firewall(threading.Thread):
         self,
         tool: FirewallTool,
         interface: str,
+        port: int = 8091,
         rules=[],
     ):
         super().__init__(daemon=True)
@@ -43,6 +46,7 @@ class Firewall(threading.Thread):
         )
 
         self.tool = tool
+        self.port = port
         self.interface = interface
         self.ips_blocked = []
         self.whitelist_ips = []
@@ -69,12 +73,38 @@ class Firewall(threading.Thread):
             return ip in self.blacklist_ips
 
     def update_whitelist(self, whitelist_ips=[]):
+        previous_whitelist_ips = []
         with self._whitelist_lock:
+            previous_whitelist_ips = list(self.whitelist_ips)
             self.whitelist_ips = list(whitelist_ips)
 
+        # Remove old whitelist ips
+        ips_to_remove = list(set(previous_whitelist_ips) - set(self.whitelist_ips))
+        for ip in ips_to_remove:
+            self.tool.remove_rule(ip, self.port, "tcp")
+
+        # Add whitelist ips
+        for ip in self.whitelist_ips:
+            success = self.tool.create_allow_rule(ip=ip, port=self.port, protocol="tcp")
+            if success:
+                self.rules.append(AllowRule(ip=ip))
+
     def update_blacklist(self, blacklist_ips=[]):
+        previous_blacklist_ips = []
         with self._blacklist_lock:
+            previous_blacklist_ips = list(self.blacklist_ips)
             self.blacklist_ips = list(blacklist_ips)
+
+        # Remove old whitelist ips
+        ips_to_remove = list(set(previous_blacklist_ips) - set(self.blacklist_ips))
+        for ip in ips_to_remove:
+            self.tool.remove_rule(ip, self.port, "tcp")
+
+        # Add blacklist ips
+        for ip in self.blacklist_ips:
+            success = self.tool.create_deny_rule(ip=ip, port=self.port, protocol="tcp")
+            if success:
+                self.rules.append(DenyRule(ip=ip))
 
     def update_specifications(self, specifications):
         with self._specifications_lock:
@@ -96,7 +126,7 @@ class Firewall(threading.Thread):
             return
 
         # Update the ip tables
-        self.tool.deny_traffic_from_ip_and_port(ip, port, protocol)
+        self.tool.create_deny_rule(ip=ip, port=port, protocol=protocol)
 
         # Update the block ips
         ip_blocked = {
@@ -127,7 +157,7 @@ class Firewall(threading.Thread):
             return
 
         # Update the ip tables
-        self.tool.remove_deny_traffic_from_ip_and_port(ip, port, protocol)
+        self.tool.remove_rule(ip=ip, port=port, protocol=protocol, allow=False)
 
         # Update the block ips
         self.ips_blocked = [
@@ -309,11 +339,14 @@ class Firewall(threading.Thread):
             protocol=protocol,
         )
 
-        # Check if ip is whitelisted
-        is_whitelisted = self.is_whitelisted(ip_src)
-
-        # Check if ip is blacklisted
-        is_blacklisted = self.is_blacklisted(ip_src)
+        # Check if a allow rule exist
+        deny_rule = self.get_rule(
+            rules=rules,
+            type=RuleType.DENY,
+            ip=ip_src,
+            port=port_dest,
+            protocol=protocol,
+        )
 
         # Check request specs
         specs_success, specs_reason = self.check_specifications(packet[Raw].load)
@@ -334,7 +367,7 @@ class Firewall(threading.Thread):
                 dos_rule,
                 current_time,
             )
-            if dos_rule and not is_blacklisted and specs_success
+            if dos_rule and specs_success
             else (False, None)
         )
 
@@ -352,7 +385,7 @@ class Firewall(threading.Thread):
                 ddos_rule,
                 current_time,
             )
-            if ddos_rule and not is_blacklisted and specs_success
+            if ddos_rule and specs_success
             else (False, None)
         )
 
@@ -365,13 +398,10 @@ class Firewall(threading.Thread):
         )
         attack_reason = dos_reason or ddos_reason or specs_reason
 
-        print(f"{attack_detected} {attack_reason} {is_blacklisted} {is_whitelisted}")
+        if attack_detected or (not has_detection_rule and not allow_rule):
+            if deny_rule:
+                return
 
-        if (
-            attack_detected
-            or is_blacklisted
-            or (not has_detection_rule and not allow_rule and not is_whitelisted)
-        ):
             self.block_ip(
                 ip=ip_src,
                 port=port_dest,
@@ -402,19 +432,9 @@ class Firewall(threading.Thread):
             type = rule.rule_type
 
             if type == RuleType.ALLOW:
-                if ip and port:
-                    self.tool.allow_traffic_from_ip_and_port(ip, port, protocol)
-                elif ip:
-                    self.tool.allow_traffic_from_ip(ip)
-                elif port:
-                    self.tool.allow_traffic_on_port(port, protocol)
+                self.tool.create_allow_rule(ip=ip, port=port, protocol=protocol)
             else:
-                if ip and port:
-                    self.tool.deny_traffic_from_ip_and_port(ip, port, protocol)
-                elif ip:
-                    self.tool.deny_traffic_from_ip(ip)
-                elif port:
-                    self.tool.deny_traffic_on_port(port, protocol)
+                self.tool.create_deny_rule(ip=ip, port=port, protocol=protocol)
 
         # Start sniffing with the filter
         sniff(

@@ -149,6 +149,7 @@ class Miner:
             firewall_tool = create_firewall_tool(self.config.firewall.tool)
             self.firewall = Firewall(
                 tool=firewall_tool,
+                port=self.axon.external_port,
                 interface=self.config.firewall.interface,
                 rules=(
                     load_json_file(self.config.firewall.config)

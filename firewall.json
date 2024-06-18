@@ -18,6 +18,11 @@
         }
     },
     {
+        "port": 8081,
+        "protocol": "tcp",
+        "type": "allow"
+    },
+    {
         "port": 22,
         "protocol": "tcp",
         "type": "allow"

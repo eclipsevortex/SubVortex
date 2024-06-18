@@ -13,7 +13,10 @@ class IptablesFirewall(FirewallTool):
         if port is not None:
             commands += ["-p", protocol, "--dport", str(port)]
 
-        commands += ["-j", "ACCEPT" if allow else "DROP"]
+        if ip or port:
+            commands += ["-j", "ACCEPT" if allow else "DROP"]
+        else:
+            commands += ["ACCEPT" if allow else "DROP"]
 
         result = subprocess.run(
             commands, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -26,15 +29,18 @@ class IptablesFirewall(FirewallTool):
         """
         if self.rule_exists(ip=ip, port=port, protocol=protocol, allow=True):
             return False
- 
-        commands = ["sudo", "iptables", "-I", "INPUT"]
+
+        commands = ["sudo", "iptables", "-A", "INPUT"]
         if ip is not None:
             commands += ["-s", ip]
 
         if port is not None:
             commands += ["-p", protocol, "--dport", str(port)]
 
-        commands += ["-j", "ACCEPT"]
+        if ip or port:
+            commands += ["-j", "ACCEPT"]
+        else:
+            commands += ["ACCEPT"]
 
         subprocess.run(
             commands,
@@ -51,14 +57,17 @@ class IptablesFirewall(FirewallTool):
         if self.rule_exists(ip=ip, port=port, protocol=protocol, allow=False):
             return False
 
-        commands = ["sudo", "iptables", "-I", "INPUT"]
+        commands = ["sudo", "iptables", "-A", "INPUT"]
         if ip is not None:
             commands += ["-s", ip]
 
         if port is not None:
             commands += ["-p", protocol, "--dport", str(port)]
 
-        commands += ["-j", "DROP"]
+        if ip or port:
+            commands += ["-j", "DROP"]
+        else:
+            commands += ["DROP"]
 
         subprocess.run(
             commands,

@@ -14,8 +14,6 @@ from subnet.firewall.firewall_model import (
     FirewallTool,
     create_rule,
     Rule,
-    AllowRule,
-    DenyRule,
     RuleType,
     DetectDoSRule,
     DetectDDoSRule,
@@ -49,8 +47,8 @@ class Firewall(threading.Thread):
         self.port = port
         self.interface = interface
         self.ips_blocked = []
-        self.whitelist_ips = []
-        self.blacklist_ips = []
+        self.whitelist_hotkeys = []
+        self.blacklist_hotkeys = []
         self.specifications = {}
 
         self.rules = [create_rule(x) for x in rules]
@@ -64,54 +62,66 @@ class Firewall(threading.Thread):
         super().join()
         bt.logging.debug(f"Firewall stopped")
 
-    def is_whitelisted(self, ip: str):
+    def is_whitelisted(self, hotkey: str):
+        is_whitelisted = False
         with self._whitelist_lock:
-            return ip in self.whitelist_ips
+            is_whitelisted = hotkey in self.whitelist_hotkeys
 
-    def is_blacklisted(self, ip: str):
+        if is_whitelisted:
+            return (True, None, None)
+
+        return (False, RuleType.DENY, f"Hotkey '{hotkey}' is not whitelisted")
+
+    def is_blacklisted(self, hotkey: str):
+        is_blacklisted = False
         with self._blacklist_lock:
-            return ip in self.blacklist_ips
+            is_blacklisted = hotkey in self.blacklist_hotkeys
 
-    def update_whitelist(self, whitelist_ips=[]):
-        previous_whitelist_ips = []
+        if is_blacklisted:
+            return (True, RuleType.DENY, f"Hotkey '{hotkey}' is blacklisted")
+
+        return (False, None, None)
+
+    def is_unknown_synapse(self, name: str):
+        """
+        True if the synapse is an allowed one, false otherwise
+        """
+        synapses = self.get_specification("synapses") or []
+        if len(synapses) > 0 and name.lower() not in synapses:
+            return (True, RuleType.DENY, f"Synapse name '{name}' not found")
+
+        return (False, None, None)
+
+    def is_old_neuron_version(self, version: int):
+        """
+        True if the neuron version is greater stricly than the one required, false otherwise
+        """
+        version_required = int(self.get_specification("neuron_version") or 0)
+        if version < version_required:
+            return (
+                True,
+                RuleType.DENY,
+                f"Neuron version {version} is outdated; version {225} is required.",
+            )
+
+        return (False, None, None)
+
+    def update_whitelist(self, whitelist_hotkeys=[]):
         with self._whitelist_lock:
-            previous_whitelist_ips = list(self.whitelist_ips)
-            self.whitelist_ips = list(whitelist_ips)
+            self.whitelist_hotkeys = list(whitelist_hotkeys)
 
-        # Remove old whitelist ips
-        ips_to_remove = list(set(previous_whitelist_ips) - set(self.whitelist_ips))
-        for ip in ips_to_remove:
-            self.tool.remove_rule(ip, self.port, "tcp")
-
-        # Add whitelist ips
-        for ip in self.whitelist_ips:
-            success = self.tool.create_allow_rule(ip=ip, port=self.port, protocol="tcp")
-            if success:
-                self.rules.append(AllowRule(ip=ip))
-
-    def update_blacklist(self, blacklist_ips=[]):
-        previous_blacklist_ips = []
+    def update_blacklist(self, blacklist_hotkeys=[]):
         with self._blacklist_lock:
-            previous_blacklist_ips = list(self.blacklist_ips)
-            self.blacklist_ips = list(blacklist_ips)
-
-        # Remove old whitelist ips
-        ips_to_remove = list(set(previous_blacklist_ips) - set(self.blacklist_ips))
-        for ip in ips_to_remove:
-            self.tool.remove_rule(ip, self.port, "tcp")
-
-        # Add blacklist ips
-        for ip in self.blacklist_ips:
-            success = self.tool.create_deny_rule(ip=ip, port=self.port, protocol="tcp")
-            if success:
-                self.rules.append(DenyRule(ip=ip))
+            self.blacklist_hotkeys = list(blacklist_hotkeys)
 
     def update_specifications(self, specifications):
         with self._specifications_lock:
             self.specifications = copy.deepcopy(specifications)
 
-    def update_versions(version):
-        return 225
+    def get_specification(self, name: str):
+        with self._specifications_lock:
+            specifications = copy.deepcopy(self.specifications)
+            return specifications.get(name)
 
     def block_ip(self, ip, port, protocol, type, reason):
         ip_blocked = next(
@@ -186,10 +196,11 @@ class Firewall(threading.Thread):
         if len(recent_packets) > rule.packet_threshold:
             return (
                 True,
+                RuleType.DETECT_DOS,
                 f"DoS attack detected: {len(recent_packets)} packets in {rule.time_window} seconds",
             )
 
-        return (False, None)
+        return (False, None, None)
 
     def detect_ddos(self, port, rule: DetectDDoSRule, current_time):
         """
@@ -209,14 +220,15 @@ class Firewall(threading.Thread):
         if len(recent_timestamps) > rule.packet_threshold:
             return (
                 True,
+                RuleType.DETECT_DDOS,
                 f"DDoS attack detected: {len(recent_timestamps)} packets in {rule.time_window} seconds",
             )
 
-        return (False, None)
+        return (False, None, None)
 
-    def check_specifications(self, payload):
+    def extract_infos(self, payload):
         """
-        True if the packet is conformed with the expected specifications (neuron synapse, version, etc), false otherwise
+        Extract information we want to check to determinate if we allow or not the packet
         """
         try:
             content = payload.decode("utf-8") if isinstance(payload, bytes) else payload
@@ -232,6 +244,7 @@ class Firewall(threading.Thread):
         # Set default value
         name = ""
         neuron_version = 0
+        hotkey = None
 
         # Get the value for each expected property
         for line in lines:
@@ -247,27 +260,13 @@ class Firewall(threading.Thread):
                 # Strip any extra whitespace and print the value
                 neuron_version = int(value.strip()) if value else 0
 
-        specifications = {}
-        with self._specifications_lock:
-            specifications = copy.deepcopy(self.specifications)
+            if "bt_header_dendrite_hotkey" in line:
+                # Split the line to get the value
+                _, value = line.split(":", 1)
+                # Strip any extra whitespace and print the value
+                hotkey = value.strip()
 
-        # Check if the packet matches an expected synapses
-        synapses = specifications.get("synapses") or []
-        if len(synapses) > 0 and name.lower() not in synapses:
-            return (
-                False,
-                f"Synapse name '{name}' not found",
-            )
-
-        # Check if the neuron version is greater stricly than the one required
-        neuron_version_required = int(specifications.get("neuron_version") or 0)
-        if neuron_version < neuron_version_required:
-            return (
-                False,
-                f"Neuron version {neuron_version} is outdated; version {225} is required.",
-            )
-
-        return (True, None)
+        return (name, neuron_version, hotkey)
 
     def get_rule(self, rules: List[Rule], type: RuleType, ip, port, protocol):
         filtered_rules = [r for r in rules if r.rule_type == type]
@@ -337,31 +336,47 @@ class Firewall(threading.Thread):
         self.packet_timestamps[ip_src][port_dest][protocol].append(current_time)
 
         # Check if a allow rule exist
-        allow_rule = self.get_rule(
+        match_allow_rule = self.get_rule(
             rules=rules,
             type=RuleType.ALLOW,
             ip=ip_src,
             port=port_dest,
             protocol=protocol,
+        ) is not None
+
+        # Initialise variables
+        must_deny = False
+        must_allow = match_allow_rule
+        rule_type = None
+        reason = None
+
+        # Extract data from packet content
+        name, neuron_version, hotkey = self.extract_infos(
+            packet[Raw].load if Raw in packet else ("", None, None)
         )
 
-        # Check if a allow rule exist
-        deny_rule = self.get_rule(
-            rules=rules,
-            type=RuleType.DENY,
-            ip=ip_src,
-            port=port_dest,
-            protocol=protocol,
+        # Check if the hotkey is blacklisted
+        must_deny, rule_type, reason = (
+            self.is_blacklisted(hotkey)
+            if not must_deny
+            else (must_deny, rule_type, reason)
         )
 
-        # Check request specs
-        specs_success, specs_reason = (
-            self.check_specifications(packet[Raw].load)
-            if Raw in packet
-            else (True, None)
+        # Check if the packet matches an expected synapses
+        must_deny, rule_type, reason = (
+            self.is_unknown_synapse(name)
+            if not must_deny
+            else (must_deny, rule_type, reason)
         )
 
-        # Check if a DoS rule exist
+        # Check if the neuron version is greater stricly than the one required
+        must_deny, rule_type, reason = (
+            self.is_old_neuron_version(neuron_version)
+            if not must_deny
+            else (must_deny, rule_type, reason)
+        )
+
+        # Check if a DoS attack is found
         dos_rule = self.get_rule(
             rules=rules,
             type=RuleType.DETECT_DOS,
@@ -369,7 +384,7 @@ class Firewall(threading.Thread):
             port=port_dest,
             protocol=protocol,
         )
-        dos_detected, dos_reason = (
+        must_deny, rule_type, reason = (
             self.detect_dos(
                 ip_src,
                 port_dest,
@@ -377,11 +392,11 @@ class Firewall(threading.Thread):
                 dos_rule,
                 current_time,
             )
-            if dos_rule and specs_success
-            else (False, None)
+            if dos_rule and not must_deny
+            else (must_deny, rule_type, reason)
         )
 
-        # Check if a DDoS rule exist
+        # Check if a DDoS attack is found
         ddos_rule = self.get_rule(
             rules=rules,
             type=RuleType.DETECT_DDOS,
@@ -389,35 +404,38 @@ class Firewall(threading.Thread):
             port=port_dest,
             protocol=protocol,
         )
-        ddos_detected, ddos_reason = (
+        must_deny, rule_type, reason = (
             self.detect_ddos(
                 port_dest,
                 ddos_rule,
                 current_time,
             )
-            if ddos_rule and specs_success
-            else (False, None)
+            if ddos_rule and not must_deny
+            else (must_deny, rule_type, reason)
         )
 
-        has_detection_rule = dos_rule or ddos_rule
-        attack_detected = dos_detected or ddos_detected or not specs_success
-        attack_type = (
-            (dos_detected and RuleType.DETECT_DOS)
-            or (ddos_detected and RuleType.DETECT_DDOS)
-            or (not specs_success and RuleType.SPECIFICATION)
-        )
-        attack_reason = dos_reason or ddos_reason or specs_reason
+        # By default all traffic is denied, so if there is not allow rule 
+        # we check if the hotkey is whitelisted
+        if not must_allow: # and not (dos_rule or ddos_rule):
+            # One of the detection has been used, so we use the default behaviour of a detection rule
+            # which is allowing the traffic except if detecting something abnormal
+            must_allow = dos_rule or ddos_rule
 
-        if attack_detected or (not has_detection_rule and not allow_rule):
-            if deny_rule:
-                return
+            # Check if the hotkey is whitelisted
+            must_allow, rule_type, reason = (
+                self.is_whitelisted(hotkey)
+                if not must_deny and not must_allow
+                else (must_allow, rule_type, reason)
+            )
 
+        # if attack_detected or (not has_detection_rule and not must_allow):
+        if must_deny or not must_allow:
             self.block_ip(
                 ip=ip_src,
                 port=port_dest,
                 protocol=protocol,
-                type=attack_type or RuleType.DENY,
-                reason=attack_reason or "Deny ip",
+                type=rule_type,
+                reason=reason or "Deny ip",
             )
             return
 

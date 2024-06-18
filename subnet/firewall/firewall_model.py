@@ -66,7 +66,6 @@ class RuleType(Enum):
     DENY = "deny"
     DETECT_DOS = "detect-dos"
     DETECT_DDOS = "detect-ddos"
-    SPECIFICATION = "specification"
 
 
 @dataclass

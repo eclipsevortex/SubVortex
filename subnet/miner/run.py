@@ -85,7 +85,7 @@ def run(self):
                 self.firewall.update_specifications(specifications)
 
                 # Define the validators whitelisted
-                whitelist = [x for x in validators if x[2] >= weights_min_stake]
+                whitelist = [x[1] for x in validators if x[2] >= weights_min_stake]
                 self.firewall.update_whitelist(whitelist)
                 bt.logging.debug("Firewall whitelist ips updated")
 

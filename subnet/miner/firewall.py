@@ -522,6 +522,8 @@ class Firewall(threading.Thread):
                     f"[{count}] Packet received {ip_src}/{port_dest} ({protocol}): {metadata} {flags}"
                 )
 
+            count = self.packet_counts[ip_src][port_dest][protocol]
+
             # if attack_detected or (not has_detection_rule and not must_allow):
             if must_deny or not must_allow:
                 self.block_ip(
@@ -533,7 +535,7 @@ class Firewall(threading.Thread):
                 )
                 flags = TCP in packet and packet[TCP].flags
                 bt.logging.info(
-                    f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
+                    f"[{count}] EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
                 )
                 return
 
@@ -550,7 +552,7 @@ class Firewall(threading.Thread):
             if ip_blocked:
                 flags = TCP in packet and packet[TCP].flags
                 bt.logging.info(
-                    f"EXCLIPSE UNBLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
+                    f"[{count}] EXCLIPSE UNBLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
                 )
 
             # Unblock the ip/port

@@ -400,11 +400,11 @@ class Firewall(threading.Thread):
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
-            is_handshake = TCP in packet and packet[TCP].flags == 'S'
+            is_data_request = Raw in packet
             must_debug = ip_src == "158.220.82.181" and port_dest == 8091
 
             # TODO: For miner only
-            if is_request_for_miner and not is_handshake:
+            if is_request_for_miner and not is_data_request:
                 # Checks only for miner, not for subtensor
                 if must_debug:
                     bt.logging.info("[EXCLIPSE] Checking miner stuffs")
@@ -490,7 +490,7 @@ class Firewall(threading.Thread):
             # TODO: For miner only
             # By default all traffic is denied, so if there is not allow rule
             # we check if the hotkey is whitelisted
-            if not must_allow and is_request_for_miner and not is_handshake:
+            if not must_allow and is_request_for_miner:
                 # One of the detection has been used, so we use the default behaviour of a detection rule
                 # which is allowing the traffic except if detecting something abnormal
                 must_allow = dos_rule or ddos_rule
@@ -513,7 +513,7 @@ class Firewall(threading.Thread):
                 )
                 if must_debug:
                     flags = TCP in packet and packet[TCP].flags
-                    bt.logging.info(f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}")
+                    bt.logging.info(f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_data_request} {flags} - {packet.summary()}")
                 return
 
             # Unblock the ip/port

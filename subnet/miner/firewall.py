@@ -400,11 +400,11 @@ class Firewall(threading.Thread):
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
-            is_data_request = Raw in packet
+            is_handshake = TCP in packet and packet[TCP].flags == "PA"
             must_debug = ip_src == "158.220.82.181" and port_dest == 8091
 
             # TODO: For miner only
-            if is_request_for_miner and is_data_request:
+            if is_request_for_miner and is_handshake:
                 # Checks only for miner, not for subtensor
                 if must_debug:
                     bt.logging.info("[EXCLIPSE] Checking miner stuffs")
@@ -417,7 +417,9 @@ class Firewall(threading.Thread):
                 )
 
                 if must_debug:
-                    bt.logging.info(f"[EXCLIPSE] Extraction result: {name}/{neuron_version}/{hotkey}: {Raw in packet}")
+                    bt.logging.info(
+                        f"[EXCLIPSE] Extraction result: {name}/{neuron_version}/{hotkey}: {Raw in packet}"
+                    )
 
                 metadata = {
                     **metadata,
@@ -513,7 +515,9 @@ class Firewall(threading.Thread):
                 )
                 if must_debug:
                     flags = TCP in packet and packet[TCP].flags
-                    bt.logging.info(f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_data_request} {flags} - {packet.summary()}")
+                    bt.logging.info(
+                        f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
+                    )
                 return
 
             # Unblock the ip/port

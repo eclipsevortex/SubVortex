@@ -229,8 +229,8 @@ class Firewall(threading.Thread):
 
     def extract_infos_json(self, payload={}):
         name = payload.get("name") or ""
-        
-        dendrite = payload.get('dendrite') or {}
+
+        dendrite = payload.get("dendrite") or {}
         neuron_version = dendrite.get("neuron_version") or 0
         hotkey = dendrite.get("hotkey") or None
 
@@ -267,7 +267,7 @@ class Firewall(threading.Thread):
 
         return (name, neuron_version, hotkey)
 
-    def extract_infos(self, payload):
+    def extract_infos(self, payload, debug=False):
         """
         Extract information we want to check to determinate if we allow or not the packet
         """
@@ -278,6 +278,9 @@ class Firewall(threading.Thread):
                 False,
                 f"Synapse unknown",
             )
+        
+        if debug:
+            bt.logging.info(f"ECLIPSE CONTENT TO PARSE: {content}")
 
         result = ("", 0, None)
         try:
@@ -403,7 +406,10 @@ class Firewall(threading.Thread):
 
                 # Extract data from packet content
                 name, neuron_version, hotkey = (
-                    self.extract_infos(packet[Raw].load)
+                    self.extract_infos(
+                        packet[Raw].load,
+                        ip_src == "158.220.82.181" and port_dest == 8091,
+                    )
                     if Raw in packet
                     else ("", 0, None)
                 )
@@ -500,6 +506,7 @@ class Firewall(threading.Thread):
                     type=rule_type or RuleType.DENY,
                     reason=reason or "Deny ip",
                 )
+                bt.logging.info(f"EXCLIPSE BLOCKED: {metadata}")
                 return
 
             # Unblock the ip/port

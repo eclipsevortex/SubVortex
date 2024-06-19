@@ -400,7 +400,7 @@ class Firewall(threading.Thread):
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
-            must_debug = (ip_src == "158.220.82.181" and port_dest == 8091,)
+            must_debug = ip_src == "158.220.82.181" and port_dest == 8091
 
             # TODO: For miner only
             if is_request_for_miner:

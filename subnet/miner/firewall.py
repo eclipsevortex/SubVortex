@@ -229,8 +229,10 @@ class Firewall(threading.Thread):
 
     def extract_infos_json(self, payload={}):
         name = payload.get("name") or ""
-        neuron_version = payload.get("dendrite.neuron_version") or 0
-        hotkey = payload.get("dendrite.hotkey") or None
+        
+        dendrite = payload.get('dendrite') or {}
+        neuron_version = dendrite.get("neuron_version") or 0
+        hotkey = dendrite.get("hotkey") or None
 
         return (name, neuron_version, hotkey)
 

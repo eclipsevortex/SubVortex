@@ -107,17 +107,21 @@ class AllowRule(Rule):
     @staticmethod
     def create(config={}):
         ip = config.get("ip")
-        port = config.get("port")
+        sport = config.get("port")
+        dport = config.get("dport")
         protocol = config.get("protocol")
 
         if ip is not None and not is_valid_ip(ip):
             raise ValueError(f"Invalid IP address: {ip}")
 
-        if port is not None and not is_valid_port(port):
-            raise ValueError(f"Invalid Port: {port}")
+        if sport is not None and not is_valid_port(sport):
+            raise ValueError(f"Invalid Port: {sport}")
+        
+        if dport is not None and not is_valid_port(dport):
+            raise ValueError(f"Invalid Port: {dport}")
 
+        port = sport or dport
         if ip is None and port is None:
-            print("BOUH")
             raise ValueError("Ip and or Port have to be provided")
 
         if protocol and not is_valid_protocol(protocol):
@@ -146,17 +150,21 @@ class DenyRule(Rule):
     @staticmethod
     def create(config={}):
         ip = config.get("ip")
-        port = config.get("port")
+        dport = config.get("dport")
+        sport = config.get("sport")
         protocol = config.get("protocol")
 
         if ip is not None and not is_valid_ip(ip):
             raise ValueError(f"Invalid IP address: {ip}")
 
-        if port is not None and not is_valid_port(port):
-            raise ValueError(f"Invalid Port: {port}")
+        if sport is not None and not is_valid_port(sport):
+            raise ValueError(f"Invalid Port: {sport}")
+        
+        if dport is not None and not is_valid_port(dport):
+            raise ValueError(f"Invalid Port: {dport}")
 
+        port = sport or dport
         if ip is None and port is None:
-            print("BOUH")
             raise ValueError("Ip and or Port have to be provided")
 
         if protocol and not is_valid_protocol(protocol):
@@ -164,7 +172,8 @@ class DenyRule(Rule):
 
         return DenyRule(
             ip=ip,
-            port=port,
+            sport=sport,
+            dport=dport,
             protocol=protocol,
         )
 
@@ -187,17 +196,17 @@ class DetectDoSRule(Rule):
 
     @staticmethod
     def create(config={}):
-        port = config.get("port")
+        dport = config.get("dport")
         protocol = config.get("protocol")
         configuration = config.get("configuration") or {}
         time_window = configuration.get("time_window")
         packet_threshold = configuration.get("packet_threshold")
 
-        if port is None:
+        if dport is None:
             raise ValueError("Port have to be provided")
 
-        if not is_valid_port(port):
-            raise ValueError(f"Invalid Port: {port}")
+        if not is_valid_port(dport):
+            raise ValueError(f"Invalid Port: {dport}")
 
         if protocol is not None and not is_valid_protocol(protocol):
             raise ValueError(f"Invalid Protocol: {protocol}")
@@ -209,7 +218,7 @@ class DetectDoSRule(Rule):
             raise ValueError(f"Invalid Packet Threashold: {packet_threshold}")
 
         return DetectDoSRule(
-            port=port,
+            dport=dport,
             protocol=protocol,
             time_window=time_window,
             packet_threshold=packet_threshold,
@@ -234,17 +243,17 @@ class DetectDDoSRule(Rule):
 
     @staticmethod
     def create(config={}):
-        port = config.get("port")
+        dport = config.get("dport")
         protocol = config.get("protocol")
         configuration = config.get("configuration") or {}
         time_window = configuration.get("time_window")
         packet_threshold = configuration.get("packet_threshold")
 
-        if port is None:
+        if dport is None:
             raise ValueError("Port have to be provided")
 
-        if not is_valid_port(port):
-            raise ValueError(f"Invalid Port: {port}")
+        if not is_valid_port(dport):
+            raise ValueError(f"Invalid Port: {dport}")
 
         if protocol is not None and not is_valid_protocol(protocol):
             raise ValueError(f"Invalid Protocol: {protocol}")
@@ -256,7 +265,7 @@ class DetectDDoSRule(Rule):
             raise ValueError(f"Invalid Packet Threashold: {packet_threshold}")
 
         return DetectDDoSRule(
-            port=port,
+            dport=dport,
             protocol=protocol,
             time_window=time_window,
             packet_threshold=packet_threshold,

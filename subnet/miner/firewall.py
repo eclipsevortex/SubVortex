@@ -140,7 +140,7 @@ class Firewall(threading.Thread):
         # Update the block ips
         ip_blocked = {
             "ip": ip,
-            "port": port,
+            "port": dport,
             "protocol": protocol,
             "type": type,
             "reason": reason,
@@ -174,7 +174,7 @@ class Firewall(threading.Thread):
         self.ips_blocked = [
             x
             for x in self.ips_blocked
-            if x["ip"] != ip or x["port"] != port or x["protocol"] != protocol
+            if x["ip"] != ip or x["port"] != dport or x["protocol"] != protocol
         ]
 
         # Update the local file
@@ -227,7 +227,7 @@ class Firewall(threading.Thread):
 
         return (False, None, None)
 
-    def extract_infos_json(self, payload):
+    def extract_infos_json(self, payload = {}):
         name = payload.get("name") or ""
         neuron_version = payload.get("dendrite.neuron_version") or 0
         hotkey = payload.get("dendrite.hotkey") or None

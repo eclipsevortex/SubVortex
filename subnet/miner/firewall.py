@@ -7,7 +7,7 @@ import threading
 import bittensor as bt
 from typing import List
 from collections import defaultdict
-from scapy.all import sniff, TCP, SYN, UDP, IP, Raw, Packet
+from scapy.all import sniff, TCP, UDP, IP, Raw, Packet
 
 from subnet.shared.encoder import EnumEncoder
 from subnet.firewall.firewall_model import (

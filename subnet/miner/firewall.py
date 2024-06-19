@@ -491,7 +491,7 @@ class Firewall(threading.Thread):
 
             # One of the detection has been used, so we use the default behaviour of a detection rule
             # which is allowing the traffic except if detecting something abnormal
-            must_allow = dos_rule or ddos_rule
+            must_allow = must_allow or dos_rule or ddos_rule
 
             # TODO: For miner only
             # By default all traffic is denied, so if there is not allow rule

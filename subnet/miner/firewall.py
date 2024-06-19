@@ -92,7 +92,11 @@ class Firewall(threading.Thread):
         """
         synapses = self.get_specification("synapses") or []
         if len(synapses) > 0 and name not in synapses:
-            return (True, RuleType.DENY, f"Synapse name '{name}' not found, available {synapses.keys()}")
+            return (
+                True,
+                RuleType.DENY,
+                f"Synapse name '{name}' not found, available {list(synapses.keys())}",
+            )
 
         return (False, None, None)
 
@@ -362,10 +366,6 @@ class Firewall(threading.Thread):
             # Set metadata for logs purpose on exception
             metadata = {"ip": ip_src, "dport": port_dest}
 
-            # Add the new time for ip/port
-            self.packet_counts[ip_src][port_dest][protocol] += 1
-            self.packet_timestamps[ip_src][port_dest][protocol].append(current_time)
-
             # Check if a allow rule exist
             match_allow_rule = (
                 self.get_rule(
@@ -400,7 +400,7 @@ class Firewall(threading.Thread):
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
-            is_handshake = Raw in packet # TCP in packet and packet[TCP].flags == "PA"
+            is_handshake = Raw in packet  # TCP in packet and packet[TCP].flags == "PA"
             must_debug = ip_src == "158.220.82.181" and port_dest == 8091
 
             # TODO: For miner only
@@ -450,6 +450,11 @@ class Firewall(threading.Thread):
                     if not must_deny
                     else (must_deny, rule_type, reason)
                 )
+
+            # Add the new time for ip/port
+            if not must_deny:
+                self.packet_counts[ip_src][port_dest][protocol] += 1
+                self.packet_timestamps[ip_src][port_dest][protocol].append(current_time)
 
             # Check if a DoS attack is found
             dos_rule = self.get_rule(

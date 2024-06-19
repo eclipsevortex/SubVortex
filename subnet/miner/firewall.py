@@ -403,6 +403,11 @@ class Firewall(threading.Thread):
             is_handshake = Raw in packet  # TCP in packet and packet[TCP].flags == "PA"
             must_debug = False  # ip_src == "158.220.82.181" and port_dest == 8091
 
+            if is_request_for_miner and TCP in packet and packet[TCP].flags != 'PA':
+                # We skip any miner requests that are not Push and Acknowledge packet
+                # as only these ones have the body
+                return
+
             # TODO: For miner only
             if is_request_for_miner and is_handshake:
                 # Checks only for miner, not for subtensor

@@ -277,7 +277,7 @@ class Firewall(threading.Thread):
             (
                 r
                 for r in filtered_rules
-                if r.ip == ip and r.port == port and r.protocol == protocol
+                if r.ip == ip and r.dport == port and r.protocol == protocol
             ),
             None,
         )
@@ -289,7 +289,7 @@ class Firewall(threading.Thread):
                 for r in filtered_rules
                 if ip is not None
                 and r.ip == ip
-                and r.port is None
+                and r.dport is None
                 and r.protocol is None
             ),
             None,
@@ -301,7 +301,7 @@ class Firewall(threading.Thread):
                 r
                 for r in filtered_rules
                 if port is not None
-                and r.port == port
+                and r.dport == port
                 and r.protocol == protocol
                 and r.ip is None
             ),
@@ -327,7 +327,7 @@ class Firewall(threading.Thread):
             return
 
         # Get all rules related to the ip/port
-        rules = [r for r in self.rules if r.ip == ip_src or r.port == port_dest]
+        rules = [r for r in self.rules if r.ip == ip_src or r.dport == port_dest]
 
         # Get the current time
         current_time = time.time()

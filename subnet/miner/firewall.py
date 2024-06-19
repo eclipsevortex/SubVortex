@@ -40,7 +40,7 @@ class Firewall(threading.Thread):
             lambda: defaultdict(lambda: defaultdict(list))
         )
 
-        self.dry = True
+        self.dry = False
         self.tool = tool
         self.port = port
         self.interface = interface

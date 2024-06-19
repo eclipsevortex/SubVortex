@@ -5,7 +5,7 @@
         "type": "detect-dos",
         "configuration": {
             "time_window": 600,
-            "packet_threshold": 6
+            "packet_threshold": 10
         }
     },
     {

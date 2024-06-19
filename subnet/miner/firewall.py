@@ -311,164 +311,181 @@ class Firewall(threading.Thread):
         return rule
 
     def packet_callback(self, packet: Packet):
-        # Get the protocol
-        protocol = "tcp" if TCP in packet else "udp" if UDP in packet else None
+        metadata = {}
+        try:
+            # Get the protocol
+            protocol = "tcp" if TCP in packet else "udp" if UDP in packet else None
 
-        # Get the destination port
-        port_dest = (
-            packet[TCP].dport
-            if TCP in packet
-            else packet[UDP].dport if UDP in packet else None
-        )
+            # Get the destination port
+            port_dest = (
+                packet[TCP].dport
+                if TCP in packet
+                else packet[UDP].dport if UDP in packet else None
+            )
 
-        # Get the source ip
-        ip_src = packet[IP].src if IP in packet else None
-        if ip_src is None:
-            return
+            # Get the source ip
+            ip_src = packet[IP].src if IP in packet else None
+            if ip_src is None:
+                return
 
-        # Get all rules related to the ip/port
-        rules = [r for r in self.rules if r.ip == ip_src or r.dport == port_dest]
+            # Get all rules related to the ip/port
+            rules = [r for r in self.rules if r.ip == ip_src or r.dport == port_dest]
 
-        # Get the current time
-        current_time = time.time()
+            # Get the current time
+            current_time = time.time()
 
-        # Add the new time for ip/port
-        self.packet_counts[ip_src][port_dest][protocol] += 1
-        self.packet_timestamps[ip_src][port_dest][protocol].append(current_time)
+            # Set metadata for logs purpose on exception
+            metadata = {"ip": ip_src, "dpor": port_dest}
 
-        # Check if a allow rule exist
-        match_allow_rule = (
-            self.get_rule(
+            # Add the new time for ip/port
+            self.packet_counts[ip_src][port_dest][protocol] += 1
+            self.packet_timestamps[ip_src][port_dest][protocol].append(current_time)
+
+            # Check if a allow rule exist
+            match_allow_rule = (
+                self.get_rule(
+                    rules=rules,
+                    type=RuleType.ALLOW,
+                    ip=ip_src,
+                    port=port_dest,
+                    protocol=protocol,
+                )
+                is not None
+            )
+            if not match_allow_rule:
+                # Default policy is to deny everything so user have to define some ALLOW rules to let the expected traffic going through
+                # There have to be an ALLOW rule for the expected traffics, if not we do nothing and it will be denied
+                return
+
+            # Check if a deny rule exist
+            match_deny_rule = (
+                self.get_rule(
+                    rules=rules,
+                    type=RuleType.DENY,
+                    ip=ip_src,
+                    port=port_dest,
+                    protocol=protocol,
+                )
+                is not None
+            )
+
+            # Initialise variables
+            must_deny = match_deny_rule
+            must_allow = match_allow_rule
+            rule_type = None
+            reason = None
+            is_request_for_miner = self.port == port_dest
+
+            # TODO: For miner only
+            if is_request_for_miner:
+                # Checks only for miner, not for subtensor
+
+                # Extract data from packet content
+                name, neuron_version, hotkey = (
+                    self.extract_infos(packet[Raw].load)
+                    if Raw in packet
+                    else ("", None, None)
+                )
+
+                metadata = {
+                    **metadata,
+                    "synapse": {
+                        "name": name,
+                        "neuron_version": neuron_version,
+                        "hotkey": hotkey,
+                    },
+                }
+
+                # Check if the hotkey is blacklisted
+                must_deny, rule_type, reason = (
+                    self.is_blacklisted(hotkey)
+                    if not must_deny
+                    else (must_deny, rule_type, reason)
+                )
+
+                # Check if the packet matches an expected synapses
+                must_deny, rule_type, reason = (
+                    self.is_unknown_synapse(name)
+                    if not must_deny
+                    else (must_deny, rule_type, reason)
+                )
+
+                # Check if the neuron version is greater stricly than the one required
+                must_deny, rule_type, reason = (
+                    self.is_old_neuron_version(neuron_version)
+                    if not must_deny
+                    else (must_deny, rule_type, reason)
+                )
+
+            # Check if a DoS attack is found
+            dos_rule = self.get_rule(
                 rules=rules,
-                type=RuleType.ALLOW,
+                type=RuleType.DETECT_DOS,
                 ip=ip_src,
                 port=port_dest,
                 protocol=protocol,
             )
-            is not None
-        )
-        if not match_allow_rule:
-            # Default policy is to deny everything so user have to define some ALLOW rules to let the expected traffic going through
-            # There have to be an ALLOW rule for the expected traffics, if not we do nothing and it will be denied
-            return
+            must_deny, rule_type, reason = (
+                self.detect_dos(
+                    ip_src,
+                    port_dest,
+                    protocol,
+                    dos_rule,
+                    current_time,
+                )
+                if dos_rule and not must_deny
+                else (must_deny, rule_type, reason)
+            )
 
-        # Check if a deny rule exist
-        match_deny_rule = (
-            self.get_rule(
+            # Check if a DDoS attack is found
+            ddos_rule = self.get_rule(
                 rules=rules,
-                type=RuleType.DENY,
+                type=RuleType.DETECT_DDOS,
                 ip=ip_src,
                 port=port_dest,
                 protocol=protocol,
             )
-            is not None
-        )
-
-        # Initialise variables
-        must_deny = match_deny_rule
-        must_allow = match_allow_rule
-        rule_type = None
-        reason = None
-        is_request_for_miner = self.port == port_dest
-
-        # TODO: For miner only
-        if is_request_for_miner:
-            # Checks only for miner, not for subtensor
-
-            # Extract data from packet content
-            name, neuron_version, hotkey = (
-                self.extract_infos(packet[Raw].load)
-                if Raw in packet
-                else ("", None, None)
-            )
-
-            # Check if the hotkey is blacklisted
             must_deny, rule_type, reason = (
-                self.is_blacklisted(hotkey)
-                if not must_deny
+                self.detect_ddos(
+                    port_dest,
+                    ddos_rule,
+                    current_time,
+                )
+                if ddos_rule and not must_deny
                 else (must_deny, rule_type, reason)
             )
 
-            # Check if the packet matches an expected synapses
-            must_deny, rule_type, reason = (
-                self.is_unknown_synapse(name)
-                if not must_deny
-                else (must_deny, rule_type, reason)
-            )
+            # TODO: For miner only
+            # By default all traffic is denied, so if there is not allow rule
+            # we check if the hotkey is whitelisted
+            if not must_allow and is_request_for_miner:
+                # One of the detection has been used, so we use the default behaviour of a detection rule
+                # which is allowing the traffic except if detecting something abnormal
+                must_allow = dos_rule or ddos_rule
 
-            # Check if the neuron version is greater stricly than the one required
-            must_deny, rule_type, reason = (
-                self.is_old_neuron_version(neuron_version)
-                if not must_deny
-                else (must_deny, rule_type, reason)
-            )
+                # Check if the hotkey is whitelisted
+                must_allow, rule_type, reason = (
+                    self.is_whitelisted(hotkey)
+                    if not must_deny and not must_allow
+                    else (must_allow, rule_type, reason)
+                )
 
-        # Check if a DoS attack is found
-        dos_rule = self.get_rule(
-            rules=rules,
-            type=RuleType.DETECT_DOS,
-            ip=ip_src,
-            port=port_dest,
-            protocol=protocol,
-        )
-        must_deny, rule_type, reason = (
-            self.detect_dos(
-                ip_src,
-                port_dest,
-                protocol,
-                dos_rule,
-                current_time,
-            )
-            if dos_rule and not must_deny
-            else (must_deny, rule_type, reason)
-        )
+            # if attack_detected or (not has_detection_rule and not must_allow):
+            if must_deny or not must_allow or must_deny:
+                self.block_ip(
+                    ip=ip_src,
+                    dport=port_dest,
+                    protocol=protocol,
+                    type=rule_type or RuleType.DENY,
+                    reason=reason or "Deny ip",
+                )
+                return
 
-        # Check if a DDoS attack is found
-        ddos_rule = self.get_rule(
-            rules=rules,
-            type=RuleType.DETECT_DDOS,
-            ip=ip_src,
-            port=port_dest,
-            protocol=protocol,
-        )
-        must_deny, rule_type, reason = (
-            self.detect_ddos(
-                port_dest,
-                ddos_rule,
-                current_time,
-            )
-            if ddos_rule and not must_deny
-            else (must_deny, rule_type, reason)
-        )
-
-        # TODO: For miner only
-        # By default all traffic is denied, so if there is not allow rule
-        # we check if the hotkey is whitelisted
-        if not must_allow and is_request_for_miner:
-            # One of the detection has been used, so we use the default behaviour of a detection rule
-            # which is allowing the traffic except if detecting something abnormal
-            must_allow = dos_rule or ddos_rule
-
-            # Check if the hotkey is whitelisted
-            must_allow, rule_type, reason = (
-                self.is_whitelisted(hotkey)
-                if not must_deny and not must_allow
-                else (must_allow, rule_type, reason)
-            )
-
-        # if attack_detected or (not has_detection_rule and not must_allow):
-        if must_deny or not must_allow or must_deny:
-            self.block_ip(
-                ip=ip_src,
-                dport=port_dest,
-                protocol=protocol,
-                type=rule_type or RuleType.DENY,
-                reason=reason or "Deny ip",
-            )
-            return
-
-        # Unblock the ip/port
-        self.unblock_ip(ip=ip_src, dport=port_dest, protocol=protocol)
+            # Unblock the ip/port
+            self.unblock_ip(ip=ip_src, dport=port_dest, protocol=protocol)
+        except Exception as ex:
+            bt.logging.warning(f"Failed to proceed firewall packet: {ex}")
+            bt.logging.debug(f"Firewall packet metadata: {metadata}")
 
     def run(self):
         # Reload the previous ips blocked

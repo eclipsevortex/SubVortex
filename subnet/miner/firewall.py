@@ -403,7 +403,7 @@ class Firewall(threading.Thread):
                 name, neuron_version, hotkey = (
                     self.extract_infos(packet[Raw].load)
                     if Raw in packet
-                    else ("", None, None)
+                    else ("", 0, None)
                 )
 
                 metadata = {

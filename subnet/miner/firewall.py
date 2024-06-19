@@ -400,23 +400,23 @@ class Firewall(threading.Thread):
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
-            is_handshake = TCP in packet and packet[TCP].flags == "PA"
+            is_handshake = Raw in packet # TCP in packet and packet[TCP].flags == "PA"
             must_debug = ip_src == "158.220.82.181" and port_dest == 8091
 
             # TODO: For miner only
             if is_request_for_miner and is_handshake:
                 # Checks only for miner, not for subtensor
-                if must_debug:
+                if False and must_debug:
                     bt.logging.info("[EXCLIPSE] Checking miner stuffs")
 
                 # Extract data from packet content
                 name, neuron_version, hotkey = (
-                    self.extract_infos(packet[Raw].load, must_debug)
+                    self.extract_infos(packet[Raw].load, False and must_debug)
                     if Raw in packet
                     else ("", 0, None)
                 )
 
-                if must_debug:
+                if False and must_debug:
                     bt.logging.info(
                         f"[EXCLIPSE] Extraction result: {name}/{neuron_version}/{hotkey}: {Raw in packet}"
                     )
@@ -489,14 +489,14 @@ class Firewall(threading.Thread):
                 else (must_deny, rule_type, reason)
             )
 
+            # One of the detection has been used, so we use the default behaviour of a detection rule
+            # which is allowing the traffic except if detecting something abnormal
+            must_allow = dos_rule or ddos_rule
+
             # TODO: For miner only
             # By default all traffic is denied, so if there is not allow rule
             # we check if the hotkey is whitelisted
             if not must_allow and is_request_for_miner:
-                # One of the detection has been used, so we use the default behaviour of a detection rule
-                # which is allowing the traffic except if detecting something abnormal
-                must_allow = dos_rule or ddos_rule
-
                 # Check if the hotkey is whitelisted
                 must_allow, rule_type, reason = (
                     self.is_whitelisted(hotkey)
@@ -513,7 +513,7 @@ class Firewall(threading.Thread):
                     type=rule_type or RuleType.DENY,
                     reason=reason or "Deny ip",
                 )
-                if must_debug:
+                if False and must_debug:
                     flags = TCP in packet and packet[TCP].flags
                     bt.logging.info(
                         f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"

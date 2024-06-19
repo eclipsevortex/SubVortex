@@ -526,14 +526,17 @@ class Firewall(threading.Thread):
                     type=rule_type or RuleType.DENY,
                     reason=reason or "Deny ip",
                 )
-                if must_debug:
-                    flags = TCP in packet and packet[TCP].flags
-                    bt.logging.info(
-                        f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
-                    )
+                flags = TCP in packet and packet[TCP].flags
+                bt.logging.info(
+                    f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
+                )
                 return
 
             # Unblock the ip/port
+            flags = TCP in packet and packet[TCP].flags
+            bt.logging.info(
+                f"EXCLIPSE UNBLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
+            )
             self.unblock_ip(ip=ip_src, dport=port_dest, protocol=protocol)
         except Exception as ex:
             bt.logging.warning(f"Failed to proceed firewall packet: {ex}")

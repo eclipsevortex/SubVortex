@@ -404,7 +404,7 @@ class Firewall(threading.Thread):
             must_debug = ip_src == "158.220.82.181" and port_dest == 8091
 
             # TODO: For miner only
-            if is_request_for_miner and not is_data_request:
+            if is_request_for_miner and is_data_request:
                 # Checks only for miner, not for subtensor
                 if must_debug:
                     bt.logging.info("[EXCLIPSE] Checking miner stuffs")

@@ -48,7 +48,7 @@
         "type": "allow"
     },
     {
-        "port": 9933,
+        "dport": 9933,
         "protocol": "tcp",
         "type": "allow"
     },

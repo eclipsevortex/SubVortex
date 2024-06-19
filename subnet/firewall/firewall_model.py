@@ -101,8 +101,8 @@ class AllowRule(Rule):
     Define the rule to allow access
     """
 
-    def __init__(self, ip=None, port=None, protocol=None):
-        super().__init__(ip, port, protocol)
+    def __init__(self, ip=None, sport=None, dport=None, protocol=None):
+        super().__init__(ip=ip, sport=sport, dport=dport, protocol=protocol)
 
     @staticmethod
     def create(config={}):
@@ -116,7 +116,7 @@ class AllowRule(Rule):
 
         if sport is not None and not is_valid_port(sport):
             raise ValueError(f"Invalid Port: {sport}")
-        
+
         if dport is not None and not is_valid_port(dport):
             raise ValueError(f"Invalid Port: {dport}")
 
@@ -144,8 +144,8 @@ class DenyRule(Rule):
     Define the rule to deny access
     """
 
-    def __init__(self, ip=None, port=None, protocol=None):
-        super().__init__(ip, port, protocol)
+    def __init__(self, ip=None, sport=None, dport=None, protocol=None):
+        super().__init__(ip=ip, sport=sport, dport=dport, protocol=protocol)
 
     @staticmethod
     def create(config={}):
@@ -159,7 +159,7 @@ class DenyRule(Rule):
 
         if sport is not None and not is_valid_port(sport):
             raise ValueError(f"Invalid Port: {sport}")
-        
+
         if dport is not None and not is_valid_port(dport):
             raise ValueError(f"Invalid Port: {dport}")
 
@@ -188,8 +188,8 @@ class DetectDoSRule(Rule):
     Define the rule to detect a DoS attack
     """
 
-    def __init__(self, port, protocol, time_window, packet_threshold):
-        super().__init__(port=port, protocol=protocol)
+    def __init__(self, dport, protocol, time_window, packet_threshold):
+        super().__init__(dport=dport, protocol=protocol)
 
         self.time_window = time_window
         self.packet_threshold = packet_threshold
@@ -235,8 +235,8 @@ class DetectDDoSRule(Rule):
     Define the rule to detect a DDoS attack
     """
 
-    def __init__(self, port, protocol, time_window, packet_threshold):
-        super().__init__(port=port, protocol=protocol)
+    def __init__(self, dport, protocol, time_window, packet_threshold):
+        super().__init__(dport=dport, protocol=protocol)
 
         self.time_window = time_window
         self.packet_threshold = packet_threshold

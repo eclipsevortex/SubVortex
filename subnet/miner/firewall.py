@@ -95,7 +95,7 @@ class Firewall(threading.Thread):
 
         return (False, None, None)
 
-    def is_old_neuron_version(self, version: int):
+    def is_old_neuron_version(self, version: int = 0):
         """
         True if the neuron version is greater stricly than the one required, false otherwise
         """

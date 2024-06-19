@@ -512,7 +512,8 @@ class Firewall(threading.Thread):
                     reason=reason or "Deny ip",
                 )
                 if must_debug:
-                    bt.logging.info(f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner}")
+                    flags = TCP in packet and packet[TCP].flags
+                    bt.logging.info(f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags}")
                 return
 
             # Unblock the ip/port

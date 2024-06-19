@@ -129,7 +129,8 @@ class AllowRule(Rule):
 
         return AllowRule(
             ip=ip,
-            port=port,
+            sport=sport,
+            dport=dport,
             protocol=protocol,
         )
 

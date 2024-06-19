@@ -92,7 +92,7 @@ class Firewall(threading.Thread):
         """
         synapses = self.get_specification("synapses") or []
         if len(synapses) > 0 and name not in synapses:
-            return (True, RuleType.DENY, f"Synapse name '{name}' not found, available {synapses}")
+            return (True, RuleType.DENY, f"Synapse name '{name}' not found, available {synapses.keys()}")
 
         return (False, None, None)
 

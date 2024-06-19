@@ -470,9 +470,6 @@ class Firewall(threading.Thread):
             with open("ips_blocked.json", "r") as file:
                 self.ips_blocked = json.load(file) or []
 
-        # Create a Dny all rule
-        self.tool.create_deny_policy()
-
         bt.logging.debug(f"Applying allow/deny rules")
         for rule in self.rules:
             if rule.rule_type not in [RuleType.ALLOW, RuleType.DENY]:
@@ -487,6 +484,9 @@ class Firewall(threading.Thread):
                 self.tool.create_allow_rule(ip=ip, port=port, protocol=protocol)
             else:
                 self.tool.create_deny_rule(ip=ip, port=port, protocol=protocol)
+
+        # Change the policy to deny
+        self.tool.create_deny_policy()
 
         # Start sniffing with the filter
         sniff(

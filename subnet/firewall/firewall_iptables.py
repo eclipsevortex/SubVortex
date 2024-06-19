@@ -41,7 +41,7 @@ class IptablesFirewall(FirewallTool):
         if self.rule_exists(ip=ip, port=port, protocol=protocol, allow=True):
             return False
 
-        commands = ["sudo", "iptables", "-A", "INPUT"]
+        commands = ["sudo", "iptables", "-I", "INPUT"]
         if ip is not None:
             commands += ["-s", ip]
 
@@ -68,7 +68,7 @@ class IptablesFirewall(FirewallTool):
         if self.rule_exists(ip=ip, port=port, protocol=protocol, allow=False):
             return False
 
-        commands = ["sudo", "iptables", "-A", "INPUT"]
+        commands = ["sudo", "iptables", "-I", "INPUT"]
         if ip is not None:
             commands += ["-s", ip]
 

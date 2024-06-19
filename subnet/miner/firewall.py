@@ -227,7 +227,7 @@ class Firewall(threading.Thread):
 
         return (False, None, None)
 
-    def extract_infos_json(self, payload = {}):
+    def extract_infos_json(self, payload={}):
         name = payload.get("name") or ""
         neuron_version = payload.get("dendrite.neuron_version") or 0
         hotkey = payload.get("dendrite.hotkey") or None
@@ -277,11 +277,16 @@ class Firewall(threading.Thread):
                 f"Synapse unknown",
             )
 
+        result = ("", 0, None)
         try:
             data = json.loads(content)
-            return self.extract_infos_json(data)
+            result = self.extract_infos_json(data)
         except ValueError as e:
-            return self.extract_infos_string(content)
+            result = self.extract_infos_string(content)
+
+        bt.logging.info(f"EXTRACT INFO {result}: {content}")
+
+        return result
 
     def get_rule(self, rules: List[Rule], type: RuleType, ip, port, protocol):
         filtered_rules = [r for r in rules if r.rule_type == type]

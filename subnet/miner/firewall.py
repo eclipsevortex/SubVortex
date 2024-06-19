@@ -513,7 +513,7 @@ class Firewall(threading.Thread):
                 )
                 if must_debug:
                     flags = TCP in packet and packet[TCP].flags
-                    bt.logging.info(f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags}")
+                    bt.logging.info(f"EXCLIPSE BLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}")
                 return
 
             # Unblock the ip/port

@@ -405,6 +405,8 @@ class Firewall(threading.Thread):
             # TODO: For miner only
             if is_request_for_miner:
                 # Checks only for miner, not for subtensor
+                if must_debug:
+                    bt.logging.info("[EXCLIPSE] Checking miner stuffs")
 
                 # Extract data from packet content
                 name, neuron_version, hotkey = (
@@ -412,6 +414,9 @@ class Firewall(threading.Thread):
                     if Raw in packet
                     else ("", 0, None)
                 )
+
+                if must_debug:
+                    bt.logging.info(f"[EXCLIPSE] Extraction result: {name}/{neuron_version}/{hotkey}: {Raw in packet}")
 
                 metadata = {
                     **metadata,

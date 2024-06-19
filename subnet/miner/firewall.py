@@ -480,6 +480,7 @@ class Firewall(threading.Thread):
                 self.ips_blocked = json.load(file) or []
 
         # Add allow rule on VPS ip
+        bt.logging.debug(f"Creating allow rule for the vps itself")
         self.tool.create_allow_rule(ip=self.ip)
 
         bt.logging.debug(f"Applying allow/deny rules")
@@ -498,6 +499,7 @@ class Firewall(threading.Thread):
                 self.tool.create_deny_rule(ip=ip, port=port, protocol=protocol)
 
         # Change the policy to deny
+        bt.logging.debug(f"Change the INPUT policy to deby by default")
         self.tool.create_deny_policy()
 
         # Start sniffing with the filter

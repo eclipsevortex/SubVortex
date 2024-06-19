@@ -227,18 +227,14 @@ class Firewall(threading.Thread):
 
         return (False, None, None)
 
-    def extract_infos(self, payload):
-        """
-        Extract information we want to check to determinate if we allow or not the packet
-        """
-        try:
-            content = payload.decode("utf-8") if isinstance(payload, bytes) else payload
-        except Exception:
-            return (
-                False,
-                f"Synapse unknown",
-            )
+    def extract_infos_json(self, payload):
+        name = payload.get("name") or ""
+        neuron_version = payload.get("dendrite.neuron_version") or None
+        hotkey = payload.get("dendrite.hotkey") or None
 
+        return (name, neuron_version, hotkey)
+
+    def extract_infos_string(self, content):
         # Split the HTTP request data into lines
         lines = content.split("\n")
 
@@ -268,6 +264,24 @@ class Firewall(threading.Thread):
                 hotkey = value.strip()
 
         return (name, neuron_version, hotkey)
+
+    def extract_infos(self, payload):
+        """
+        Extract information we want to check to determinate if we allow or not the packet
+        """
+        try:
+            content = payload.decode("utf-8") if isinstance(payload, bytes) else payload
+        except Exception:
+            return (
+                False,
+                f"Synapse unknown",
+            )
+
+        try:
+            data = json.loads(content)
+            return self.extract_infos_json(data)
+        except ValueError as e:
+            return self.extract_infos_string(content)
 
     def get_rule(self, rules: List[Rule], type: RuleType, ip, port, protocol):
         filtered_rules = [r for r in rules if r.rule_type == type]
@@ -335,7 +349,7 @@ class Firewall(threading.Thread):
             current_time = time.time()
 
             # Set metadata for logs purpose on exception
-            metadata = {"ip": ip_src, "dpor": port_dest}
+            metadata = {"ip": ip_src, "dport": port_dest}
 
             # Add the new time for ip/port
             self.packet_counts[ip_src][port_dest][protocol] += 1

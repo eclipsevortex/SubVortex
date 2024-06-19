@@ -18,7 +18,7 @@ class FirewallTool(ABC):
         pass
 
     @abstractmethod
-    def create_allow_rule(self, ip=None,sport=None, dport=None, protocol="tcp"):
+    def create_allow_rule(self, ip=None, sport=None, dport=None, protocol="tcp"):
         pass
 
     @abstractmethod

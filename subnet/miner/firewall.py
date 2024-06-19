@@ -493,11 +493,11 @@ class Firewall(threading.Thread):
 
             if type == RuleType.ALLOW:
                 self.tool.create_allow_rule(
-                    ip=ip, sport=sport, dport=dport, sport=sport, protocol=protocol
+                    ip=ip, sport=sport, dport=dport, protocol=protocol
                 )
             else:
                 self.tool.create_deny_rule(
-                    ip=ip, sport=sport, dport=dport, dport=dport, protocol=protocol
+                    ip=ip, sport=sport, dport=dport, protocol=protocol
                 )
 
         # Change the policy to deny

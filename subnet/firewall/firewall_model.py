@@ -107,7 +107,7 @@ class AllowRule(Rule):
     @staticmethod
     def create(config={}):
         ip = config.get("ip")
-        sport = config.get("port")
+        sport = config.get("sport")
         dport = config.get("dport")
         protocol = config.get("protocol")
 
@@ -150,8 +150,8 @@ class DenyRule(Rule):
     @staticmethod
     def create(config={}):
         ip = config.get("ip")
-        dport = config.get("dport")
         sport = config.get("sport")
+        dport = config.get("dport")
         protocol = config.get("protocol")
 
         if ip is not None and not is_valid_ip(ip):

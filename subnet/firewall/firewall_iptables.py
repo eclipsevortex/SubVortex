@@ -37,6 +37,14 @@ class IptablesFirewall(FirewallTool):
         return True
 
     def create_allow_loopback_rule(self):
+        commands = ["sudo", "iptables", "-C", "INPUT", "-i", "lo", "-j", "ACCEPT"]
+        result = subprocess.run(
+            commands, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+
+        if result.returncode == 0:
+            return
+
         commands = ["sudo", "iptables", "-A", "INPUT", "-i", "lo", "-j", "ACCEPT"]
 
         subprocess.run(

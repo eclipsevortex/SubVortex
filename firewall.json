@@ -5,7 +5,7 @@
         "type": "detect-dos",
         "configuration": {
             "time_window": 600,
-            "packet_threshold": 10
+            "packet_threshold": 14
         }
     },
     {
@@ -14,7 +14,7 @@
         "type": "detect-ddos",
         "configuration": {
             "time_window": 300,
-            "packet_threshold": 120
+            "packet_threshold": 224
         }
     },
     {

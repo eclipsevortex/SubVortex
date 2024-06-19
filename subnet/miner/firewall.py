@@ -349,6 +349,10 @@ class Firewall(threading.Thread):
             )
             is not None
         )
+        if not match_allow_rule:
+            # Default policy is to deny everything so user have to define some ALLOW rules to let the expected traffic going through
+            # There have to be an ALLOW rule for the expected traffics, if not we do nothing and it will be denied
+            return
 
         # Check if a deny rule exist
         match_deny_rule = (

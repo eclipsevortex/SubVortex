@@ -509,6 +509,9 @@ class Firewall(threading.Thread):
                     else (must_allow, rule_type, reason)
                 )
 
+            count = self.packet_counts[ip_src][port_dest][protocol]
+            bt.logging.info(f"[{count}] Packet received {ip_src}/{port_dest} ({protocol}): {metadata}")
+
             # if attack_detected or (not has_detection_rule and not must_allow):
             if must_deny or not must_allow:
                 self.block_ip(

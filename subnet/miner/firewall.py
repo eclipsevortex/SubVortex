@@ -512,8 +512,9 @@ class Firewall(threading.Thread):
             count = self.packet_counts[ip_src][port_dest][protocol]
 
             if must_debug:
+                flags = packet[TCP].flags if TCP in packet else []
                 bt.logging.info(
-                    f"[{count}] Packet received {ip_src}/{port_dest} ({protocol}): {metadata}"
+                    f"[{count}] Packet received {ip_src}/{port_dest} ({protocol}): {metadata} {flags}"
                 )
 
             # if attack_detected or (not has_detection_rule and not must_allow):

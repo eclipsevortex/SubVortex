@@ -1,9 +1,5 @@
 [
     {
-        "ip": "155.133.26.129",
-        "type": "allow"
-    },
-    {
         "port": 8091,
         "protocol": "tcp",
         "type": "detect-dos",

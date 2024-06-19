@@ -189,6 +189,7 @@ class Miner:
             )
             self.firewall = Firewall(
                 tool=firewall_tool,
+                ip=self.axon.external_ip,
                 port=self.axon.external_port,
                 interface=self.config.firewall.interface,
                 rules=rules or [],

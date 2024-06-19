@@ -28,6 +28,7 @@ class Firewall(threading.Thread):
         self,
         tool: FirewallTool,
         interface: str,
+        ip: str = None,
         port: int = 8091,
         rules=[],
     ):
@@ -40,7 +41,9 @@ class Firewall(threading.Thread):
             lambda: defaultdict(lambda: defaultdict(list))
         )
 
+        self.dry = True
         self.tool = tool
+        self.ip = ip
         self.port = port
         self.interface = interface
         self.ips_blocked = []
@@ -133,7 +136,8 @@ class Firewall(threading.Thread):
             return
 
         # Update the ip tables
-        self.tool.create_deny_rule(ip=ip, port=port, protocol=protocol)
+        if not self.dry:
+            self.tool.create_deny_rule(ip=ip, port=port, protocol=protocol)
 
         # Update the block ips
         ip_blocked = {
@@ -165,7 +169,8 @@ class Firewall(threading.Thread):
             return
 
         # Update the ip tables
-        self.tool.remove_rule(ip=ip, port=port, protocol=protocol, allow=False)
+        if not self.dry:
+            self.tool.remove_rule(ip=ip, port=port, protocol=protocol, allow=False)
 
         # Update the block ips
         self.ips_blocked = [
@@ -469,6 +474,9 @@ class Firewall(threading.Thread):
         if os.path.exists("ips_blocked.json"):
             with open("ips_blocked.json", "r") as file:
                 self.ips_blocked = json.load(file) or []
+
+        # Add allow rule on VPS ip
+        self.tool.create_allow_rule(ip=self.ip)
 
         bt.logging.debug(f"Applying allow/deny rules")
         for rule in self.rules:

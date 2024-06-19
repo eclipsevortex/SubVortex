@@ -28,7 +28,6 @@ class Firewall(threading.Thread):
         self,
         tool: FirewallTool,
         interface: str,
-        ip: str = None,
         port: int = 8091,
         rules=[],
     ):
@@ -43,7 +42,6 @@ class Firewall(threading.Thread):
 
         self.dry = True
         self.tool = tool
-        self.ip = ip
         self.port = port
         self.interface = interface
         self.ips_blocked = []
@@ -123,12 +121,12 @@ class Firewall(threading.Thread):
             specifications = copy.deepcopy(self.specifications)
             return specifications.get(name)
 
-    def block_ip(self, ip, port, protocol, type, reason):
+    def block_ip(self, ip, dport, protocol, type, reason):
         ip_blocked = next(
             (
                 x
                 for x in self.ips_blocked
-                if x["ip"] == ip and x["port"] == port and x["protocol"] == protocol
+                if x["ip"] == ip and x["port"] == dport and x["protocol"] == protocol
             ),
             None,
         )
@@ -137,7 +135,7 @@ class Firewall(threading.Thread):
 
         # Update the ip tables
         if not self.dry:
-            self.tool.create_deny_rule(ip=ip, port=port, protocol=protocol)
+            self.tool.create_deny_rule(ip=ip, dport=dport, protocol=protocol)
 
         # Update the block ips
         ip_blocked = {
@@ -154,14 +152,14 @@ class Firewall(threading.Thread):
             file.write(json.dumps(self.ips_blocked, cls=EnumEncoder))
 
         protocol_str = protocol.upper() if protocol else None
-        bt.logging.warning(f"Blocking {protocol_str} {ip}/{port}: {reason}")
+        bt.logging.warning(f"Blocking {protocol_str} {ip}/{dport}: {reason}")
 
-    def unblock_ip(self, ip, port, protocol):
+    def unblock_ip(self, ip, dport, protocol):
         ip_blocked = next(
             (
                 x
                 for x in self.ips_blocked
-                if x["ip"] == ip and x["port"] == port and x["protocol"] == protocol
+                if x["ip"] == ip and x["port"] == dport and x["protocol"] == protocol
             ),
             None,
         )
@@ -170,7 +168,7 @@ class Firewall(threading.Thread):
 
         # Update the ip tables
         if not self.dry:
-            self.tool.remove_rule(ip=ip, port=port, protocol=protocol, allow=False)
+            self.tool.remove_rule(ip=ip, dport=dport, protocol=protocol, allow=False)
 
         # Update the block ips
         self.ips_blocked = [
@@ -183,7 +181,7 @@ class Firewall(threading.Thread):
         with open("ips_blocked.json", "w") as file:
             file.write(json.dumps(self.ips_blocked, cls=EnumEncoder))
 
-        bt.logging.warning(f"Unblocking {protocol.upper()} {ip}/{port}")
+        bt.logging.warning(f"Unblocking {protocol.upper()} {ip}/{dport}")
 
     def detect_dos(self, ip, port, protocol, rule: DetectDoSRule, current_time):
         """
@@ -462,7 +460,7 @@ class Firewall(threading.Thread):
         if must_deny or not must_allow or must_deny:
             self.block_ip(
                 ip=ip_src,
-                port=port_dest,
+                dport=port_dest,
                 protocol=protocol,
                 type=rule_type or RuleType.DENY,
                 reason=reason or "Deny ip",
@@ -470,7 +468,7 @@ class Firewall(threading.Thread):
             return
 
         # Unblock the ip/port
-        self.unblock_ip(ip_src, port_dest, protocol)
+        self.unblock_ip(ip=ip_src, dport=port_dest, protocol=protocol)
 
     def run(self):
         # Reload the previous ips blocked
@@ -479,9 +477,8 @@ class Firewall(threading.Thread):
             with open("ips_blocked.json", "r") as file:
                 self.ips_blocked = json.load(file) or []
 
-        # Add allow rule on VPS ip
-        bt.logging.debug(f"Creating allow rule for the vps itself")
-        self.tool.create_allow_rule(ip=self.ip)
+        bt.logging.debug(f"Creating allow rule for loopback")
+        self.tool.create_allow_loopback_rule()
 
         bt.logging.debug(f"Applying allow/deny rules")
         for rule in self.rules:
@@ -489,17 +486,22 @@ class Firewall(threading.Thread):
                 continue
 
             ip = rule.ip
-            port = rule.port
+            dport = rule.dport
+            sport = rule.sport
             protocol = rule.protocol
             type = rule.rule_type
 
             if type == RuleType.ALLOW:
-                self.tool.create_allow_rule(ip=ip, port=port, protocol=protocol)
+                self.tool.create_allow_rule(
+                    ip=ip, sport=sport, dport=dport, sport=sport, protocol=protocol
+                )
             else:
-                self.tool.create_deny_rule(ip=ip, port=port, protocol=protocol)
+                self.tool.create_deny_rule(
+                    ip=ip, sport=sport, dport=dport, dport=dport, protocol=protocol
+                )
 
         # Change the policy to deny
-        bt.logging.debug(f"Change the INPUT policy to deby by default")
+        bt.logging.debug(f"Change the INPUT policy to deny by default")
         self.tool.create_deny_policy()
 
         # Start sniffing with the filter

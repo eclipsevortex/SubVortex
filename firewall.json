@@ -1,6 +1,6 @@
 [
     {
-        "port": 8091,
+        "dport": 8091,
         "protocol": "tcp",
         "type": "detect-dos",
         "configuration": {
@@ -9,7 +9,7 @@
         }
     },
     {
-        "port": 8091,
+        "dport": 8091,
         "protocol": "tcp",
         "type": "detect-ddos",
         "configuration": {
@@ -18,22 +18,32 @@
         }
     },
     {
-        "port": 22,
+        "dport": 22,
         "protocol": "tcp",
         "type": "allow"
     },
     {
-        "port": 443,
+        "dport": 443,
         "protocol": "tcp",
         "type": "allow"
     },
     {
-        "port": 8091,
+        "sport": 443,
         "protocol": "tcp",
         "type": "allow"
     },
     {
-        "port": 9944,
+        "sport": 53,
+        "protocol": "udp",
+        "type": "allow"
+    },
+    {
+        "dport": 8091,
+        "protocol": "tcp",
+        "type": "allow"
+    },
+    {
+        "dport": 9944,
         "protocol": "tcp",
         "type": "allow"
     },
@@ -43,7 +53,7 @@
         "type": "allow"
     },
     {
-        "port": 30333,
+        "dport": 30333,
         "protocol": "tcp",
         "type": "allow"
     }

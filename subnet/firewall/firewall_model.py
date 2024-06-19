@@ -6,7 +6,11 @@ from abc import ABC, abstractmethod
 
 class FirewallTool(ABC):
     @abstractmethod
-    def rule_exists(self, ip=None, port=None, protocol="tcp", allow=True):
+    def rule_exists(self, ip=None, sport=None, dport=None, protocol="tcp", allow=True):
+        pass
+
+    @abstractmethod
+    def create_allow_loopback_rule(self):
         pass
 
     @abstractmethod
@@ -14,15 +18,15 @@ class FirewallTool(ABC):
         pass
 
     @abstractmethod
-    def create_allow_rule(self, ip=None, port=None, protocol="tcp"):
+    def create_allow_rule(self, ip=None,sport=None, dport=None, protocol="tcp"):
         pass
 
     @abstractmethod
-    def create_deny_rule(self, ip=None, port=None, protocol="tcp"):
+    def create_deny_rule(self, ip=None, sport=None, dport=None, protocol="tcp"):
         pass
 
     @abstractmethod
-    def remove_rule(self, ip=None, port=None, protocol="tcp", allow=True):
+    def remove_rule(self, ip=None, sport=None, dport=None, protocol="tcp", allow=True):
         pass
 
 
@@ -74,9 +78,10 @@ class RuleType(Enum):
 
 @dataclass
 class Rule(ABC):
-    def __init__(self, ip=None, port=None, protocol=None):
+    def __init__(self, ip=None, sport=None, dport=None, protocol=None):
         self.ip = ip
-        self.port = port
+        self.sport = sport
+        self.dport = dport
         self.protocol = protocol
 
     @staticmethod

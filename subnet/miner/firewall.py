@@ -7,7 +7,7 @@ import threading
 import bittensor as bt
 from typing import List
 from collections import defaultdict
-from scapy.all import sniff, TCP, UDP, IP, Raw, Packet
+from scapy.all import sniff, TCP, SYN, UDP, IP, Raw, Packet
 
 from subnet.shared.encoder import EnumEncoder
 from subnet.firewall.firewall_model import (
@@ -400,10 +400,11 @@ class Firewall(threading.Thread):
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
+            is_handshake = SYN in packet
             must_debug = ip_src == "158.220.82.181" and port_dest == 8091
 
             # TODO: For miner only
-            if is_request_for_miner:
+            if is_request_for_miner and not is_handshake:
                 # Checks only for miner, not for subtensor
                 if must_debug:
                     bt.logging.info("[EXCLIPSE] Checking miner stuffs")
@@ -489,7 +490,7 @@ class Firewall(threading.Thread):
             # TODO: For miner only
             # By default all traffic is denied, so if there is not allow rule
             # we check if the hotkey is whitelisted
-            if not must_allow and is_request_for_miner:
+            if not must_allow and is_request_for_miner and not is_handshake:
                 # One of the detection has been used, so we use the default behaviour of a detection rule
                 # which is allowing the traffic except if detecting something abnormal
                 must_allow = dos_rule or ddos_rule
@@ -502,7 +503,7 @@ class Firewall(threading.Thread):
                 )
 
             # if attack_detected or (not has_detection_rule and not must_allow):
-            if must_deny or not must_allow or must_deny:
+            if must_deny or not must_allow:
                 self.block_ip(
                     ip=ip_src,
                     dport=port_dest,

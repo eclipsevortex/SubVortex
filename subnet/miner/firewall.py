@@ -278,9 +278,9 @@ class Firewall(threading.Thread):
                 False,
                 f"Synapse unknown",
             )
-        
+
         if debug:
-            bt.logging.info(f"ECLIPSE CONTENT TO PARSE: {content}")
+            bt.logging.info(f"[EXCLIPSE] CONTENT TO PARSE: {content}")
 
         result = ("", 0, None)
         try:
@@ -289,7 +289,8 @@ class Firewall(threading.Thread):
         except ValueError as e:
             result = self.extract_infos_string(content)
 
-        bt.logging.info(f"EXTRACT INFO {result}: {content}")
+        if debug:
+            bt.logging.info(f"[EXCLIPSE] EXTRACT INFO {result}: {content}")
 
         return result
 
@@ -399,6 +400,7 @@ class Firewall(threading.Thread):
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
+            must_debug = (ip_src == "158.220.82.181" and port_dest == 8091,)
 
             # TODO: For miner only
             if is_request_for_miner:
@@ -406,10 +408,7 @@ class Firewall(threading.Thread):
 
                 # Extract data from packet content
                 name, neuron_version, hotkey = (
-                    self.extract_infos(
-                        packet[Raw].load,
-                        ip_src == "158.220.82.181" and port_dest == 8091,
-                    )
+                    self.extract_infos(packet[Raw].load, must_debug)
                     if Raw in packet
                     else ("", 0, None)
                 )
@@ -506,7 +505,8 @@ class Firewall(threading.Thread):
                     type=rule_type or RuleType.DENY,
                     reason=reason or "Deny ip",
                 )
-                bt.logging.info(f"EXCLIPSE BLOCKED: {metadata}")
+                if must_debug:
+                    bt.logging.info(f"EXCLIPSE BLOCKED: {metadata}")
                 return
 
             # Unblock the ip/port

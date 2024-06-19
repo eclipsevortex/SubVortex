@@ -44,7 +44,7 @@ def is_valid_protocol(protocol):
     True if the protocol is valid, false otherwise
     Match tcp
     """
-    return protocol.lower() in ["tcp"]
+    return protocol.lower() in ["tcp", "udp"]
 
 
 def is_valid_port(port):

@@ -401,7 +401,7 @@ class Firewall(threading.Thread):
             reason = None
             is_request_for_miner = self.port == port_dest
             is_handshake = Raw in packet  # TCP in packet and packet[TCP].flags == "PA"
-            must_debug = False # ip_src == "158.220.82.181" and port_dest == 8091
+            must_debug = False  # ip_src == "158.220.82.181" and port_dest == 8091
 
             # TODO: For miner only
             if is_request_for_miner and is_handshake:
@@ -532,11 +532,23 @@ class Firewall(threading.Thread):
                 )
                 return
 
-            # Unblock the ip/port
-            flags = TCP in packet and packet[TCP].flags
-            bt.logging.info(
-                f"EXCLIPSE UNBLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
+            ip_blocked = next(
+                (
+                    x
+                    for x in self.ips_blocked
+                    if x["ip"] == ip_src
+                    and x["port"] == port_dest
+                    and x["protocol"] == protocol
+                ),
+                None,
             )
+            if ip_blocked:
+                flags = TCP in packet and packet[TCP].flags
+                bt.logging.info(
+                    f"EXCLIPSE UNBLOCKED: {metadata} {is_request_for_miner} {is_handshake} {flags} - {packet.summary()}"
+                )
+
+            # Unblock the ip/port
             self.unblock_ip(ip=ip_src, dport=port_dest, protocol=protocol)
         except Exception as ex:
             bt.logging.warning(f"Failed to proceed firewall packet: {ex}")

@@ -193,6 +193,7 @@ class Miner:
                 interface=self.config.firewall.interface,
                 rules=rules or [],
             )
+            self.update_firewall()
             self.firewall.start()
 
         # Start  starts the miner's axon, making it active on the network.
@@ -337,6 +338,34 @@ class Miner:
         self.previous_last_updates = last_updates
 
         return True
+
+    def update_firewall(self):
+        validators = self.metagraph.get_validators()
+
+        # Get version and min stake
+        version = get_hyperparameter_value(self.subtensor, "weights_version")
+        weights_min_stake = get_weights_min_stake(self.subtensor.substrate)
+
+        # Update the specifications
+        specifications = {
+            "neuron_version": version,
+            "synapses": self.axon.forward_class_types,
+        }
+
+        # Define the validators whitelisted
+        whitelist = [x for x in validators if x[2] >= weights_min_stake]
+        whitelist_hotkeys = [x[1] for x in whitelist]
+
+        # Define the validators blacklisted
+        blacklist = list(set(validators) - set(whitelist))
+        blacklist_hotkeys = [x[1] for x in blacklist]
+
+        self.firewall.update(
+            specifications=specifications,
+            whitelist_hotkeys=whitelist_hotkeys,
+            blacklist_hotkeys=blacklist_hotkeys,
+        )
+        bt.logging.debug("Firewall updated")
 
 
 def run_miner():

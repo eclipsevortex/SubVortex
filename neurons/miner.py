@@ -37,7 +37,10 @@ from subnet.bittensor.axon import SubVortexAxon
 from subnet.bittensor.synapse import SubVortexSynapse
 
 from subnet import __version__ as THIS_VERSION
-from subnet.firewall.firewall_factory import create_firewall_tool
+from subnet.firewall.firewall_factory import (
+    create_firewall_tool,
+    create_firewall_observer,
+)
 from subnet.miner import run
 from subnet.miner.firewall import Firewall
 from subnet.miner.config import (
@@ -181,14 +184,14 @@ class Miner:
             bt.logging.debug(
                 f"Starting firewall on interface {self.config.firewall.interface}"
             )
-            firewall_tool = create_firewall_tool(self.config.firewall.tool)
             rules = (
                 load_json_file(self.config.firewall.config)
                 if self.config.firewall.config
                 else None
             )
             self.firewall = Firewall(
-                tool=firewall_tool,
+                observer=create_firewall_observer(),
+                tool=create_firewall_tool(),
                 port=self.axon.external_port,
                 interface=self.config.firewall.interface,
                 rules=rules or [],

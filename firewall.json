@@ -5,7 +5,7 @@
         "type": "detect-dos",
         "configuration": {
             "time_window": 600,
-            "packet_threshold": 8
+            "packet_threshold": 4
         }
     },
     {
@@ -13,48 +13,8 @@
         "protocol": "tcp",
         "type": "detect-ddos",
         "configuration": {
-            "time_window": 300,
-            "packet_threshold": 108
+            "time_window": 600,
+            "packet_threshold": 64
         }
-    },
-    {
-        "dport": 22,
-        "protocol": "tcp",
-        "type": "allow"
-    },
-    {
-        "dport": 443,
-        "protocol": "tcp",
-        "type": "allow"
-    },
-    {
-        "sport": 443,
-        "protocol": "tcp",
-        "type": "allow"
-    },
-    {
-        "sport": 53,
-        "protocol": "udp",
-        "type": "allow"
-    },
-    {
-        "dport": 8091,
-        "protocol": "tcp",
-        "type": "allow"
-    },
-    {
-        "dport": 9944,
-        "protocol": "tcp",
-        "type": "allow"
-    },
-    {
-        "dport": 9933,
-        "protocol": "tcp",
-        "type": "allow"
-    },
-    {
-        "dport": 30333,
-        "protocol": "tcp",
-        "type": "allow"
     }
 ]

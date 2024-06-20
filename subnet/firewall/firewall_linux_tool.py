@@ -3,7 +3,7 @@ import subprocess
 from subnet.firewall.firewall_tool import FirewallTool
 
 
-class IptablesFirewall(FirewallTool):
+class FirewallLinuxTool(FirewallTool):
     def rule_exists(
         self, ip=None, sport=None, dport=None, protocol="tcp", allow=True, queue=None
     ):

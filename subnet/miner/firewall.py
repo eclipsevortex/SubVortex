@@ -180,7 +180,7 @@ class Firewall(threading.Thread):
         with open("ips_blocked.json", "w") as file:
             file.write(json.dumps(self.ips_blocked, cls=EnumEncoder))
 
-        bt.logging.warning(f"Unblocking {protocol.upper()} {ip}/{dport}")
+        bt.logging.success(f"Unblocking {protocol.upper()} {ip}/{dport}")
 
     def detect_dos(self, ip, port, protocol, rule: DetectDoSRule, current_time):
         """

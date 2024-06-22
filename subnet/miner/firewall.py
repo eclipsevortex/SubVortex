@@ -399,13 +399,13 @@ class Firewall(threading.Thread):
                     # => We use the result got with the SYN packet
 
                     if self.requests[packet.id][2] == "allow":
-                        queue_packet.accept()
+                        packet.accept()
                         return
 
-                    queue_packet.drop()
+                    packet.drop()
                     return
                 else:
-                    self.requests[packet.id] = (packet.seq, packet.ack, request[2])
+                    self.requests[packet.id] = (packet.seq, packet.ack, self.requests[packet.id][2])
 
             if is_request_for_miner and is_data_packet:
                 # Checks only for miner, not for subtensor

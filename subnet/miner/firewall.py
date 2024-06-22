@@ -47,7 +47,6 @@ class Firewall(threading.Thread):
         self.port = port
         self.interface = interface
         self.ips_blocked = []
-        self.whitelist_hotkeys = []
         self.blacklist_hotkeys = []
         self.specifications = {}
         self.queues = {}
@@ -63,19 +62,6 @@ class Firewall(threading.Thread):
         self.stop_flag.set()
         super().join()
         bt.logging.debug(f"Firewall stopped")
-
-    def is_whitelisted(self, hotkey: str):
-        """
-        True if the hotkey is whitelisted, false otherwise
-        """
-        is_whitelisted = False
-        with self._lock:
-            is_whitelisted = hotkey in self.whitelist_hotkeys
-
-        if is_whitelisted:
-            return (True, None, None)
-
-        return (False, RuleType.DENY, f"Hotkey '{hotkey}' is not whitelisted")
 
     def is_blacklisted(self, hotkey: str):
         """
@@ -133,10 +119,9 @@ class Firewall(threading.Thread):
             is not None
         )
 
-    def update(self, specifications={}, whitelist_hotkeys=[], blacklist_hotkeys=[]):
+    def update(self, specifications={}, blacklist_hotkeys=[]):
         with self._lock:
             self.specifications = copy.deepcopy(specifications)
-            self.whitelist_hotkeys = list(whitelist_hotkeys)
             self.blacklist_hotkeys = list(blacklist_hotkeys)
 
     def get_specification(self, name: str):
@@ -359,11 +344,36 @@ class Firewall(threading.Thread):
             # Set metadata for logs purpose on exception
             metadata = {"ip": ip_src, "dport": port_dest}
 
+            # Check if a allow rule exist
+            match_allow_rule = (
+                self.get_rule(
+                    rules=rules,
+                    type=RuleType.ALLOW,
+                    ip=ip_src,
+                    port=port_dest,
+                    protocol=protocol,
+                )
+                is not None
+            )
+
+            # Check if a deny rule exist
+            match_deny_rule = (
+                self.get_rule(
+                    rules=rules,
+                    type=RuleType.DENY,
+                    ip=ip_src,
+                    port=port_dest,
+                    protocol=protocol,
+                )
+                is not None
+            )
+
             # Initialise variables
             request = self.requests.get(packet.id) or (None, None, None)
             seq = request[0]
             ack = request[1]
-            must_deny = False
+            must_allow = match_allow_rule
+            must_deny = match_deny_rule
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
@@ -394,7 +404,7 @@ class Firewall(threading.Thread):
                         "allow" if is_previously_allowed else "deny",
                     )
 
-                if not is_data_packet:  # or is_part_of_same_data:
+                if not is_data_packet:
                     # Packet is not a data packet OR packet is part of the same chunk (data is sent in chunk)
                     # => We use the result got with the SYN packet
 
@@ -405,7 +415,11 @@ class Firewall(threading.Thread):
                     packet.drop()
                     return
                 else:
-                    self.requests[packet.id] = (packet.seq, packet.ack, self.requests[packet.id][2])
+                    self.requests[packet.id] = (
+                        packet.seq,
+                        packet.ack,
+                        self.requests[packet.id][2],
+                    )
 
             if is_request_for_miner and is_data_packet:
                 # Checks only for miner, not for subtensor
@@ -487,17 +501,7 @@ class Firewall(threading.Thread):
 
             # One of the detection has been used, so we use the default behaviour of a detection rule
             # which is allowing the traffic except if detecting something abnormal
-            must_allow = dos_rule is not None or ddos_rule is not None
-
-            # By default all traffic is denied, so if there is not allow rule
-            # we check if the hotkey is whitelisted
-            if not must_allow and is_request_for_miner and is_data_packet:
-                # Check if the hotkey is whitelisted
-                must_allow, rule_type, reason = (
-                    self.is_whitelisted(hotkey)
-                    if not must_deny and not must_allow
-                    else (must_allow, rule_type, reason)
-                )
+            must_allow = must_allow or dos_rule is not None or ddos_rule is not None
 
             count = len(self.packet_timestamps[ip_src][port_dest][protocol])
 
@@ -600,8 +604,8 @@ class Firewall(threading.Thread):
         self.observer.subscribe(queue_num=1, callback=self.packet_callback)
 
         try:
-            bt.logging.info("Starting NFQUEUE")
+            bt.logging.info("Starting packet observer")
             self.observer.start()
         finally:
-            bt.logging.info("Stopping NFQUEUE")
+            bt.logging.info("Stopping packet observer")
             self.observer.stop()

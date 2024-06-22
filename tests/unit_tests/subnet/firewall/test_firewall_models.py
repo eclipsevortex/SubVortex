@@ -18,14 +18,14 @@ class TestAllowRule(unittest.TestCase):
 
     def test_given_a_config_when_ip_is_not_provided_should_create_the_rule(self):
         # Arrange
-        config = {"port": 8091, "protocol": "tcp", "type": "allow"}
+        config = {"dport": 8091, "protocol": "tcp", "type": "allow"}
 
         # Action
         rule = AllowRule.create(config)
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
 
     def test_given_a_config_when_ip_is_not_formatted_correctly_should_raise_an_exception(
@@ -50,7 +50,7 @@ class TestAllowRule(unittest.TestCase):
 
         # Action / Assert
         assert "192.168.10.1" == rule.ip
-        assert None == rule.port
+        assert None == rule.dport
         assert "tcp" == rule.protocol
 
     def test_given_a_config_when_port_is_not_provided_should_create_the_rule(self):
@@ -62,14 +62,14 @@ class TestAllowRule(unittest.TestCase):
 
         # Action / Assert
         assert "192.168.10.1" == rule.ip
-        assert None == rule.port
+        assert None == rule.dport
         assert "tcp" == rule.protocol
 
     def test_given_a_config_when_port_is_not_formatted_correctly_should_raise_an_exception(
         self,
     ):
         # Arrange
-        config = {"port": 0, "protocol": "tcp", "type": "allow"}
+        config = {"dport": 0, "protocol": "tcp", "type": "allow"}
 
         # Action
         with self.assertRaises(ValueError) as cm:
@@ -82,26 +82,26 @@ class TestAllowRule(unittest.TestCase):
         self,
     ):
         # Arrange
-        config = {"port": 8091, "protocol": "tcp", "type": "allow"}
+        config = {"dport": 8091, "protocol": "tcp", "type": "allow"}
 
         # Action
         rule = AllowRule.create(config)
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
 
     def test_given_a_config_when_protocol_is_not_provided_should_create_the_rule(self):
         # Arrange
-        config = {"ip": "192.168.10.1", "port": 8091, "type": "allow"}
+        config = {"ip": "192.168.10.1", "dport": 8091, "type": "allow"}
 
         # Action
         rule = AllowRule.create(config)
 
         # Action / Assert
         assert "192.168.10.1" == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert None == rule.protocol
 
     def test_given_a_config_when_protocol_is_not_formatted_correctly_should_raise_an_exception(
@@ -110,7 +110,7 @@ class TestAllowRule(unittest.TestCase):
         # Arrange
         config = {
             "ip": "192.168.10.1",
-            "port": 8091,
+            "dport": 8091,
             "protocol": "udp",
             "type": "allow",
         }
@@ -128,7 +128,7 @@ class TestAllowRule(unittest.TestCase):
         # Arrange
         config = {
             "ip": "192.168.10.1",
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "allow",
         }
@@ -138,7 +138,7 @@ class TestAllowRule(unittest.TestCase):
 
         # Action / Assert
         assert "192.168.10.1" == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
 
 
@@ -158,14 +158,14 @@ class TestDenyRule(unittest.TestCase):
 
     def test_given_a_config_when_ip_is_not_provided_should_create_the_rule(self):
         # Arrange
-        config = {"port": 8091, "protocol": "tcp", "type": "allow"}
+        config = {"dport": 8091, "protocol": "tcp", "type": "allow"}
 
         # Action
         rule = DenyRule.create(config)
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
 
     def test_given_a_config_when_ip_is_not_formatted_correctly_should_raise_an_exception(
@@ -190,7 +190,7 @@ class TestDenyRule(unittest.TestCase):
 
         # Action / Assert
         assert "192.168.10.1" == rule.ip
-        assert None == rule.port
+        assert None == rule.dport
         assert "tcp" == rule.protocol
 
     def test_given_a_config_when_port_is_not_provided_should_create_the_rule(self):
@@ -202,14 +202,14 @@ class TestDenyRule(unittest.TestCase):
 
         # Action / Assert
         assert "192.168.10.1" == rule.ip
-        assert None == rule.port
+        assert None == rule.dport
         assert "tcp" == rule.protocol
 
     def test_given_a_config_when_port_is_not_formatted_correctly_should_raise_an_exception(
         self,
     ):
         # Arrange
-        config = {"port": 0, "protocol": "tcp", "type": "allow"}
+        config = {"dport": 0, "protocol": "tcp", "type": "allow"}
 
         # Action
         with self.assertRaises(ValueError) as cm:
@@ -222,26 +222,26 @@ class TestDenyRule(unittest.TestCase):
         self,
     ):
         # Arrange
-        config = {"port": 8091, "protocol": "tcp", "type": "allow"}
+        config = {"dport": 8091, "protocol": "tcp", "type": "allow"}
 
         # Action
         rule = DenyRule.create(config)
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
 
     def test_given_a_config_when_protocol_is_not_provided_should_create_the_rule(self):
         # Arrange
-        config = {"ip": "192.168.10.1", "port": 8091, "type": "allow"}
+        config = {"ip": "192.168.10.1", "dport": 8091, "type": "allow"}
 
         # Action
         rule = DenyRule.create(config)
 
         # Action / Assert
         assert "192.168.10.1" == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert None == rule.protocol
 
     def test_given_a_config_when_protocol_is_not_formatted_correctly_should_raise_an_exception(
@@ -250,7 +250,7 @@ class TestDenyRule(unittest.TestCase):
         # Arrange
         config = {
             "ip": "192.168.10.1",
-            "port": 8091,
+            "dport": 8091,
             "protocol": "udp",
             "type": "allow",
         }
@@ -268,7 +268,7 @@ class TestDenyRule(unittest.TestCase):
         # Arrange
         config = {
             "ip": "192.168.10.1",
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "allow",
         }
@@ -278,7 +278,7 @@ class TestDenyRule(unittest.TestCase):
 
         # Action / Assert
         assert "192.168.10.1" == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
 
 
@@ -307,7 +307,7 @@ class TestDetectDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 0,
+            "dport": 0,
             "protocol": "tcp",
             "type": "detect-dos",
             "configuration": {
@@ -328,7 +328,7 @@ class TestDetectDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-dos",
             "configuration": {
@@ -342,7 +342,7 @@ class TestDetectDoSRule(unittest.TestCase):
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
         assert 30 == rule.time_window
         assert 1 == rule.packet_threshold
@@ -350,7 +350,7 @@ class TestDetectDoSRule(unittest.TestCase):
     def test_given_a_config_when_protocol_is_not_provided_should_create_the_rule(self):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "type": "detect-dos",
             "configuration": {
                 "time_window": 30,
@@ -363,7 +363,7 @@ class TestDetectDoSRule(unittest.TestCase):
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert None == rule.protocol
         assert 30 == rule.time_window
         assert 1 == rule.packet_threshold
@@ -373,7 +373,7 @@ class TestDetectDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "udp",
             "type": "detect-dos",
             "configuration": {
@@ -394,7 +394,7 @@ class TestDetectDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-dos",
             "configuration": {
@@ -408,7 +408,7 @@ class TestDetectDoSRule(unittest.TestCase):
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
         assert 30 == rule.time_window
         assert 1 == rule.packet_threshold
@@ -418,7 +418,7 @@ class TestDetectDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-dos",
             "configuration": {
@@ -438,7 +438,7 @@ class TestDetectDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-dos",
             "configuration": {
@@ -459,7 +459,7 @@ class TestDetectDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-dos",
             "configuration": {
@@ -473,7 +473,7 @@ class TestDetectDoSRule(unittest.TestCase):
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
         assert 30 == rule.time_window
         assert 1 == rule.packet_threshold
@@ -504,7 +504,7 @@ class TestDetectDDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 0,
+            "dport": 0,
             "protocol": "tcp",
             "type": "detect-ddos",
             "configuration": {
@@ -525,7 +525,7 @@ class TestDetectDDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-ddos",
             "configuration": {
@@ -539,7 +539,7 @@ class TestDetectDDoSRule(unittest.TestCase):
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
         assert 30 == rule.time_window
         assert 1 == rule.packet_threshold
@@ -547,7 +547,7 @@ class TestDetectDDoSRule(unittest.TestCase):
     def test_given_a_config_when_protocol_is_not_provided_should_create_the_rule(self):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "type": "detect-ddos",
             "configuration": {
                 "time_window": 30,
@@ -560,7 +560,7 @@ class TestDetectDDoSRule(unittest.TestCase):
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert None == rule.protocol
         assert 30 == rule.time_window
         assert 1 == rule.packet_threshold
@@ -570,7 +570,7 @@ class TestDetectDDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "udp",
             "type": "detect-ddos",
             "configuration": {
@@ -591,7 +591,7 @@ class TestDetectDDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-ddos",
             "configuration": {
@@ -605,7 +605,7 @@ class TestDetectDDoSRule(unittest.TestCase):
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
         assert 30 == rule.time_window
         assert 1 == rule.packet_threshold
@@ -615,7 +615,7 @@ class TestDetectDDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-ddos",
             "configuration": {
@@ -635,7 +635,7 @@ class TestDetectDDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-ddos",
             "configuration": {
@@ -656,7 +656,7 @@ class TestDetectDDoSRule(unittest.TestCase):
     ):
         # Arrange
         config = {
-            "port": 8091,
+            "dport": 8091,
             "protocol": "tcp",
             "type": "detect-ddos",
             "configuration": {
@@ -670,7 +670,7 @@ class TestDetectDDoSRule(unittest.TestCase):
 
         # Action / Assert
         assert None == rule.ip
-        assert 8091 == rule.port
+        assert 8091 == rule.dport
         assert "tcp" == rule.protocol
         assert 30 == rule.time_window
         assert 1 == rule.packet_threshold

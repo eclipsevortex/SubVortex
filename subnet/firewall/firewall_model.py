@@ -18,7 +18,7 @@ def is_valid_protocol(protocol):
     True if the protocol is valid, false otherwise
     Match tcp
     """
-    return protocol.lower() in ["tcp", "udp"]
+    return protocol.lower() in ["tcp"]
 
 
 def is_valid_port(port):
@@ -75,27 +75,22 @@ class AllowRule(Rule):
     Define the rule to allow access
     """
 
-    def __init__(self, ip=None, sport=None, dport=None, protocol=None):
-        super().__init__(ip=ip, sport=sport, dport=dport, protocol=protocol)
+    def __init__(self, ip=None, dport=None, protocol=None):
+        super().__init__(ip=ip, dport=dport, protocol=protocol)
 
     @staticmethod
     def create(config={}):
         ip = config.get("ip")
-        sport = config.get("sport")
         dport = config.get("dport")
         protocol = config.get("protocol")
 
         if ip is not None and not is_valid_ip(ip):
             raise ValueError(f"Invalid IP address: {ip}")
 
-        if sport is not None and not is_valid_port(sport):
-            raise ValueError(f"Invalid Port: {sport}")
-
         if dport is not None and not is_valid_port(dport):
             raise ValueError(f"Invalid Port: {dport}")
 
-        port = sport or dport
-        if ip is None and port is None:
+        if ip is None and dport is None:
             raise ValueError("Ip and or Port have to be provided")
 
         if protocol and not is_valid_protocol(protocol):
@@ -103,7 +98,6 @@ class AllowRule(Rule):
 
         return AllowRule(
             ip=ip,
-            sport=sport,
             dport=dport,
             protocol=protocol,
         )
@@ -112,6 +106,18 @@ class AllowRule(Rule):
     def rule_type(self):
         return RuleType.ALLOW
 
+    def __str__(self):
+        return f"AllowRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol})"
+    
+    def __eq__(self, other):
+        if isinstance(other, AllowRule):
+            return (
+                self.ip == other.ip
+                and self.dport == other.dport
+                and self.protocol == other.protocol
+            )
+        return False
+
 
 @dataclass
 class DenyRule(Rule):
@@ -119,27 +125,22 @@ class DenyRule(Rule):
     Define the rule to deny access
     """
 
-    def __init__(self, ip=None, sport=None, dport=None, protocol=None):
-        super().__init__(ip=ip, sport=sport, dport=dport, protocol=protocol)
+    def __init__(self, ip=None, dport=None, protocol=None):
+        super().__init__(ip=ip, dport=dport, protocol=protocol)
 
     @staticmethod
     def create(config={}):
         ip = config.get("ip")
-        sport = config.get("sport")
         dport = config.get("dport")
         protocol = config.get("protocol")
 
         if ip is not None and not is_valid_ip(ip):
             raise ValueError(f"Invalid IP address: {ip}")
 
-        if sport is not None and not is_valid_port(sport):
-            raise ValueError(f"Invalid Port: {sport}")
-
         if dport is not None and not is_valid_port(dport):
             raise ValueError(f"Invalid Port: {dport}")
 
-        port = sport or dport
-        if ip is None and port is None:
+        if ip is None and dport is None:
             raise ValueError("Ip and or Port have to be provided")
 
         if protocol and not is_valid_protocol(protocol):
@@ -147,7 +148,6 @@ class DenyRule(Rule):
 
         return DenyRule(
             ip=ip,
-            sport=sport,
             dport=dport,
             protocol=protocol,
         )
@@ -155,6 +155,18 @@ class DenyRule(Rule):
     @property
     def rule_type(self):
         return RuleType.DENY
+
+    def __str__(self):
+        return f"AllowRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol})"
+    
+    def __eq__(self, other):
+        if isinstance(other, DenyRule):
+            return (
+                self.ip == other.ip
+                and self.dport == other.dport
+                and self.protocol == other.protocol
+            )
+        return False
 
 
 @dataclass
@@ -203,6 +215,20 @@ class DetectDoSRule(Rule):
     def rule_type(self):
         return RuleType.DETECT_DOS
 
+    def __str__(self):
+        return f"AllowRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol}, time_window={self.time_window}, packet_threshold={self.packet_threshold})"
+    
+    def __eq__(self, other):
+        if isinstance(other, DetectDoSRule):
+            return (
+                self.ip == other.ip
+                and self.dport == other.dport
+                and self.protocol == other.protocol
+                and self.time_window == other.time_window
+                and self.packet_threshold == other.packet_threshold
+            )
+        return False
+
 
 @dataclass
 class DetectDDoSRule(Rule):
@@ -250,6 +276,19 @@ class DetectDDoSRule(Rule):
     def rule_type(self):
         return RuleType.DETECT_DDOS
 
+    def __str__(self):
+        return f"AllowRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol}, time_window={self.time_window}, packet_threshold={self.packet_threshold})"
+
+    def __eq__(self, other):
+        if isinstance(other, DetectDDoSRule):
+            return (
+                self.ip == other.ip
+                and self.dport == other.dport
+                and self.protocol == other.protocol
+                and self.time_window == other.time_window
+                and self.packet_threshold == other.packet_threshold
+            )
+        return False
 
 def create_rule(config={}) -> Rule:
     if config.get("type") == "allow":

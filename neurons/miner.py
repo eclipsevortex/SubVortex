@@ -355,17 +355,15 @@ class Miner:
             "synapses": self.axon.forward_class_types,
         }
 
-        # Define the validators whitelisted
-        whitelist = [x for x in validators if x[2] >= weights_min_stake]
-        whitelist_hotkeys = [x[1] for x in whitelist]
+        # Define the valid validators
+        valid_validators = [x for x in validators if x[2] >= weights_min_stake]
 
         # Define the validators blacklisted
-        blacklist = list(set(validators) - set(whitelist))
+        blacklist = list(set(validators) - set(valid_validators))
         blacklist_hotkeys = [x[1] for x in blacklist]
 
         self.firewall.update(
             specifications=specifications,
-            whitelist_hotkeys=whitelist_hotkeys,
             blacklist_hotkeys=blacklist_hotkeys,
         )
         bt.logging.debug("Firewall updated")

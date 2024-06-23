@@ -33,6 +33,11 @@ def mock_check_rule(
         return mock_run
 
 
+def get_time(second):
+    specific_time = time.struct_time((2024, 5, 28, 12, 0, second, 0, 0, -1))
+    return time.mktime(specific_time)
+
+
 class TestFirewall(unittest.TestCase):
     def setUp(self):
         bt.logging.on()
@@ -55,8 +60,7 @@ class TestFirewall(unittest.TestCase):
         assert block is not None
 
     def set_time(self, mock_time, second=0):
-        specific_time = time.struct_time((2024, 5, 28, 12, 0, second, 0, 0, -1))
-        mock_time.return_value = time.mktime(specific_time)
+        mock_time.return_value = get_time(second)
 
     def send_packet(
         self,
@@ -623,6 +627,75 @@ class TestPackets(TestFirewall):
 class TestDoSAttacks(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
+    def test_only_requests_within_time_window_are_kept(self, mock_time, mock_open):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-dos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 4,
+                },
+            },
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[28, 29],
+        )
+
+        # Assert
+        assert 2 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[31, 32],
+        )
+
+        # Assert
+        assert 2 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+
+    @patch("builtins.open")
+    @patch("time.time")
     def test_given_a_dos_rule_when_a_dos_attack_is_detected_should_deny_the_request(
         self, mock_time, mock_open
     ):
@@ -863,9 +936,7 @@ class TestDoSAttacks(TestFirewall):
 class TestDDoSAttacks(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_a_ddos_rule_when_a_ddos_attack_is_detected_should_deny_the_request(
-        self, mock_time, mock_open
-    ):
+    def test_only_requests_within_time_window_are_kept(self, mock_time, mock_open):
         # Arrange
         observer = MagicMock()
         tool = MagicMock()
@@ -880,7 +951,7 @@ class TestDDoSAttacks(TestFirewall):
                 "type": "detect-ddos",
                 "configuration": {
                     "time_window": 30,
-                    "packet_threshold": 1,
+                    "packet_threshold": 4,
                 },
             },
         ]
@@ -890,7 +961,7 @@ class TestDDoSAttacks(TestFirewall):
         # Action
         self.send_request(
             src_ip="192.168.0.1",
-            dst_ip="192.168.0.2",
+            dst_ip="192.168.1.1",
             src_port=7091,
             dst_port=8091,
             firewall=firewall,
@@ -899,9 +970,14 @@ class TestDDoSAttacks(TestFirewall):
             seconds=[0, 1],
         )
 
+        # Assert
+        assert 1 == len(firewall.packet_timestamps.keys())
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+
+        # Action
         self.send_request(
-            src_ip="192.168.0.3",
-            dst_ip="192.168.0.2",
+            src_ip="192.168.0.2",
+            dst_ip="192.168.1.1",
             src_port=7091,
             dst_port=8091,
             firewall=firewall,
@@ -911,20 +987,31 @@ class TestDDoSAttacks(TestFirewall):
         )
 
         # Assert
-        assert 1 == len(firewall.ips_blocked)
-        assert 2 == packet_mock.accept.call_count  # Accept S/FA from first request
-        assert 2 == packet_mock.drop.call_count  # Drop S/FA from second request
-        assert {
-            "ip": "192.168.0.3",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DDOS,
-            "reason": "DDoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
+        assert 2 == len(firewall.packet_timestamps.keys())
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.2"][8091]["tcp"])
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.3",
+            dst_ip="192.168.1.1",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[31, 32],
+        )
+
+        # Assert
+        assert 3 == len(firewall.packet_timestamps.keys())
+        assert 0 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.2"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.3"][8091]["tcp"])
 
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_a_ddos_rule_when_no_ddos_attack_is_detected_should_allow_the_request(
+    def test_given_a_ddos_rule_when_receive_less_requests_than_the_benchmark_within_the_time_window_should_allow_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -978,7 +1065,7 @@ class TestDDoSAttacks(TestFirewall):
 
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_a_ddos_rule_and_a_previous_request_denied_when_a_ddos_attack_is_detected_should_deny_the_request(
+    def test_given_a_ddos_rule_when_receive_more_requests_than_the_benchmark_within_the_time_window_but_does_not_trigger_ddos_attack_should_allow_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -1026,53 +1113,13 @@ class TestDDoSAttacks(TestFirewall):
         )
 
         # Assert
-        assert 1 == len(firewall.ips_blocked)
-        assert 2 == packet_mock.accept.call_count  # Accept S/FA from first request
-        assert 2 == packet_mock.drop.call_count  # Drop S/FA from second request
-        assert {
-            "ip": "192.168.0.3",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DDOS,
-            "reason": "DDoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
-
-        # Arrange
-        packet_mock.reset_mock()
-
-        # Action
-        self.send_request(
-            src_ip="192.168.0.4",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[56, 57],
-        )
-
-        assert 2 == len(firewall.ips_blocked)
-        packet_mock.accept.assert_not_called
-        assert 2 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.3",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DDOS,
-            "reason": "DDoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
-        assert {
-            "ip": "192.168.0.4",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DDOS,
-            "reason": "DDoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[1]
+        assert 0 == len(firewall.ips_blocked)
+        assert 4 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called
 
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_a_ddos_rule_and_a_previous_request_denied_when_no_ddos_attack_is_detected_should_deny_the_request(
+    def test_given_a_ddos_rule_when_receive_more_requests_than_the_benchmark_within_the_time_window_and_does_trigger_ddos_attack_should_deny_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -1096,7 +1143,14 @@ class TestDDoSAttacks(TestFirewall):
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
         firewall.run()
 
+        vps = [2, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        for j, (request_count) in enumerate(vps):
+            ip = "192.168.0.{}".format(j + 1)
+            for _ in range(0, request_count):
+                firewall.packet_timestamps[ip][8091]["tcp"].append(get_time(j))
+
         # Action
+        seconds = len(vps)
         self.send_request(
             src_ip="192.168.0.1",
             dst_ip="192.168.0.2",
@@ -1105,57 +1159,337 @@ class TestDDoSAttacks(TestFirewall):
             firewall=firewall,
             mock_packet=packet_mock,
             mock_time=mock_time,
-            seconds=[0, 1],
-        )
-
-        self.send_request(
-            src_ip="192.168.0.3",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[28, 29],
+            seconds=[seconds, +1],
         )
 
         # Assert
         assert 1 == len(firewall.ips_blocked)
-        assert 2 == packet_mock.accept.call_count  # Accept S/FA from first request
-        assert 2 == packet_mock.drop.call_count  # Drop S/FA from second request
+        packet_mock.accept.assert_not_called
+        assert 2 == packet_mock.drop.call_count
         assert {
-            "ip": "192.168.0.3",
+            "ip": "192.168.0.1",
             "port": 8091,
             "protocol": "tcp",
             "type": RuleType.DETECT_DDOS,
-            "reason": "DDoS attack detected: 2 requests in 30 seconds",
+            "reason": "DDoS attack detected: 3 requests in 30 seconds",
         } == firewall.ips_blocked[0]
 
-        # Arrange
-        packet_mock.reset_mock()
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_check_ddos_attacks(self, mock_time, mock_open):
+        test_cases = [
+            (
+                [3, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [3, 2, 3, 1, 1, 1, 1, 1, 1, 1],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0010000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [2, 2, 2, 1, 1, 1, 1, 1, 1, 1],
+                [
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [5, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+                [
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [10, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [10, 4, 4, 6, 4, 5, 8, 4, 4, 4],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [5, 4, 4, 5, 4, 5, 5, 4, 4, 5],
+                [
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [10, 4, 4, 6, 4, 5, 12, 4, 4, 4],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000001000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [50, 4, 4, 6, 4, 5, 8, 4, 4, 4],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [20, 4, 4, 25, 4, 5, 18, 4, 4, 15],
+                [
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0001000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [12, 10, 11, 13, 12, 10, 11, 12, 11, 13],
+                [
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [15, 4, 4, 6, 4, 5, 8, 4, 4, 4],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [40, 4, 4, 6, 4, 5, 8, 4, 4, 4],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [10, 5, 4, 7, 6, 5, 8, 6, 4, 5],
+                [
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [45, 4, 4, 40, 4, 5, 8, 4, 4, 4],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0001000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+            (
+                [30, 4, 10, 5, 4, 25, 8, 4, 4, 12],
+                [
+                    "1000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000010000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                    "0000000000",
+                ],
+            ),
+        ]
 
-        # Action
-        self.send_request(
-            src_ip="192.168.0.4",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[60, 61],
-        )
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
 
-        assert 1 == len(firewall.ips_blocked)
-        assert 2 == packet_mock.accept.call_count
-        packet_mock.drop.assert_not_called
-        assert {
-            "ip": "192.168.0.3",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DDOS,
-            "reason": "DDoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-ddos",
+                "configuration": {
+                    "time_window": 300,
+                    "packet_threshold": 1,
+                },
+            },
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.run()
+
+        ip_template = "192.168.0.{}"
+        test_case_num = 0
+        for vps, expected in test_cases:
+            with self.subTest(test_case_num=test_case_num, vps=vps, expected=expected):
+                test_case_num += 1
+                for i, (expect) in enumerate(expected):
+                    seconds = 0
+
+                    # Loop accross all the vps
+                    src_ip = ip_template.format(i + 1)
+
+                    # Arrange
+                    firewall.packet_timestamps.clear()
+                    firewall.ips_blocked.clear()
+                    firewall.requests.clear()
+
+                    for j, (request_count) in enumerate(vps):
+                        ip = ip_template.format(j + 1)
+                        for _ in range(0, request_count):
+                            firewall.packet_timestamps[ip][8091]["tcp"].append(
+                                get_time(seconds)
+                            )
+                            seconds += 1
+
+                    firewall.packet_timestamps[src_ip][8091]["tcp"] = (
+                        firewall.packet_timestamps[src_ip][8091]["tcp"][:-1]
+                    )
+
+                    # Action
+                    seconds = seconds if seconds % 2 == 0 else seconds + 1
+                    self.send_request(
+                        src_ip=src_ip,
+                        dst_ip="192.168.1.1",
+                        src_port=7091,
+                        dst_port=8091,
+                        firewall=firewall,
+                        mock_packet=packet_mock,
+                        mock_time=mock_time,
+                        seconds=[seconds, seconds + 1],
+                    )
+
+                    # Assert
+                    for j, digit in enumerate(expect):
+                        ip = ip_template.format(j + 1)
+                        ip_blocked = firewall.is_blocked(ip, 8091, "tcp")
+                        count = len(firewall.packet_timestamps[ip][8091]["tcp"])
+
+                        expected_ddos = digit == "1"
+                        assert expected_ddos == ip_blocked
+                        assert vps[j] == count
 
 
 class TestMiner(TestFirewall):

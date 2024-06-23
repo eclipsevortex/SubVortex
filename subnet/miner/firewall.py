@@ -2,8 +2,8 @@ import os
 import copy
 import json
 import time
-import logging
 import threading
+import numpy as np
 import bittensor as bt
 from typing import List
 from collections import defaultdict
@@ -20,10 +20,6 @@ from subnet.firewall.firewall_model import (
     DetectDoSRule,
     DetectDDoSRule,
 )
-
-# Disalbe scapy logging
-logging.getLogger("scapy.runtime").setLevel(logging.CRITICAL)
-
 
 class Firewall(threading.Thread):
     def __init__(
@@ -56,9 +52,11 @@ class Firewall(threading.Thread):
 
     def start(self):
         super().start()
+        self.observer.start()
         bt.logging.debug(f"Firewall started")
 
     def stop(self):
+        self.observer.stop()
         self.stop_flag.set()
         super().join()
         bt.logging.debug(f"Firewall stopped")
@@ -171,26 +169,34 @@ class Firewall(threading.Thread):
         """
         Detect Denial of Service attack which is an attack from a single source that overwhelms a target with requests,
         """
-        recent_packets = [
+        recent_timestamps = [
             t
             for t in self.packet_timestamps[ip][port][protocol]
             if current_time - t < rule.time_window
         ]
-        self.packet_timestamps[ip][port][protocol] = recent_packets
+        self.packet_timestamps[ip][port][protocol] = recent_timestamps
 
-        if len(recent_packets) > rule.packet_threshold:
+        if len(recent_timestamps) > rule.packet_threshold:
             return (
                 True,
                 RuleType.DETECT_DOS,
-                f"DoS attack detected: {len(recent_packets)} requests in {rule.time_window} seconds",
+                f"DoS attack detected: {len(recent_timestamps)} requests in {rule.time_window} seconds",
             )
 
         return (False, None, None)
 
-    def detect_ddos(self, port, rule: DetectDDoSRule, current_time):
+    def get_ip_index(self, firewall_data, ip_to_find):
+        for index, ip in enumerate(firewall_data.keys()):
+            if ip == ip_to_find:
+                return index
+        return None
+
+    def detect_ddos(self, ip, port, protocol, rule: DetectDDoSRule, current_time):
         """
         Detect Distributed Denial of Service which is an attack from multiple sources that overwhelms a target with requests,
         """
+        index = self.get_ip_index(self.packet_timestamps, ip)
+
         all_timestamps = [
             timestamp
             for ports in self.packet_timestamps.values()
@@ -202,11 +208,40 @@ class Firewall(threading.Thread):
             t for t in all_timestamps if current_time - t < rule.time_window
         ]
 
-        if len(recent_timestamps) > rule.packet_threshold:
+        # Create an array with the number of recent timestamps for each vps
+        requests = []
+        for _, ports in self.packet_timestamps.items():
+            for port, protocols in ports.items():
+                for _, timestamps in protocols.items():
+                    request_timestamps = [
+                        t for t in timestamps if current_time - t < rule.time_window
+                    ]
+                    requests.append(len(request_timestamps))
+
+        # Remove old timestamps
+        for ip, ports in self.packet_timestamps.items():
+            for port, protocols in ports.items():
+                for protocol, timestamps in protocols.items():
+                    self.packet_timestamps[ip][port][protocol] = [
+                        t for t in timestamps if current_time - t < rule.time_window
+                    ]
+
+        if len(recent_timestamps) <= rule.packet_threshold:
+            return (False, None, None)
+
+        t = np.percentile(requests, 75)
+
+        legit = [x for x in requests if x <= t]
+        max_legit = np.max(legit) if len(legit) > 0 else 0
+        mean_legit = np.mean(legit) if len(legit) > 0 else 0
+
+        ip_count = requests[index]
+
+        if ip_count > max_legit + mean_legit:
             return (
                 True,
                 RuleType.DETECT_DDOS,
-                f"DDoS attack detected: {len(recent_timestamps)} requests in {rule.time_window} seconds",
+                f"DDoS attack detected: {ip_count} requests in {rule.time_window} seconds",
             )
 
         return (False, None, None)
@@ -383,14 +418,14 @@ class Firewall(threading.Thread):
 
             # True is the packet is a connection initiation, false otherwise
             # packet.seq and seq will be the same if it is part of a retry
-            is_syn_packet = (
+            is_sync_packet = (
                 packet.seq != seq and packet.ack == 0 and packet.flags == "S"
             )
 
             # True if the packet is a data packet, false otherwise
             is_data_packet = packet.ack != ack and packet.flags == "PA"
 
-            if is_syn_packet:
+            if is_sync_packet:
                 # A new connection has been initiated, processing a new request
                 self.requests[packet.id] = (packet.seq, 0, None)
 
@@ -477,7 +512,7 @@ class Firewall(threading.Thread):
                     dos_rule,
                     current_time,
                 )
-                if dos_rule and not must_deny
+                if dos_rule and not must_deny and is_sync_packet
                 else (must_deny, rule_type, reason)
             )
 
@@ -491,17 +526,22 @@ class Firewall(threading.Thread):
             )
             must_deny, rule_type, reason = (
                 self.detect_ddos(
+                    ip_src,
                     port_dest,
+                    protocol,
                     ddos_rule,
                     current_time,
                 )
-                if ddos_rule and not must_deny
+                if ddos_rule and not must_deny and is_sync_packet
                 else (must_deny, rule_type, reason)
             )
 
             # One of the detection has been used, so we use the default behaviour of a detection rule
             # which is allowing the traffic except if detecting something abnormal
             must_allow = must_allow or dos_rule is not None or ddos_rule is not None
+            must_deny = must_deny or (
+                is_data_packet and self.requests[packet.id][2] == "deny"
+            )
 
             count = len(self.packet_timestamps[ip_src][port_dest][protocol])
 
@@ -528,7 +568,7 @@ class Firewall(threading.Thread):
 
                 copyright = (
                     "Packet new connection"
-                    if is_syn_packet
+                    if is_sync_packet
                     else "Packet data" if is_data_packet else "Packet unknown"
                 )
                 bt.logging.trace(
@@ -553,7 +593,7 @@ class Firewall(threading.Thread):
             # Accept packet
             copyright = (
                 "Packet new connection"
-                if is_syn_packet
+                if is_sync_packet
                 else "Packet data" if is_data_packet else "Packet unknown"
             )
             bt.logging.trace(
@@ -602,10 +642,3 @@ class Firewall(threading.Thread):
 
         # Subscribe to the observer
         self.observer.subscribe(queue_num=1, callback=self.packet_callback)
-
-        try:
-            bt.logging.info("Starting packet observer")
-            self.observer.start()
-        finally:
-            bt.logging.info("Stopping packet observer")
-            self.observer.stop()

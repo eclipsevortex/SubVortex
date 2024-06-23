@@ -1,6 +1,5 @@
 import time
 import unittest
-import subprocess
 import bittensor as bt
 from unittest.mock import patch, MagicMock, call
 
@@ -20,17 +19,6 @@ def is_sublist(sublist, main_list):
         if main_list[i : i + sublist_len] == sublist:
             return True
     return False
-
-
-def mock_check_rule(
-    mock_run, returncode, cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-):
-    if is_sublist(["sudo", "iptables", "-C", "INPUT"], cmd):
-        return subprocess.CompletedProcess(
-            args=cmd, returncode=returncode, stdout=stdout, stderr=stderr
-        )
-    else:
-        return mock_run
 
 
 def get_time(second):

@@ -9,11 +9,19 @@ class FirewallTool(ABC):
         pass
 
     @abstractmethod
+    def flush_input_chain(self):
+        pass
+
+    @abstractmethod
     def create_allow_loopback_rule(self):
         pass
 
     @abstractmethod
     def create_deny_policy(self):
+        pass
+
+    @abstractmethod
+    def create_allow_policy(self):
         pass
 
     @abstractmethod

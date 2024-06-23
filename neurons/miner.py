@@ -23,7 +23,6 @@ import asyncio
 import bittensor as bt
 import threading
 import traceback
-from typing import Union
 
 from subnet.protocol import Score
 
@@ -394,7 +393,6 @@ def run_miner():
         if miner and miner.firewall:
             bt.logging.info("Stopping firewall")
             miner.firewall.stop()
-            miner.firewall.join()
 
         if miner:
             bt.logging.info("Stopping axon")

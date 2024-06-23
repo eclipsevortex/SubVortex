@@ -21,6 +21,7 @@ from subnet.firewall.firewall_model import (
     DetectDDoSRule,
 )
 
+
 class Firewall(threading.Thread):
     def __init__(
         self,
@@ -52,7 +53,6 @@ class Firewall(threading.Thread):
 
     def start(self):
         super().start()
-        self.observer.start()
         bt.logging.debug(f"Firewall started")
 
     def stop(self):
@@ -127,6 +127,12 @@ class Firewall(threading.Thread):
             specifications = copy.deepcopy(self.specifications)
             return specifications.get(name)
 
+    def get_ip_index(self, firewall_data, ip_to_find):
+        for index, ip in enumerate(firewall_data.keys()):
+            if ip == ip_to_find:
+                return index
+        return None
+
     def block_ip(self, ip, dport, protocol, type, reason):
         if self.is_blocked(ip, dport, protocol):
             return
@@ -169,11 +175,15 @@ class Firewall(threading.Thread):
         """
         Detect Denial of Service attack which is an attack from a single source that overwhelms a target with requests,
         """
+        # Get the timestamps within the time window for the combination ip/port/protocol
         recent_timestamps = [
             t
             for t in self.packet_timestamps[ip][port][protocol]
             if current_time - t < rule.time_window
         ]
+
+        # Override the packets timestamps in order to keep only the ones within the time window
+        # for the combination ip/port/protocol
         self.packet_timestamps[ip][port][protocol] = recent_timestamps
 
         if len(recent_timestamps) > rule.packet_threshold:
@@ -185,18 +195,13 @@ class Firewall(threading.Thread):
 
         return (False, None, None)
 
-    def get_ip_index(self, firewall_data, ip_to_find):
-        for index, ip in enumerate(firewall_data.keys()):
-            if ip == ip_to_find:
-                return index
-        return None
-
     def detect_ddos(self, ip, port, protocol, rule: DetectDDoSRule, current_time):
         """
         Detect Distributed Denial of Service which is an attack from multiple sources that overwhelms a target with requests,
         """
         index = self.get_ip_index(self.packet_timestamps, ip)
 
+        # Get all the timestamps
         all_timestamps = [
             timestamp
             for ports in self.packet_timestamps.values()
@@ -204,6 +209,7 @@ class Firewall(threading.Thread):
             for timestamp in times
         ]
 
+        # Get the timestamps within the time window
         recent_timestamps = [
             t for t in all_timestamps if current_time - t < rule.time_window
         ]
@@ -475,13 +481,6 @@ class Firewall(threading.Thread):
                     },
                 }
 
-                # Check if the hotkey is blacklisted
-                must_deny, rule_type, reason = (
-                    self.is_blacklisted(hotkey)
-                    if not must_deny
-                    else (must_deny, rule_type, reason)
-                )
-
                 # Check if the packet matches an expected synapses
                 must_deny, rule_type, reason = (
                     self.is_unknown_synapse(name)
@@ -492,6 +491,13 @@ class Firewall(threading.Thread):
                 # Check if the neuron version is greater stricly than the one required
                 must_deny, rule_type, reason = (
                     self.is_old_neuron_version(neuron_version)
+                    if not must_deny
+                    else (must_deny, rule_type, reason)
+                )
+
+                # Check if the hotkey is blacklisted
+                must_deny, rule_type, reason = (
+                    self.is_blacklisted(hotkey)
                     if not must_deny
                     else (must_deny, rule_type, reason)
                 )
@@ -642,3 +648,4 @@ class Firewall(threading.Thread):
 
         # Subscribe to the observer
         self.observer.subscribe(queue_num=1, callback=self.packet_callback)
+        self.observer.start()

@@ -164,13 +164,6 @@ def add_args(cls, parser):
         help="List of ports to forward but not to sniff",
         default="firewall.json",
     )
-    parser.add_argument(
-        "--firewall.tool",
-        type=str,
-        required=False,
-        help="Tool to use to manage the firewall rules. Default, iptables",
-        default="iptables",
-    )
 
     # Blacklist.
     parser.add_argument(

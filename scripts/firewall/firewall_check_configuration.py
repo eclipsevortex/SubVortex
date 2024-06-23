@@ -2,7 +2,7 @@ import argparse
 import bittensor as bt
 
 from subnet.shared.utils import load_json_file
-from subnet.miner.firewall_models import create_rule
+from subnet.firewall.firewall_model import create_rule
 
 
 def main(config):

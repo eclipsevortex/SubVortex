@@ -30,8 +30,30 @@ class FirewallLinuxTool(FirewallTool):
         )
         return result.returncode == 0
 
+    def flush_input_chain(self):
+        commands = ["sudo", "iptables", "-F", "INPUT"]
+
+        subprocess.run(
+            commands,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        return True
+
     def create_deny_policy(self):
         commands = ["sudo", "iptables", "-P", "INPUT", "DROP"]
+
+        subprocess.run(
+            commands,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        return True
+
+    def create_allow_policy(self):
+        commands = ["sudo", "iptables", "-P", "INPUT", "ACCEPT"]
 
         subprocess.run(
             commands,

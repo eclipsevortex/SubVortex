@@ -3,8 +3,7 @@ import time
 import argparse
 import subprocess
 import bittensor as bt
-
-from subnet.firewall.firewall_factory import create_firewall_tool
+from typing import List
 
 
 def run_command(command, stdout=subprocess.DEVNULL):
@@ -54,13 +53,34 @@ def get_pm2_process_args(process_name: str):
         return (None, None, None)
 
 
-def restart_pm2_process(process_name: str):
-    process_path, process_interpreter, process_args = get_pm2_process_args(process_name)
-    if "--firewall.on" in process_args:
-        return
+def update_firewall_args(config, process_args: List[str]):
+    updated_args = []
+    i = 0
 
-    process_args = process_args + ["--firewall.on"]
+    while i < len(process_args):
+        if process_args[i].startswith("--firewall."):
+            if i + 1 < len(process_args) and not process_args[i + 1].startswith("--"):
+                i += 2
+            else:
+                i += 1
+        else:
+            updated_args.append(process_args[i])
+            i += 1
 
+    # Add new or updated firewall settings
+    for key, value in config.items():
+        updated_args.append(f"--firewall.{key}")
+        updated_args.append(value)
+
+    return updated_args
+
+
+def restart_pm2_process(
+    process_name: str,
+    process_path: str,
+    process_interpreter: str,
+    process_args: List[str],
+):
     # Remove the existing process
     run_command(["pm2", "delete", process_name])
 
@@ -83,14 +103,28 @@ def restart_pm2_process(process_name: str):
 def main(config):
     process_name = config.process.name
 
+    bt.logging.debug(f"Updating process arguments")
+    process_path, process_interpreter, process_args = get_pm2_process_args(process_name)
+    process_args = update_firewall_args(config, process_args)
+
     bt.logging.debug(f"Restart miner")
-    restart_pm2_process(process_name)
+    restart_pm2_process(
+        process_name=process_name,
+        process_path=process_path,
+        process_interpreter=process_interpreter,
+        process_args=process_args,
+    )
 
     # Wait a few seconds to allow the process to restart
+    waited = 0
     status = "unknown"
     while status not in ["online", "errored"]:
         status = check_pm2_process_status(process_name)
         time.sleep(1)
+        waited += 1
+
+        if waited > 10:
+            break
 
     if status == "online":
         bt.logging.success("Firewall has been activated")
@@ -104,6 +138,18 @@ if __name__ == "__main__":
         bt.logging.add_args(parser)
         parser.add_argument(
             "--process.name", type=str, help="Name of the miner in pm2", default=None
+        )
+        parser.add_argument(
+            "--firewall.interface",
+            type=str,
+            help="Interface to listen the traffic to (default eth0)",
+            default="eth0",
+        )
+        parser.add_argument(
+            "--firewall.config",
+            type=str,
+            help="List of ports to forward but not to sniff",
+            default="firewall.json",
         )
 
         config = bt.config(parser)

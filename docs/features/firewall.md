@@ -11,7 +11,11 @@ To protect miners, owners can enable the firewall feature available on all miner
 - [Prerequisites](#prerequisites)
 - [Design](#design)
 - [Installation](#installation)
+  - [Manual installation](#manual-installation)
+  - [Automatic installation](#automatic-installation)
 - [Uninstallation](#uninstallation)
+  - [Manual uninstallation](#manual-uninstallation)
+  - [Automatic uninstallation](#automatic-uninstallation)
 - [Rules](#rules)
   - [Static rules](#static-rules)
   - [Dynamic rules](#dynamic-rules)
@@ -82,7 +86,19 @@ Firewall is not implemented for Window.
 
 # Installation
 
-To enable the firewall on the miner, add the argument `--firewall.on` to the start command.
+> IMPORTANT <br />
+> Modifying iptables rules can block access to your machine, potentially leaving you with no choice but to reinstall your VPS.
+> Please be careful when managing iptables. We recommend using our scripts on a testnet VPS first.
+
+Before installing the firewall using one of the two possible methods, some packages need to be installed as prerequisites.
+
+```bash
+./scripts/os/os_setup.sh -t miner
+```
+
+## Manual Installation
+
+To install the firewall, add the argument `--firewall.on` to the start command.
 
 ```bash
 pm2 start neurons/miner.py \
@@ -102,11 +118,82 @@ Options
 - `--firewall.interface` - Network interface to listen for traffic on, default is `eth0`.
 - `--firewall.config` - Path to the firewall configuration file, default is `firewall.json`.
 
+## Automatic Installation
+
+To install the firewall, run the following script
+
+```bash
+python3 scripts/firewall/firewall_activate.py --process.name MINER_NAME
+```
+
+Options
+
+- `--process.name` - Name of the miner used by pm2.
+- `--firewall.interface` - Network interface to listen for traffic on, default is `eth0`.
+- `--firewall.config` - Path to the firewall configuration file, default is `firewall.json`.
+
+Replace `MINER_NAME` by the name of your miner.
+
+Check the process arguments
+
+```bash
+pm2 show MINER_NAME
+```
+
+You should see something like
+
+```bash
+script args       │ --netuid 7 --subtensor.network local --wallet.name miner --wallet.hotkey default --logging.debug --firewall.on
+```
+
+> IMPORTANT: Be sure you do **HAVE** the argument `--firewall.on`
+
+Check the miner log
+
+```bash
+pm2 log MINER_NAME
+```
+
+You should see some firewall logs such as
+
+```bash
+12|miner-60  | 2024-06-24 19:02:32.133 |      DEBUG       |  - Starting firewall on interface eth0 -
+```
+
+Check the iptables
+
+```bash
+sudo iptables -n -v -L INPUT
+```
+
+You should see these rules
+
+```bash
+Chain INPUT (policy DROP 17530 packets, 1274K bytes)
+ pkts bytes target     prot opt in     out     source               destination
+  930  446K ACCEPT     all  --  lo     *       0.0.0.0/0            0.0.0.0/0
+  319 43650 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+    0     0 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:443
+    0     0 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp spt:443
+    0     0 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp spt:80
+    2   213 ACCEPT     udp  --  *      *       0.0.0.0/0            0.0.0.0/0            udp spt:53
+    0     0 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:9944
+    0     0 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:9933
+24763 1910K ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:30333
+   47 24747 NFQUEUE    tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:8091 NFQUEUE num 1
+```
+
 <br />
 
 # Uninstallation
 
-To disable the firewall on the miner, remove the argument `--firewall.on` to the start command.
+> IMPORTANT <br />
+> Modifying iptables rules can block access to your machine, potentially leaving you with no choice but to reinstall your VPS.
+> Please be careful when managing iptables. We recommend using our scripts on a testnet VPS first.
+
+## Manual Uninstallation
+
+To uninstall the firewall, remove the argument `--firewall.on` to the start command.
 
 ```bash
 pm2 start neurons/miner.py \
@@ -120,10 +207,59 @@ pm2 start neurons/miner.py \
   --auto-update
 ```
 
-And execute the following scripts
+## Automatic Uninstallation
 
-```python
-python3 scripts/firewall/firewall_clean.py
+To uninstall the firewall, run the following script
+
+```bash
+python3 scripts/firewall/firewall_deactivate.py --process.name MINER_NAME
+```
+
+Options
+
+- `--process.name` - Name of the miner used by pm2.
+- `--firewall.interface` - Network interface to listen for traffic on, default is `eth0`.
+- `--firewall.config` - Path to the firewall configuration file, default is `firewall.json`.
+
+Replace `MINER_NAME` by the name of your miner.
+
+Check the process arguments
+
+```bash
+pm2 show MINER_NAME
+```
+
+You should see something like
+
+```bash
+script args       │ --netuid 7 --subtensor.network local --wallet.name miner --wallet.hotkey default --logging.debug
+```
+
+> IMPORTANT: Be sure you do **NOT HAVE** the argument `--firewall.on`
+
+Check the miner log
+
+```bash
+pm2 log MINER_NAME
+```
+
+You should not see any firewall logs, so you should not see the following
+
+```bash
+12|miner-60  | 2024-06-24 19:02:32.133 |      DEBUG       |  - Starting firewall on interface eth0 -
+```
+
+Check the iptables
+
+```bash
+sudo iptables -n -v -L INPUT
+```
+
+You should not see any rules mentioning in the activation of the firewall, so you should see something
+
+```bash
+Chain INPUT (policy ACCEPT 15481 packets, 1415K bytes)
+ pkts bytes target     prot opt in     out     source               destination
 ```
 
 # Rules
@@ -275,7 +411,7 @@ You are free to adjust the configuration as needed based on your research but at
 The rule cannot simply count the number of requests across all VPS and compare it to a benchmark, as we do for DoS attacks, because some legitimate VPS may be flagged unfairly. For example, if a malicious VPS sends the right number of requests and a legitimate VPS sends the last request that triggers the alert, the legitimate VPS will be flagged as a DDoS attacker, which is incorrect.
 
 So, here the solution we implemented for SubVortex
-![DDoS Explanation](./ddos.png)
+![DDoS Explanation](../assets/firewall-ddos.png)
 
 The rule visually distinguishes between legitimate user activity and potential DDoS attacks by analyzing request patterns from various VPS (IP) addresses. Each blue dot represents the number of requests from a specific VPS. The orange line represents the 75th percentile, dividing the VPS into two categories: the legit group (below the 75th percentile) and the potential attackers group (above the 75th percentile). The green line indicates the mean number of requests within the legit group, serving as a baseline for normal activity and helping to follow the trend more effectively than using only the percentile or another static value. The benchmark line (red) is established by adding the legit group's mean to the maximum number of requests within the same group. Any VPS exceeding this benchmark is flagged as a potential DDoS attacker. This approach ensures accurate identification of abnormal request patterns while minimizing false positives.
 

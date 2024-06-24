@@ -34,17 +34,23 @@ class Github:
         except Exception:
             return self.latest_version
 
-    def get_branch(self, tag="latest"):
+    def get_branch(self, branch_name="main"):
         """
         Get the expected branch
         """
-        if tag == "latest":
-            subprocess.run(["git", "checkout", "-B", "main"], check=True)
-            subprocess.run(["git", "pull"], check=True)
-            bt.logging.info(f"Successfully pulled source code for main branch'.")
-        else:
-            subprocess.run(["git", "checkout", f"tags/{tag}"], check=True)
-            bt.logging.info(f"Successfully pulled source code for tag '{tag}'.")
+        # Stash if there is any local changes just in case
+        subprocess.run(["git", "stash"], check=True)
+
+        # Checkout branch
+        subprocess.run(["git", "checkout", "-B", branch_name], check=True)
+
+        # Pull branch
+        subprocess.run(["git", "reset", "--hard", f"origin/{branch_name}"], check=True)
+
+        # Stash if there is any local changes just in case
+        subprocess.run(["git", "stash"], check=True)
+
+        bt.logging.info(f"Successfully pulled source code for branch '{branch_name}'.")
 
     def get_tag(self, tag):
         """

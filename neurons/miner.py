@@ -40,7 +40,7 @@ from subnet.firewall.firewall_factory import (
     create_firewall_tool,
     create_firewall_observer,
 )
-from subnet.miner import run
+from subnet.miner.run import run
 from subnet.miner.firewall import Firewall
 from subnet.miner.config import (
     config,

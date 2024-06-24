@@ -67,10 +67,13 @@ def update_firewall_args(config, process_args: List[str]):
             updated_args.append(process_args[i])
             i += 1
 
-    # Add new or updated firewall settings
-    for key, value in config.items():
-        updated_args.append(f"--firewall.{key}")
-        updated_args.append(value)
+    updated_args = updated_args + [
+        "--firewall.on",
+        "--firewall.interface",
+        config.firewall.interface,
+        "--firewall.config",
+        config.firewall.config,
+    ]
 
     return updated_args
 

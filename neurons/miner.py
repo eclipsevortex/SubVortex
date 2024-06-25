@@ -342,8 +342,6 @@ class Miner:
         return True
 
     def update_firewall(self):
-        validators = self.metagraph.get_validators()
-
         # Get version and min stake
         version = get_hyperparameter_value(self.subtensor, "weights_version")
         weights_min_stake = get_weights_min_stake(self.subtensor.substrate)
@@ -355,15 +353,13 @@ class Miner:
         }
 
         # Define the valid validators
-        valid_validators = [x for x in validators if x[2] >= weights_min_stake]
+        validators = self.metagraph.get_validators(weights_min_stake)
+        valid_validators = [x[1] for x in validators]
 
-        # Define the validators blacklisted
-        blacklist = list(set(validators) - set(valid_validators))
-        blacklist_hotkeys = [x[1] for x in blacklist]
-
+        # Update the firewall
         self.firewall.update(
             specifications=specifications,
-            blacklist_hotkeys=blacklist_hotkeys,
+            whitelist_hotkeys=valid_validators,
         )
         bt.logging.debug("Firewall updated")
 

@@ -316,7 +316,7 @@ The rule is not configurable and so can not be changed without changing the sour
 
 The rule denies all incoming traffic coming from a validator with an old neuron version.
 
-The rule uses the neuron version of the miner and deny any traffic sending a neuron version oldest than that one.
+The rule uses the version set in the hyperparameter `weights_version` and deny any traffic sending a neuron version oldest than that one.
 
 The rule is not configurable and so can not be changed without changing the source code which is not recommended.
 

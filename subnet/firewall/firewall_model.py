@@ -174,7 +174,7 @@ class DenyRule(Rule):
         return RuleType.DENY
 
     def __str__(self):
-        return f"AllowRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol})"
+        return f"DenyRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol})"
     
     def __eq__(self, other):
         if isinstance(other, DenyRule):
@@ -233,7 +233,7 @@ class DetectDoSRule(Rule):
         return RuleType.DETECT_DOS
 
     def __str__(self):
-        return f"AllowRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol}, time_window={self.time_window}, packet_threshold={self.packet_threshold})"
+        return f"DetectDoSRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol}, time_window={self.time_window}, packet_threshold={self.packet_threshold})"
     
     def __eq__(self, other):
         if isinstance(other, DetectDoSRule):
@@ -294,7 +294,7 @@ class DetectDDoSRule(Rule):
         return RuleType.DETECT_DDOS
 
     def __str__(self):
-        return f"AllowRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol}, time_window={self.time_window}, packet_threshold={self.packet_threshold})"
+        return f"DetectDDoSRule(ip={self.ip}, dport={self.dport}, protocol={self.protocol}, time_window={self.time_window}, packet_threshold={self.packet_threshold})"
 
     def __eq__(self, other):
         if isinstance(other, DetectDDoSRule):

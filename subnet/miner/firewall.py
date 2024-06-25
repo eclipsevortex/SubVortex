@@ -20,6 +20,7 @@ import copy
 import json
 import time
 import threading
+import traceback
 import numpy as np
 import bittensor as bt
 from typing import List
@@ -33,7 +34,6 @@ from subnet.firewall.firewall_model import (
     create_rule,
     Rule,
     RuleType,
-    AllowRule,
     DetectDoSRule,
     DetectDDoSRule,
 )
@@ -61,9 +61,8 @@ class Firewall(threading.Thread):
         self.port = port
         self.interface = interface
         self.ips_blocked = []
-        self.blacklist_hotkeys = []
+        self.whitelist_hotkeys = []
         self.specifications = {}
-        self.queues = {}
         self.requests = {}
 
         self.rules = [create_rule(x) for x in rules]
@@ -78,13 +77,23 @@ class Firewall(threading.Thread):
         super().join()
         bt.logging.debug(f"Firewall stopped")
 
+    def is_whitelisted(self, hotkey: str):
+        """
+        True if the hotkey is whitelisted, false otherwise
+        """
+        is_whitelisted = False
+        with self._lock:
+            is_whitelisted = hotkey in self.whitelist_hotkeys
+
+        return is_whitelisted
+
     def is_blacklisted(self, hotkey: str):
         """
         True if the hotkey is blacklisted, false otherwise
         """
         is_blacklisted = False
         with self._lock:
-            is_blacklisted = hotkey in self.blacklist_hotkeys
+            is_blacklisted = hotkey not in self.whitelist_hotkeys
 
         if is_blacklisted:
             return (True, RuleType.DENY, f"Hotkey '{hotkey}' is blacklisted")
@@ -114,7 +123,7 @@ class Firewall(threading.Thread):
             return (
                 True,
                 RuleType.DENY,
-                f"Neuron version {version} is outdated; version {225} is required.",
+                f"Neuron version {version} is outdated; version {version_required} is required.",
             )
 
         return (False, None, None)
@@ -134,10 +143,10 @@ class Firewall(threading.Thread):
             is not None
         )
 
-    def update(self, specifications={}, blacklist_hotkeys=[]):
+    def update(self, specifications={}, whitelist_hotkeys=[]):
         with self._lock:
             self.specifications = copy.deepcopy(specifications)
-            self.blacklist_hotkeys = list(blacklist_hotkeys)
+            self.whitelist_hotkeys = list(whitelist_hotkeys)
 
     def get_specification(self, name: str):
         with self._lock:
@@ -161,7 +170,7 @@ class Firewall(threading.Thread):
             "protocol": protocol,
             "type": type,
             "reason": reason,
-            "metadata": metadata
+            "metadata": metadata,
         }
         self.ips_blocked.append(ip_blocked)
 
@@ -431,11 +440,15 @@ class Firewall(threading.Thread):
             request = self.requests.get(packet.id) or (None, None, None)
             seq = request[0]
             ack = request[1]
-            must_allow = match_allow_rule
+            # If no rule, by default we allow packets
+            must_allow = match_allow_rule or True
             must_deny = match_deny_rule
             rule_type = None
             reason = None
             is_request_for_miner = self.port == port_dest
+
+            # True if there is any explicit allow/deny rule defined
+            is_decision_made = match_allow_rule or match_deny_rule
 
             # OR find why the seq number is not the same accross all the packets
             is_previously_allowed = not self.is_blocked(ip_src, port_dest, protocol)
@@ -502,23 +515,26 @@ class Firewall(threading.Thread):
                 # Check if the packet matches an expected synapses
                 must_deny, rule_type, reason = (
                     self.is_unknown_synapse(name)
-                    if not must_deny
-                    else (must_deny, rule_type, reason)
-                )
-
-                # Check if the neuron version is greater stricly than the one required
-                must_deny, rule_type, reason = (
-                    self.is_old_neuron_version(neuron_version)
-                    if not must_deny
+                    if not must_deny and not is_decision_made
                     else (must_deny, rule_type, reason)
                 )
 
                 # Check if the hotkey is blacklisted
                 must_deny, rule_type, reason = (
                     self.is_blacklisted(hotkey)
-                    if not must_deny
+                    if not must_deny and not is_decision_made
                     else (must_deny, rule_type, reason)
                 )
+
+                # Check if the neuron version is greater stricly than the one required
+                must_deny, rule_type, reason = (
+                    self.is_old_neuron_version(neuron_version)
+                    if not must_deny and not is_decision_made
+                    else (must_deny, rule_type, reason)
+                )
+
+                if not is_decision_made:
+                    must_allow = must_allow or self.is_whitelisted(hotkey)
 
             # Check if a DoS attack is found
             dos_rule = self.get_rule(
@@ -560,12 +576,15 @@ class Firewall(threading.Thread):
                 else (must_deny, rule_type, reason)
             )
 
-            # One of the detection has been used, so we use the default behaviour of a detection rule
-            # which is allowing the traffic except if detecting something abnormal
-            must_allow = must_allow or dos_rule is not None or ddos_rule is not None
-            must_deny = must_deny or (
-                is_data_packet and self.requests[packet.id][2] == "deny"
-            )
+            # Check if we must allow the packet if
+            # - Packet is a SYNC packet
+            must_allow = must_allow or is_sync_packet
+
+            # Check if we must deny the packet if
+            # - The SYNC packet has been denied
+            # - Has been flagged as must denied already by one of the rule
+            is_previous_packets_denied = self.requests[packet.id][2] == "deny"
+            must_deny = must_deny or is_previous_packets_denied
 
             count = len(self.packet_timestamps[ip_src][port_dest][protocol])
 
@@ -628,6 +647,7 @@ class Firewall(threading.Thread):
         except Exception as ex:
             bt.logging.warning(f"Failed to proceed firewall packet: {ex}")
             bt.logging.debug(f"Firewall packet metadata: {metadata}")
+            bt.logging.trace(traceback.format_exc())
 
     def run(self):
         # Reload the previous ips blocked
@@ -646,20 +666,13 @@ class Firewall(threading.Thread):
         self.tool.create_allow_rule(sport=443, protocol="tcp")
         self.tool.create_allow_rule(sport=80, protocol="tcp")
         self.tool.create_allow_rule(sport=53, protocol="udp")
-
         self.tool.create_allow_rule(dport=9944, protocol="tcp")
-        self.rules.append(AllowRule(dport=9944, protocol="tcp"))
-
         self.tool.create_allow_rule(dport=9933, protocol="tcp")
-        self.rules.append(AllowRule(dport=9933, protocol="tcp"))
-
         self.tool.create_allow_rule(dport=30333, protocol="tcp")
-        self.rules.append(AllowRule(dport=30333, protocol="tcp"))
 
         # Create queue rules
         bt.logging.debug(f"Creating queue rules")
         self.tool.create_allow_rule(dport=8091, protocol="tcp", queue=1)
-        self.rules.append(AllowRule(dport=8091, protocol="tcp"))
 
         # Change the policy to deny
         bt.logging.debug(f"Change the INPUT policy to deny by default")

@@ -40,7 +40,8 @@ class Neuron:
             port = details.get("port")
             reason = details.get("reason")
             metadata = details.get("metadata") or {}
-            hotkey = metadata.get("hotkey")
+            synapse = metadata.get("synapse") or {}
+            hotkey = synapse.get("hotkey")
 
             details = next(
                 (
@@ -54,9 +55,9 @@ class Neuron:
             uid = self.metagraph.uids[details[0]] if details else "NA"
 
             if is_neuron_part_of_subnet:
-                bt.logging.warning(f"{ip}:{port} is part of SN{self.config.netuid} (UID: {uid}) - {reason}")
+                bt.logging.warning(f"[{hotkey}] {ip}:{port} is part of SN{self.config.netuid} (UID: {uid}) - {reason}")
             else:
-                bt.logging.info(f"{ip}:{port} not part of SN{self.config.netuid} - {reason}")
+                bt.logging.info(f"[{hotkey}] {ip}:{port} not part of SN{self.config.netuid} - {reason}")
 
 
 if __name__ == "__main__":

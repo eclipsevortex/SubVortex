@@ -1,9 +1,9 @@
 import time
 import unittest
 import bittensor as bt
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
-from subnet.firewall.firewall_model import RuleType, AllowRule, DenyRule
+from subnet.firewall.firewall_model import RuleType
 from subnet.miner.firewall import Firewall
 from subnet.bittensor.synapse import Synapse
 from subnet.protocol import Score
@@ -83,7 +83,7 @@ class TestFirewall(unittest.TestCase):
         mock_time,
         seconds=[],
         seq=1000,
-        synapse="SubVortexSynapse",
+        synapse="Synapse",
         neuron_version=225,
         hotkey="5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja",
     ):
@@ -130,66 +130,10 @@ class TestFirewall(unittest.TestCase):
             )
 
 
-class TestRules(TestFirewall):
-    @patch("builtins.open")
-    def test_when_starting_the_firewall_should_create_the_predefined_allow_rules(
-        self, mock_open
-    ):
-        # Arrange
-        observer = MagicMock()
-        tool = MagicMock()
-
-        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
-
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
-
-        # Action
-        firewall.run()
-
-        # Assert
-        assert 4 == len(firewall.rules)
-        assert AllowRule(dport=9944, protocol="tcp") == firewall.rules[0]
-        assert AllowRule(dport=9933, protocol="tcp") == firewall.rules[1]
-        assert AllowRule(dport=30333, protocol="tcp") == firewall.rules[2]
-        assert AllowRule(dport=8091, protocol="tcp") == firewall.rules[3]
-
-    @patch("builtins.open")
-    def test_when_starting_the_firewall_should_create_the_predefined_rules_on_vps(
-        self, mock_open
-    ):
-        # Arrange
-        observer = MagicMock()
-        tool = MagicMock()
-
-        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
-
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
-
-        # Action
-        firewall.run()
-
-        # Assert
-        assert 9 == tool.create_allow_rule.call_count
-        tool.create_allow_rule.assert_has_calls(
-            [
-                call(dport=22, protocol="tcp"),
-                call(dport=443, protocol="tcp"),
-                call(sport=443, protocol="tcp"),
-                call(sport=80, protocol="tcp"),
-                call(sport=53, protocol="udp"),
-                call(dport=9944, protocol="tcp"),
-                call(dport=9933, protocol="tcp"),
-                call(dport=30333, protocol="tcp"),
-                call(dport=8091, protocol="tcp", queue=1),
-            ]
-        )
-        tool.create_deny_policy.assert_called_once()
-
-
 class TestPackets(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_no_rules_when_receiving_all_packets_for_tcp_requests_should_deny_all_of_them(
+    def test_given_no_rules_when_receiving_all_packets_for_tcp_requests_should_allow_all_the_ones_for_connection_establishment_and_denied_all_the_rest(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -204,6 +148,7 @@ class TestPackets(TestFirewall):
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
 
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.run()
 
         # Action
         # Step 1: SYN (Client to Server)
@@ -326,14 +271,14 @@ class TestPackets(TestFirewall):
             port=8091,
             protocol="tcp",
             type=RuleType.DENY,
-            reason="Deny ip",
+            reason="Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
         )
-        assert 6 == packet_mock.drop.call_count
-        assert 0 == packet_mock.accept.call_count
+        assert 2 == packet_mock.accept.call_count
+        assert 4 == packet_mock.drop.call_count
 
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_an_allow_rule_packet_when_receiving_all_packets_for_tcp_requests_should_accept_all_of_them(
+    def test_given_an_allow_rule_when_receiving_all_packets_for_tcp_requests_should_allow_all_of_them(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -347,7 +292,14 @@ class TestPackets(TestFirewall):
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
 
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
         firewall.run()
 
         # Action
@@ -470,7 +422,7 @@ class TestPackets(TestFirewall):
 
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_a_deny_rule_packet_when_receiving_all_packets_for_tcp_requests_should_deny_all_of_them(
+    def test_given_a_deny_rule_when_receiving_all_packets_for_tcp_requests_should_deny_all_of_them(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -484,9 +436,15 @@ class TestPackets(TestFirewall):
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
 
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "deny",
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
         firewall.run()
-        firewall.rules = firewall.rules[:-1] + [DenyRule(dport=8091, protocol="tcp")]
 
         # Action
         # Step 1: SYN (Client to Server)
@@ -614,8 +572,1239 @@ class TestPackets(TestFirewall):
         assert 6 == packet_mock.drop.call_count
         packet_mock.accept.assert_not_called()
 
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_dos_rule_when_receiving_all_packets_for_tcp_requests_without_triggering_any_alert_should_allow_all_the_ones_for_connection_establishment_and_denied_all_the_rest(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
 
-class TestDoSAttacks(TestFirewall):
+        client_seq = 1000
+        server_seq = 2000
+        client_ack = 0
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-dos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.run()
+
+        # Action
+        # Step 1: SYN (Client to Server)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="S",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+        )
+
+        # Step 2: SYN-ACK (Server to Client)
+
+        # Step 3: ACK (Client to Server)
+        client_seq += 1
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=2,
+        )
+
+        # Step 4: PSH-ACK (Client to Server - Request Data)
+        payload = "b'POST /SubVortexSynapse HTTP/1.1\r\nHost: 192.168.0.2:8091\r\nname: SubVortexSynapse\r\ntimeout: 5.0\r\nbt_header_axon_ip: 192.168.2\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="PA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=3,
+        )
+
+        # Step 5: ACK (Server to Client)
+
+        # Step 6: PSH-ACK (Server to Client - Response Data)
+        payload = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nMock answer!"
+
+        # Step 7: ACK (Client to Server)
+        client_ack = server_seq + len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=6,
+        )
+
+        # Step 8: FIN-ACK (Client to Server)
+        client_seq += len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="FA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=7,
+        )
+
+        # Step 9: ACK (Server to Client)
+
+        # Step 10: FIN-ACK (Server to Client)
+        server_seq += len(payload)
+
+        # Step 11: ACK (Client to Server)
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_ack,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=10,
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
+        )
+        assert 2 == packet_mock.accept.call_count
+        assert 4 == packet_mock.drop.call_count
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_dos_rule_and_hotkey_whitelisted_when_receiving_all_packets_for_tcp_requests_without_triggering_any_alert_should_allow_all_of_them(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        client_seq = 1000
+        server_seq = 2000
+        client_ack = 0
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-dos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.whitelist_hotkeys = [
+            "5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"
+        ]
+        firewall.run()
+
+        # Action
+        # Step 1: SYN (Client to Server)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="S",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+        )
+
+        # Step 2: SYN-ACK (Server to Client)
+
+        # Step 3: ACK (Client to Server)
+        client_seq += 1
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=2,
+        )
+
+        # Step 4: PSH-ACK (Client to Server - Request Data)
+        payload = "b'POST /SubVortexSynapse HTTP/1.1\r\nHost: 192.168.0.2:8091\r\nname: SubVortexSynapse\r\ntimeout: 5.0\r\nbt_header_axon_ip: 192.168.2\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="PA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=3,
+        )
+
+        # Step 5: ACK (Server to Client)
+
+        # Step 6: PSH-ACK (Server to Client - Response Data)
+        payload = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nMock answer!"
+
+        # Step 7: ACK (Client to Server)
+        client_ack = server_seq + len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=6,
+        )
+
+        # Step 8: FIN-ACK (Client to Server)
+        client_seq += len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="FA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=7,
+        )
+
+        # Step 9: ACK (Server to Client)
+
+        # Step 10: FIN-ACK (Server to Client)
+        server_seq += len(payload)
+
+        # Step 11: ACK (Client to Server)
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_ack,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=10,
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        packet_mock.drop.assert_not_called()
+        assert 6 == packet_mock.accept.call_count
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_dos_rule_when_receiving_all_packets_for_tcp_requests_triggering_an_alert_should_deny_all_of_them(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        client_seq = 1000
+        server_seq = 2000
+        client_ack = 0
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-dos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.run()
+
+        # Simulate an old requests
+        mock_time.return_value = get_time(0)
+        firewall.packet_timestamps["192.168.0.1"][8091]["tcp"] = [
+            mock_time.return_value
+        ]
+        seconds = 28
+
+        # Action
+        # Step 1: SYN (Client to Server)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="S",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds,
+        )
+
+        # Step 2: SYN-ACK (Server to Client)
+
+        # Step 3: ACK (Client to Server)
+        client_seq += 1
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds + 2,
+        )
+
+        # Step 4: PSH-ACK (Client to Server - Request Data)
+        payload = "b'POST /SubVortexSynapse HTTP/1.1\r\nHost: 192.168.0.2:8091\r\nname: SubVortexSynapse\r\ntimeout: 5.0\r\nbt_header_axon_ip: 192.168.2\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="PA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds + 3,
+        )
+
+        # Step 5: ACK (Server to Client)
+
+        # Step 6: PSH-ACK (Server to Client - Response Data)
+        payload = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nMock answer!"
+
+        # Step 7: ACK (Client to Server)
+        client_ack = server_seq + len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds + 6,
+        )
+
+        # Step 8: FIN-ACK (Client to Server)
+        client_seq += len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="FA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=7,
+        )
+
+        # Step 9: ACK (Server to Client)
+
+        # Step 10: FIN-ACK (Server to Client)
+        server_seq += len(payload)
+
+        # Step 11: ACK (Client to Server)
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_ack,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds + 10,
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        assert 2 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DETECT_DOS,
+            reason="DoS attack detected: 2 requests in 30 seconds",
+        )
+        assert 0 == packet_mock.accept.call_count
+        assert 6 == packet_mock.drop.call_count
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_ddos_rule_when_receiving_all_packets_for_tcp_requests_without_triggering_any_alert_should_allow_all_the_ones_for_connection_establishment_and_denied_all_the_rest(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        client_seq = 1000
+        server_seq = 2000
+        client_ack = 0
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-ddos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.run()
+
+        # Action
+        # Step 1: SYN (Client to Server)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="S",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+        )
+
+        # Step 2: SYN-ACK (Server to Client)
+
+        # Step 3: ACK (Client to Server)
+        client_seq += 1
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=2,
+        )
+
+        # Step 4: PSH-ACK (Client to Server - Request Data)
+        payload = "b'POST /SubVortexSynapse HTTP/1.1\r\nHost: 192.168.0.2:8091\r\nname: SubVortexSynapse\r\ntimeout: 5.0\r\nbt_header_axon_ip: 192.168.2\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="PA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=3,
+        )
+
+        # Step 5: ACK (Server to Client)
+
+        # Step 6: PSH-ACK (Server to Client - Response Data)
+        payload = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nMock answer!"
+
+        # Step 7: ACK (Client to Server)
+        client_ack = server_seq + len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=6,
+        )
+
+        # Step 8: FIN-ACK (Client to Server)
+        client_seq += len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="FA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=7,
+        )
+
+        # Step 9: ACK (Server to Client)
+
+        # Step 10: FIN-ACK (Server to Client)
+        server_seq += len(payload)
+
+        # Step 11: ACK (Client to Server)
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_ack,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=10,
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
+        )
+        assert 2 == packet_mock.accept.call_count
+        assert 4 == packet_mock.drop.call_count
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_ddos_rule_and_hotkey_whitelisted_when_receiving_all_packets_for_tcp_requests_without_triggering_any_alert_should_allow_all_of_them(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        client_seq = 1000
+        server_seq = 2000
+        client_ack = 0
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-ddos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.whitelist_hotkeys = [
+            "5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"
+        ]
+        firewall.run()
+
+        # Action
+        # Step 1: SYN (Client to Server)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="S",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+        )
+
+        # Step 2: SYN-ACK (Server to Client)
+
+        # Step 3: ACK (Client to Server)
+        client_seq += 1
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=2,
+        )
+
+        # Step 4: PSH-ACK (Client to Server - Request Data)
+        payload = "b'POST /SubVortexSynapse HTTP/1.1\r\nHost: 192.168.0.2:8091\r\nname: SubVortexSynapse\r\ntimeout: 5.0\r\nbt_header_axon_ip: 192.168.2\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="PA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=3,
+        )
+
+        # Step 5: ACK (Server to Client)
+
+        # Step 6: PSH-ACK (Server to Client - Response Data)
+        payload = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nMock answer!"
+
+        # Step 7: ACK (Client to Server)
+        client_ack = server_seq + len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=6,
+        )
+
+        # Step 8: FIN-ACK (Client to Server)
+        client_seq += len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="FA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=7,
+        )
+
+        # Step 9: ACK (Server to Client)
+
+        # Step 10: FIN-ACK (Server to Client)
+        server_seq += len(payload)
+
+        # Step 11: ACK (Client to Server)
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_ack,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=10,
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        packet_mock.drop.assert_not_called()
+        assert 6 == packet_mock.accept.call_count
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_ddos_rule_when_receiving_all_packets_for_tcp_requests_triggering_an_alert_should_deny_all_of_them(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        client_seq = 1000
+        server_seq = 2000
+        client_ack = 0
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-ddos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.run()
+
+        # Simulate an old requests
+        mock_time.return_value = get_time(0)
+        firewall.packet_timestamps["192.168.0.1"][8091]["tcp"] = [
+            get_time(0),
+            get_time(1),
+        ]
+        firewall.packet_timestamps["192.168.0.2"][8091]["tcp"] = [get_time(2)]
+        firewall.packet_timestamps["192.168.0.3"][8091]["tcp"] = [get_time(3)]
+        firewall.packet_timestamps["192.168.0.4"][8091]["tcp"] = [get_time(4)]
+        seconds = 28
+
+        # Action
+        # Step 1: SYN (Client to Server)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="S",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds,
+        )
+
+        # Step 2: SYN-ACK (Server to Client)
+
+        # Step 3: ACK (Client to Server)
+        client_seq += 1
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds + 2,
+        )
+
+        # Step 4: PSH-ACK (Client to Server - Request Data)
+        payload = "b'POST /SubVortexSynapse HTTP/1.1\r\nHost: 192.168.0.2:8091\r\nname: SubVortexSynapse\r\ntimeout: 5.0\r\nbt_header_axon_ip: 192.168.2\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="PA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds + 3,
+        )
+
+        # Step 5: ACK (Server to Client)
+
+        # Step 6: PSH-ACK (Server to Client - Response Data)
+        payload = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nMock answer!"
+
+        # Step 7: ACK (Client to Server)
+        client_ack = server_seq + len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds + 6,
+        )
+
+        # Step 8: FIN-ACK (Client to Server)
+        client_seq += len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="FA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=7,
+        )
+
+        # Step 9: ACK (Server to Client)
+
+        # Step 10: FIN-ACK (Server to Client)
+        server_seq += len(payload)
+
+        # Step 11: ACK (Client to Server)
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_ack,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=seconds + 10,
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        assert 3 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DETECT_DDOS,
+            reason="DDoS attack detected: 3 requests in 30 seconds",
+        )
+        assert 0 == packet_mock.accept.call_count
+        assert 6 == packet_mock.drop.call_count
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_whitelist_hotkey_when_receiving_all_packets_for_tcp_requests_should_allow_all_of_them(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        client_seq = 1000
+        server_seq = 2000
+        client_ack = 0
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.whitelist_hotkeys = [
+            "5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"
+        ]
+        firewall.run()
+
+        # Action
+        # Step 1: SYN (Client to Server)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="S",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+        )
+
+        # Step 2: SYN-ACK (Server to Client)
+
+        # Step 3: ACK (Client to Server)
+        client_seq += 1
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=2,
+        )
+
+        # Step 4: PSH-ACK (Client to Server - Request Data)
+        payload = "b'POST /SubVortexSynapse HTTP/1.1\r\nHost: 192.168.0.2:8091\r\nname: SubVortexSynapse\r\ntimeout: 5.0\r\nbt_header_axon_ip: 192.168.2\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="PA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=3,
+        )
+
+        # Step 5: ACK (Server to Client)
+
+        # Step 6: PSH-ACK (Server to Client - Response Data)
+        payload = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nMock answer!"
+
+        # Step 7: ACK (Client to Server)
+        client_ack = server_seq + len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=6,
+        )
+
+        # Step 8: FIN-ACK (Client to Server)
+        client_seq += len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="FA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=7,
+        )
+
+        # Step 9: ACK (Server to Client)
+
+        # Step 10: FIN-ACK (Server to Client)
+        server_seq += len(payload)
+
+        # Step 11: ACK (Client to Server)
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_ack,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=10,
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        packet_mock.drop.assert_not_called()
+        assert 6 == packet_mock.accept.call_count
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_blacklist_hotkey_when_receiving_all_packets_for_tcp_requests_should_allow_all_the_ones_for_connection_establishment_and_denied_all_the_rest(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        client_seq = 1000
+        server_seq = 2000
+        client_ack = 0
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.run()
+
+        # Action
+        # Step 1: SYN (Client to Server)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="S",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+        )
+
+        # Step 2: SYN-ACK (Server to Client)
+
+        # Step 3: ACK (Client to Server)
+        client_seq += 1
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=2,
+        )
+
+        # Step 4: PSH-ACK (Client to Server - Request Data)
+        payload = "b'POST /SubVortexSynapse HTTP/1.1\r\nHost: 192.168.0.2:8091\r\nname: SubVortexSynapse\r\ntimeout: 5.0\r\nbt_header_axon_ip: 192.168.2\r\nbt_header_axon_port: 8091\r\nbt_header_axon_hotkey: 5EUyagbvnJQwjEmTmdbiVtGqPzVNxZAreJBoFyTsYSpWX8x1\r\nbt_header_dendrite_ip: 192.168.0.1\r\nbt_header_dendrite_version: 7002000\r\nbt_header_dendrite_nonce: 1718696917604843780\r\nbt_header_dendrite_uuid: 085bdf0c-2d47-11ef-a8bd-07d2e5f8de9a\r\nbt_header_dendrite_hotkey: 5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja\r\nbt_header_dendrite_signature: 0x7a57c4cdbcd604c667fa833afe795925e085642e272745d258d174c6f8268d1d30203c3a153ee952da83adefeb531a43fab69c46ddb6b9b6d17edeaf31380088\r\nbt_header_dendrite_neuron_version: 225\r\nheader_size: 640\r\ntotal_size: 3516\r\ncomputed_body_hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\r\nAccept: */*\r\nAccept-Encoding: gzip, deflate\r\nUser-Agent: Python/3.10 aiohttp/3.9.5\r\nContent-Length: 797\r\nContent-Type: application/json\r\n\r\n'"
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="PA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=3,
+        )
+
+        # Step 5: ACK (Server to Client)
+
+        # Step 6: PSH-ACK (Server to Client - Response Data)
+        payload = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nMock answer!"
+
+        # Step 7: ACK (Client to Server)
+        client_ack = server_seq + len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=6,
+        )
+
+        # Step 8: FIN-ACK (Client to Server)
+        client_seq += len(payload)
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_seq,
+            ack=client_ack,
+            flags="FA",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=7,
+        )
+
+        # Step 9: ACK (Server to Client)
+
+        # Step 10: FIN-ACK (Server to Client)
+        server_seq += len(payload)
+
+        # Step 11: ACK (Client to Server)
+        client_ack = server_seq + 1
+        self.send_packet(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            seq=client_ack,
+            ack=client_ack,
+            flags="A",
+            payload=payload,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=10,
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
+        )
+        assert 2 == packet_mock.accept.call_count
+        assert 4 == packet_mock.drop.call_count
+
+
+class TestDoSRule(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
     def test_only_requests_within_time_window_are_kept(self, mock_time, mock_open):
@@ -638,6 +1827,9 @@ class TestDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -709,6 +1901,9 @@ class TestDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -760,6 +1955,9 @@ class TestDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -803,6 +2001,9 @@ class TestDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -881,6 +2082,9 @@ class TestDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -928,7 +2132,7 @@ class TestDoSAttacks(TestFirewall):
         packet_mock.drop.assert_not_called
 
 
-class TestDDoSAttacks(TestFirewall):
+class TestDDoSRule(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
     def test_only_requests_within_time_window_are_kept(self, mock_time, mock_open):
@@ -951,6 +2155,9 @@ class TestDDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -1028,6 +2235,9 @@ class TestDDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -1082,6 +2292,9 @@ class TestDDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -1136,6 +2349,9 @@ class TestDDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         vps = [2, 1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -1434,6 +2650,9 @@ class TestDDoSAttacks(TestFirewall):
             },
         ]
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         ip_template = "192.168.0.{}"
@@ -1488,10 +2707,10 @@ class TestDDoSAttacks(TestFirewall):
                         assert vps[j] == count
 
 
-class TestMiner(TestFirewall):
+class TestBlackListRule(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_a_deny_rule_when_packet_contains_a_blacklisted_hotkey_should_deny_the_request(
+    def test_when_packet_contains_a_blacklisted_hotkey_should_deny_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -1501,7 +2720,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
+            "synapses": {"Synapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
@@ -1509,157 +2728,6 @@ class TestMiner(TestFirewall):
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
         firewall.update(
             specifications=specifications,
-            blacklist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
-        )
-        firewall.run()
-        firewall.rules = firewall.rules[:-1] + [DenyRule(dport=8091, protocol="tcp")]
-
-        # Action
-        self.send_request(
-            src_ip="192.168.0.1",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[0, 1],
-        )
-
-        # Assert
-        assert 1 == len(firewall.ips_blocked)
-        packet_mock.accept.assert_not_called()
-        assert 2 == packet_mock.drop.call_count
-        self.assert_blocked(
-            firewall=firewall,
-            ip="192.168.0.1",
-            port=8091,
-            protocol="tcp",
-            type=RuleType.DENY,
-            reason="Deny ip",
-        )
-
-    @patch("builtins.open")
-    @patch("time.time")
-    def test_given_a_deny_rule_when_packet_contains_unknown_synapse_should_deny_the_request(
-        self, mock_time, mock_open
-    ):
-        # Arrange
-        observer = MagicMock()
-        tool = MagicMock()
-        packet_mock = MagicMock()
-
-        specifications = {
-            "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
-        }
-
-        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
-
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
-        firewall.update(
-            specifications=specifications,
-        )
-        firewall.run()
-        firewall.rules = firewall.rules[:-1] + [DenyRule(dport=8091, protocol="tcp")]
-
-        # Action
-        self.send_request(
-            src_ip="192.168.0.1",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[0, 1],
-            synapse="QnATask",
-        )
-
-        # Assert
-        assert 1 == len(firewall.ips_blocked)
-        packet_mock.accept.assert_not_called()
-        assert 2 == packet_mock.drop.call_count
-        self.assert_blocked(
-            firewall=firewall,
-            ip="192.168.0.1",
-            port=8091,
-            protocol="tcp",
-            type=RuleType.DENY,
-            reason="Deny ip",
-        )
-
-    @patch("builtins.open")
-    @patch("time.time")
-    def test_given_a_deny_rule_when_packet_contains_outdated_version_should_deny_the_request(
-        self, mock_time, mock_open
-    ):
-        # Arrange
-        observer = MagicMock()
-        tool = MagicMock()
-        packet_mock = MagicMock()
-
-        specifications = {
-            "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
-        }
-
-        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
-
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
-        firewall.update(
-            specifications=specifications,
-        )
-        firewall.run()
-        firewall.rules = firewall.rules[:-1] + [DenyRule(dport=8091, protocol="tcp")]
-
-        # Action
-        self.send_request(
-            src_ip="192.168.0.1",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[0, 1],
-            neuron_version=224,
-        )
-
-        # Assert
-        assert 1 == len(firewall.ips_blocked)
-        packet_mock.accept.assert_not_called()
-        assert 2 == packet_mock.drop.call_count
-        self.assert_blocked(
-            firewall=firewall,
-            ip="192.168.0.1",
-            port=8091,
-            protocol="tcp",
-            type=RuleType.DENY,
-            reason="Deny ip",
-        )
-
-    @patch("builtins.open")
-    @patch("time.time")
-    def test_given_an_allow_rule_when_packet_contains_a_blacklisted_hotkey_should_deny_the_request(
-        self, mock_time, mock_open
-    ):
-        # Arrange
-        observer = MagicMock()
-        tool = MagicMock()
-        packet_mock = MagicMock()
-
-        specifications = {
-            "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
-        }
-
-        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
-
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
-        firewall.update(
-            specifications=specifications,
-            blacklist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
         )
         firewall.run()
 
@@ -1690,7 +2758,7 @@ class TestMiner(TestFirewall):
 
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_an_allow_rule_when_packet_contains_unknown_synapse_should_deny_the_request(
+    def test_when_packet_does_not_contains_a_blacklisted_hotkey_should_allow_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -1700,7 +2768,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
+            "synapses": {"Synapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
@@ -1708,6 +2776,50 @@ class TestMiner(TestFirewall):
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
         firewall.update(
             specifications=specifications,
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
+        )
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+
+class TestWrongSynapseRule(TestFirewall):
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_when_packet_contains_an_unknown_synapse_should_deny_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        specifications = {
+            "neuron_version": 225,
+            "synapses": {"Synapse": Synapse, "Score": Score},
+        }
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.update(
+            specifications=specifications,
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
         )
         firewall.run()
 
@@ -1734,12 +2846,12 @@ class TestMiner(TestFirewall):
             port=8091,
             protocol="tcp",
             type=RuleType.DENY,
-            reason="Synapse name 'QnATask' not found, available ['SubVortexSynapse', 'Score']",
+            reason="Synapse name 'QnATask' not found, available ['Synapse', 'Score']",
         )
 
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_an_allow_rule_when_packet_contains_outdated_version_should_deny_the_request(
+    def test_when_packet_contains_a_known_synapse_should_allow_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -1749,7 +2861,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
+            "synapses": {"Synapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
@@ -1757,6 +2869,51 @@ class TestMiner(TestFirewall):
         firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
         firewall.update(
             specifications=specifications,
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
+        )
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+            synapse="Synapse",
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+
+class TestVersionRule(TestFirewall):
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_when_packet_contains_outdated_version_should_deny_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        specifications = {
+            "neuron_version": 225,
+            "synapses": {"Synapse": Synapse, "Score": Score},
+        }
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.update(
+            specifications=specifications,
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
         )
         firewall.run()
 
@@ -1785,3 +2942,303 @@ class TestMiner(TestFirewall):
             type=RuleType.DENY,
             reason="Neuron version 224 is outdated; version 225 is required.",
         )
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_when_packet_contains_required_version_should_allow_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        specifications = {
+            "neuron_version": 225,
+            "synapses": {"Synapse": Synapse, "Score": Score},
+        }
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.update(
+            specifications=specifications,
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"],
+        )
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+
+class TestCustomRules(TestFirewall):
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_no_rules_when_hotkey_is_not_whitelisted_should_deny_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        assert 1 == packet_mock.accept.call_count
+        assert 1 == packet_mock.drop.call_count
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
+        )
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_no_rules_when_hotkey_is_whitelisted_should_accept_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_custom_deny_rule_when_hotkey_is_not_whitelisted_should_deny_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "deny",
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        packet_mock.accept.assert_not_called()
+        assert 2 == packet_mock.drop.call_count
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Deny ip",
+        )
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_custom_deny_rule_when_hotkey_is_whitelisted_should_deny_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "deny",
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        packet_mock.accept.assert_not_called()
+        assert 2 == packet_mock.drop.call_count
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Deny ip",
+        )
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_custom_accept_rule_when_hotkey_is_not_whitelisted_should_accept_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_custom_accept_rule_when_hotkey_is_whitelisted_should_accept_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()

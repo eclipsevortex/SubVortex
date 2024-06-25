@@ -6,7 +6,7 @@ from pydantic import (
 )
 
 
-class SubVortexTerminalInfo(bt.TerminalInfo):
+class TerminalInfo(bt.TerminalInfo):
     # The bittensor version on the terminal as an int.
     neuron_version: Optional[int] = Field(
         title="neuron_version",
@@ -22,12 +22,12 @@ class SubVortexTerminalInfo(bt.TerminalInfo):
     )
 
 
-class SubVortexSynapse(bt.Synapse):
-    dendrite: Optional[SubVortexTerminalInfo] = Field(
+class Synapse(bt.Synapse):
+    dendrite: Optional[TerminalInfo] = Field(
         title="dendrite",
         description="Dendrite Terminal Information",
-        examples=["SubVortexTerminalInfo"],
-        default=SubVortexTerminalInfo(),
+        examples=["TerminalInfo"],
+        default=TerminalInfo(),
         frozen=False,
         repr=False,
     )

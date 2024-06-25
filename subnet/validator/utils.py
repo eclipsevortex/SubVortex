@@ -21,7 +21,7 @@ from typing import List
 from Crypto.Random import random
 
 from subnet.constants import DEFAULT_CHUNK_SIZE
-from subnet.bittensor.synapse import SubVortexSynapse
+from subnet.bittensor.synapse import Synapse
 from subnet.validator.models import Miner
 from subnet.validator.database import get_selected_miners, set_selection
 
@@ -153,7 +153,7 @@ async def ping_uid(self, uid):
     try:
         response = await self.dendrite(
             self.metagraph.axons[uid],
-            SubVortexSynapse(),
+            Synapse(),
             deserialize=False,
             timeout=5,
         )

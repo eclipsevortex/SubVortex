@@ -33,7 +33,7 @@ from subnet.shared.substrate import get_weights_min_stake
 
 from subnet.bittensor.metagraph import SubVortexMetagraph
 from subnet.bittensor.axon import SubVortexAxon
-from subnet.bittensor.synapse import SubVortexSynapse
+from subnet.bittensor.synapse import Synapse
 
 from subnet import __version__ as THIS_VERSION
 from subnet.firewall.firewall_factory import (
@@ -217,7 +217,7 @@ class Miner:
 
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
-    def _blacklist(self, synapse: SubVortexSynapse) -> typing.Tuple[bool, str]:
+    def _blacklist(self, synapse: Synapse) -> typing.Tuple[bool, str]:
         caller = synapse.dendrite.hotkey
         caller_version = synapse.dendrite.neuron_version or 0
         synapse_type = type(synapse).__name__

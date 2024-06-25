@@ -2,7 +2,7 @@ import time
 import bittensor as bt
 
 from subnet.shared.utils import get_version, version2number
-from subnet.bittensor.synapse import SubVortexTerminalInfo, SubVortexSynapse
+from subnet.bittensor.synapse import TerminalInfo, Synapse
 
 
 class SubVortexDendrite(bt.dendrite):
@@ -31,7 +31,7 @@ class SubVortexDendrite(bt.dendrite):
     def preprocess_synapse_for_request(
         self,
         target_axon_info: bt.AxonInfo,
-        synapse: SubVortexSynapse,
+        synapse: Synapse,
         timeout: float = 12.0,
     ) -> bt.Synapse:
         """
@@ -42,7 +42,7 @@ class SubVortexDendrite(bt.dendrite):
 
         # Build the Dendrite headers using the local system's details
         validator_version = version2number(get_version())
-        synapse.dendrite = SubVortexTerminalInfo(
+        synapse.dendrite = TerminalInfo(
             ip=self.external_ip,
             version=bt.__version_as_int__,
             neuron_version=validator_version,

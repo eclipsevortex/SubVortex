@@ -7,7 +7,7 @@ from bittensor.axon import AxonMiddleware, FastAPIThreadedServer
 from fastapi import FastAPI, APIRouter
 from typing import Optional, Callable, Tuple, Dict, List
 
-from subnet.bittensor.synapse import SubVortexSynapse
+from subnet.bittensor.synapse import Synapse
 
 
 class SubVortexAxon(bt.axon):
@@ -20,7 +20,7 @@ class SubVortexAxon(bt.axon):
         external_ip: Optional[str] = None,
         external_port: Optional[int] = None,
         max_workers: Optional[int] = None,
-        blacklist_fn: Callable[[SubVortexSynapse], Tuple[bool, str]] = None,
+        blacklist_fn: Callable[[Synapse], Tuple[bool, str]] = None,
     ):
         r"""Creates a new bt.Axon object from passed arguments.
         Args:
@@ -105,7 +105,7 @@ class SubVortexAxon(bt.axon):
         self.app.add_middleware(self.middleware_cls, axon=self)
 
         # Attach default forward.
-        def ping(r: SubVortexSynapse) -> SubVortexSynapse:
+        def ping(r: Synapse) -> Synapse:
             return r
 
         self.attach(

@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock, call
 
 from subnet.firewall.firewall_model import RuleType, AllowRule, DenyRule
 from subnet.miner.firewall import Firewall
-from subnet.bittensor.synapse import SubVortexSynapse
+from subnet.bittensor.synapse import Synapse
 from subnet.protocol import Score
 
 from tests.unit_tests.mocks.mock_packet import create_packet
@@ -1493,7 +1493,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": SubVortexSynapse, "Score": Score},
+            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
@@ -1542,7 +1542,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": SubVortexSynapse, "Score": Score},
+            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
@@ -1591,7 +1591,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": SubVortexSynapse, "Score": Score},
+            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
@@ -1640,7 +1640,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": SubVortexSynapse, "Score": Score},
+            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
@@ -1688,7 +1688,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": SubVortexSynapse, "Score": Score},
+            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
@@ -1736,7 +1736,7 @@ class TestMiner(TestFirewall):
 
         specifications = {
             "neuron_version": 225,
-            "synapses": {"SubVortexSynapse": SubVortexSynapse, "Score": Score},
+            "synapses": {"SubVortexSynapse": Synapse, "Score": Score},
         }
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"

@@ -150,7 +150,7 @@ class Firewall(threading.Thread):
                 return index
         return None
 
-    def block_ip(self, ip, dport, protocol, type, reason):
+    def block_ip(self, ip, dport, protocol, type, reason, metadata):
         if self.is_blocked(ip, dport, protocol):
             return
 
@@ -161,6 +161,7 @@ class Firewall(threading.Thread):
             "protocol": protocol,
             "type": type,
             "reason": reason,
+            "metadata": metadata
         }
         self.ips_blocked.append(ip_blocked)
 
@@ -321,7 +322,7 @@ class Firewall(threading.Thread):
                 f"Synapse unknown",
             )
 
-        result = ("", 0, None)
+        result = ("", 0, None, None, None)
         try:
             # Split headers and body
             headers, body = content.split("\r\n\r\n", 1)
@@ -587,6 +588,7 @@ class Firewall(threading.Thread):
                         protocol=protocol,
                         type=rule_type or RuleType.DENY,
                         reason=reason or "Deny ip",
+                        metadata=metadata,
                     )
 
                 copyright = (

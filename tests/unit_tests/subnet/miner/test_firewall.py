@@ -33,7 +33,7 @@ class TestFirewall(unittest.TestCase):
     def tearDown(self):
         bt.logging.off()
 
-    def assert_blocked(self, firewall, ip, port, protocol, rule_type):
+    def assert_blocked(self, firewall, ip, port, protocol, type, reason):
         block = next(
             (
                 x
@@ -41,7 +41,8 @@ class TestFirewall(unittest.TestCase):
                 if x.get("ip") == ip
                 and x.get("port") == port
                 and x.get("protocol") == protocol
-                and x.get("type") == rule_type
+                and x.get("type") == type
+                and x.get("reason") == reason
             ),
             None,
         )
@@ -319,13 +320,14 @@ class TestPackets(TestFirewall):
         # Assert
         assert 1 == len(firewall.ips_blocked)
         assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DENY,
-            "reason": "Deny ip",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Deny ip",
+        )
         assert 6 == packet_mock.drop.call_count
         assert 0 == packet_mock.accept.call_count
 
@@ -601,13 +603,14 @@ class TestPackets(TestFirewall):
         # Assert
         assert 1 == len(firewall.ips_blocked)
         assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DENY,
-            "reason": "Deny ip",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Deny ip",
+        )
         assert 6 == packet_mock.drop.call_count
         packet_mock.accept.assert_not_called()
 
@@ -724,13 +727,14 @@ class TestDoSAttacks(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         assert 2 == packet_mock.accept.call_count  # Accept S/FA from first request
         assert 2 == packet_mock.drop.call_count  # Drop S/FA from second request
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DOS,
-            "reason": "DoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DETECT_DOS,
+            reason="DoS attack detected: 2 requests in 30 seconds",
+        )
 
     @patch("builtins.open")
     @patch("time.time")
@@ -817,13 +821,14 @@ class TestDoSAttacks(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         assert 2 == packet_mock.accept.call_count
         assert 2 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DOS,
-            "reason": "DoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DETECT_DOS,
+            reason="DoS attack detected: 2 requests in 30 seconds",
+        )
 
         # Arrange
         packet_mock.reset_mock()
@@ -843,13 +848,14 @@ class TestDoSAttacks(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         packet_mock.accept.assert_not_called
         assert 2 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DOS,
-            "reason": "DoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DETECT_DOS,
+            reason="DoS attack detected: 2 requests in 30 seconds",
+        )
 
     @patch("builtins.open")
     @patch("time.time")
@@ -893,13 +899,14 @@ class TestDoSAttacks(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         assert 2 == packet_mock.accept.call_count
         assert 2 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DOS,
-            "reason": "DoS attack detected: 2 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DETECT_DOS,
+            reason="DoS attack detected: 2 requests in 30 seconds",
+        )
 
         # Arrange
         packet_mock.reset_mock()
@@ -1154,13 +1161,14 @@ class TestDDoSAttacks(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         packet_mock.accept.assert_not_called
         assert 2 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DETECT_DDOS,
-            "reason": "DDoS attack detected: 3 requests in 30 seconds",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DETECT_DDOS,
+            reason="DDoS attack detected: 3 requests in 30 seconds",
+        )
 
     @patch("builtins.open")
     @patch("time.time")
@@ -1522,13 +1530,14 @@ class TestMiner(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         packet_mock.accept.assert_not_called()
         assert 2 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DENY,
-            "reason": "Deny ip",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Deny ip",
+        )
 
     @patch("builtins.open")
     @patch("time.time")
@@ -1571,13 +1580,14 @@ class TestMiner(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         packet_mock.accept.assert_not_called()
         assert 2 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DENY,
-            "reason": "Deny ip",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Deny ip",
+        )
 
     @patch("builtins.open")
     @patch("time.time")
@@ -1620,13 +1630,14 @@ class TestMiner(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         packet_mock.accept.assert_not_called()
         assert 2 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DENY,
-            "reason": "Deny ip",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Deny ip",
+        )
 
     @patch("builtins.open")
     @patch("time.time")
@@ -1668,13 +1679,14 @@ class TestMiner(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         assert 1 == packet_mock.accept.call_count
         assert 1 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DENY,
-            "reason": "Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
+        )
 
     @patch("builtins.open")
     @patch("time.time")
@@ -1716,13 +1728,14 @@ class TestMiner(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         assert 1 == packet_mock.accept.call_count
         assert 1 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DENY,
-            "reason": "Synapse name 'QnATask' not found, available ['SubVortexSynapse', 'Score']",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Synapse name 'QnATask' not found, available ['SubVortexSynapse', 'Score']",
+        )
 
     @patch("builtins.open")
     @patch("time.time")
@@ -1764,10 +1777,11 @@ class TestMiner(TestFirewall):
         assert 1 == len(firewall.ips_blocked)
         assert 1 == packet_mock.accept.call_count
         assert 1 == packet_mock.drop.call_count
-        assert {
-            "ip": "192.168.0.1",
-            "port": 8091,
-            "protocol": "tcp",
-            "type": RuleType.DENY,
-            "reason": "Neuron version 224 is outdated; version 225 is required.",
-        } == firewall.ips_blocked[0]
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Neuron version 224 is outdated; version 225 is required.",
+        )

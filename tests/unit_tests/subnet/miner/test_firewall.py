@@ -1,4 +1,5 @@
 import time
+import json
 import unittest
 import bittensor as bt
 from unittest.mock import patch, MagicMock
@@ -39,7 +40,7 @@ class TestFirewall(unittest.TestCase):
                 x
                 for x in firewall.ips_blocked
                 if x.get("ip") == ip
-                and x.get("port") == port
+                and x.get("dport") == port
                 and x.get("protocol") == protocol
                 and x.get("type") == type
                 and x.get("reason") == reason
@@ -2987,10 +2988,10 @@ class TestVersionRule(TestFirewall):
         packet_mock.drop.assert_not_called()
 
 
-class TestCustomRules(TestFirewall):
+class TestAllowRule(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_no_rules_when_hotkey_is_not_whitelisted_should_deny_the_request(
+    def test_given_an_accept_rule_when_hotkey_is_not_whitelisted_should_accept_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -3000,7 +3001,15 @@ class TestCustomRules(TestFirewall):
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
 
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        rules = [
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
         firewall.run()
 
         # Action
@@ -3016,21 +3025,13 @@ class TestCustomRules(TestFirewall):
         )
 
         # Assert
-        assert 1 == len(firewall.ips_blocked)
-        assert 1 == packet_mock.accept.call_count
-        assert 1 == packet_mock.drop.call_count
-        self.assert_blocked(
-            firewall=firewall,
-            ip="192.168.0.1",
-            port=8091,
-            protocol="tcp",
-            type=RuleType.DENY,
-            reason="Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
-        )
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
 
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_no_rules_when_hotkey_is_whitelisted_should_accept_the_request(
+    def test_given_an_accept_rule_when_hotkey_is_whitelisted_should_accept_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -3040,7 +3041,15 @@ class TestCustomRules(TestFirewall):
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
 
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        rules = [
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            }
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
         firewall.update(
             whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
         )
@@ -3063,6 +3072,119 @@ class TestCustomRules(TestFirewall):
         assert 2 == packet_mock.accept.call_count
         packet_mock.drop.assert_not_called()
 
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_an_accept_rule_when_a_dos_attack_is_detected_should_accept_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-dos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            },
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            },
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1, 28, 29],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 4 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_an_accept_rule_when_a_ddos_attack_is_detected_should_accept_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-ddos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            },
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            },
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
+        firewall.run()
+
+        vps = [2, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        for j, (request_count) in enumerate(vps):
+            ip = "192.168.0.{}".format(j + 1)
+            for _ in range(0, request_count):
+                firewall.packet_timestamps[ip][8091]["tcp"].append(get_time(j))
+
+        # Action
+        seconds = len(vps)
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[seconds, seconds + 1],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+
+class DenyRule(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
     def test_given_a_custom_deny_rule_when_hotkey_is_not_whitelisted_should_deny_the_request(
@@ -3162,9 +3284,11 @@ class TestCustomRules(TestFirewall):
             reason="Deny ip",
         )
 
+
+class TestNoRules(TestFirewall):
     @patch("builtins.open")
     @patch("time.time")
-    def test_given_a_custom_accept_rule_when_hotkey_is_not_whitelisted_should_accept_the_request(
+    def test_given_no_rules_when_hotkey_is_not_whitelisted_should_deny_the_request(
         self, mock_time, mock_open
     ):
         # Arrange
@@ -3174,15 +3298,50 @@ class TestCustomRules(TestFirewall):
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
 
-        rules = [
-            {
-                "ip": "192.168.0.1",
-                "dport": 8091,
-                "protocol": "tcp",
-                "type": "allow",
-            }
-        ]
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1],
+        )
+
+        # Assert
+        assert 1 == len(firewall.ips_blocked)
+        assert 1 == packet_mock.accept.call_count
+        assert 1 == packet_mock.drop.call_count
+        self.assert_blocked(
+            firewall=firewall,
+            ip="192.168.0.1",
+            port=8091,
+            protocol="tcp",
+            type=RuleType.DENY,
+            reason="Hotkey '5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja' is blacklisted",
+        )
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_no_rules_when_hotkey_is_whitelisted_should_accept_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
         firewall.run()
 
         # Action
@@ -3202,156 +3361,87 @@ class TestCustomRules(TestFirewall):
         assert 2 == packet_mock.accept.call_count
         packet_mock.drop.assert_not_called()
 
+
+class TestIpBlockedFile(TestFirewall):
     @patch("builtins.open")
-    @patch("time.time")
-    def test_given_a_custom_accept_rule_when_hotkey_is_whitelisted_should_accept_the_request(
-        self, mock_time, mock_open
+    @patch("os.path.exists", return_value=True)
+    def test_given_no_ips_blocked_when_starting_should_restore_nothing(
+        self, mock_exists, mock_open
     ):
         # Arrange
         observer = MagicMock()
         tool = MagicMock()
-        packet_mock = MagicMock()
 
         mock_open.return_value.__enter__.return_value.read.return_value = "[]"
 
-        rules = [
-            {
-                "ip": "192.168.0.1",
-                "dport": 8091,
-                "protocol": "tcp",
-                "type": "allow",
-            }
-        ]
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
-        firewall.update(
-            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
-        )
-        firewall.run()
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
 
         # Action
-        self.send_request(
-            src_ip="192.168.0.1",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[0, 1],
-        )
+        firewall.run()
 
         # Assert
         assert 0 == len(firewall.ips_blocked)
-        assert 2 == packet_mock.accept.call_count
-        packet_mock.drop.assert_not_called()
+        assert 0 == len(firewall.packet_timestamps)
 
     @patch("builtins.open")
-    @patch("time.time")
-    def test_given_a_custom_accept_rule_when_a_dos_attack_is_detected_should_accept_the_request(
-        self, mock_time, mock_open
+    @patch("os.path.exists", return_value=True)
+    def test_given_ips_blocked_saved_when_starting_should_restore_them(
+        self, mock_exists, mock_open
     ):
         # Arrange
         observer = MagicMock()
         tool = MagicMock()
-        packet_mock = MagicMock()
 
-        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
-
-        rules = [
-            {
-                "dport": 8091,
-                "protocol": "tcp",
-                "type": "detect-dos",
-                "configuration": {
-                    "time_window": 30,
-                    "packet_threshold": 1,
-                },
-            },
-            {
-                "ip": "192.168.0.1",
-                "dport": 8091,
-                "protocol": "tcp",
-                "type": "allow",
-            },
-        ]
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
-        firewall.update(
-            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        mock_data = json.dumps(
+            [
+                {
+                    "ip": "65.109.75.3",
+                    "dport": 8091,
+                    "protocol": "tcp",
+                    "type": "deny",
+                    "reason": "Synapse name 'QnATask' not found, available ['Synapse', 'Score']",
+                    "synapse": {
+                        "name": "QnATask",
+                        "neuron_version": 225,
+                        "hotkey": "5ZSdXPrYCTnsrDh2nYZMtAUb3d6h8eouDCF3zhdw8ru3czSr",
+                    },
+                    "timestamps": [1716894001.0, 1716894028.0],
+                }
+            ]
         )
-        firewall.run()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = mock_data
+
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=[])
 
         # Action
-        self.send_request(
-            src_ip="192.168.0.1",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[0, 1, 28, 29],
-        )
-
-        # Assert
-        assert 0 == len(firewall.ips_blocked)
-        assert 4 == packet_mock.accept.call_count
-        packet_mock.drop.assert_not_called()
-
-    @patch("builtins.open")
-    @patch("time.time")
-    def test_given_a_custom_accept_rule_when_a_ddos_attack_is_detected_should_accept_the_request(
-        self, mock_time, mock_open
-    ):
-        # Arrange
-        observer = MagicMock()
-        tool = MagicMock()
-        packet_mock = MagicMock()
-
-        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
-
-        rules = [
-            {
-                "dport": 8091,
-                "protocol": "tcp",
-                "type": "detect-ddos",
-                "configuration": {
-                    "time_window": 30,
-                    "packet_threshold": 1,
-                },
-            },
-            {
-                "ip": "192.168.0.1",
-                "dport": 8091,
-                "protocol": "tcp",
-                "type": "allow",
-            },
-        ]
-        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
-        firewall.update(
-            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
-        )
         firewall.run()
 
-        vps = [2, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-        for j, (request_count) in enumerate(vps):
-            ip = "192.168.0.{}".format(j + 1)
-            for _ in range(0, request_count):
-                firewall.packet_timestamps[ip][8091]["tcp"].append(get_time(j))
-
-        # Action
-        seconds = len(vps)
-        self.send_request(
-            src_ip="192.168.0.1",
-            dst_ip="192.168.0.2",
-            src_port=7091,
-            dst_port=8091,
-            firewall=firewall,
-            mock_packet=packet_mock,
-            mock_time=mock_time,
-            seconds=[seconds, seconds + 1],
-        )
-
         # Assert
-        assert 0 == len(firewall.ips_blocked)
-        assert 2 == packet_mock.accept.call_count
-        packet_mock.drop.assert_not_called()
+        assert 1 == len(firewall.ips_blocked)
+
+        # Check the details of the blocked ip
+        ip_blocked = firewall.ips_blocked[0]
+        assert "65.109.75.3" == ip_blocked["ip"]
+        assert 8091 == ip_blocked["dport"]
+        assert "tcp" == ip_blocked["protocol"]
+        assert "deny" == ip_blocked["type"]
+        assert (
+            "Synapse name 'QnATask' not found, available ['Synapse', 'Score']"
+            == ip_blocked["reason"]
+        )
+        assert "QnATask" == ip_blocked["synapse"]["name"]
+        assert 225 == ip_blocked["synapse"]["neuron_version"]
+        assert (
+            "5ZSdXPrYCTnsrDh2nYZMtAUb3d6h8eouDCF3zhdw8ru3czSr"
+            == ip_blocked["synapse"]["hotkey"]
+        )
+        assert [1716894001.0, 1716894028.0] == ip_blocked["timestamps"]
+
+        # Check the timestamps of the packets already processed
+        assert 1 == len(firewall.packet_timestamps.keys())
+        assert 1 == len(firewall.packet_timestamps["65.109.75.3"].keys())
+        assert 1 == len(firewall.packet_timestamps["65.109.75.3"][8091].keys())
+        assert [1716894001.0, 1716894028.0] == firewall.packet_timestamps[
+            "65.109.75.3"
+        ][8091]["tcp"]

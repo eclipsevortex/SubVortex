@@ -138,7 +138,7 @@ class Firewall(threading.Thread):
                     x
                     for x in self.ips_blocked
                     if x["ip"] == ip
-                    and x["port"] == dport
+                    and x["dport"] == dport
                     and x["protocol"] == protocol
                 ),
                 None,
@@ -172,24 +172,25 @@ class Firewall(threading.Thread):
                 return index
         return None
 
-    def block_ip(self, ip, dport, protocol, type, reason, metadata):
+    def block_ip(self, ip, dport, protocol, type, reason, synapse):
         if self.is_blocked(ip, dport, protocol):
             return
 
         # Update the block ips
         ip_blocked = {
             "ip": ip,
-            "port": dport,
+            "dport": dport,
             "protocol": protocol,
             "type": type,
             "reason": reason,
-            "metadata": metadata,
+            "synapse": synapse,
+            "timestamps": self.packet_timestamps[ip][dport][protocol],
         }
         self.ips_blocked.append(ip_blocked)
 
         # Update the local file
         with open("ips_blocked.json", "w") as file:
-            file.write(json.dumps(self.ips_blocked, cls=EnumEncoder))
+            file.write(json.dumps(self.ips_blocked, indent=4, cls=EnumEncoder))
 
         protocol_str = protocol.upper() if protocol else None
         bt.logging.warning(f"Blocking {protocol_str} {ip}/{dport}: {reason}")
@@ -202,7 +203,7 @@ class Firewall(threading.Thread):
         self.ips_blocked = [
             x
             for x in self.ips_blocked
-            if x["ip"] != ip or x["port"] != dport or x["protocol"] != protocol
+            if x["ip"] != ip or x["dport"] != dport or x["protocol"] != protocol
         ]
 
         # Update the local file
@@ -336,15 +337,13 @@ class Firewall(threading.Thread):
         """
         Extract information we want to check to determinate if we allow or not the packet
         """
+        result = ("", 0, None)
+
         try:
             content = payload.decode("utf-8") if isinstance(payload, bytes) else payload
         except Exception:
-            return (
-                False,
-                f"Synapse unknown",
-            )
+            return result
 
-        result = ("", 0, None, None, None)
         try:
             # Split headers and body
             headers, body = content.split("\r\n\r\n", 1)
@@ -642,7 +641,7 @@ class Firewall(threading.Thread):
                         protocol=protocol,
                         type=rule_type or RuleType.DENY,
                         reason=reason or "Deny ip",
-                        metadata=metadata,
+                        synapse=metadata.get("synapse", {}),
                     )
 
                 # Trace some details of the dropped packet
@@ -698,8 +697,8 @@ class Firewall(threading.Thread):
             packet.accept()
         except Exception as ex:
             bt.logging.warning(f"Failed to proceed firewall packet: {ex}")
-            bt.logging.debug(f"Firewall packet metadata: {metadata}")
-            bt.logging.trace(traceback.format_exc())
+            bt.logging.info(f"Firewall packet metadata: {metadata}")
+            bt.logging.debug(traceback.format_exc())
 
     def run(self):
         # Reload the previous ips blocked
@@ -708,6 +707,17 @@ class Firewall(threading.Thread):
             with open("ips_blocked.json", "r") as file:
                 self.ips_blocked = json.load(file) or []
 
+        # Restore the ips blocked
+        for ip_blocked in self.ips_blocked:
+            ip = ip_blocked.get("ip")
+            dport = ip_blocked.get("dport")
+            protocol = ip_blocked.get("protocol")
+            timestamps = ip_blocked.get("timestamps") or []
+            if ip is None or dport is None or protocol is None:
+                continue
+            
+            self.packet_timestamps[ip][dport][protocol] += timestamps
+        
         bt.logging.debug(f"Creating allow rule for loopback")
         self.tool.create_allow_loopback_rule()
 

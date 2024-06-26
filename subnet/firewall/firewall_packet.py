@@ -74,6 +74,10 @@ class FirewallPacket:
             self._payload = self._raw_packet[payload_offset:]
 
     @property
+    def internal_id(self):
+        return f"{self.sip}:{self.dport}:{self.seq}:{self.ack}"
+
+    @property
     def id(self):
         return f"{self.sip}:{self.dport}"
 

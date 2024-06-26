@@ -38,6 +38,8 @@ from subnet.firewall.firewall_model import (
     DetectDDoSRule,
 )
 
+PACKET_HISTORY_DURATION = 30  # Keep history for 30 seconds
+
 
 class Firewall(threading.Thread):
     def __init__(
@@ -64,6 +66,7 @@ class Firewall(threading.Thread):
         self.whitelist_hotkeys = []
         self.specifications = {}
         self.requests = {}
+        self.processed_requests = {}
 
         self.rules = [create_rule(x) for x in rules]
 
@@ -142,6 +145,16 @@ class Firewall(threading.Thread):
             )
             is not None
         )
+
+    def cleanup_old_packets(self, current_time):
+        """Remove packets older than the PACKET_HISTORY_DURATION."""
+        keys_to_delete = [
+            key
+            for key, data in self.processed_requests.items()
+            if current_time - data.get("time") > PACKET_HISTORY_DURATION
+        ]
+        for key in keys_to_delete:
+            del self.processed_requests[key]
 
     def update(self, specifications={}, whitelist_hotkeys=[]):
         with self._lock:
@@ -462,6 +475,16 @@ class Firewall(threading.Thread):
             # True if the packet is a data packet, false otherwise
             is_data_packet = packet.ack != ack and packet.flags == "PA"
 
+            # Clean old processed packets we stored to avoid old packet we have
+            # already made decision for
+            self.cleanup_old_packets(current_time)
+
+            # Check if we receive packets from some old requests
+            # due to the TCP protocol's inherent behavior of re-transmitting packets
+            # when it doesn't receive an acknowledgment from the recipient
+            if packet.internal_id in self.processed_requests:
+                return
+
             if is_sync_packet:
                 # A new connection has been initiated, processing a new request
                 self.requests[packet.id] = (packet.seq, 0, None)
@@ -610,6 +633,7 @@ class Firewall(threading.Thread):
                         metadata=metadata,
                     )
 
+                # Trace some details of the dropped packet
                 copyright = (
                     "Packet new connection"
                     if is_sync_packet
@@ -618,6 +642,13 @@ class Firewall(threading.Thread):
                 bt.logging.trace(
                     f"[{packet.id}][{packet.protocol}][{packet.flags}][#{count}] {copyright} dropped - {reason}"
                 )
+
+                # Keep the decion on the data packet for potential pack retransmission
+                if is_data_packet:
+                    self.processed_requests[packet.internal_id] = {
+                        "decision": "deny",
+                        "time": current_time,
+                    }
 
                 # Drop packet
                 packet.drop()
@@ -634,7 +665,7 @@ class Firewall(threading.Thread):
             if is_data_packet and not is_previously_allowed:
                 self.unblock_ip(ip=ip_src, dport=port_dest, protocol=protocol)
 
-            # Accept packet
+            # Trace some details of the allowed packet
             copyright = (
                 "Packet new connection"
                 if is_sync_packet
@@ -643,6 +674,15 @@ class Firewall(threading.Thread):
             bt.logging.trace(
                 f"[{packet.id}][{packet.protocol}][{packet.flags}][#{count}] {copyright} allowed"
             )
+
+            # Keep the decion on the data packet for potential pack retransmission
+            if is_data_packet:
+                self.processed_requests[packet.internal_id] = {
+                    "decision": "allow",
+                    "time": current_time,
+                }
+
+            # Allow packet
             packet.accept()
         except Exception as ex:
             bt.logging.warning(f"Failed to proceed firewall packet: {ex}")

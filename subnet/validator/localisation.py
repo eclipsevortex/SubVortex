@@ -24,10 +24,14 @@ def get_country_by_my_api(ip: str):
 
     data = response.json()
 
-    maxmind_country = data.get("maxmind_country")
-    ipinfo_country = data.get("ipinfo_country")
+    # New property to use
+    country = data.get("country")
 
-    return (maxmind_country, None) if maxmind_country else (ipinfo_country, None)
+    # Depcreated
+    country = country or data.get("maxmind_country")
+    country = country or data.get("ipinfo_country")
+
+    return (country, None)
 
 
 def get_country_by_country_is(ip: str):

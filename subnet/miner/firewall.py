@@ -544,7 +544,7 @@ class Firewall(threading.Thread):
                 # Check if the packet matches an expected synapses
                 must_deny, rule_type, reason = (
                     self.is_unknown_synapse(name)
-                    if not must_deny and not is_decision_made
+                    if not must_deny
                     else (must_deny, rule_type, reason)
                 )
 
@@ -558,7 +558,7 @@ class Firewall(threading.Thread):
                 # Check if the neuron version is greater stricly than the one required
                 must_deny, rule_type, reason = (
                     self.is_old_neuron_version(neuron_version)
-                    if not must_deny and not is_decision_made
+                    if not must_deny
                     else (must_deny, rule_type, reason)
                 )
 
@@ -581,7 +581,10 @@ class Firewall(threading.Thread):
                     dos_rule,
                     current_time,
                 )
-                if dos_rule and not must_deny and is_sync_packet
+                if dos_rule
+                and not must_deny
+                and is_sync_packet
+                and not is_decision_made
                 else (must_deny, rule_type, reason)
             )
 
@@ -601,7 +604,10 @@ class Firewall(threading.Thread):
                     ddos_rule,
                     current_time,
                 )
-                if ddos_rule and not must_deny and is_sync_packet
+                if ddos_rule
+                and not must_deny
+                and is_sync_packet
+                and not is_decision_made
                 else (must_deny, rule_type, reason)
             )
 

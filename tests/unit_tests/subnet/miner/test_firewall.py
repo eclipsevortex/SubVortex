@@ -2372,7 +2372,7 @@ class TestDDoSRule(TestFirewall):
             firewall=firewall,
             mock_packet=packet_mock,
             mock_time=mock_time,
-            seconds=[seconds, +1],
+            seconds=[seconds, seconds + 1],
         )
 
         # Assert
@@ -3238,6 +3238,117 @@ class TestCustomRules(TestFirewall):
             mock_packet=packet_mock,
             mock_time=mock_time,
             seconds=[0, 1],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 2 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_custom_accept_rule_when_a_dos_attack_is_detected_should_accept_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-dos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            },
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            },
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
+        firewall.run()
+
+        # Action
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[0, 1, 28, 29],
+        )
+
+        # Assert
+        assert 0 == len(firewall.ips_blocked)
+        assert 4 == packet_mock.accept.call_count
+        packet_mock.drop.assert_not_called()
+
+    @patch("builtins.open")
+    @patch("time.time")
+    def test_given_a_custom_accept_rule_when_a_ddos_attack_is_detected_should_accept_the_request(
+        self, mock_time, mock_open
+    ):
+        # Arrange
+        observer = MagicMock()
+        tool = MagicMock()
+        packet_mock = MagicMock()
+
+        mock_open.return_value.__enter__.return_value.read.return_value = "[]"
+
+        rules = [
+            {
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "detect-ddos",
+                "configuration": {
+                    "time_window": 30,
+                    "packet_threshold": 1,
+                },
+            },
+            {
+                "ip": "192.168.0.1",
+                "dport": 8091,
+                "protocol": "tcp",
+                "type": "allow",
+            },
+        ]
+        firewall = Firewall(observer=observer, tool=tool, interface="eth0", rules=rules)
+        firewall.update(
+            whitelist_hotkeys=["5DngNUpv5kSvi1gF57KYCELezPVHSCtdUjsjgYrXEgdjU4Ja"]
+        )
+        firewall.run()
+
+        vps = [2, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        for j, (request_count) in enumerate(vps):
+            ip = "192.168.0.{}".format(j + 1)
+            for _ in range(0, request_count):
+                firewall.packet_timestamps[ip][8091]["tcp"].append(get_time(j))
+
+        # Action
+        seconds = len(vps)
+        self.send_request(
+            src_ip="192.168.0.1",
+            dst_ip="192.168.0.2",
+            src_port=7091,
+            dst_port=8091,
+            firewall=firewall,
+            mock_packet=packet_mock,
+            mock_time=mock_time,
+            seconds=[seconds, seconds + 1],
         )
 
         # Assert

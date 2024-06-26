@@ -37,12 +37,12 @@ def get_current_block(subtensor) -> int:
     return subtensor.get_current_block()
 
 
-def get_hyperparameter_value(subtensor: "bt.subtensor", param_name: str):
+def get_hyperparameter_value(subtensor: "bt.subtensor", param_name: str, netuid: int):
     """
     Get the value of the requested hyperparameter
     """
     hex_bytes_result = subtensor.query_runtime_api(
-        runtime_api="SubnetInfoRuntimeApi", method="get_subnet_hyperparams", params=[7]
+        runtime_api="SubnetInfoRuntimeApi", method="get_subnet_hyperparams", params=[netuid]
     )
 
     if hex_bytes_result is None:

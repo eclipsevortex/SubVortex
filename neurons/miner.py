@@ -137,10 +137,10 @@ class Miner:
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
         bt.logging.debug(str(self.metagraph))
 
-        self.my_subnet_uid = self.metagraph.hotkeys.index(
+        self.uid = self.metagraph.hotkeys.index(
             self.wallet.hotkey.ss58_address
         )
-        bt.logging.info(f"Running miner on uid: {self.my_subnet_uid}")
+        bt.logging.info(f"Running miner on uid: {self.uid}")
 
         # The axon handles request processing, allowing validators to send this process requests.
         self.axon = SubVortexAxon(
@@ -236,7 +236,7 @@ class Miner:
             return True, "Unrecognized hotkey"
 
         # Block hotkeys that do not have the latest version
-        active_version = get_hyperparameter_value(self.subtensor, "weights_version")
+        active_version = get_hyperparameter_value(self.subtensor, "weights_version", self.config.netuid)
         if caller_version < active_version:
             bt.logging.debug(
                 f"Blacklisted a {synapse_type} request from a non-updated hotkey {caller}"
@@ -343,7 +343,7 @@ class Miner:
 
     def update_firewall(self):
         # Get version and min stake
-        version = get_hyperparameter_value(self.subtensor, "weights_version")
+        version = get_hyperparameter_value(self.subtensor, "weights_version", self.config.netuid)
         weights_min_stake = get_weights_min_stake(self.subtensor.substrate)
 
         # Update the specifications

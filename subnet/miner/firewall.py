@@ -475,14 +475,20 @@ class Firewall(threading.Thread):
             # True if the packet is a data packet, false otherwise
             is_data_packet = packet.ack != ack and packet.flags == "PA"
 
-            # Clean old processed packets we stored to avoid old packet we have
-            # already made decision for
+            # Check if we receive olds packets where decision has already been made.
+            # Due to the TCP protocol's inherent behavior of re-transmitting packets
+            # when it doesn't receive an acknowledgment from the recipient
+            processed_request = self.processed_requests.get(packet.internal_id)
+
+            # Clean old processed packets
             self.cleanup_old_packets(current_time)
 
-            # Check if we receive packets from some old requests
-            # due to the TCP protocol's inherent behavior of re-transmitting packets
-            # when it doesn't receive an acknowledgment from the recipient
-            if packet.internal_id in self.processed_requests:
+            if processed_request is not None:
+                if processed_request["decision"] == "allow":
+                    packet.accept()
+                else:
+                    packet.drop()
+
                 return
 
             if is_sync_packet:

@@ -2043,6 +2043,7 @@ class TestDoSRule(TestFirewall):
             firewall=firewall,
             mock_packet=packet_mock,
             mock_time=mock_time,
+            seq=2000,
             seconds=[56, 57],
         )
 
@@ -2124,6 +2125,7 @@ class TestDoSRule(TestFirewall):
             firewall=firewall,
             mock_packet=packet_mock,
             mock_time=mock_time,
+            seq=2000,
             seconds=[60, 61],
         )
 

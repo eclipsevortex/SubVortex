@@ -122,7 +122,15 @@ class FirewallPacket:
         return self._payload
     
     def accept(self):
-        self._packet.accept()
+        try:
+            self._packet.accept()
+            return True
+        except: 
+            return False
 
     def drop(self):
-        self._packet.drop()
+        try:
+            self._packet.drop()
+            return True
+        except: 
+            return False

@@ -27,7 +27,6 @@ import traceback
 from subnet.protocol import Score
 
 from subnet.shared.checks import check_registration
-from subnet.shared.utils import load_json_file
 from subnet.shared.subtensor import get_hyperparameter_value
 from subnet.shared.substrate import get_weights_min_stake
 
@@ -36,6 +35,7 @@ from subnet.bittensor.axon import SubVortexAxon
 from subnet.bittensor.synapse import Synapse
 
 from subnet import __version__ as THIS_VERSION
+from subnet.file.file_monitor import FileMonitor
 from subnet.firewall.firewall_factory import (
     create_firewall_tool,
     create_firewall_observer,
@@ -175,25 +175,24 @@ class Miner:
             )
             sys.exit(1)
 
+        # File monitor
+        self.file_monitor = FileMonitor()
+        self.file_monitor.start()
+
         # Firewall
         self.firewall = None
         if self.config.firewall.on:
             bt.logging.debug(
                 f"Starting firewall on interface {self.config.firewall.interface}"
             )
-            rules = (
-                load_json_file(self.config.firewall.config)
-                if self.config.firewall.config
-                else None
-            )
             self.firewall = Firewall(
                 observer=create_firewall_observer(),
                 tool=create_firewall_tool(),
                 port=self.axon.external_port,
                 interface=self.config.firewall.interface,
-                rules=rules or [],
             )
             self.update_firewall()
+            self.file_monitor.add_file_provider(self.firewall.provider)
             self.firewall.start()
 
         # Start  starts the miner's axon, making it active on the network.
@@ -390,8 +389,10 @@ def run_miner():
         sys.exit(1)
     finally:
         if miner and miner.firewall:
-            bt.logging.info("Stopping firewall")
             miner.firewall.stop()
+
+        if miner and miner.file_monitor:
+            miner.file_monitor.stop()
 
         if miner:
             bt.logging.info("Stopping axon")

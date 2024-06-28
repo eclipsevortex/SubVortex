@@ -32,5 +32,5 @@ class FirewallObserver(ABC):
         pass
 
     @abstractmethod
-    def _packet_callback(self, packet):
+    def _create_callback(self, packet):
         pass

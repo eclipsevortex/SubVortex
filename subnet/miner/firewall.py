@@ -815,13 +815,13 @@ class Firewall(threading.Thread):
         self.tool.create_allow_rule(sport=443, protocol="tcp")
         self.tool.create_allow_rule(sport=80, protocol="tcp")
         self.tool.create_allow_rule(sport=53, protocol="udp")
-        self.tool.create_allow_rule(dport=9944, protocol="tcp")
-        self.tool.create_allow_rule(dport=9933, protocol="tcp")
-        self.tool.create_allow_rule(dport=30333, protocol="tcp")
 
         # Create queue rules
         bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating queue rules")
         self.tool.create_allow_rule(dport=8091, protocol="tcp", queue=1)
+        self.tool.create_allow_rule(dport=9944, protocol="tcp", queue=2)
+        self.tool.create_allow_rule(dport=9933, protocol="tcp", queue=3)
+        self.tool.create_allow_rule(dport=30333, protocol="tcp", queue=4)
 
         # Change the policy to deny
         bt.logging.debug(
@@ -831,4 +831,7 @@ class Firewall(threading.Thread):
 
         # Subscribe to the observer
         self.observer.subscribe(queue_num=1, callback=self.packet_callback)
+        self.observer.subscribe(queue_num=2, callback=self.packet_callback)
+        self.observer.subscribe(queue_num=3, callback=self.packet_callback)
+        self.observer.subscribe(queue_num=4, callback=self.packet_callback)
         self.observer.start()

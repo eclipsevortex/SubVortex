@@ -37,7 +37,8 @@ TCP_FLAG_LABELS = {
 
 
 class FirewallPacket:
-    def __init__(self, packet):
+    def __init__(self, packet, queue_num = 1):
+        self.queue_num = queue_num
         self._packet = packet
         self._raw_packet = packet.get_payload()
 

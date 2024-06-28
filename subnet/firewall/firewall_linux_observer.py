@@ -14,6 +14,7 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import threading
 
 from subnet.shared.platform import is_linux_platform
 from subnet.firewall.firewall_observer import FirewallObserver
@@ -25,7 +26,9 @@ if is_linux_platform():
 
 class FirewallLinuxObserver(FirewallObserver):
     def __init__(self) -> None:
-        self._nfqueue = NetfilterQueue()
+        self._threads = []
+        self._queues = []
+        self._callbacks = {}
 
     def subscribe(self, *args, **kwargs):
         queue_num = kwargs.get("queue_num", None)
@@ -36,21 +39,46 @@ class FirewallLinuxObserver(FirewallObserver):
         if not queue_num:
             raise ValueError("Provide callback")
 
-        self._callback = callback
-        self._nfqueue.bind(queue_num, self._packet_callback)
+        queue = NetfilterQueue()
+        queue.bind(queue_num, self._create_callback(queue_num))
+
+        self._queues.append(queue)
+        self._callbacks[queue_num] = callback
 
     def start(self):
-        self._nfqueue.run()
+        """
+        Start all queue in a thread
+        """
+        for queue in self._queues:
+            thread = threading.Thread(target=queue.run)
+            thread.start()
+
+            # Save the new thread to be able to stop it
+            self._threads.append(thread)
 
     def stop(self):
-        self._nfqueue.unbind()
+        """
+        Stop all the threads and unbind all the queue
+        """
+        # Unbind all queues
+        for queue in self._queues:
+            queue.unbind()
 
-    def _packet_callback(self, packet):
-        try:
-            instance = FirewallPacket(packet)
-            if not self._callback:
-                return
+        # Stop all thread
+        for thread in self._threads:
+            thread.join()
 
-            self._callback(instance)
-        except Exception:
-            pass
+    def _create_callback(self, queue_num):
+        def _packet_callback(packet):
+            try:
+                instance = FirewallPacket(packet, queue_num)
+
+                callback = self._callbacks.get(queue_num)
+                if not callback:
+                    return
+
+                callback(instance)
+            except Exception:
+                pass
+
+        return _packet_callback

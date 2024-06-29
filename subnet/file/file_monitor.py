@@ -30,6 +30,7 @@ class FileMonitor(threading.Thread):
         while not self.stop_flag.is_set():
             try:
                 # Wait a specific time before starting
+                bt.logging.info(f"[{LOGGER_NAME}][{file.logger_name}] Sleeping {file.check_interval}s")
                 await asyncio.sleep(file.check_interval)
 
                 bt.logging.debug(
@@ -44,7 +45,7 @@ class FileMonitor(threading.Thread):
                     bt.logging.debug(
                         f"[{LOGGER_NAME}][{file.logger_name}] File has not changed"
                     )
-                    return
+                    continue
 
                 # Load the file
                 data = file.load_file()

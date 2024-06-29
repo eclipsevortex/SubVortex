@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firewall Monitor</title>
+    <style>
+        .right-align {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <h1>Firewall Monitor</h1>
+    <table border="1">
+        <tr>
+            <th>Timestamp</th>
+            <th>IP Address</th>
+            <th>Port</th>
+            <th>Protocol</th>
+            <th>Action</th>
+            <th>Reason</th>
+        </tr>
+        <tbody id="events-table">
+        </tbody>
+    </table>
+    <script>
+        async function fetchEvents() {
+            const response = await fetch('/events');
+            const events = await response.json();
+            const table = document.getElementById('events-table');
+            table.innerHTML = '';
+            events.forEach(event => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${new Date(event.timestamp * 1000).toLocaleString()}</td>
+                                 <td class="right-align">${event.ip}</td>
+                                 <td class="right-align">${event.port}</td>
+                                 <td>${event.protocol}</td>
+                                 <td>${event.action}</td>
+                                 <td>${event.reason || ''}</td>`;
+                table.appendChild(row);
+            });
+        }
+
+        setInterval(fetchEvents, 1000);
+        fetchEvents();
+    </script>
+</body>
+</html>

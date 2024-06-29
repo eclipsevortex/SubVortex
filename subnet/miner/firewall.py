@@ -28,6 +28,8 @@ from collections import defaultdict
 
 from subnet.shared.file import load_json_file, save_json_file
 from subnet.file.file_local_monitor import FileLocalMonitor
+from subnet.firewall.storage.firewall_file_storage import FirewallFileStorage
+from subnet.firewall.firewall_monitor import FirewallMonitor
 from subnet.firewall.firewall_packet import FirewallPacket
 from subnet.firewall.firewall_observer import FirewallObserver
 from subnet.firewall.firewall_tool import FirewallTool
@@ -70,9 +72,11 @@ class Firewall(threading.Thread):
         self.whitelist_hotkeys = []
         self.specifications = {}
         self.requests = {}
-        self.processed_requests = {}
+        self._processed_requests = {}
         self._rules = []
         self.first_try = True
+
+        self.monitor = FirewallMonitor(storage=FirewallFileStorage())
 
         self.provider = FileLocalMonitor(
             logger_name=FIREWALL_LOGGING_NAME,
@@ -81,13 +85,25 @@ class Firewall(threading.Thread):
             callback=self.update_rules,
         )
 
+    @property
+    def rules(self):
+        with self._lock:
+            return list(self._rules)
+
+    @property
+    def processed_requests(self):
+        with self._lock:
+            return copy.deepcopy(self._processed_requests)
+
     def start(self):
+        self.monitor.start()
         super().start()
         bt.logging.debug(f"{FIREWALL_LOGGING_NAME} started")
 
     def stop(self):
         self.observer.stop()
         self.stop_flag.set()
+        self.monitor.join()
         super().join()
         bt.logging.debug(f"{FIREWALL_LOGGING_NAME} stopped")
 
@@ -97,7 +113,9 @@ class Firewall(threading.Thread):
         """
         attempt = 1
         while self.first_try and attempt <= FIREWALL_ATTEMPTS:
-            bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}][{attempt}] Waiting file to be process...")
+            bt.logging.debug(
+                f"[{FIREWALL_LOGGING_NAME}][{attempt}] Waiting file to be process..."
+            )
             time.sleep(1)
             attempt += 1
 
@@ -178,11 +196,6 @@ class Firewall(threading.Thread):
             -1,
         )
 
-    @property
-    def rules(self):
-        with self._lock:
-            return list(self._rules)
-
     def is_blocked(self, ip, dport, protocol):
         """
         True if the search ip blocked has been found, false otherwise
@@ -203,13 +216,19 @@ class Firewall(threading.Thread):
 
     def cleanup_old_packets(self, current_time):
         """Remove packets older than the PACKET_HISTORY_DURATION."""
+        processed_requests = self.processed_requests
         keys_to_delete = [
             key
-            for key, data in self.processed_requests.items()
+            for key, data in processed_requests.items()
             if current_time - data.get("time") > FIREWALL_PACKET_HISTORY_DURATION
         ]
+
+        # Delete the keys in a separate loop
         for key in keys_to_delete:
-            del self.processed_requests[key]
+            del processed_requests[key]
+
+        with self._lock:
+            self._processed_requests = processed_requests
 
     def update(self, specifications={}, whitelist_hotkeys=[]):
         with self._lock:
@@ -223,7 +242,7 @@ class Firewall(threading.Thread):
         self.first_try = False
 
         bt.logging.success(
-            f"[{FIREWALL_LOGGING_NAME}] File proceed successfully: {len(self._rules)} rules loaded"
+            f"[{FIREWALL_LOGGING_NAME}] File proceed successfully: {len(data)} rules loaded"
         )
 
     def get_specification(self, name: str):
@@ -237,7 +256,7 @@ class Firewall(threading.Thread):
                 return index
         return None
 
-    def block_ip(self, ip, dport, protocol, type, reason, synapse):
+    def block_ip(self, ip, dport, protocol, type, reason, synapse, timestamp):
         ip_blocked = None
 
         index = self.get_index_ip_blocked(ip, dport, protocol)
@@ -249,7 +268,6 @@ class Firewall(threading.Thread):
                 "synapse": synapse,
                 "timestamps": self.packet_timestamps[ip][dport][protocol],
             }
-
         else:
             ip_blocked = {
                 "ip": ip,
@@ -266,14 +284,38 @@ class Firewall(threading.Thread):
         # Update the local file
         save_json_file("ips_blocked.json", self.ips_blocked)
 
-        # Notify user only if it a new op blocked
-        if index == -1:
-            protocol_str = protocol.upper() if protocol else None
-            bt.logging.warning(f"Blocking {protocol_str} {ip}/{dport}: {reason}")
-
-    def unblock_ip(self, ip, dport, protocol):
-        if not self.is_blocked(ip, dport, protocol):
+        if index != -1:
+            # Ip was alraedy blocked so we do nothing
             return
+
+        # Emit new event
+        event_data = {
+            "action": "deny",
+            "ip": ip,
+            "port": dport,
+            "protocol": protocol,
+            "reason": reason,
+            "timestamp": timestamp,
+        }
+        self.monitor.emit(event_data)
+
+        protocol_str = protocol.upper() if protocol else None
+        bt.logging.warning(f"Blocking {protocol_str} {ip}/{dport}: {reason}")
+
+    def unblock_ip(self, ip, dport, protocol, timestamp):
+        index = self.get_index_ip_blocked(ip, dport, protocol)
+        if index == -1:
+            return
+
+        # Emit new event
+        event_data = {
+            "action": "allow",
+            "ip": ip,
+            "port": dport,
+            "protocol": protocol,
+            "timestamp": timestamp,
+        }
+        self.monitor.emit(event_data)
 
         # Update the block ips
         self.ips_blocked = [
@@ -553,7 +595,6 @@ class Firewall(threading.Thread):
                 if not is_sync_packet
                 else None
             )
-            is_sync_allowed = sync_ip_blocked is not None
 
             # Check if we receive olds packets where decision has already been made.
             # Due to the TCP protocol's inherent behavior of re-transmitting packets
@@ -582,7 +623,7 @@ class Firewall(threading.Thread):
                     self.requests[packet.id] = (
                         packet.seq,
                         0,
-                        "allow" if is_sync_allowed else "deny",
+                        None,
                     )
 
                 if not is_data_packet:
@@ -729,6 +770,7 @@ class Firewall(threading.Thread):
                     type=rule_type or RuleType.DENY,
                     reason=reason or "Deny ip",
                     synapse=metadata.get("synapse", {}),
+                    timestamp=current_time,
                 )
 
                 # Trace some details of the dropped packet
@@ -738,7 +780,7 @@ class Firewall(threading.Thread):
                     else "Packet data" if is_data_packet else "Packet unknown"
                 )
                 bt.logging.trace(
-                    f"[{packet.id}][{packet.protocol}][{packet.flags}][#{count}] {copyright} dropped - {reason} {self.ips_blocked}"
+                    f"[{packet.id}][{packet.protocol}][{packet.flags}][#{count}] {copyright} dropped - {reason}"
                 )
 
                 # Keep the decision on the data packet for potential pack retransmission
@@ -761,7 +803,12 @@ class Firewall(threading.Thread):
 
             # Unblock the ip/port if data packet and previously blocked
             if is_data_packet:
-                self.unblock_ip(ip=ip_src, dport=port_dest, protocol=protocol)
+                self.unblock_ip(
+                    ip=ip_src,
+                    dport=port_dest,
+                    protocol=protocol,
+                    timestamp=current_time,
+                )
 
             # Trace some details of the allowed packet
             copyright = (

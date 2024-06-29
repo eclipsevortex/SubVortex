@@ -5,7 +5,7 @@
         "type": "detect-dos",
         "configuration": {
             "time_window": 300,
-            "packet_threshold": 2
+            "packet_threshold": 4
         }
     },
     {
@@ -16,5 +16,19 @@
             "time_window": 300,
             "packet_threshold": 128
         }
+    },
+    {
+        "dport": 9944,
+        "protocol": "tcp",
+        "type": "detect-dos",
+        "configuration": {
+            "time_window": 12,
+            "packet_threshold": 2
+        }
+    },
+    {
+        "dport": 9933,
+        "protocol": "tcp",
+        "type": "deny"
     }
 ]

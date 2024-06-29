@@ -173,7 +173,7 @@ class FirewallLinuxTool(FirewallTool):
         Remove a rule in the iptables
         """
         if not self.rule_exists(
-            ip=ip, sport=sport, dport=dport, protocol=protocol, allow=False, queue=queue
+            ip=ip, sport=sport, dport=dport, protocol=protocol, allow=allow, queue=queue
         ):
             return False
 
@@ -186,7 +186,7 @@ class FirewallLinuxTool(FirewallTool):
         elif sport is not None:
             commands += ["-p", protocol, "--sport", str(sport)]
 
-        if queue is not None:
+        if queue is None:
             commands += ["-j", "ACCEPT" if allow else "DROP"]
         else:
             commands += ["-j", "NFQUEUE", "--queue-num", str(queue)]

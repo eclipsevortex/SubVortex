@@ -44,7 +44,7 @@ class FileMonitor(threading.Thread):
                     bt.logging.debug(
                         f"[{LOGGER_NAME}][{file.logger_name}] File has not changed"
                     )
-                    return
+                    continue
 
                 # Load the file
                 data = file.load_file()

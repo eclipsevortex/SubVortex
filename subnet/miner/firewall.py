@@ -70,7 +70,7 @@ class Firewall(threading.Thread):
         self.whitelist_hotkeys = []
         self.specifications = {}
         self.requests = {}
-        self.processed_requests = {}
+        self._processed_requests = {}
         self._rules = []
         self.first_try = True
 
@@ -80,6 +80,16 @@ class Firewall(threading.Thread):
             check_interval=FIREWALL_SLEEP,
             callback=self.update_rules,
         )
+
+    @property
+    def rules(self):
+        with self._lock:
+            return list(self._rules)
+
+    @property
+    def processed_requests(self):
+        with self._lock:
+            return copy.deepcopy(self._processed_requests)
 
     def start(self):
         super().start()
@@ -97,7 +107,9 @@ class Firewall(threading.Thread):
         """
         attempt = 1
         while self.first_try and attempt <= FIREWALL_ATTEMPTS:
-            bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}][{attempt}] Waiting file to be process...")
+            bt.logging.debug(
+                f"[{FIREWALL_LOGGING_NAME}][{attempt}] Waiting file to be process..."
+            )
             time.sleep(1)
             attempt += 1
 
@@ -178,11 +190,6 @@ class Firewall(threading.Thread):
             -1,
         )
 
-    @property
-    def rules(self):
-        with self._lock:
-            return list(self._rules)
-
     def is_blocked(self, ip, dport, protocol):
         """
         True if the search ip blocked has been found, false otherwise
@@ -203,13 +210,21 @@ class Firewall(threading.Thread):
 
     def cleanup_old_packets(self, current_time):
         """Remove packets older than the PACKET_HISTORY_DURATION."""
+        processed_requests = self.processed_requests
         keys_to_delete = [
             key
             for key, data in self.processed_requests.items()
+            for key, data in processed_requests.items()
             if current_time - data.get("time") > FIREWALL_PACKET_HISTORY_DURATION
         ]
+
+        # Delete the keys in a separate loop
         for key in keys_to_delete:
             del self.processed_requests[key]
+            del processed_requests[key]
+
+        with self._lock:
+            self._processed_requests = processed_requests
 
     def update(self, specifications={}, whitelist_hotkeys=[]):
         with self._lock:
@@ -223,7 +238,7 @@ class Firewall(threading.Thread):
         self.first_try = False
 
         bt.logging.success(
-            f"[{FIREWALL_LOGGING_NAME}] File proceed successfully: {len(self._rules)} rules loaded"
+            f"[{FIREWALL_LOGGING_NAME}] File proceed successfully: {len(data)} rules loaded"
         )
 
     def get_specification(self, name: str):
@@ -553,7 +568,6 @@ class Firewall(threading.Thread):
                 if not is_sync_packet
                 else None
             )
-            is_sync_allowed = sync_ip_blocked is not None
 
             # Check if we receive olds packets where decision has already been made.
             # Due to the TCP protocol's inherent behavior of re-transmitting packets
@@ -582,7 +596,7 @@ class Firewall(threading.Thread):
                     self.requests[packet.id] = (
                         packet.seq,
                         0,
-                        "allow" if is_sync_allowed else "deny",
+                        None,
                     )
 
                 if not is_data_packet:
@@ -738,7 +752,7 @@ class Firewall(threading.Thread):
                     else "Packet data" if is_data_packet else "Packet unknown"
                 )
                 bt.logging.trace(
-                    f"[{packet.id}][{packet.protocol}][{packet.flags}][#{count}] {copyright} dropped - {reason} {self.ips_blocked}"
+                    f"[{packet.id}][{packet.protocol}][{packet.flags}][#{count}] {copyright} dropped - {reason}"
                 )
 
                 # Keep the decision on the data packet for potential pack retransmission

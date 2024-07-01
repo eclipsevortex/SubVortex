@@ -14,6 +14,7 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import time
 import threading
 
 from subnet.shared.platform import is_linux_platform
@@ -71,7 +72,11 @@ class FirewallLinuxObserver(FirewallObserver):
     def _create_callback(self, queue_num):
         def _packet_callback(packet):
             try:
-                instance = FirewallPacket(packet, queue_num)
+                # Set the time of reception 
+                current_time = time.time()
+
+                # Create a packet instance 
+                instance = FirewallPacket(packet, current_time, queue_num)
 
                 callback = self._callbacks.get(queue_num)
                 if not callback:

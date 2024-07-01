@@ -37,8 +37,10 @@ TCP_FLAG_LABELS = {
 
 
 class FirewallPacket:
-    def __init__(self, packet, queue_num = 1):
+    def __init__(self, packet, current_time, queue_num = 1):
         self.queue_num = queue_num
+        self.status = None
+        self._current_time = current_time
         self._packet = packet
         self._raw_packet = packet.get_payload()
 
@@ -81,7 +83,11 @@ class FirewallPacket:
     @property
     def id(self):
         return f"{self.sip}:{self.dport}:{self.protocol}"
-
+    
+    @property
+    def current_time(self):
+        return self._current_time
+    
     @property
     def sip(self):
         return self._src_ip
@@ -125,6 +131,7 @@ class FirewallPacket:
     def accept(self):
         try:
             self._packet.accept()
+            self.status = "allow"
             return True
         except: 
             return False
@@ -132,6 +139,7 @@ class FirewallPacket:
     def drop(self):
         try:
             self._packet.drop()
+            self.status = "deny"
             return True
         except: 
             return False

@@ -145,9 +145,9 @@ def create_kernel_packet(src_ip, dst_ip, src_port, dst_port, seq, ack, flags, pa
 
 
 def create_packet(
-    src_ip, dst_ip, src_port, dst_port, seq, ack, flags, payload, packet_mock
+    src_ip, dst_ip, src_port, dst_port, seq, ack, flags, payload, packet_mock, mock_time
 ):
     packet = PacketMock(
         src_ip, dst_ip, src_port, dst_port, seq, ack, flags, payload, packet_mock
     )
-    return FirewallPacket(packet)
+    return FirewallPacket(packet, mock_time.return_value)

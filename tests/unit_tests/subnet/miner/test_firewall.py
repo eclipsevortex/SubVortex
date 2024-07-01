@@ -90,6 +90,7 @@ class TestFirewall(unittest.TestCase):
             flags,
             payload,
             self.mock_packet,
+            self.mock_time
         )
         firewall.packet_callback(packet)
 
@@ -1659,6 +1660,7 @@ class TestDoSRule(TestFirewall):
             dst_port=8091,
             firewall=firewall,
             seconds=[28, 29],
+            initial_index=2
         )
 
         # Assert
@@ -1672,6 +1674,7 @@ class TestDoSRule(TestFirewall):
             dst_port=8091,
             firewall=firewall,
             seconds=[31, 32],
+            initial_index=4
         )
 
         # Assert
@@ -1942,6 +1945,7 @@ class TestDDoSRule(TestFirewall):
             dst_port=8091,
             firewall=firewall,
             seconds=[28, 29],
+            initial_index=2
         )
 
         # Assert
@@ -1957,6 +1961,7 @@ class TestDDoSRule(TestFirewall):
             dst_port=8091,
             firewall=firewall,
             seconds=[31, 32],
+            initial_index=4
         )
 
         # Assert
@@ -2355,7 +2360,7 @@ class TestDDoSRule(TestFirewall):
                 ],
             ),
         ]
-
+        
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
         firewall.update_rules(
             [
@@ -2389,7 +2394,7 @@ class TestDDoSRule(TestFirewall):
                     # Arrange
                     firewall.packet_timestamps.clear()
                     firewall.ips_blocked.clear()
-                    firewall.requests.clear()
+                    firewall._requests.clear()
 
                     for j, (request_count) in enumerate(vps):
                         ip = ip_template.format(j + 1)
@@ -2412,6 +2417,7 @@ class TestDDoSRule(TestFirewall):
                         dst_port=8091,
                         firewall=firewall,
                         seconds=[seconds, seconds + 1],
+                        initial_index=(test_case_num - 1 + i)
                     )
 
                     # Assert

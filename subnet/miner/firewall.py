@@ -58,18 +58,28 @@ class Firewall(threading.Thread):
 
         self._lock = threading.Lock()
         self.stop_flag = threading.Event()
-        self.packet_timestamps = defaultdict(list)
-
         self.tool = tool
         self.observer = observer
         self.port = port
         self.interface = interface
-        self.ips_blocked = []
         self.whitelist_hotkeys = []
         self.specifications = {}
-        self.requests = {}
-        self._processed_packets = {}
+
+        self.ips_blocked = []
+
+        self.packet_timestamps = defaultdict(list)
+
+        self._requests = defaultdict(list)
+        """
+        List all the requests with their packets
+        The key is ip:dport:protocol, the value is a list of packets
+        """
+
         self._rules = []
+        """
+        List all the active rules       
+        """
+
         self.first_try = True
 
         self.provider = FileLocalMonitor(
@@ -86,16 +96,6 @@ class Firewall(threading.Thread):
         """
         with self._lock:
             return list(self._rules)
-
-    @property
-    def processed_packets(self):
-        """
-        Keep previous processed packets to prevent processing again same packets
-        Due to the TCP protocol's inherent behavior of re-transmitting packets
-        when it doesn't receive an acknowledgment from the recipient
-        """
-        with self._lock:
-            return copy.deepcopy(self._processed_packets)
 
     def start(self):
         super().start()
@@ -214,23 +214,22 @@ class Firewall(threading.Thread):
             is not None
         )
 
-    def cleanup_old_packets(self, current_time):
+    def cleanup_old_packets(self, current_time, requests: dict):
         """Remove packets older than the PACKET_HISTORY_DURATION."""
-        processed_requests = self.processed_packets
         keys_to_delete = [
             key
-            for key, data in self.processed_packets.items()
-            for key, data in processed_requests.items()
-            if current_time - data.get("time") > FIREWALL_PACKET_HISTORY_DURATION
+            for key, packets in requests.items()
+            if len(packets) > 0
+            and current_time - packets[-1].current_time
+            > FIREWALL_PACKET_HISTORY_DURATION
         ]
+
+        if len(keys_to_delete) == 0:
+            return
 
         # Delete the keys in a separate loop
         for key in keys_to_delete:
-            del self.processed_packets[key]
-            del processed_requests[key]
-
-        with self._lock:
-            self._processed_packets = processed_requests
+            del requests[key]
 
     def update(self, specifications={}, whitelist_hotkeys=[]):
         with self._lock:
@@ -308,7 +307,7 @@ class Firewall(threading.Thread):
         protocol_str = protocol.upper() if protocol else None
         bt.logging.success(f"Unblocking {protocol_str} {ip}/{dport}")
 
-    def detect_dos(self, id, ip, port, protocol, rule: DetectDoSRule, current_time):
+    def detect_dos(self, id, current_time, rule: DetectDoSRule):
         """
         Detect Denial of Service attack which is an attack from a single source that overwhelms a target with requests,
         """
@@ -330,7 +329,7 @@ class Firewall(threading.Thread):
 
         return (False, None, None)
 
-    def detect_ddos(self, id, ip, port, protocol, rule: DetectDDoSRule, current_time):
+    def detect_ddos(self, id, current_time, rule: DetectDDoSRule):
         """
         Detect Distributed Denial of Service which is an attack from multiple sources that overwhelms a target with requests,
         """
@@ -500,9 +499,6 @@ class Firewall(threading.Thread):
                 r for r in self.rules if r.ip == packet.sip or r.dport == packet.dport
             ]
 
-            # Get the current time
-            current_time = time.time()
-
             # Set metadata for logs purpose on exception
             metadata = {"ip": packet.sip, "dport": packet.dport}
 
@@ -530,10 +526,20 @@ class Firewall(threading.Thread):
                 is not None
             )
 
+            # Work with a copy of the requests
+            requests = []
+            with self._lock:
+                requests = self._requests
+
+            # Clean old packets
+            self.cleanup_old_packets(packet.current_time, requests)
+
             # Initialise variables
-            request = self.requests.get(packet.id) or (None, None, None)
-            seq = request[0]
-            ack = request[1]
+            request = requests.get(packet.id) or []
+            previous_packet = request[-1] if len(request) > 0 else None
+            seq = previous_packet.seq if previous_packet is not None else 0
+            ack = previous_packet.ack if previous_packet is not None else 0
+
             # If no rule, by default we allow packets
             must_allow = match_allow_rule or True
             must_deny = match_deny_rule
@@ -563,13 +569,16 @@ class Firewall(threading.Thread):
             # Check if we receive olds packets where decision has already been made.
             # Due to the TCP protocol's inherent behavior of re-transmitting packets
             # when it doesn't receive an acknowledgment from the recipient
-            processed_packet = self.processed_packets.get(packet.internal_id)
+            processed_packet = (
+                next((x for x in request if x.internal_id == packet.internal_id), None)
+                if request
+                else None
+            )
 
-            # Clean old processed packets
-            self.cleanup_old_packets(current_time)
-
+            # If the current packet matches an old one
+            # we use the same decision
             if processed_packet is not None:
-                if processed_packet["decision"] == "allow":
+                if processed_packet.status == "allow":
                     packet.accept()
                 else:
                     packet.drop()
@@ -577,35 +586,19 @@ class Firewall(threading.Thread):
                 return
 
             if is_sync_packet:
-                # A new connection has been initiated, processing a new request
-                self.requests[packet.id] = (packet.seq, 0, None)
+                # SYNC packet (meaning new request), so we re-initialise the request
+                request = requests[packet.id] = []
 
                 # Add the new time for ip/port
-                self.packet_timestamps[packet.id].append(current_time)
-            else:
-                if self.requests.get(packet.id) is None:
-                    self.requests[packet.id] = (
-                        packet.seq,
-                        0,
-                        None,
-                    )
-
-                if not is_data_packet:
-                    # Packet is not a data packet OR packet is part of the same chunk (data is sent in chunk)
-                    # => We use the result got with the SYN packet
-
-                    if self.requests[packet.id][2] == "allow":
-                        packet.accept()
-                        return
-
-                    packet.drop()
-                    return
+                self.packet_timestamps[packet.id].append(packet.current_time)
+            elif not is_data_packet:
+                # Packet that is not a data packet such as A, FA, etc
+                # => Use the previous packet decision
+                if request[-1].status == "allow":
+                    packet.accept()
                 else:
-                    self.requests[packet.id] = (
-                        packet.seq,
-                        packet.ack,
-                        self.requests[packet.id][2],
-                    )
+                    packet.drop()
+                return
 
             if is_request_for_miner and is_data_packet:
                 # Checks only for miner, not for subtensor
@@ -661,11 +654,8 @@ class Firewall(threading.Thread):
             must_deny, rule_type, reason = (
                 self.detect_dos(
                     packet.id,
-                    packet.sip,
-                    packet.dport,
-                    packet.protocol,
+                    packet.current_time,
                     dos_rule,
-                    current_time,
                 )
                 if dos_rule
                 and not must_deny
@@ -685,11 +675,8 @@ class Firewall(threading.Thread):
             must_deny, rule_type, reason = (
                 self.detect_ddos(
                     packet.id,
-                    packet.sip,
-                    packet.dport,
-                    packet.protocol,
+                    packet.current_time,
                     ddos_rule,
-                    current_time,
                 )
                 if ddos_rule
                 and not must_deny
@@ -705,7 +692,9 @@ class Firewall(threading.Thread):
             # Check if we must deny the packet if
             # - The SYNC packet has been denied
             # - Has been flagged as must denied already by one of the rule
-            is_previous_packets_denied = self.requests[packet.id][2] == "deny"
+            is_previous_packets_denied = (
+                len(request) > 0 and request[-1].status == "deny"
+            )
             must_deny = must_deny or is_previous_packets_denied
 
             count = len(self.packet_timestamps[packet.id])
@@ -725,12 +714,6 @@ class Firewall(threading.Thread):
                 if sync_ip_blocked:
                     reason = sync_ip_blocked.get("reason")
                     rule_type = sync_ip_blocked.get("type")
-
-                self.requests[packet.id] = (
-                    self.requests[packet.id][0],
-                    self.requests[packet.id][1],
-                    "deny",
-                )
 
                 # Flag ip as blocked
                 self.block_ip(
@@ -754,22 +737,16 @@ class Firewall(threading.Thread):
                 )
 
                 # Keep the decision on the data packet for potential pack retransmission
-                if is_data_packet:
-                    self.processed_packets[packet.internal_id] = {
-                        "decision": "deny",
-                        "time": current_time,
-                    }
+                # if is_data_packet:
+                requests[packet.id].append(packet)
 
                 # Drop packet
                 packet.drop()
 
-                return
+                with self._lock:
+                    self._requests = requests
 
-            self.requests[packet.id] = (
-                self.requests[packet.id][0],
-                self.requests[packet.id][1],
-                "allow",
-            )
+                return
 
             # Unblock the ip/port if data packet and previously blocked
             if is_data_packet:
@@ -788,14 +765,14 @@ class Firewall(threading.Thread):
             )
 
             # Keep the decision on the data packet for potential pack retransmission
-            if not is_data_packet:
-                self.processed_packets[packet.internal_id] = {
-                    "decision": "allow",
-                    "time": current_time,
-                }
+            # if not is_data_packet:
+            requests[packet.id].append(packet)
 
             # Allow packet
             packet.accept()
+
+            with self._lock:
+                self._requests = requests
         except Exception as ex:
             bt.logging.warning(
                 f"[{FIREWALL_LOGGING_NAME}] Failed to proceed firewall packet: {ex}"

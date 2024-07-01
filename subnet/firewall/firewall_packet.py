@@ -80,7 +80,7 @@ class FirewallPacket:
 
     @property
     def id(self):
-        return f"{self.sip}:{self.dport}"
+        return f"{self.sip}:{self.dport}:{self.protocol}"
 
     @property
     def sip(self):

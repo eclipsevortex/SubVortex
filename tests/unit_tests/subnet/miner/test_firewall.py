@@ -260,7 +260,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 1 == len(firewall.ips_blocked)
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.assert_blocked(
             firewall=firewall,
             ip="192.168.0.1",
@@ -394,7 +394,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 0 == len(firewall.ips_blocked)
-        assert 0 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 0 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.mock_packet.drop.assert_not_called()
         assert 6 == self.mock_packet.accept.call_count
 
@@ -520,7 +520,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 1 == len(firewall.ips_blocked)
-        assert 0 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 0 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.assert_blocked(
             firewall=firewall,
             ip="192.168.0.1",
@@ -658,7 +658,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 1 == len(firewall.ips_blocked)
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.assert_blocked(
             firewall=firewall,
             ip="192.168.0.1",
@@ -799,7 +799,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 0 == len(firewall.ips_blocked)
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.mock_packet.drop.assert_not_called()
         assert 6 == self.mock_packet.accept.call_count
 
@@ -829,7 +829,7 @@ class TestPackets(TestFirewall):
 
         # Simulate an old requests
         self.mock_time.return_value = get_time(0)
-        firewall.packet_timestamps["192.168.0.1"][8091]["tcp"] = [
+        firewall.packet_timestamps["192.168.0.1:8091:tcp"] = [
             self.mock_time.return_value
         ]
         seconds = 28
@@ -937,7 +937,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 1 == len(firewall.ips_blocked)
-        assert 2 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 2 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.assert_blocked(
             firewall=firewall,
             ip="192.168.0.1",
@@ -1075,7 +1075,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 1 == len(firewall.ips_blocked)
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.assert_blocked(
             firewall=firewall,
             ip="192.168.0.1",
@@ -1216,7 +1216,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 0 == len(firewall.ips_blocked)
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.mock_packet.drop.assert_not_called()
         assert 6 == self.mock_packet.accept.call_count
 
@@ -1246,13 +1246,13 @@ class TestPackets(TestFirewall):
 
         # Simulate an old requests
         self.mock_time.return_value = get_time(0)
-        firewall.packet_timestamps["192.168.0.1"][8091]["tcp"] = [
+        firewall.packet_timestamps["192.168.0.1:8091:tcp"] = [
             get_time(0),
             get_time(1),
         ]
-        firewall.packet_timestamps["192.168.0.2"][8091]["tcp"] = [get_time(2)]
-        firewall.packet_timestamps["192.168.0.3"][8091]["tcp"] = [get_time(3)]
-        firewall.packet_timestamps["192.168.0.4"][8091]["tcp"] = [get_time(4)]
+        firewall.packet_timestamps["192.168.0.2:8091:tcp"] = [get_time(2)]
+        firewall.packet_timestamps["192.168.0.3:8091:tcp"] = [get_time(3)]
+        firewall.packet_timestamps["192.168.0.4:8091:tcp"] = [get_time(4)]
         seconds = 28
 
         # Action
@@ -1358,7 +1358,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 1 == len(firewall.ips_blocked)
-        assert 3 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 3 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.assert_blocked(
             firewall=firewall,
             ip="192.168.0.1",
@@ -1486,7 +1486,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 0 == len(firewall.ips_blocked)
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.mock_packet.drop.assert_not_called()
         assert 6 == self.mock_packet.accept.call_count
 
@@ -1603,7 +1603,7 @@ class TestPackets(TestFirewall):
 
         # Assert
         assert 1 == len(firewall.ips_blocked)
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
         self.assert_blocked(
             firewall=firewall,
             ip="192.168.0.1",
@@ -1649,7 +1649,7 @@ class TestDoSRule(TestFirewall):
         )
 
         # Assert
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
 
         # Action
         self.send_request(
@@ -1662,7 +1662,7 @@ class TestDoSRule(TestFirewall):
         )
 
         # Assert
-        assert 2 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 2 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
 
         # Action
         self.send_request(
@@ -1675,7 +1675,7 @@ class TestDoSRule(TestFirewall):
         )
 
         # Assert
-        assert 2 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 2 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
 
     def test_given_a_dos_rule_when_a_dos_attack_is_detected_should_deny_the_request(
         self,
@@ -1932,7 +1932,7 @@ class TestDDoSRule(TestFirewall):
 
         # Assert
         assert 1 == len(firewall.packet_timestamps.keys())
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
 
         # Action
         self.send_request(
@@ -1946,8 +1946,8 @@ class TestDDoSRule(TestFirewall):
 
         # Assert
         assert 2 == len(firewall.packet_timestamps.keys())
-        assert 1 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
-        assert 1 == len(firewall.packet_timestamps["192.168.0.2"][8091]["tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.2:8091:tcp"])
 
         # Action
         self.send_request(
@@ -1961,9 +1961,9 @@ class TestDDoSRule(TestFirewall):
 
         # Assert
         assert 3 == len(firewall.packet_timestamps.keys())
-        assert 0 == len(firewall.packet_timestamps["192.168.0.1"][8091]["tcp"])
-        assert 1 == len(firewall.packet_timestamps["192.168.0.2"][8091]["tcp"])
-        assert 1 == len(firewall.packet_timestamps["192.168.0.3"][8091]["tcp"])
+        assert 0 == len(firewall.packet_timestamps["192.168.0.1:8091:tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.2:8091:tcp"])
+        assert 1 == len(firewall.packet_timestamps["192.168.0.3:8091:tcp"])
 
     def test_given_a_ddos_rule_when_receive_less_requests_than_the_benchmark_within_the_time_window_should_allow_the_request(
         self,
@@ -2086,7 +2086,7 @@ class TestDDoSRule(TestFirewall):
         for j, (request_count) in enumerate(vps):
             ip = "192.168.0.{}".format(j + 1)
             for _ in range(0, request_count):
-                firewall.packet_timestamps[ip][8091]["tcp"].append(get_time(j))
+                firewall.packet_timestamps[f"{ip}:8091:tcp"].append(get_time(j))
 
         # Action
         seconds = len(vps)
@@ -2394,13 +2394,13 @@ class TestDDoSRule(TestFirewall):
                     for j, (request_count) in enumerate(vps):
                         ip = ip_template.format(j + 1)
                         for _ in range(0, request_count):
-                            firewall.packet_timestamps[ip][8091]["tcp"].append(
+                            firewall.packet_timestamps[f"{ip}:8091:tcp"].append(
                                 get_time(seconds)
                             )
                             seconds += 1
 
-                    firewall.packet_timestamps[src_ip][8091]["tcp"] = (
-                        firewall.packet_timestamps[src_ip][8091]["tcp"][:-1]
+                    firewall.packet_timestamps[f"{src_ip}:8091:tcp"] = (
+                        firewall.packet_timestamps[f"{src_ip}:8091:tcp"][:-1]
                     )
 
                     # Action
@@ -2418,7 +2418,7 @@ class TestDDoSRule(TestFirewall):
                     for j, digit in enumerate(expect):
                         ip = ip_template.format(j + 1)
                         ip_blocked = firewall.is_blocked(ip, 8091, "tcp")
-                        count = len(firewall.packet_timestamps[ip][8091]["tcp"])
+                        count = len(firewall.packet_timestamps[f"{ip}:8091:tcp"])
 
                         expected_ddos = digit == "1"
                         assert expected_ddos == ip_blocked
@@ -2780,7 +2780,7 @@ class TestAllowRule(TestFirewall):
         for j, (request_count) in enumerate(vps):
             ip = "192.168.0.{}".format(j + 1)
             for _ in range(0, request_count):
-                firewall.packet_timestamps[ip][8091]["tcp"].append(get_time(j))
+                firewall.packet_timestamps[f"{ip}:8091:tcp"].append(get_time(j))
 
         # Action
         seconds = len(vps)
@@ -2997,11 +2997,9 @@ class TestIpBlockedFile(TestFirewall):
 
         # Check the timestamps of the packets already processed
         assert 1 == len(firewall.packet_timestamps.keys())
-        assert 1 == len(firewall.packet_timestamps["65.109.75.3"].keys())
-        assert 1 == len(firewall.packet_timestamps["65.109.75.3"][8091].keys())
         assert [1716894001.0, 1716894028.0] == firewall.packet_timestamps[
-            "65.109.75.3"
-        ][8091]["tcp"]
+            "65.109.75.3:8091:tcp"
+        ]
 
     def test_given_ips_blocked_saved_when_a_allow_rule_is_added_should_restore_them(
         self,

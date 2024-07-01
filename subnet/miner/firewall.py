@@ -58,9 +58,7 @@ class Firewall(threading.Thread):
 
         self._lock = threading.Lock()
         self.stop_flag = threading.Event()
-        self.packet_timestamps = defaultdict(
-            lambda: defaultdict(lambda: defaultdict(list))
-        )
+        self.packet_timestamps = defaultdict(list)
 
         self.tool = tool
         self.observer = observer
@@ -70,7 +68,7 @@ class Firewall(threading.Thread):
         self.whitelist_hotkeys = []
         self.specifications = {}
         self.requests = {}
-        self._processed_requests = {}
+        self._processed_packets = {}
         self._rules = []
         self.first_try = True
 
@@ -83,13 +81,21 @@ class Firewall(threading.Thread):
 
     @property
     def rules(self):
+        """
+        List of rules to apply
+        """
         with self._lock:
             return list(self._rules)
 
     @property
-    def processed_requests(self):
+    def processed_packets(self):
+        """
+        Keep previous processed packets to prevent processing again same packets
+        Due to the TCP protocol's inherent behavior of re-transmitting packets
+        when it doesn't receive an acknowledgment from the recipient
+        """
         with self._lock:
-            return copy.deepcopy(self._processed_requests)
+            return copy.deepcopy(self._processed_packets)
 
     def start(self):
         super().start()
@@ -210,21 +216,21 @@ class Firewall(threading.Thread):
 
     def cleanup_old_packets(self, current_time):
         """Remove packets older than the PACKET_HISTORY_DURATION."""
-        processed_requests = self.processed_requests
+        processed_requests = self.processed_packets
         keys_to_delete = [
             key
-            for key, data in self.processed_requests.items()
+            for key, data in self.processed_packets.items()
             for key, data in processed_requests.items()
             if current_time - data.get("time") > FIREWALL_PACKET_HISTORY_DURATION
         ]
 
         # Delete the keys in a separate loop
         for key in keys_to_delete:
-            del self.processed_requests[key]
+            del self.processed_packets[key]
             del processed_requests[key]
 
         with self._lock:
-            self._processed_requests = processed_requests
+            self._processed_packets = processed_requests
 
     def update(self, specifications={}, whitelist_hotkeys=[]):
         with self._lock:
@@ -252,7 +258,7 @@ class Firewall(threading.Thread):
                 return index
         return None
 
-    def block_ip(self, ip, dport, protocol, type, reason, synapse):
+    def block_ip(self, id, ip, dport, protocol, type, reason, synapse):
         ip_blocked = None
 
         index = self.get_index_ip_blocked(ip, dport, protocol)
@@ -262,9 +268,8 @@ class Firewall(threading.Thread):
                 "type": type,
                 "reason": reason,
                 "synapse": synapse,
-                "timestamps": self.packet_timestamps[ip][dport][protocol],
+                "timestamps": self.packet_timestamps[id],
             }
-
         else:
             ip_blocked = {
                 "ip": ip,
@@ -273,7 +278,7 @@ class Firewall(threading.Thread):
                 "type": type,
                 "reason": reason,
                 "synapse": synapse,
-                "timestamps": self.packet_timestamps[ip][dport][protocol],
+                "timestamps": self.packet_timestamps[id],
             }
 
             self.ips_blocked.append(ip_blocked)
@@ -303,20 +308,18 @@ class Firewall(threading.Thread):
         protocol_str = protocol.upper() if protocol else None
         bt.logging.success(f"Unblocking {protocol_str} {ip}/{dport}")
 
-    def detect_dos(self, ip, port, protocol, rule: DetectDoSRule, current_time):
+    def detect_dos(self, id, ip, port, protocol, rule: DetectDoSRule, current_time):
         """
         Detect Denial of Service attack which is an attack from a single source that overwhelms a target with requests,
         """
         # Get the timestamps within the time window for the combination ip/port/protocol
         recent_timestamps = [
-            t
-            for t in self.packet_timestamps[ip][port][protocol]
-            if current_time - t < rule.time_window
+            t for t in self.packet_timestamps[id] if current_time - t < rule.time_window
         ]
 
         # Override the packets timestamps in order to keep only the ones within the time window
         # for the combination ip/port/protocol
-        self.packet_timestamps[ip][port][protocol] = recent_timestamps
+        self.packet_timestamps[id] = recent_timestamps
 
         if len(recent_timestamps) > rule.packet_threshold:
             return (
@@ -327,42 +330,36 @@ class Firewall(threading.Thread):
 
         return (False, None, None)
 
-    def detect_ddos(self, ip, port, protocol, rule: DetectDDoSRule, current_time):
+    def detect_ddos(self, id, ip, port, protocol, rule: DetectDDoSRule, current_time):
         """
         Detect Distributed Denial of Service which is an attack from multiple sources that overwhelms a target with requests,
         """
-        index = self.get_ip_index(self.packet_timestamps, ip)
-
-        # Get all the timestamps
-        all_timestamps = [
-            timestamp
-            for ports in self.packet_timestamps.values()
-            for times in ports[port].values()
-            for timestamp in times
-        ]
+        index = next(
+            (i for i, (x) in enumerate(self.packet_timestamps.keys()) if x == id), -1
+        )
 
         # Get the timestamps within the time window
         recent_timestamps = [
-            t for t in all_timestamps if current_time - t < rule.time_window
+            t
+            for ts in self.packet_timestamps.values()
+            for t in ts
+            if current_time - t < rule.time_window
         ]
 
         # Create an array with the number of recent timestamps for each vps
-        requests = []
-        for _, ports in self.packet_timestamps.items():
-            for port, protocols in ports.items():
-                for _, timestamps in protocols.items():
-                    request_timestamps = [
-                        t for t in timestamps if current_time - t < rule.time_window
-                    ]
-                    requests.append(len(request_timestamps))
+        requests = [
+            sum(1 for t in ts if current_time - t < rule.time_window)
+            for ts in self.packet_timestamps.values()
+        ]
 
-        # Remove old timestamps
-        for ip, ports in self.packet_timestamps.items():
-            for port, protocols in ports.items():
-                for protocol, timestamps in protocols.items():
-                    self.packet_timestamps[ip][port][protocol] = [
-                        t for t in timestamps if current_time - t < rule.time_window
-                    ]
+        # Remove the timestamps outside the time window
+        self.packet_timestamps = defaultdict(
+            list,
+            {
+                key: [t for t in ts if current_time - t < rule.time_window]
+                for key, ts in self.packet_timestamps.items()
+            },
+        )
 
         if len(recent_timestamps) <= rule.packet_threshold:
             return (False, None, None)
@@ -572,13 +569,13 @@ class Firewall(threading.Thread):
             # Check if we receive olds packets where decision has already been made.
             # Due to the TCP protocol's inherent behavior of re-transmitting packets
             # when it doesn't receive an acknowledgment from the recipient
-            processed_request = self.processed_requests.get(packet.internal_id)
+            processed_packet = self.processed_packets.get(packet.internal_id)
 
             # Clean old processed packets
             self.cleanup_old_packets(current_time)
 
-            if processed_request is not None:
-                if processed_request["decision"] == "allow":
+            if processed_packet is not None:
+                if processed_packet["decision"] == "allow":
                     packet.accept()
                 else:
                     packet.drop()
@@ -590,7 +587,7 @@ class Firewall(threading.Thread):
                 self.requests[packet.id] = (packet.seq, 0, None)
 
                 # Add the new time for ip/port
-                self.packet_timestamps[ip_src][port_dest][protocol].append(current_time)
+                self.packet_timestamps[packet.id].append(current_time)
             else:
                 if self.requests.get(packet.id) is None:
                     self.requests[packet.id] = (
@@ -669,6 +666,7 @@ class Firewall(threading.Thread):
             )
             must_deny, rule_type, reason = (
                 self.detect_dos(
+                    packet.id,
                     ip_src,
                     port_dest,
                     protocol,
@@ -692,6 +690,7 @@ class Firewall(threading.Thread):
             )
             must_deny, rule_type, reason = (
                 self.detect_ddos(
+                    packet.id,
                     ip_src,
                     port_dest,
                     protocol,
@@ -715,12 +714,16 @@ class Firewall(threading.Thread):
             is_previous_packets_denied = self.requests[packet.id][2] == "deny"
             must_deny = must_deny or is_previous_packets_denied
 
-            count = len(self.packet_timestamps[ip_src][port_dest][protocol])
+            count = len(self.packet_timestamps[packet.id])
 
             # Check if there is a deny or allow rule defined to reset
             # the timestamps for that ip if there are any
-            if is_sync_packet and is_decision_made and ip_src in self.packet_timestamps:
-                self.packet_timestamps[ip_src][port_dest][protocol] = []
+            if (
+                is_sync_packet
+                and is_decision_made
+                and packet.id in self.packet_timestamps
+            ):
+                self.packet_timestamps[packet.id] = []
 
             if must_deny or not must_allow:
                 # If sync packet has been blocked we reuse the type and reason
@@ -737,6 +740,7 @@ class Firewall(threading.Thread):
 
                 # Flag ip as blocked
                 self.block_ip(
+                    id=packet.id,
                     ip=ip_src,
                     dport=port_dest,
                     protocol=protocol,
@@ -757,7 +761,7 @@ class Firewall(threading.Thread):
 
                 # Keep the decision on the data packet for potential pack retransmission
                 if is_data_packet:
-                    self.processed_requests[packet.internal_id] = {
+                    self.processed_packets[packet.internal_id] = {
                         "decision": "deny",
                         "time": current_time,
                     }
@@ -788,8 +792,8 @@ class Firewall(threading.Thread):
             )
 
             # Keep the decision on the data packet for potential pack retransmission
-            if is_data_packet:
-                self.processed_requests[packet.internal_id] = {
+            if not is_data_packet:
+                self.processed_packets[packet.internal_id] = {
                     "decision": "allow",
                     "time": current_time,
                 }
@@ -817,7 +821,8 @@ class Firewall(threading.Thread):
             if ip is None or dport is None or protocol is None:
                 continue
 
-            self.packet_timestamps[ip][dport][protocol] += timestamps
+            id = f"{ip}:{dport}:{protocol}"
+            self.packet_timestamps[id] += timestamps
 
         bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating allow rule for loopback")
         self.tool.create_allow_loopback_rule()

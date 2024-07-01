@@ -31,3 +31,5 @@ async def send_scope(self, miner: Miner):
         return version or "0.0.0"
     except Exception as err:
         bt.logging.warning(f"[{miner.uid}] send_scope() Sending scope failed: {err}")
+
+    return "0.0.0"

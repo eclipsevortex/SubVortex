@@ -1,5 +1,7 @@
 import os
 import sys
+import subprocess
+from os import path
 import bittensor as bt
 
 from subnet.shared.version import BaseVersionControl
@@ -13,6 +15,8 @@ from subnet.validator.database import (
 
 LAST_VERSION_BEFORE_AUTO_UPDATE = "2.2.0"
 
+here = path.abspath(path.dirname(__file__))
+
 
 class VersionControl(BaseVersionControl):
     def __init__(self, database, dump_path: str):
@@ -23,6 +27,19 @@ class VersionControl(BaseVersionControl):
         bt.logging.info(f"Restarting validator...")
         python = sys.executable
         os.execl(python, python, *sys.argv)
+
+    def update_os_packages(self):
+        try:
+            script_path = path.join(here, "../../scripts/os/os_setup.sh")
+            result = subprocess.run(
+                ["bash", script_path, "-t", "validator"],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            return result.returncode == 0
+        except subprocess.CalledProcessError as err:
+            bt.logging.error(f"[OS] Upgrade failed: {err}")
 
     async def upgrade_redis(self):
         """
@@ -92,7 +109,7 @@ class VersionControl(BaseVersionControl):
 
         return (success, local_version, remote_version)
 
-    def upgrade_validator(self):
+    def upgrade_validator(self, tag=None, branch=None):
         current_version = None
         remote_version = None
         is_upgrade = None
@@ -107,8 +124,11 @@ class VersionControl(BaseVersionControl):
             current_version = self.github.get_version()
             bt.logging.debug(f"[Subnet] Local version: {current_version}")
 
+            # True if there is a custom tag or branch, false otherwise
+            is_custom_version = tag is not None or branch is not None
+
             # Check if the subnet has to be upgraded
-            if current_version == remote_version:
+            if not is_custom_version and current_version == remote_version:
                 bt.logging.success(f"[Subnet] Already using {current_version}")
                 return (True, current_version, remote_version)
 
@@ -117,13 +137,14 @@ class VersionControl(BaseVersionControl):
             current_version_num = int(current_version.replace(".", ""))
             remote_version_num = int(remote_version.replace(".", ""))
 
-            is_upgrade = remote_version_num > current_version_num
-            if is_upgrade:
-                success = self.upgrade_subnet(remote_version)
+            if is_custom_version:
+                success = self.upgrade_subnet(tag=tag, branch=branch)
+            elif remote_version_num > current_version_num:
+                success = self.upgrade_subnet(version=remote_version)
             else:
-                success = self.downgrade_subnet(remote_version)
+                success = self.downgrade_subnet(version=remote_version)
 
-            if is_upgrade and not success:
+            if not success:
                 bt.logging.info(f"[Subnet] Rolling back to {current_version}...")
                 self.downgrade_subnet(current_version)
         except Exception as err:
@@ -134,7 +155,7 @@ class VersionControl(BaseVersionControl):
 
         return (success, current_version, remote_version)
 
-    async def upgrade(self):
+    async def upgrade(self, tag=None, branch=None):
         try:
             # Flag to stop miner activity
             self.upgrading = True
@@ -142,9 +163,12 @@ class VersionControl(BaseVersionControl):
             # Create the migrations dump
             create_dump_migrations()
 
+            # Install os packages
+            self.update_os_packages()
+
             # Update Subnet
             subnet_success, subnet_old_version, subnet_new_version = (
-                self.upgrade_validator()
+                self.upgrade_validator(tag=tag, branch=branch)
             )
             if not subnet_success:
                 return self.must_restart

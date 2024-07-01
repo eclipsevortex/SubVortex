@@ -1,7 +1,8 @@
 # Logging
-LOGGING_NAME = "Country"
+COUNTRY_LOGGING_NAME = "Country"
 
 # Monitor
+COUNTRY_ATTEMPTS = 5
 COUNTRY_SLEEP = 5 * 60  # Every 5 minutes
 COUNTRY_URL = {
     7: "http://drive.google.com/uc?id=14RkFaEuwfc8lnJghNc3oKLT32kqcdjTd&export=download",

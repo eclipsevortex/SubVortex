@@ -1,0 +1,829 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+import os
+import copy
+import json
+import time
+import threading
+import traceback
+import numpy as np
+import bittensor as bt
+from typing import List
+from collections import defaultdict
+
+from subnet.shared.file import load_json_file, save_json_file
+from subnet.file.file_local_monitor import FileLocalMonitor
+from subnet.firewall.firewall_packet import FirewallPacket
+from subnet.firewall.firewall_observer import FirewallObserver
+from subnet.firewall.firewall_tool import FirewallTool
+from subnet.firewall.firewall_model import (
+    create_rule,
+    Rule,
+    RuleType,
+    DetectDoSRule,
+    DetectDDoSRule,
+)
+from subnet.firewall.firewall_constants import (
+    FIREWALL_LOGGING_NAME,
+    FIREWALL_ATTEMPTS,
+    FIREWALL_SLEEP,
+    FIREWALL_PACKET_HISTORY_DURATION,
+)
+
+
+class Firewall(threading.Thread):
+    def __init__(
+        self,
+        tool: FirewallTool,
+        observer: FirewallObserver,
+        interface: str,
+        port: int = 8091,
+        config_file: str = "firewall.json",
+    ):
+        super().__init__(daemon=True)
+
+        self._lock = threading.Lock()
+        self.stop_flag = threading.Event()
+        self.tool = tool
+        self.observer = observer
+        self.port = port
+        self.interface = interface
+        self.whitelist_hotkeys = []
+        self.specifications = {}
+        self.first_try = True
+
+        self.ips_blocked = []
+
+        self.packet_timestamps = defaultdict(list)
+
+        self._requests = defaultdict(list)
+        """
+        List all the requests with their packets
+        The key is ip:dport:protocol, the value is a list of packets
+        """
+
+        self._rules = []
+        """
+        List all the active rules       
+        """
+
+        self.provider = FileLocalMonitor(
+            logger_name=FIREWALL_LOGGING_NAME,
+            file_path=config_file,
+            check_interval=FIREWALL_SLEEP,
+            callback=self.update_config,
+        )
+
+    @property
+    def rules(self):
+        """
+        List of rules to apply
+        """
+        with self._lock:
+            return list(self._rules)
+
+    def start(self):
+        super().start()
+        bt.logging.debug(f"{FIREWALL_LOGGING_NAME} started")
+
+    def stop(self):
+        self.observer.stop()
+        self.stop_flag.set()
+        super().join()
+        bt.logging.debug(f"{FIREWALL_LOGGING_NAME} stopped")
+
+    def wait(self):
+        """
+        Wait until we have execute the run method at least one
+        """
+        attempt = 1
+        while self.first_try and attempt <= FIREWALL_ATTEMPTS:
+            bt.logging.debug(
+                f"[{FIREWALL_LOGGING_NAME}][{attempt}] Waiting file to be process..."
+            )
+            time.sleep(1)
+            attempt += 1
+
+    def is_whitelisted(self, hotkey: str):
+        """
+        True if the hotkey is whitelisted, false otherwise
+        """
+        is_whitelisted = False
+        with self._lock:
+            is_whitelisted = hotkey in self.whitelist_hotkeys
+
+        return is_whitelisted
+
+    def is_blacklisted(self, hotkey: str):
+        """
+        True if the hotkey is blacklisted, false otherwise
+        """
+        is_blacklisted = False
+        with self._lock:
+            is_blacklisted = hotkey not in self.whitelist_hotkeys
+
+        if is_blacklisted:
+            return (True, RuleType.DENY, f"Hotkey '{hotkey}' is blacklisted")
+
+        return (False, None, None)
+
+    def is_unknown_synapse(self, name: str):
+        """
+        True if the synapse is an allowed one, false otherwise
+        """
+        synapses = self.get_specification("synapses") or []
+        if len(synapses) > 0 and name not in synapses:
+            return (
+                True,
+                RuleType.DENY,
+                f"Synapse name '{name}' not found, available {list(synapses.keys())}",
+            )
+
+        return (False, None, None)
+
+    def is_old_neuron_version(self, version: int = 0):
+        """
+        True if the neuron version is greater stricly than the one required, false otherwise
+        """
+        version_required = int(self.get_specification("neuron_version") or 0)
+        if version < version_required:
+            return (
+                True,
+                RuleType.DENY,
+                f"Neuron version {version} is outdated; version {version_required} is required.",
+            )
+
+        return (False, None, None)
+
+    def get_ip_blocked(self, ip, dport, protocol):
+        """
+        Return the index of the ip blocked searched, -1 otherwise
+        """
+        return next(
+            (
+                x
+                for x in self.ips_blocked
+                if x["ip"] == ip and x["dport"] == dport and x["protocol"] == protocol
+            ),
+            None,
+        )
+
+    def get_index_ip_blocked(self, ip, dport, protocol):
+        """
+        Return the index of the ip blocked searched, -1 otherwise
+        """
+        return next(
+            (
+                index
+                for index, x in enumerate(self.ips_blocked)
+                if x["ip"] == ip and x["dport"] == dport and x["protocol"] == protocol
+            ),
+            -1,
+        )
+
+    def is_blocked(self, ip, dport, protocol):
+        """
+        True if the search ip blocked has been found, false otherwise
+        """
+        return (
+            next(
+                (
+                    x
+                    for x in self.ips_blocked
+                    if x["ip"] == ip
+                    and x["dport"] == dport
+                    and x["protocol"] == protocol
+                ),
+                None,
+            )
+            is not None
+        )
+
+    def cleanup_old_packets(self, current_time, requests: dict):
+        """Remove packets older than the PACKET_HISTORY_DURATION."""
+        keys_to_delete = [
+            key
+            for key, packets in requests.items()
+            if len(packets) > 0
+            and current_time - packets[-1].current_time
+            > FIREWALL_PACKET_HISTORY_DURATION
+        ]
+
+        if len(keys_to_delete) == 0:
+            return
+
+        # Delete the keys in a separate loop
+        for key in keys_to_delete:
+            del requests[key]
+
+    def update(self, specifications={}, whitelist_hotkeys=[]):
+        with self._lock:
+            self.specifications = copy.deepcopy(specifications)
+            self.whitelist_hotkeys = list(whitelist_hotkeys)
+
+    def update_config(self, data):
+        with self._lock:
+            self._rules = [create_rule(x) for x in data]
+
+        self.first_try = False
+
+        bt.logging.success(
+            f"[{FIREWALL_LOGGING_NAME}] File proceed successfully: {len(data)} rules loaded"
+        )
+
+    def get_specification(self, name: str):
+        with self._lock:
+            specifications = copy.deepcopy(self.specifications)
+            return specifications.get(name)
+
+    def get_ip_index(self, firewall_data, ip_to_find):
+        for index, ip in enumerate(firewall_data.keys()):
+            if ip == ip_to_find:
+                return index
+        return None
+
+    def block_ip(self, id, ip, dport, protocol, type, reason, synapse):
+        ip_blocked = None
+
+        index = self.get_index_ip_blocked(ip, dport, protocol)
+        if index != -1:
+            self.ips_blocked[index] = {
+                **self.ips_blocked[index],
+                "type": type,
+                "reason": reason,
+                "synapse": synapse,
+                "timestamps": self.packet_timestamps[id],
+            }
+        else:
+            ip_blocked = {
+                "ip": ip,
+                "dport": dport,
+                "protocol": protocol,
+                "type": type,
+                "reason": reason,
+                "synapse": synapse,
+                "timestamps": self.packet_timestamps[id],
+            }
+
+            self.ips_blocked.append(ip_blocked)
+
+        # Update the local file
+        save_json_file("ips_blocked.json", self.ips_blocked)
+
+        # Notify user only if it a new op blocked
+        if index == -1:
+            protocol_str = protocol.upper() if protocol else None
+            bt.logging.warning(f"Blocking {protocol_str} {ip}/{dport}: {reason}")
+
+    def unblock_ip(self, ip, dport, protocol):
+        if not self.is_blocked(ip, dport, protocol):
+            return
+
+        # Update the block ips
+        self.ips_blocked = [
+            x
+            for x in self.ips_blocked
+            if x["ip"] != ip or x["dport"] != dport or x["protocol"] != protocol
+        ]
+
+        # Update the local file
+        save_json_file("ips_blocked.json", self.ips_blocked)
+
+        protocol_str = protocol.upper() if protocol else None
+        bt.logging.success(f"Unblocking {protocol_str} {ip}/{dport}")
+
+    def detect_dos(self, id, current_time, rule: DetectDoSRule):
+        """
+        Detect Denial of Service attack which is an attack from a single source that overwhelms a target with requests,
+        """
+        # Get the timestamps within the time window for the combination ip/port/protocol
+        recent_timestamps = [
+            t for t in self.packet_timestamps[id] if current_time - t < rule.time_window
+        ]
+
+        # Override the packets timestamps in order to keep only the ones within the time window
+        # for the combination ip/port/protocol
+        self.packet_timestamps[id] = recent_timestamps
+
+        if len(recent_timestamps) > rule.packet_threshold:
+            return (
+                True,
+                RuleType.DETECT_DOS,
+                f"DoS attack detected: {len(recent_timestamps)} requests in {rule.time_window} seconds",
+            )
+
+        return (False, None, None)
+
+    def detect_ddos(self, id, current_time, rule: DetectDDoSRule):
+        """
+        Detect Distributed Denial of Service which is an attack from multiple sources that overwhelms a target with requests,
+        """
+        index = next(
+            (i for i, (x) in enumerate(self.packet_timestamps.keys()) if x == id), -1
+        )
+
+        # Get the timestamps within the time window
+        recent_timestamps = [
+            t
+            for ts in self.packet_timestamps.values()
+            for t in ts
+            if current_time - t < rule.time_window
+        ]
+
+        # Create an array with the number of recent timestamps for each vps
+        requests = [
+            sum(1 for t in ts if current_time - t < rule.time_window)
+            for ts in self.packet_timestamps.values()
+        ]
+
+        # Remove the timestamps outside the time window
+        self.packet_timestamps = defaultdict(
+            list,
+            {
+                key: [t for t in ts if current_time - t < rule.time_window]
+                for key, ts in self.packet_timestamps.items()
+            },
+        )
+
+        if len(recent_timestamps) <= rule.packet_threshold:
+            return (False, None, None)
+
+        t = np.percentile(requests, 75)
+
+        legit = [x for x in requests if x <= t]
+        max_legit = np.max(legit) if len(legit) > 0 else 0
+        mean_legit = np.mean(legit) if len(legit) > 0 else 0
+
+        ip_count = requests[index]
+
+        if ip_count > max_legit + mean_legit:
+            return (
+                True,
+                RuleType.DETECT_DDOS,
+                f"DDoS attack detected: {ip_count} requests in {rule.time_window} seconds",
+            )
+
+        return (False, None, None)
+
+    def extract_infos_json(self, payload={}):
+        name = payload.get("name") or ""
+
+        dendrite = payload.get("dendrite") or {}
+        neuron_version = dendrite.get("neuron_version") or 0
+        hotkey = dendrite.get("hotkey") or None
+
+        return (name, neuron_version, hotkey)
+
+    def extract_infos_string(self, content):
+        # Split the HTTP request data into lines
+        lines = content.split("\n")
+
+        # Set default value
+        name = ""
+        neuron_version = 0
+        hotkey = None
+
+        # Get the value for each expected property
+        for line in lines:
+            if "name" in line:
+                # Split the line to get the value
+                _, value = line.split(":", 1)
+                # Strip any extra whitespace and print the value
+                name = value.strip()
+
+            if "bt_header_dendrite_neuron_version" in line:
+                # Split the line to get the value
+                _, value = line.split(":", 1)
+                # Strip any extra whitespace and print the value
+                neuron_version = int(value.strip()) if value else 0
+
+            if "bt_header_dendrite_hotkey" in line:
+                # Split the line to get the value
+                _, value = line.split(":", 1)
+                # Strip any extra whitespace and print the value
+                hotkey = value.strip()
+
+        return (name, neuron_version, hotkey)
+
+    def extract_infos(self, payload):
+        """
+        Extract information we want to check to determinate if we allow or not the packet
+        """
+        result = ("", 0, None)
+
+        try:
+            content = payload.decode("utf-8") if isinstance(payload, bytes) else payload
+        except Exception:
+            return result
+
+        try:
+            # Split headers and body
+            headers, body = content.split("\r\n\r\n", 1)
+
+            # Check if Content-Type is application/json
+            if "Content-Type: application/json" in headers:
+                data = json.loads(body)
+                result = self.extract_infos_json(data)
+            else:
+                result = self.extract_infos_string(content)
+        except ValueError as e:
+            result = self.extract_infos_string(content)
+
+        return result
+
+    def get_rule(self, rules: List[Rule], type: RuleType, ip, port, protocol):
+        filtered_rules = [r for r in rules if r.rule_type == type]
+
+        # Ip/Port rule
+        rule = next(
+            (
+                r
+                for r in filtered_rules
+                if r.ip == ip and r.dport == port and r.protocol == protocol
+            ),
+            None,
+        )
+
+        # Ip rule
+        rule = rule or next(
+            (
+                r
+                for r in filtered_rules
+                if ip is not None
+                and r.ip == ip
+                and r.dport is None
+                and r.protocol is None
+            ),
+            None,
+        )
+
+        # Port rule
+        rule = rule or next(
+            (
+                r
+                for r in filtered_rules
+                if port is not None
+                and r.dport == port
+                and r.protocol == protocol
+                and r.ip is None
+            ),
+            None,
+        )
+
+        return rule
+
+    def packet_callback(self, packet: FirewallPacket):
+        metadata = {}
+        try:
+            # Get the source ip
+            if packet.sip is None:
+                return
+
+            # Get all rules related to the ip/port
+            rules = [
+                r for r in self.rules if r.ip == packet.sip or r.dport == packet.dport
+            ]
+
+            # Set metadata for logs purpose on exception
+            metadata = {"ip": packet.sip, "dport": packet.dport}
+
+            # Check if a allow rule exist
+            match_allow_rule = (
+                self.get_rule(
+                    rules=rules,
+                    type=RuleType.ALLOW,
+                    ip=packet.sip,
+                    port=packet.dport,
+                    protocol=packet.protocol,
+                )
+                is not None
+            )
+
+            # Check if a deny rule exist
+            match_deny_rule = (
+                self.get_rule(
+                    rules=rules,
+                    type=RuleType.DENY,
+                    ip=packet.sip,
+                    port=packet.dport,
+                    protocol=packet.protocol,
+                )
+                is not None
+            )
+
+            # Work with a copy of the requests
+            requests = []
+            with self._lock:
+                requests = self._requests
+
+            # Clean old packets
+            self.cleanup_old_packets(packet.current_time, requests)
+
+            # Initialise variables
+            request = requests.get(packet.id) or []
+            previous_packet = request[-1] if len(request) > 0 else None
+            seq = previous_packet.seq if previous_packet is not None else 0
+            ack = previous_packet.ack if previous_packet is not None else 0
+
+            # If no rule, by default we allow packets
+            must_allow = match_allow_rule or True
+            must_deny = match_deny_rule
+            rule_type = None
+            reason = None
+            is_request_for_miner = self.port == packet.dport
+
+            # True if there is any explicit allow/deny rule defined
+            is_decision_made = match_allow_rule or match_deny_rule
+
+            # True is the packet is a connection initiation, false otherwise
+            # packet.seq and seq will be the same if it is part of a retry
+            is_sync_packet = (
+                packet.seq != seq and packet.ack == 0 and packet.flags == "S"
+            )
+
+            # True if the packet is a data packet, false otherwise
+            is_data_packet = packet.ack != ack and packet.flags == "PA"
+
+            # Get the details of the sync blocked if it has been blocked
+            sync_ip_blocked = (
+                self.get_ip_blocked(packet.sip, packet.dport, packet.protocol)
+                if not is_sync_packet
+                else None
+            )
+
+            # Check if we receive olds packets where decision has already been made.
+            # Due to the TCP protocol's inherent behavior of re-transmitting packets
+            # when it doesn't receive an acknowledgment from the recipient
+            processed_packet = (
+                next((x for x in request if x.internal_id == packet.internal_id), None)
+                if request
+                else None
+            )
+
+            # If the current packet matches an old one
+            # we use the same decision
+            if processed_packet is not None:
+                if processed_packet.status == "allow":
+                    packet.accept()
+                else:
+                    packet.drop()
+
+                return
+
+            if is_sync_packet:
+                # SYNC packet (meaning new request), so we re-initialise the request
+                request = requests[packet.id] = []
+
+                # Add the new time for ip/port
+                self.packet_timestamps[packet.id].append(packet.current_time)
+            elif not is_data_packet:
+                # Packet that is not a data packet such as A, FA, etc
+                # => Use the previous packet decision
+                if request[-1].status == "allow":
+                    packet.accept()
+                else:
+                    packet.drop()
+                return
+
+            if is_request_for_miner and is_data_packet:
+                # Checks only for miner, not for subtensor
+
+                # Extract data from packet content
+                name, neuron_version, hotkey = (
+                    self.extract_infos(packet.payload)
+                    if packet.payload
+                    else ("", 0, None)
+                )
+
+                metadata = {
+                    **metadata,
+                    "synapse": {
+                        "name": name,
+                        "neuron_version": neuron_version,
+                        "hotkey": hotkey,
+                    },
+                }
+
+                # Check if the packet matches an expected synapses
+                must_deny, rule_type, reason = (
+                    self.is_unknown_synapse(name)
+                    if not must_deny
+                    else (must_deny, rule_type, reason)
+                )
+
+                # Check if the hotkey is blacklisted
+                must_deny, rule_type, reason = (
+                    self.is_blacklisted(hotkey)
+                    if not must_deny and not is_decision_made
+                    else (must_deny, rule_type, reason)
+                )
+
+                # Check if the neuron version is greater stricly than the one required
+                must_deny, rule_type, reason = (
+                    self.is_old_neuron_version(neuron_version)
+                    if not must_deny
+                    else (must_deny, rule_type, reason)
+                )
+
+                if not is_decision_made:
+                    must_allow = must_allow or self.is_whitelisted(hotkey)
+
+            # Check if a DoS attack is found
+            dos_rule = self.get_rule(
+                rules=rules,
+                type=RuleType.DETECT_DOS,
+                ip=packet.sip,
+                port=packet.dport,
+                protocol=packet.protocol,
+            )
+            must_deny, rule_type, reason = (
+                self.detect_dos(
+                    packet.id,
+                    packet.current_time,
+                    dos_rule,
+                )
+                if dos_rule
+                and not must_deny
+                and is_sync_packet
+                and not is_decision_made
+                else (must_deny, rule_type, reason)
+            )
+
+            # Check if a DDoS attack is found
+            ddos_rule = self.get_rule(
+                rules=rules,
+                type=RuleType.DETECT_DDOS,
+                ip=packet.sip,
+                port=packet.dport,
+                protocol=packet.protocol,
+            )
+            must_deny, rule_type, reason = (
+                self.detect_ddos(
+                    packet.id,
+                    packet.current_time,
+                    ddos_rule,
+                )
+                if ddos_rule
+                and not must_deny
+                and is_sync_packet
+                and not is_decision_made
+                else (must_deny, rule_type, reason)
+            )
+
+            # Check if we must allow the packet if
+            # - Packet is a SYNC packet
+            must_allow = must_allow or is_sync_packet
+
+            # Check if we must deny the packet if
+            # - The SYNC packet has been denied
+            # - Has been flagged as must denied already by one of the rule
+            is_previous_packets_denied = (
+                len(request) > 0 and request[-1].status == "deny"
+            )
+            must_deny = must_deny or is_previous_packets_denied
+
+            count = len(self.packet_timestamps[packet.id])
+
+            # Check if there is a deny or allow rule defined to reset
+            # the timestamps for that ip if there are any
+            if (
+                is_sync_packet
+                and is_decision_made
+                and packet.id in self.packet_timestamps
+            ):
+                self.packet_timestamps[packet.id] = []
+
+            if must_deny or not must_allow:
+                # If sync packet has been blocked we reuse the type and reason
+                # as it is the right one to use
+                if sync_ip_blocked:
+                    reason = sync_ip_blocked.get("reason")
+                    rule_type = sync_ip_blocked.get("type")
+
+                # Flag ip as blocked
+                self.block_ip(
+                    id=packet.id,
+                    ip=packet.sip,
+                    dport=packet.dport,
+                    protocol=packet.protocol,
+                    type=rule_type or RuleType.DENY,
+                    reason=reason or "Deny ip",
+                    synapse=metadata.get("synapse", {}),
+                )
+
+                # Trace some details of the dropped packet
+                copyright = (
+                    "Packet new connection"
+                    if is_sync_packet
+                    else "Packet data" if is_data_packet else "Packet unknown"
+                )
+                bt.logging.trace(
+                    f"[{packet.id}][{packet.protocol}][{packet.flags}][#{count}] {copyright} dropped - {reason}"
+                )
+
+                # Keep the decision on the data packet for potential pack retransmission
+                # if is_data_packet:
+                requests[packet.id].append(packet)
+
+                # Drop packet
+                packet.drop()
+
+                with self._lock:
+                    self._requests = requests
+
+                return
+
+            # Unblock the ip/port if data packet and previously blocked
+            if is_data_packet:
+                self.unblock_ip(
+                    ip=packet.sip, dport=packet.dport, protocol=packet.protocol
+                )
+
+            # Trace some details of the allowed packet
+            copyright = (
+                "Packet new connection"
+                if is_sync_packet
+                else "Packet data" if is_data_packet else "Packet unknown"
+            )
+            bt.logging.trace(
+                f"[{packet.id}][{packet.protocol}][{packet.flags}][#{count}] {copyright} allowed"
+            )
+
+            # Keep the decision on the data packet for potential pack retransmission
+            # if not is_data_packet:
+            requests[packet.id].append(packet)
+
+            # Allow packet
+            packet.accept()
+
+            with self._lock:
+                self._requests = requests
+        except Exception as ex:
+            bt.logging.warning(
+                f"[{FIREWALL_LOGGING_NAME}] Failed to proceed firewall packet: {ex}"
+            )
+            bt.logging.info(f"[{FIREWALL_LOGGING_NAME}] Packet metadata: {metadata}")
+            bt.logging.debug(traceback.format_exc())
+
+    def run(self):
+        # Reload the previous ips blocked
+        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Loading blocked ips")
+        self.ips_blocked = load_json_file("ips_blocked.json") or []
+
+        # Restore the ips blocked
+        for ip_blocked in self.ips_blocked:
+            ip = ip_blocked.get("ip")
+            dport = ip_blocked.get("dport")
+            protocol = ip_blocked.get("protocol")
+            timestamps = ip_blocked.get("timestamps") or []
+            if ip is None or dport is None or protocol is None:
+                continue
+
+            id = f"{ip}:{dport}:{protocol}"
+            self.packet_timestamps[id] += timestamps
+
+        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating allow rule for loopback")
+        self.tool.create_allow_loopback_rule()
+
+        # Create Allow rules
+        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating allow rules")
+        self.tool.create_allow_rule(dport=22, protocol="tcp")
+        self.tool.create_allow_rule(dport=443, protocol="tcp")
+        self.tool.create_allow_rule(sport=443, protocol="tcp")
+        self.tool.create_allow_rule(sport=80, protocol="tcp")
+        self.tool.create_allow_rule(sport=53, protocol="udp")
+
+        # Create queue rules
+        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating queue rules")
+        self.tool.create_allow_rule(dport=8091, protocol="tcp", queue=1)
+        self.tool.create_allow_rule(dport=9944, protocol="tcp", queue=2)
+        self.tool.create_allow_rule(dport=9933, protocol="tcp", queue=3)
+        self.tool.create_allow_rule(dport=30333, protocol="tcp", queue=4)
+
+        # Change the policy to deny
+        bt.logging.debug(
+            f"[{FIREWALL_LOGGING_NAME}] Change the INPUT policy to deny by default"
+        )
+        self.tool.create_deny_policy()
+
+        # Subscribe to the observer
+        self.observer.subscribe(queue_num=1, callback=self.packet_callback)
+        self.observer.subscribe(queue_num=2, callback=self.packet_callback)
+        self.observer.subscribe(queue_num=3, callback=self.packet_callback)
+        self.observer.subscribe(queue_num=4, callback=self.packet_callback)
+        self.observer.start()

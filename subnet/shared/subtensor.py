@@ -1,4 +1,5 @@
 import time
+import bittensor as bt
 from math import floor
 from functools import lru_cache, update_wrapper
 from typing import Callable, Any
@@ -34,3 +35,25 @@ def ttl_cache(maxsize: int = 128, typed: bool = False, ttl: int = -1):
 @ttl_cache(maxsize=1, ttl=12)
 def get_current_block(subtensor) -> int:
     return subtensor.get_current_block()
+
+
+def get_hyperparameter_value(subtensor: "bt.subtensor", param_name: str, netuid: int):
+    """
+    Get the value of the requested hyperparameter
+    """
+    hex_bytes_result = subtensor.query_runtime_api(
+        runtime_api="SubnetInfoRuntimeApi", method="get_subnet_hyperparams", params=[netuid]
+    )
+
+    if hex_bytes_result is None:
+        return []
+
+    if hex_bytes_result.startswith("0x"):
+        bytes_result = bytes.fromhex(hex_bytes_result[2:])
+    else:
+        bytes_result = bytes.fromhex(hex_bytes_result)
+
+    # Print the bytes object
+    subnet = bt.chain_data.SubnetHyperparameters.from_vec_u8(bytes_result)
+    value = subnet.__dict__[param_name]
+    return value

@@ -31,11 +31,11 @@ async def handle_synapse(self, uid: int):
     miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
 
     # Check the miner is available
-    available = await ping_uid(self, miner.uid)
+    available, reason = await ping_uid(self, miner.uid)
     if available == False:
         miner.verified = False
         miner.process_time = DEFAULT_PROCESS_TIME
-        return "Miner is not verified"
+        return f"Miner is not verified: {reason}" if reason else "Miner is not verified"
 
     bt.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
 
@@ -109,11 +109,13 @@ async def challenge_data(self):
     locations = self.country_service.get_locations()
 
     # Execute the challenges
-    tasks = []
-    reasons = []
-    for uid in uids:
-        tasks.append(asyncio.create_task(handle_synapse(self, uid)))
-        reasons = await asyncio.gather(*tasks)
+    tasks = [handle_synapse(self, uid) for uid in uids]
+    reasons = await asyncio.gather(*tasks)
+    # tasks = []
+    # reasons = []
+    # for uid in uids:
+    #     tasks.append(asyncio.create_task(handle_synapse(self, uid)))
+    #     reasons = await asyncio.gather(*tasks)
 
     # Initialise the rewards object
     rewards: torch.FloatTensor = torch.zeros(len(uids), dtype=torch.float32).to(

@@ -14,7 +14,7 @@
 ---
 
 <div>
-  <img src="subvortex.png" alt="Image Description" width="300" height="300">
+  <img src="subvortex.png" alt="Image Description" width="310" height="200">
 </div>
 <br />
 <div style="font-size: 20px">Testnet: 92 • Mainnet: 7</div>
@@ -29,6 +29,7 @@
 - [Roles](#roles)
 - [Subtensor & Bittensor](#subtensor--bittensor)
 - [Incentive Mechanism](#incentive-mechanism)
+- [Firewall](#firewall)
 - [Value Proposition](#value-proposition)
 - [Team Composition](#team-composition)
 - [Road Map](#road-map)
@@ -128,6 +129,10 @@ To assign a score to each miner, we will establish a connection with the subtens
 ### Global Distribution
 
 This reward incentivizes miners to effectively distribute subtensors across different geographical locations to optimize performance and reduce latency for a better subnet experience.
+
+## Firewall
+
+To know more on the firewall, refer to the [firewall guide](./docs/features/firewall/firewall.md)
 
 ## Value Proposition
 
@@ -351,6 +356,8 @@ pm2 start neurons/miner.py \
 ```
 
 > IMPORTANT: Do not run more than one miner per machine. Running multiple miners will result in the loss of incentive and emissions on all miners.
+
+To enable the firewall, add the `--firewall.on` flag. It is highly recommended to enable the firewall to protect your miner from attacks that could impact your score. For more details about the firewall, please refer to our [firewall guide](./docs/features/firewall/firewall.md)
 
 ### Running a Validator
 

@@ -16,7 +16,7 @@ class FirewallMonitor(threading.Thread):
         """
         Save all the events received in the event log file
         """
-        with open("events.log", "a") as file:
+        with open("firewall-events.json", "a") as file:
             while True:
                 event = self._queue.get()
                 if event is None:

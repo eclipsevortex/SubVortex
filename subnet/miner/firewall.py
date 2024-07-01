@@ -27,6 +27,7 @@ from typing import List
 from collections import defaultdict
 
 from subnet.shared.file import load_json_file, save_json_file
+from subnet.shared.encoder import encode_bytes
 from subnet.file.file_local_monitor import FileLocalMonitor
 from subnet.firewall.storage.firewall_file_storage import FirewallFileStorage
 from subnet.firewall.firewall_monitor import FirewallMonitor
@@ -259,13 +260,15 @@ class Firewall(threading.Thread):
     def block_ip(self, ip, dport, protocol, type, reason, synapse, timestamp):
         ip_blocked = None
 
+        synase_to_send = {k: v for k, v in synapse.items() if k not in ["payload"]}
+
         index = self.get_index_ip_blocked(ip, dport, protocol)
         if index != -1:
             self.ips_blocked[index] = {
                 **self.ips_blocked[index],
                 "type": type,
                 "reason": reason,
-                "synapse": synapse,
+                "synapse": synase_to_send,
                 "timestamps": self.packet_timestamps[ip][dport][protocol],
             }
         else:
@@ -275,7 +278,7 @@ class Firewall(threading.Thread):
                 "protocol": protocol,
                 "type": type,
                 "reason": reason,
-                "synapse": synapse,
+                "synapse": synase_to_send,
                 "timestamps": self.packet_timestamps[ip][dport][protocol],
             }
 
@@ -294,15 +297,17 @@ class Firewall(threading.Thread):
             "ip": ip,
             "port": dport,
             "protocol": protocol,
+            "hotkey": synapse.get("hotkey"),
             "reason": reason,
             "timestamp": timestamp,
+            "payload": encode_bytes(synapse.get("payload")),
         }
         self.monitor.emit(event_data)
 
         protocol_str = protocol.upper() if protocol else None
         bt.logging.warning(f"Blocking {protocol_str} {ip}/{dport}: {reason}")
 
-    def unblock_ip(self, ip, dport, protocol, timestamp):
+    def unblock_ip(self, ip, dport, protocol, timestamp, synapse):
         index = self.get_index_ip_blocked(ip, dport, protocol)
         if index == -1:
             return
@@ -313,7 +318,9 @@ class Firewall(threading.Thread):
             "ip": ip,
             "port": dport,
             "protocol": protocol,
+            "hotkey": synapse.get("hotkey"),
             "timestamp": timestamp,
+            "payload": synapse.get("payload"),
         }
         self.monitor.emit(event_data)
 
@@ -455,7 +462,7 @@ class Firewall(threading.Thread):
         """
         Extract information we want to check to determinate if we allow or not the packet
         """
-        result = ("", 0, None)
+        result = ("", 0, None, payload)
 
         try:
             content = payload.decode("utf-8") if isinstance(payload, bytes) else payload
@@ -465,6 +472,9 @@ class Firewall(threading.Thread):
         try:
             # Split headers and body
             headers, body = content.split("\r\n\r\n", 1)
+            bt.logging.debug("START Extraction")
+            bt.logging.debug(content)
+            bt.logging.debug("END Extraction")
 
             # Check if Content-Type is application/json
             if "Content-Type: application/json" in headers:
@@ -475,7 +485,7 @@ class Firewall(threading.Thread):
         except ValueError as e:
             result = self.extract_infos_string(content)
 
-        return result
+        return (*result, payload)
 
     def get_rule(self, rules: List[Rule], type: RuleType, ip, port, protocol):
         filtered_rules = [r for r in rules if r.rule_type == type]
@@ -647,7 +657,7 @@ class Firewall(threading.Thread):
                 # Checks only for miner, not for subtensor
 
                 # Extract data from packet content
-                name, neuron_version, hotkey = (
+                name, neuron_version, hotkey, payload = (
                     self.extract_infos(packet.payload)
                     if packet.payload
                     else ("", 0, None)
@@ -659,6 +669,7 @@ class Firewall(threading.Thread):
                         "name": name,
                         "neuron_version": neuron_version,
                         "hotkey": hotkey,
+                        "payload": payload,
                     },
                 }
 
@@ -808,6 +819,7 @@ class Firewall(threading.Thread):
                     dport=port_dest,
                     protocol=protocol,
                     timestamp=current_time,
+                    synapse=metadata.get("synapse", {}),
                 )
 
             # Trace some details of the allowed packet

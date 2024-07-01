@@ -3,21 +3,38 @@
 <head>
     <title>Firewall Monitor</title>
     <style>
-        .right-align {
-            text-align: right;
+        table {
+            width: 100%;
+            border-collapse: collapse;
         }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+       
+        .timestamp { width: 15%; }
+        .ip-address { width: 10%; }
+        .port { width: 5%; }
+        .protocol { width: 5%; }
+        .hotkey { width: 20%; }
+        .action { width: 5%; }
+        .reason { width: 30%; max-width: 400px; overflow-y: scroll; }
+        .payload { width: 10%; max-width: 200px; overflow-y: scroll; }
     </style>
 </head>
 <body>
     <h1>Firewall Monitor</h1>
-    <table border="1">
+    <table class="table">
         <tr>
-            <th>Timestamp</th>
-            <th>IP Address</th>
-            <th>Port</th>
-            <th>Protocol</th>
-            <th>Action</th>
-            <th>Reason</th>
+            <th class="timestamp">Timestamp</th>
+            <th class="ip-address">IP Address</th>
+            <th class="port">Port</th>
+            <th class="protocol">Protocol</th>
+            <th class="action">Hotkey</th>
+            <th class="action">Action</th>
+            <th class="reason">Reason</th>
+            <th class="payload">Payload</th>
         </tr>
         <tbody id="events-table">
         </tbody>
@@ -30,12 +47,14 @@
             table.innerHTML = '';
             events.forEach(event => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td>${new Date(event.timestamp * 1000).toLocaleString()}</td>
-                                 <td class="right-align">${event.ip}</td>
-                                 <td class="right-align">${event.port}</td>
-                                 <td>${event.protocol}</td>
-                                 <td>${event.action}</td>
-                                 <td>${event.reason || ''}</td>`;
+                row.innerHTML = `<td class="timestamp">${new Date(event.timestamp * 1000).toLocaleString()}</td>
+                                 <td class="ip-address">${event.ip}</td>
+                                 <td class="port">${event.port}</td>
+                                 <td class="protocol">${event.protocol}</td>
+                                 <td class="protocol">${event.hotkey}</td>
+                                 <td class="action">${event.action}</td>
+                                 <td class="reason">${event.reason || ''}</td>
+                                 <td class="payload">${event.payload || ''}</td>`;
                 table.appendChild(row);
             });
         }

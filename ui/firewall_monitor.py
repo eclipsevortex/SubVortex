@@ -1,3 +1,4 @@
+import os
 import sys
 import json
 import signal
@@ -18,7 +19,10 @@ def index():
 @app.route("/events")
 def get_events():
     events = []
-    with open("events.log", "r") as file:
+    if not os.path.exists("firewall-events.json"):
+        return jsonify(events)
+
+    with open("firewall-events.json", "r") as file:
         for line in file:
             events.append(json.loads(line))
     return jsonify(events)
@@ -39,7 +43,7 @@ def signal_handler(sig, frame):
 
 if __name__ == "__main__":
     # Register signal handlers
-    signal.signal(signal.SIGINT, signal_handler)   # Handle Ctrl+C
+    signal.signal(signal.SIGINT, signal_handler)  # Handle Ctrl+C
     signal.signal(signal.SIGTERM, signal_handler)  # Handle `pm2 stop` and `pm2 delete`
 
     try:

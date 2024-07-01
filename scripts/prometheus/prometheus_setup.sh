@@ -1,31 +1,36 @@
 #!/bin/bash
 
+source ${BASH_SOURCE%/*}/prometheus_variables.sh
+
+# Update package index
+sudo apt update
+
 # Step 1: Download Prometheus
 wget https://github.com/prometheus/prometheus/releases/download/v2.30.3/prometheus-2.30.3.linux-amd64.tar.gz
-echo -e '\e[32mPrometheus downloaded\e[0m'
+echo -e "\e[32m$PROMETHEUS_NAME downloaded\e[0m"
 
 # Step 2: Extract Prometheus archive
 tar xvfz prometheus-2.30.3.linux-amd64.tar.gz
-echo -e '\e[32mPrometheus extracted\e[0m'
+echo -e "\e[32m$PROMETHEUS_NAME extracted\e[0m"
 
 # Step 3: Move Prometheus binaries to /usr/local/bin
 sudo mv prometheus-2.30.3.linux-amd64/{prometheus,promtool} /usr/local/bin/
-echo -e '\e[32mPrometheus binary moved\e[0m'
+echo -e "\e[32m$PROMETHEUS_NAME binary moved\e[0m"
 
 # Step 4: Move Prometheus configuration directory to /etc/prometheus
 sudo mkdir -p /etc/prometheus
 sudo mv prometheus-2.30.3.linux-amd64/{prometheus.yml,console_libraries,consoles} /etc/prometheus/
-echo -e '\e[32mPrometheus configuration moved\e[0m'
+echo -e "\e[32m$PROMETHEUS_NAME configuration moved\e[0m"
 
 # Step 5: Create Prometheus user and directories
 sudo useradd --no-create-home --shell /bin/false prometheus
 mkdir /var/lib/prometheus
 sudo chown -R prometheus:prometheus /etc/prometheus /usr/local/bin/prometheus /usr/local/bin/promtool /var/lib/prometheus
-echo -e '\e[32mPrometheus user/directories created\e[0m'
+echo -e "\e[32m$PROMETHEUS_NAME user/directories created\e[0m"
 
 # Step 6: Copy Prometheus configuration to scape subtensor metrics
 sudo cp prometheus.yml /etc/prometheus/prometheus.yml
-echo -e '\e[32mPrometheus configuration file overrided\e[0m'
+echo -e "\e[32m$PROMETHEUS_NAME configuration file overrided\e[0m"
 
 # Step 6: Configure systemd service for Prometheus
 sudo tee /etc/systemd/system/prometheus.service > /dev/null <<EOF
@@ -47,9 +52,9 @@ ExecStart=/usr/local/bin/prometheus \
 [Install]
 WantedBy=multi-user.target
 EOF
-echo -e '\e[32mPrometheus systemd service configured\e[0m'
+echo -e "\e[32m$PROMETHEUS_NAME systemd service configured\e[0m"
 
 # Step 7: Clean up
 rm prometheus-2.30.3.linux-amd64.tar.gz
 rm -rf prometheus-2.30.3.linux-amd64
-echo -e '\e[32mPrometheus cleaned up\e[0m'
+echo -e "\e[32m$PROMETHEUS_NAME cleaned up\e[0m"

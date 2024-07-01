@@ -491,35 +491,29 @@ class Firewall(threading.Thread):
     def packet_callback(self, packet: FirewallPacket):
         metadata = {}
         try:
-            # Get the protocol
-            protocol = packet.protocol
-
-            # Get the destination port
-            port_dest = packet.dport
-
             # Get the source ip
-            ip_src = packet.sip
-            # ip_src = payload[IP].src if IP in payload else None
-            if ip_src is None:
+            if packet.sip is None:
                 return
 
             # Get all rules related to the ip/port
-            rules = [r for r in self.rules if r.ip == ip_src or r.dport == port_dest]
+            rules = [
+                r for r in self.rules if r.ip == packet.sip or r.dport == packet.dport
+            ]
 
             # Get the current time
             current_time = time.time()
 
             # Set metadata for logs purpose on exception
-            metadata = {"ip": ip_src, "dport": port_dest}
+            metadata = {"ip": packet.sip, "dport": packet.dport}
 
             # Check if a allow rule exist
             match_allow_rule = (
                 self.get_rule(
                     rules=rules,
                     type=RuleType.ALLOW,
-                    ip=ip_src,
-                    port=port_dest,
-                    protocol=protocol,
+                    ip=packet.sip,
+                    port=packet.dport,
+                    protocol=packet.protocol,
                 )
                 is not None
             )
@@ -529,9 +523,9 @@ class Firewall(threading.Thread):
                 self.get_rule(
                     rules=rules,
                     type=RuleType.DENY,
-                    ip=ip_src,
-                    port=port_dest,
-                    protocol=protocol,
+                    ip=packet.sip,
+                    port=packet.dport,
+                    protocol=packet.protocol,
                 )
                 is not None
             )
@@ -545,7 +539,7 @@ class Firewall(threading.Thread):
             must_deny = match_deny_rule
             rule_type = None
             reason = None
-            is_request_for_miner = self.port == port_dest
+            is_request_for_miner = self.port == packet.dport
 
             # True if there is any explicit allow/deny rule defined
             is_decision_made = match_allow_rule or match_deny_rule
@@ -561,7 +555,7 @@ class Firewall(threading.Thread):
 
             # Get the details of the sync blocked if it has been blocked
             sync_ip_blocked = (
-                self.get_ip_blocked(ip_src, port_dest, protocol)
+                self.get_ip_blocked(packet.sip, packet.dport, packet.protocol)
                 if not is_sync_packet
                 else None
             )
@@ -660,16 +654,16 @@ class Firewall(threading.Thread):
             dos_rule = self.get_rule(
                 rules=rules,
                 type=RuleType.DETECT_DOS,
-                ip=ip_src,
-                port=port_dest,
-                protocol=protocol,
+                ip=packet.sip,
+                port=packet.dport,
+                protocol=packet.protocol,
             )
             must_deny, rule_type, reason = (
                 self.detect_dos(
                     packet.id,
-                    ip_src,
-                    port_dest,
-                    protocol,
+                    packet.sip,
+                    packet.dport,
+                    packet.protocol,
                     dos_rule,
                     current_time,
                 )
@@ -684,16 +678,16 @@ class Firewall(threading.Thread):
             ddos_rule = self.get_rule(
                 rules=rules,
                 type=RuleType.DETECT_DDOS,
-                ip=ip_src,
-                port=port_dest,
-                protocol=protocol,
+                ip=packet.sip,
+                port=packet.dport,
+                protocol=packet.protocol,
             )
             must_deny, rule_type, reason = (
                 self.detect_ddos(
                     packet.id,
-                    ip_src,
-                    port_dest,
-                    protocol,
+                    packet.sip,
+                    packet.dport,
+                    packet.protocol,
                     ddos_rule,
                     current_time,
                 )
@@ -741,9 +735,9 @@ class Firewall(threading.Thread):
                 # Flag ip as blocked
                 self.block_ip(
                     id=packet.id,
-                    ip=ip_src,
-                    dport=port_dest,
-                    protocol=protocol,
+                    ip=packet.sip,
+                    dport=packet.dport,
+                    protocol=packet.protocol,
                     type=rule_type or RuleType.DENY,
                     reason=reason or "Deny ip",
                     synapse=metadata.get("synapse", {}),
@@ -779,7 +773,9 @@ class Firewall(threading.Thread):
 
             # Unblock the ip/port if data packet and previously blocked
             if is_data_packet:
-                self.unblock_ip(ip=ip_src, dport=port_dest, protocol=protocol)
+                self.unblock_ip(
+                    ip=packet.sip, dport=packet.dport, protocol=packet.protocol
+                )
 
             # Trace some details of the allowed packet
             copyright = (

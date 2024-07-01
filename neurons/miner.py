@@ -190,6 +190,7 @@ class Miner:
                 tool=create_firewall_tool(),
                 port=self.axon.external_port,
                 interface=self.config.firewall.interface,
+                config_file=self.config.firewall.config
             )
             self.update_firewall()
             self.file_monitor.add_file_provider(self.firewall.provider)

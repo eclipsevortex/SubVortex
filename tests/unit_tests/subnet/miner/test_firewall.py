@@ -282,7 +282,7 @@ class TestPackets(TestFirewall):
         client_ack = 0
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -408,7 +408,7 @@ class TestPackets(TestFirewall):
         client_ack = 0
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -542,7 +542,7 @@ class TestPackets(TestFirewall):
         client_ack = 0
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -680,7 +680,7 @@ class TestPackets(TestFirewall):
         client_ack = 0
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -813,7 +813,7 @@ class TestPackets(TestFirewall):
         client_ack = 0
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -959,7 +959,7 @@ class TestPackets(TestFirewall):
         client_ack = 0
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1097,7 +1097,7 @@ class TestPackets(TestFirewall):
         client_ack = 0
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1230,7 +1230,7 @@ class TestPackets(TestFirewall):
         client_ack = 0
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1621,7 +1621,7 @@ class TestDoSRule(TestFirewall):
     def test_only_requests_within_time_window_are_kept(self):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1685,7 +1685,7 @@ class TestDoSRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1731,7 +1731,7 @@ class TestDoSRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1769,7 +1769,7 @@ class TestDoSRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1841,7 +1841,7 @@ class TestDoSRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1905,7 +1905,7 @@ class TestDDoSRule(TestFirewall):
     def test_only_requests_within_time_window_are_kept(self):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -1975,7 +1975,7 @@ class TestDDoSRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -2022,7 +2022,7 @@ class TestDDoSRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -2069,7 +2069,7 @@ class TestDDoSRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -2362,7 +2362,7 @@ class TestDDoSRule(TestFirewall):
         ]
         
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -2647,7 +2647,7 @@ class TestAllowRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "ip": "192.168.0.1",
@@ -2679,7 +2679,7 @@ class TestAllowRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "ip": "192.168.0.1",
@@ -2714,7 +2714,7 @@ class TestAllowRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -2758,7 +2758,7 @@ class TestAllowRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -2811,7 +2811,7 @@ class TestDenyRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "ip": "192.168.0.1",
@@ -2851,7 +2851,7 @@ class TestDenyRule(TestFirewall):
     ):
         # Arrange
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "ip": "192.168.0.1",
@@ -3014,7 +3014,7 @@ class TestIpBlockedFile(TestFirewall):
         self.mock_json_file.return_value = []
 
         firewall = Firewall(observer=self.observer, tool=self.tool, interface="eth0")
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,
@@ -3059,7 +3059,7 @@ class TestIpBlockedFile(TestFirewall):
         self.mock_packet.reset_mock()
 
         # Allow rule
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "ip": "192.168.0.1",
@@ -3090,7 +3090,7 @@ class TestIpBlockedFile(TestFirewall):
         self.mock_packet.reset_mock()
 
         # DoS rule
-        firewall.update_rules(
+        firewall.update_config(
             [
                 {
                     "dport": 8091,

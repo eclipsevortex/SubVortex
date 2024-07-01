@@ -53,6 +53,7 @@ class Firewall(threading.Thread):
         observer: FirewallObserver,
         interface: str,
         port: int = 8091,
+        config_file: str = "firewall.json",
     ):
         super().__init__(daemon=True)
 
@@ -64,6 +65,7 @@ class Firewall(threading.Thread):
         self.interface = interface
         self.whitelist_hotkeys = []
         self.specifications = {}
+        self.first_try = True
 
         self.ips_blocked = []
 
@@ -80,13 +82,11 @@ class Firewall(threading.Thread):
         List all the active rules       
         """
 
-        self.first_try = True
-
         self.provider = FileLocalMonitor(
             logger_name=FIREWALL_LOGGING_NAME,
-            file_path="firewall.json",
+            file_path=config_file,
             check_interval=FIREWALL_SLEEP,
-            callback=self.update_rules,
+            callback=self.update_config,
         )
 
     @property
@@ -236,7 +236,7 @@ class Firewall(threading.Thread):
             self.specifications = copy.deepcopy(specifications)
             self.whitelist_hotkeys = list(whitelist_hotkeys)
 
-    def update_rules(self, data):
+    def update_config(self, data):
         with self._lock:
             self._rules = [create_rule(x) for x in data]
 

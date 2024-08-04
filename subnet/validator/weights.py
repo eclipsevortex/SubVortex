@@ -17,6 +17,7 @@
 
 # Utils for weights setting on chain.
 
+import os
 import torch
 import bittensor as bt
 
@@ -59,85 +60,101 @@ def set_weights_for_validator(
     Raises:
         Exception: If there's an error while setting weights, the exception is logged for diagnosis.
     """
-    # Calculate the average reward for each uid across non-zero values.
-    # Replace any NaN values with 0.
-    nan_idxs = torch.where(torch.isnan(moving_averaged_scores))[0]
-    moving_averaged_scores_no_nan = torch.where(
-        torch.isnan(moving_averaged_scores),
-        torch.zeros_like(moving_averaged_scores),
-        moving_averaged_scores
-    )
-    # Gather negative indices
-    neg_idxs = torch.where(moving_averaged_scores_no_nan < 0)[0]
+    original_value = os.environ.get("USE_TORCH")
 
-    # Ensure positive
-    minimum = min(moving_averaged_scores_no_nan)
+    # Use torch to until we investigate and rewrite this method with numpy
+    os.environ["USE_TORCH"] = "1"
 
-    # Replace nan with min
-    moving_averaged_scores_no_nan[nan_idxs] = minimum.clone()
+    try:
+        # Calculate the average reward for each uid across non-zero values.
+        # Replace any NaN values with 0.
+        nan_idxs = torch.where(torch.isnan(moving_averaged_scores))[0]
+        moving_averaged_scores_no_nan = torch.where(
+            torch.isnan(moving_averaged_scores),
+            torch.zeros_like(moving_averaged_scores),
+            moving_averaged_scores,
+        )
+        # Gather negative indices
+        neg_idxs = torch.where(moving_averaged_scores_no_nan < 0)[0]
 
-    # Make all values positive
-    if minimum < 0:
-        positive_moving_averaged_scores = moving_averaged_scores_no_nan - minimum
-    else:
-        positive_moving_averaged_scores = moving_averaged_scores_no_nan
-    bt.logging.debug(f"Positive scores", positive_moving_averaged_scores)
+        # Ensure positive
+        minimum = min(moving_averaged_scores_no_nan)
 
-    # Push all orinally negative indices to zero
-    positive_moving_averaged_scores[neg_idxs] = 0
+        # Replace nan with min
+        moving_averaged_scores_no_nan[nan_idxs] = minimum.clone()
 
-    # Normalize, ensuring no division by zero or NaNs occur
-    sum_scores = positive_moving_averaged_scores.sum()
-    bt.logging.info(f"Score sum: {sum_scores}")
-    if sum_scores > 0:
-        raw_weights = torch.nn.functional.normalize(positive_moving_averaged_scores, p=1, dim=0)
-    else:
-        raw_weights = torch.zeros_like(positive_moving_averaged_scores)
+        # Make all values positive
+        if minimum < 0:
+            positive_moving_averaged_scores = moving_averaged_scores_no_nan - minimum
+        else:
+            positive_moving_averaged_scores = moving_averaged_scores_no_nan
+        bt.logging.debug(f"Positive scores", positive_moving_averaged_scores)
 
-    # Doubly ensure raw_weights does not contain NaNs (this should not happen after normalization, but as an extra precaution)
-    raw_weights = torch.where(
-        torch.isnan(raw_weights),
-        torch.zeros_like(raw_weights),
-        raw_weights,
-    )
+        # Push all orinally negative indices to zero
+        positive_moving_averaged_scores[neg_idxs] = 0
 
-    bt.logging.debug("raw_weights", raw_weights)
-    bt.logging.debug("raw_weight_uids", metagraph.uids.to("cpu"))
+        # Normalize, ensuring no division by zero or NaNs occur
+        sum_scores = positive_moving_averaged_scores.sum()
+        bt.logging.info(f"Score sum: {sum_scores}")
+        if sum_scores > 0:
+            raw_weights = torch.nn.functional.normalize(
+                positive_moving_averaged_scores, p=1, dim=0
+            )
+        else:
+            raw_weights = torch.zeros_like(positive_moving_averaged_scores)
 
-    # Process the raw weights to final_weights via subtensor limitations.
-    (
-        processed_weight_uids,
-        processed_weights,
-    ) = bt.utils.weight_utils.process_weights_for_netuid(
-        uids=metagraph.uids.to("cpu"),
-        weights=raw_weights.to("cpu"),
-        netuid=netuid,
-        subtensor=subtensor,
-        metagraph=metagraph,
-    )
-    bt.logging.debug("processed_weights", processed_weights)
-    bt.logging.debug("processed_weight_uids", processed_weight_uids)
+        # Doubly ensure raw_weights does not contain NaNs (this should not happen after normalization, but as an extra precaution)
+        raw_weights = torch.where(
+            torch.isnan(raw_weights),
+            torch.zeros_like(raw_weights),
+            raw_weights,
+        )
 
-    # Convert to uint16 weights and uids.
-    uint_uids, uint_weights = bt.utils.weight_utils.convert_weights_and_uids_for_emit(
-        uids=processed_weight_uids, weights=processed_weights
-    )
-    bt.logging.debug("uint_weights", uint_weights)
-    bt.logging.debug("uint_uids", uint_uids)
+        bt.logging.debug("raw_weights", raw_weights)
+        bt.logging.debug("raw_weight_uids", metagraph.uids)
 
-    # Set the weights on chain via our subtensor connection.
-    success, message = set_weights(
-        subtensor=subtensor,
-        wallet=wallet,
-        netuid=netuid,
-        uids=uint_uids,
-        weights=uint_weights,
-        version_key=spec_version,
-        wait_for_finalization=False,
-        wait_for_inclusion=False,
-    )
+        # Process the raw weights to final_weights via subtensor limitations.
+        (
+            processed_weight_uids,
+            processed_weights,
+        ) = bt.utils.weight_utils.process_weights_for_netuid(
+            uids=metagraph.uids,
+            weights=raw_weights.to("cpu"),
+            netuid=netuid,
+            subtensor=subtensor,
+            metagraph=metagraph,
+        )
+        bt.logging.debug("processed_weights", processed_weights)
+        bt.logging.debug("processed_weight_uids", processed_weight_uids)
 
-    if success is True:
-        bt.logging.info("Set weights on chain successfully!")
-    else:
-        bt.logging.error(f"Set weights failed {message}.")
+        # Convert to uint16 weights and uids.
+        uint_uids, uint_weights = (
+            bt.utils.weight_utils.convert_weights_and_uids_for_emit(
+                uids=processed_weight_uids, weights=processed_weights
+            )
+        )
+        bt.logging.debug("uint_weights", uint_weights)
+        bt.logging.debug("uint_uids", uint_uids)
+
+        # Set the weights on chain via our subtensor connection.
+        success, message = set_weights(
+            subtensor=subtensor,
+            wallet=wallet,
+            netuid=netuid,
+            uids=uint_uids,
+            weights=uint_weights,
+            version_key=spec_version,
+            wait_for_finalization=False,
+            wait_for_inclusion=False,
+        )
+
+        if success is True:
+            bt.logging.info("Set weights on chain successfully!")
+        else:
+            bt.logging.error(f"Set weights failed {message}.")
+    finally:
+        # Restore the initial value
+        if not original_value:
+            del os.environ["USE_TORCH"]
+        else:
+            os.environ["USE_TORCH"] = original_value

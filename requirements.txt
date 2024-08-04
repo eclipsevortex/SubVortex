@@ -1,14 +1,16 @@
+Flask==3.0.3
 Requests==2.32.3
 aioredis==2.0.1
-bittensor==6.12.1
+bittensor==7.3.0
 cryptography==42.0.5
-fastapi==0.111.0
+fastapi==0.110.1
 ipwhois==1.2.0
 loguru==0.7.0
-netfilterqueue==1.1.0
+netfilterqueue==1.1.0; sys_platform == 'linux'
+pyshark==0.6; sys_platform == 'darwin'
 numpy==1.26.4
 pycryptodome==3.20.0
-pydantic==1.10.17
+pydantic==2.8.2
 pytest==8.2.2
 python-dotenv==1.0.1
 redis==5.0.1
@@ -19,5 +21,5 @@ starlette==0.37.2
 substrate_interface==1.7.5
 torch==2.0.1
 transformers==4.42.4
-uvicorn==0.30.1
+uvicorn==0.30.0
 wandb==0.16.5

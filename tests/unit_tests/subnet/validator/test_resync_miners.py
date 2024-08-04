@@ -44,6 +44,7 @@ locations = {
 }
 
 
+@pytest.mark.usefixtures("validator")
 class TestResyncMiners(unittest.IsolatedAsyncioTestCase):
     @pytest.fixture(autouse=True)
     def prepare_fixture(self, validator):

@@ -3,6 +3,8 @@ import argparse
 import subprocess
 import bittensor as bt
 
+from subnet.miner.version import VersionControl
+
 
 def get_current_branch():
     result = subprocess.run(
@@ -76,7 +78,7 @@ def upgrade_to_branch(branch: str):
     bt.logging.debug(f"Checkout the branch {branch}")
 
     # Pull the branch
-    subprocess.run(["git", "pull"], check=True)
+    subprocess.run(["git", "pull", "origin", branch], check=True)
     bt.logging.debug(f"Pull the branch {branch}")
 
     bt.logging.success(f"Successfully pulled source code for {branch} branch'.")
@@ -87,32 +89,15 @@ def main(args):
         bt.logging.error(f"Please provide a tag or a branch to upgrade to")
         return
 
-    if args.tag:
-        upgrade_to_tag(args.tag)
-    else:
-        upgrade_to_branch(args.branch)
-
-    subprocess.run(["pip", "install", "-r", "requirements.txt"])
-    bt.logging.info(f"Dependencies installed successfully")
-
-    subprocess.run(["pip", "install", "-e", "."])
-    bt.logging.info(f"Source installed successfully")
+    version_control = VersionControl()
+    version_control.upgrade(tag=args.tag, branch=args.branch)
 
 
 if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "--tag",
-            type=str,
-            help="Tag to pull",
-        )
-        parser.add_argument(
-            "--branch",
-            type=str,
-            default="main",
-            help="Branch to pull",
-        )
+        parser.add_argument("--tag", type=str, help="Tag to pull", default=None)
+        parser.add_argument("--branch", type=str, help="Branch to pull", default=None)
         args = parser.parse_args()
 
         main(args)

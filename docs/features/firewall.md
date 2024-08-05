@@ -87,7 +87,7 @@ To listen incoming packets, we can not use Scapy because, by default, it capture
 
 To solve that issue, we decided to configure some rules in iptables using queue and then use **NetfilterQueue** which is a Python library that provides access to packets that have been matched by iptables rules and placed into a user-space queue. It allows you to process packets in user space rather than in the kernel, enabling advanced packet manipulation, inspection, and decision-making before the packets are accepted, dropped, or otherwise handled.
 
-By using **iptables** and **NetfilterQueue**, we guarantee any packets will go through the miner firewall before going to the miner itself which avoid any unexpected requests to be proceed by the miner.
+By using **iptables** and **NetfilterQueue**, we guarantee any packets will go through the miner firewall before going to the miner itself which avoid any unexpected requests to be processed by the miner.
 
 ## Macos
 
@@ -591,3 +591,43 @@ It is highly recommended to enable the firewall to protect your miner and use th
 
 > IMPORTANT <br />
 > The order of rules in iptables is critical because the first matching rule is the one that gets applied. Careful planning and management of rule order can ensure the firewall behaves as intended.
+
+**Miner Firewall Configuration Rules**
+We have configured two essential firewall rules for the miner:
+
+DoS Rule: For details, see [Denial of Service Rule](#denial-of-service-rule).
+DDoS Rule: For details, see [Distributed Denial of Service Rule](#distributed-denial-of-service-rule).
+While you are free to update these rules, we highly recommend keeping them as configured to ensure maximum accuracy and protection.
+
+**Subtensor Firewall Configuration Suggestions**
+No firewall rules have been pre-configured for the Subtensor. However, we recommend the following configurations:
+
+- Port 9944: Configure a DoS rule to allow only 1 request every 12 seconds, which aligns with the block creation time on the chain.
+
+```json
+{
+  "dport": 9944,
+  "protocol": "tcp",
+  "type": "detect-dos",
+  "configuration": {
+    "time_window": 12,
+    "packet_threshold": 2
+  }
+}
+```
+
+- Port 9933: Configure a Deny rule to block all traffic on this port as it is officially not used.
+
+```json
+{
+  "dport": 9933,
+  "protocol": "tcp",
+  "type": "deny"
+}
+```
+
+- Port 30333: No configuration is necessary as there is already a default rule allowing all traffic on this port.
+
+You are free to update these rules and add or remove anything to make your firewall more accurate. Sharing your settings with the community is highly encouraged, as it helps make the subnet and the entire Bittensor network stronger.
+
+For optimal security, please implement these configurations carefully. If you have any questions or need further assistance, feel free to contact SubVortex team.

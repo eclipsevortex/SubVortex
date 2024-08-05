@@ -2,6 +2,7 @@ import json
 import time
 import socket
 import select
+import bittensor as bt
 
 from http.server import BaseHTTPRequestHandler
 
@@ -20,12 +21,7 @@ class SSEHandler(BaseHTTPRequestHandler):
         try:
             super().handle()
         except ConnectionResetError:
-            self.server.handle_error(self.request, self.client_address)
-            if hasattr(self, 'path'):
-                clients = self.server.streams.get(self.path, [])
-                if self in clients:
-                    self.server.streams[self.path].remove(self)
-                    self.no_events_sent = True
+            pass
 
     def do_GET(self):
         path = self.path.strip("/")
@@ -43,6 +39,9 @@ class SSEHandler(BaseHTTPRequestHandler):
 
         self.server.streams[path].append(self)
         self.no_events_sent = True
+        bt.logging.debug(
+            f"[SSE][{path}] New connection - {len(self.server.streams[path])} connection(s) active"
+        )
 
         missed_heartbeats = 0
         last_heartbeat = time.time()
@@ -65,13 +64,8 @@ class SSEHandler(BaseHTTPRequestHandler):
                     else:
                         missed_heartbeats = 0
                     last_heartbeat = current_time
-        except Exception:
-            pass
         finally:
-            clients = self.server.streams.get(path, [])
-            if self in clients:
-                self.server.streams[path].remove(self)
-                self.no_events_sent = True
+            self._remove_client()
 
     def send_event(self, event):
         try:
@@ -85,10 +79,7 @@ class SSEHandler(BaseHTTPRequestHandler):
             socket.timeout,
             socket.error,
         ):
-            clients = self.server.streams.get(self.path, [])
-            if self in clients:
-                self.server.streams[self.path].remove(self)
-                self.no_events_sent = True
+            pass
 
     def send_heartbeat(self):
         try:
@@ -103,3 +94,13 @@ class SSEHandler(BaseHTTPRequestHandler):
             socket.error,
         ):
             return False
+
+    def _remove_client(self):
+        path = self.path.strip("/")
+        clients = self.server.streams.get(path, [])
+        if self in clients:
+            self.server.streams[path].remove(self)
+            self.no_events_sent = True
+            bt.logging.debug(
+                f"[SSE][{path}] Connection removed - {len(self.server.streams[path])} connection(s) remaining"
+            )

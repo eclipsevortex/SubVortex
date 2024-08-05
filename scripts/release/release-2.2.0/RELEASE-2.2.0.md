@@ -28,7 +28,7 @@ Previous Release: 2.0.0
 2. **Stop validator**: Stop your validator. We **HAVE TO** stop it because there is a redis migration.
 
    ```bash
-   pm2 stop validator-92
+   pm2 stop validator-7
    ```
 
    Check you have **stopped** in the status as shown below
@@ -37,7 +37,7 @@ Previous Release: 2.0.0
    ┌────┬─────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
    │ id │ name            │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
    ├────┼─────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-   │ 0  │ validator-92    │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+   │ 0  │ validator-7    │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
    └────┴─────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
    ```
 
@@ -104,7 +104,7 @@ Previous Release: 2.0.0
    If you were not using wandb before, please delete the validator
 
    ```bash
-   pm2 delete validator-92
+   pm2 delete validator-7
    ```
 
    Then, run the following command by chaing all the variable **$XXX**
@@ -114,9 +114,9 @@ Previous Release: 2.0.0
 
    ```bash
    pm2 start neurons/validator.py \
-    --name validator-92 \
+    --name validator-7 \
     --interpreter python3 -- \
-    --netuid 92 \
+    --netuid 7 \
     --wallet.name $WALLET_NAME \
     --wallet.hotkey $HOTKEY_NAME \
     --subtensor.chain_endpoint ws://$SUBTENSOR_IP:9944 \
@@ -126,12 +126,12 @@ Previous Release: 2.0.0
    If you were using wandb before, please restart the validator
 
    ```bash
-   pm2 restart validator-92
+   pm2 restart validator-7
    ```
 
 7. **Check logs**: Check the validator logs to see if you see some `New Block`
    ```bash
-   pm2 logs validator-92
+   pm2 logs validator-7
    ```
 
 <br />
@@ -143,7 +143,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
 1. **Stop validator**: Stop your validator. We **HAVE TO** stop it because there is a redis migration.
 
    ```bash
-   pm2 stop validator-92
+   pm2 stop validator-7
    ```
 
    Check you have **stopped** in the status as shown below
@@ -152,7 +152,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
    ┌────┬─────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
    │ id │ name            │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
    ├────┼─────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-   │ 0  │ validator-92    │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+   │ 0  │ validator-7    │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
    └────┴─────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
    ```
 
@@ -228,7 +228,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
 4. **Restart validator**: Restart your validator to take the old version
 
    ```bash
-   pm2 restart validator-92
+   pm2 restart validator-7
    ```
 
    If you have any issue with wandb, please check you are logged in
@@ -247,7 +247,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
 
 5. **Check logs**: Check the validator logs to see if you see some `New Block`
    ```bash
-   pm2 logs validator-92
+   pm2 logs validator-7
    ```
 
 <br />
@@ -297,12 +297,12 @@ If any issues arise during or after the rollout, follow these steps to perform a
 2. **Restart miner**: Restart your miner to take the new version
 
    ```bash
-   pm2 restart miner-92
+   pm2 restart miner-7
    ```
 
 3. **Check logs**: Check the miner logs to see if you see some `New Block`
    ```bash
-   pm2 logs miner-92
+   pm2 logs miner-7
    ```
 
 ## Rollback Process <a id="miner-rollback-process"></a>
@@ -360,12 +360,12 @@ If any issues arise during or after the rollout, follow these steps to perform a
 2. **Restart miner**: Restart your miner to take the old version
 
    ```bash
-   pm2 restart miner-92
+   pm2 restart miner-7
    ```
 
 3. **Check logs**: Check the miner logs to see if you see some `New Block`
    ```bash
-   pm2 logs miner-92
+   pm2 logs miner-7
    ```
 
 <br />

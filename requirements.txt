@@ -7,7 +7,6 @@ fastapi==0.110.1
 ipwhois==1.2.0
 loguru==0.7.0
 netfilterqueue==1.1.0; sys_platform == 'linux'
-pyshark==0.6; sys_platform == 'darwin'
 numpy==1.26.4
 pycryptodome==3.20.0
 pydantic==2.8.2

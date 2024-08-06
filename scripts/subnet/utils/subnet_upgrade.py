@@ -3,7 +3,8 @@ import argparse
 import subprocess
 import bittensor as bt
 
-from subnet.miner.version import VersionControl
+from subnet.miner.version import VersionControl as MinerVersionControl
+from subnet.validator.version import VersionControl as ValidatorVersionControl
 
 
 def get_current_branch():
@@ -88,9 +89,16 @@ def main(args):
     if not args.tag and not args.branch:
         bt.logging.error(f"Please provide a tag or a branch to upgrade to")
         return
-
-    version_control = VersionControl()
+    
+    version_control = MinerVersionControl()
     version_control.upgrade(tag=args.tag, branch=args.branch)
+
+    # if args.miner:
+    #     version_control = MinerVersionControl()
+    #     version_control.upgrade(tag=args.tag, branch=args.branch)
+    # else:
+    #     version_control = ValidatorVersionControl()
+    #     version_control.upgrade(tag=args.tag, branch=args.branch)
 
 
 if __name__ == "__main__":
@@ -98,6 +106,12 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         parser.add_argument("--tag", type=str, help="Tag to pull", default=None)
         parser.add_argument("--branch", type=str, help="Branch to pull", default=None)
+        parser.add_argument(
+            "--miner",
+            action="store_true",
+            help="True if miner upgrade, False if validator",
+            default=False,
+        )
         args = parser.parse_args()
 
         main(args)

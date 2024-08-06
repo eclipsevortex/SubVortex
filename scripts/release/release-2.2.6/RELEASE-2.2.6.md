@@ -6,6 +6,7 @@ Previous Release: 2.2.5
 
 ---
 
+- [Prerequisites](#prerequisites)
 - [Validator](#validators)
   - [Rollout Process](#validator-rollout-process)
   - [Rollback Process](#validator-rollback-process)
@@ -20,6 +21,17 @@ Previous Release: 2.2.5
 ---
 
 <br />
+
+# Prerequisites
+
+Before installing the new release using one of the two possible methods, some packages need to be installed as prerequisites.
+
+```bash
+./scripts/os/os_setup.sh -t miner
+```
+
+For validator, please use the same command line above as the requirements for now is common for miners and validators.
+
 
 # Validator
 
@@ -131,7 +143,7 @@ If any issues arise during or after the rollout, follow these steps to perform a
 2. **Downgrade Subnet**: Checkout the previous release tag
 
    ```bash
-   git checkout tags/v2.2.6
+   git checkout tags/v2.2.5
    ```
 
    Then, install the dependencies

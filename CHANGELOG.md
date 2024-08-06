@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.6 / 2024-08-06
+
+## What's Changed
+* use the new property of the country api by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/73
+* fix substensor scripts by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/75
+* freeze requirements by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/76
+* implement miner firewall by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/77
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.5...v2.2.6
+
 ## 2.2.5 / 2024-05-31
 
 ## What's Changed

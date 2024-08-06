@@ -51,16 +51,16 @@ function install_macos_dependencies(){
     
     # Update brew packages
     brew update
-
-    # Install dependencies    
-    brew install make llvm curl libssl protobuf
+    
+    # Install dependencies
+    brew install protobuf
     echo -e '\e[32mBrew dependencies installed[0m'
 }
 
 function install_linux_dependencies() {
     # Update the list of packages
     apt-get update
-
+    
     # Necessary libraries for Rust execution
     apt install build-essential
     apt-get install clang curl git make
@@ -107,7 +107,7 @@ git checkout main
 echo -e '\e[32mCheckout main branch\e[0m'
 
 # Remove previous chain state:
-rm -rf /tmp/blockchain 
+rm -rf /tmp/blockchain
 echo -e '\e[32mRemove chain state\e[0m'
 
 # Get the latest version

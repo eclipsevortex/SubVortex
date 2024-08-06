@@ -41,7 +41,7 @@ def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
     return current_block - prev_step_block >= checkpoint_block_length
 
 
-async def resync_metagraph_and_miners(self, force_refresh = False):
+async def resync_metagraph_and_miners(self, force_refresh=False):
     """Checkpoints the training process."""
     bt.logging.info("checkpoint()")
     resynched = resync_metagraph(self)
@@ -107,10 +107,7 @@ def save_state(self):
             "neuron_weights": self.moving_averaged_scores.to("cpu").tolist(),
         }
         torch.save(neuron_state_dict, f"{self.config.neuron.full_path}/model.torch")
-        bt.logging.success(
-            prefix="Saved model",
-            sufix=f"<blue>{ self.config.neuron.full_path }/model.torch</blue>",
-        )
+        bt.logging.success(f"Save model {self.config.neuron.full_path }/model.torch")
     except Exception as e:
         bt.logging.warning(f"Failed to save model with error: {e}")
 
@@ -137,8 +134,7 @@ def load_state(self):
         elif not torch.isnan(neuron_weights).any():
             self.moving_averaged_scores = neuron_weights.to(self.device)
         bt.logging.success(
-            prefix="Reloaded model",
-            sufix=f"<blue>{ self.config.neuron.full_path }/model.torch</blue>",
+            f"Reloaded model {self.config.neuron.full_path }/model.torch"
         )
     except Exception as e:
         bt.logging.warning(f"Failed to load model with error: {e}")
@@ -443,7 +439,7 @@ def init_wandb(self):
 
         bt.logging.success(
             prefix="Started a new wandb run",
-            sufix=f"<blue> {wandb.run.name} </blue>",
+            suffix=f"<blue> {wandb.run.name} </blue>",
         )
     except Exception as err:
         bt.logging.warning(f"init_wandb() initialising wandb failed: {err}")

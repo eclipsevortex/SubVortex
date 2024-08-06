@@ -50,11 +50,6 @@ class SubnetVersion:
         )
 
 
-__version__ = "2.2.5"
+__version__ = "2.2.6"
 version = SubnetVersion.from_string(__version__)
 __spec_version__ = version.to_spec_version()
-
-# Import all submodules.
-from . import protocol
-from . import validator
-from . import miner

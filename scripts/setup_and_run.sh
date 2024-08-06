@@ -60,7 +60,7 @@ done
 
 # We change the default value of the subnet if testnet network is choosen
 # and no subtensor is provided
-if [[ $NETWORK == "testnet" ]] && [[ $SUBTENSOR == "finney" ]]; then 
+if [[ $NETWORK == "testnet" ]] && [[ $SUBTENSOR == "finney" ]]; then
     SUBTENSOR='test'
 fi
 
@@ -79,7 +79,7 @@ fi
 if [[ $ACTION_ON_COLDKEY == "yes" ]]; then
     read -p "Do you want to generate a new coldkey (yes/no)? " NEW_COLDKEY
     read -p "Enter the wallet name: " WALLET_NAME
-
+    
     if [[ $NEW_COLDKEY == 'no' ]]; then
         read -p "Enter mnemonic, seed, or json file location for the coldkey? " COLDKEY_MNEMONIC
     fi
@@ -97,7 +97,7 @@ fi
 if [[ $ACTION_ON_HOTKEY == "yes" ]]; then
     read -p "Do you want to generate a new hotkey (yes/no)? " NEW_HOTKEY
     read -p "Enter the hotkey name: " HOTKEY_NAME
-
+    
     if [[ $NEW_HOTKEY == 'no' ]]; then
         read -p "Enter mnemonic, seed, or json file location for the hotkey? " HOTKEY_MNEMONIC
     fi
@@ -121,7 +121,7 @@ if [[ "$TYPE" == "validator" ]]; then
         echo -e "\\e[31mThe possible choices are 'process' or 'docker'.\\e[0m"
         exit 1
     fi
-
+    
     read -p "Do you want to install wandb - it is highly recommended to expose statics to users (yes/no)? " WANDB
     
     # Check the value entered
@@ -144,6 +144,9 @@ fi
 
 # Install prerequisites
 install_pm2
+
+# Install os packages
+./scripts/os/os_setup.sh -t $TYPE
 
 # Install subnet
 ## Install the subnet
@@ -187,7 +190,7 @@ fi
 if [[ $REGISTER == 'yes' ]]; then
     # Get subtensor option
     OPTIONS=$([[ "$SUBTENSOR" == "ws://"* ]] && echo "--subtensor.chain_endpoint $SUBTENSOR" || echo "--subtensor.network $SUBTENSOR")
-
+    
     # Register hotkey
     btcli s register \
     --netuid $NETUID \
@@ -203,7 +206,7 @@ if [[ "$TYPE" == "miner" ]]; then
     if [[ ! -z $process ]]; then
         pm2 stop miner-$NETUID && pm2 delete miner-$NETUID
     fi
-
+    
     # Run the miner
     pm2 start $HOME/SubVortex/neurons/miner.py \
     --name miner-$NETUID \
@@ -221,18 +224,18 @@ if [[ "$TYPE" == "validator" ]]; then
     # Get subtensor option
     OPTIONS=$([[ "$SUBTENSOR" == "ws://"* ]] && echo "--subtensor.chain_endpoint $SUBTENSOR" || echo "--subtensor.network $SUBTENSOR")
     OPTIONS+=$([[ "$WANDB" == "no" ]] && echo " --wandb.off" || echo "")
-
+    
     # Stop and delete validator if up and running
     process=$(pm2 list | grep "validator-$NETUID" &> /dev/null;)
     if [[ ! -z $process ]]; then
         pm2 stop validator-$NETUID && pm2 delete validator-$NETUID
     fi
-
+    
     # Set the redis password
     if [[ $VALIDATOR_EXEC_TYPE == "docker" ]]; then
         export REDIS_PASSWORD=$(docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
     fi
-
+    
     # Run the validator
     pm2 start $HOME/SubVortex/neurons/validator.py -f \
     --name validator-$NETUID \

@@ -1,10 +1,8 @@
-import re
-import os
-import codecs
 import requests
 import subprocess
 import bittensor as bt
 from os import path
+from subnet.shared.utils import get_version
 
 
 here = path.abspath(path.dirname(__file__))
@@ -17,14 +15,7 @@ class Github:
         self.latest_version = None
 
     def get_version(self) -> str:
-        with codecs.open(
-            os.path.join(here, "../__init__.py"), encoding="utf-8"
-        ) as init_file:
-            version_match = re.search(
-                r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
-            )
-            version_string = version_match.group(1)
-            return version_string
+        return get_version()
 
     def get_latest_version(self) -> str:
         """
@@ -43,17 +34,29 @@ class Github:
         except Exception:
             return self.latest_version
 
-    def get_branch(self, tag="latest"):
+    def get_branch(self, branch_name="main"):
         """
         Get the expected branch
         """
-        if tag == "latest":
-            subprocess.run(["git", "checkout", "-B", "main"], check=True)
-            subprocess.run(["git", "pull"], check=True)
-            bt.logging.info(f"Successfully pulled source code for main branch'.")
-        else:
-            subprocess.run(["git", "checkout", f"tags/{tag}"], check=True)
-            bt.logging.info(f"Successfully pulled source code for tag '{tag}'.")
+        # Stash if there is any local changes just in case
+        subprocess.run(["git", "stash"], check=True)
+
+        # Checkout branch
+        subprocess.run(["git", "checkout", "-B", branch_name], check=True)
+
+        # Set tracking
+        subprocess.run(
+            ["git", "branch", f"--set-upstream-to=origin/{branch_name}", branch_name],
+            check=True,
+        )
+
+        # Pull branch
+        subprocess.run(["git", "reset", "--hard", f"origin/{branch_name}"], check=True)
+
+        # Stash if there is any local changes just in case
+        subprocess.run(["git", "stash"], check=True)
+
+        bt.logging.info(f"Successfully pulled source code for branch '{branch_name}'.")
 
     def get_tag(self, tag):
         """

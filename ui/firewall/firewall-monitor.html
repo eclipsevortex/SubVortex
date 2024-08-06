@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firewall Monitor</title>
+    <link rel="stylesheet" href="/firewall-monitor.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-main">
+            <h1>Firewall Monitor</h1>
+            <button id="toggle-fetch">Pause</button>
+        </div>
+        <div style="display: flex; align-items: center">
+            <div style="display: flex; align-items: center; flex-grow: 1;">
+                <div class="header-requests"># of requests: <span id="request-counter">0</span></div>
+            </div>
+            <div style="display: flex; align-self: right;">
+                <div id="notification-bar" class="notification-bar">Connecting...</div>
+            </div>
+        </div>
+    </div>
+    <div class="table-container" id="table-container">
+        <table class="table" id="virtual-table">
+            <thead id="virtual-table-head">
+                <tr>
+                    <th class="symbol col-1"></th>
+                    <th class="timestamp col-1">Time</th>
+                    <th class="process-time col-1">Process Time</th>
+                    <th class="request-id col-2">Id</th>
+                    <th class="previous-id col-2">Prev Id</th>
+                    <th class="ip-address col-1">IP Address</th>
+                    <th class="port">Port</th>
+                    <th class="protocol">Protocol</th>
+                    <th class="packets"># Packets</th>
+                    <th class="action">Action</th>
+                    <th class="notify">Notified</th>
+                    <th class="reason col-3">Reason</th>
+                </tr>
+            </thead>
+            <tbody id="virtual-table-body">
+            </tbody>
+        </table>
+        <div id="spacer"></div>
+    </div>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const EVENT_SOURCE_URL = "{{EVENT_SOURCE_URL}}";
+        
+        let source;
+        let isPaused = false;
+        let toggleStates = {};
+        let lastScrollTop = 0;
+        let estimatedRowHeight = 72; // Initial estimate of row height
+        const buffer = 2; // Buffer rows to render above and below the viewport
+        let requestsData = []; // Store all the requests data here
+        let packetsMap = new Map(); // Map to store packets for each request ID
+        let visibleRows = [];
+        let previousPackets = new Map();
+        let tableContainer = document.getElementById('table-container');
+        let table = document.getElementById('virtual-table');
+        let tableHead = document.getElementById('virtual-table-head');
+        let tableBody = document.getElementById('virtual-table-body');
+        let notificationBar = document.getElementById('notification-bar');
+        let spacer = document.getElementById('spacer');
+        const processChunkSize = 100;
+        
+        const RENDER_INTERVAL = 1000
+
+        function deepCopyMap(originalMap) {
+            const copiedMap = new Map();
+
+            for (const [key, value] of originalMap) {
+                if (value && typeof value === 'object') {
+                    copiedMap.set(key, JSON.parse(JSON.stringify(value)));
+                } else {
+                    copiedMap.set(key, value);
+                }
+            }
+
+            return copiedMap;
+        }
+
+        function humanizeDuration(totalSeconds) {
+            const totalMilliseconds = totalSeconds * 1000;
+            const totalMicroseconds = totalMilliseconds * 1000;
+            const totalNanoseconds = totalMicroseconds * 1000;
+
+            const nanoseconds = Math.floor(totalNanoseconds % 1000);
+            const microseconds = Math.floor(totalMicroseconds % 1000);
+            const milliseconds = Math.floor(totalMilliseconds % 1000);
+            const seconds = Math.floor(totalSeconds) % 60;
+            const minutes = Math.floor(totalSeconds / 60) % 60;
+
+            const humanized = [];
+
+            if (minutes > 0) {
+                humanized.push(`${minutes}m`);
+                if (seconds > 0) {
+                    humanized.push(`${seconds}s`);
+                }
+            } else if (seconds > 0) {
+                humanized.push(`${seconds}s`);
+            } else if (milliseconds > 0) {
+                humanized.push(`${milliseconds}ms`);
+            } else if (microseconds > 0) {
+                humanized.push(`${microseconds}µs`);
+            } else {
+                humanized.push(`${nanoseconds}ns`);
+            }
+
+            return humanized.join(', ');
+        }
+
+        function getQueryParams() {
+            const params = {};
+            const queryString = window.location.search.slice(1);
+            const pairs = queryString.split('&');
+
+            for (const pair of pairs) {
+                const [key, value] = pair.split('=');
+                if (key) {
+                    params[decodeURIComponent(key)] = decodeURIComponent(value);
+                }
+            }
+
+            return params;
+        }
+
+        function toggleDetails(event) {
+            const detailsRow = event.currentTarget.parentElement.nextElementSibling;
+            const symbol = event.currentTarget;
+            if (detailsRow && detailsRow.classList.contains('details')) {
+                const isVisible = detailsRow.style.display === 'table-row';
+                detailsRow.style.display = isVisible ? 'none' : 'table-row';
+                symbol.textContent = isVisible ? '[+]' : '[-]';
+
+                // Update the toggle state
+                const requestId = event.currentTarget.parentElement.querySelector('.request-id').textContent;
+                toggleStates[requestId] = !isVisible;
+
+                const detailRows = document.querySelectorAll('tr.details[style*="display: table-row;"]');
+                detailRows.forEach(detailRow => {
+                    const subTableRows = detailRow.querySelectorAll('.sub-table > tbody > tr');
+                    subTableRows.forEach((row, index) => {
+                        if (index % 2 === 0) { 
+                            row.classList.add("row-background");
+                        } else {
+                            row.classList.remove("row-background");
+                        }
+                    });
+                });
+            }
+        }
+
+        function applyFilters(data) {
+            const params = getQueryParams();
+            const ipFilter = (params['ip'] || '').toLowerCase();
+            const portFilter = (params['port'] || '');
+            const actionFilter = (params['action'] || '').toLowerCase();
+
+            return data.filter(packet => {
+                const matchesIp = ipFilter === '' || packet.sip.toLowerCase().includes(ipFilter);
+                const matchesPort = portFilter === '' || packet.dport.toString().toLowerCase().includes(portFilter);
+                const matchesAction = actionFilter === '' || packet.status.toLowerCase().includes(actionFilter);
+                return matchesIp && matchesPort && matchesAction;
+            });
+        }
+
+        function arePacketsDifferent(request_id, prevPacketsMap, packetsMap) {
+            row1Packets = prevPacketsMap.get(request_id) || []
+            row2Packets = packetsMap.get(request_id) || []
+            return row1Packets.length != row2Packets.length
+        }
+
+        function update_row_background() {
+            const rows = document.querySelectorAll('.table > tbody > tr[id$="-main"]');
+            rows.forEach((row, index) => {
+                if (index % 2 === 0) {
+                    row.classList.add("row-background");
+                } else {
+                    row.classList.remove("row-background")
+                }
+            });
+        }
+
+        function reset() {
+            loaded = false
+
+            toggleStates = {}
+            requestsData = []
+            packetsMap.clear()
+            previousPackets.clear()
+
+            // Remove all the rows
+            const tbody = document.getElementById('virtual-table-body');
+            if (tbody) {
+                tbody.innerHTML = '';
+            }
+
+            // Update counter
+            const counterElement = document.getElementById('request-counter');
+            if (counterElement) {
+                counterElement.innerHTML = 0;
+            }
+        }
+
+        function createRowHTML(request, index) {
+            const packets = packetsMap.get(request.request_id);
+            const status = packets.length > 0 ? packets[packets.length - 1].status : "";
+            const reason = packets.reduceRight((acc, packet) => acc || packet.reason, "") || "";
+            const process_time = packets.reduce((sum, packet) => sum + packet.process_time, 0);
+
+            const detailsRowStyle = `display: ${toggleStates[request.request_id] ? "table-row" : "none"}`;
+            return `
+                <tr id="${request.request_id}-main">
+                    <td class="symbol col-1" onclick="toggleDetails(event)">[${toggleStates[request.request_id] ? '-' : '+' }]</td>
+                    <td class="timestamp col-1">${new Date(request.current_time * 1000).toLocaleString()}</td>
+                    <td class="process-time col-1">${humanizeDuration(process_time)}</td>
+                    <td class="request-id col-2">${request.request_id}</td>
+                    <td class="previous-id col-2">${request.previous_id || ''}</td>
+                    <td class="ip-address col-1">${request.sip}</td>
+                    <td class="port">${request.dport}</td>
+                    <td class="protocol">${request.protocol}</td>
+                    <td class="packets">${packets.length}</td>
+                    <td class="action" style="color: ${status === 'allow' ? '#4CAF50' : '#F44336'}">${status}</td>
+                    <td class="notify">${request.notified === true ? '✅' : '❌'}</td>
+                    <td class="reason col-3">${reason}</td>
+                </tr>
+                <tr class="details" id="${request.request_id}-details" style="${detailsRowStyle}">
+                    <td colspan="16">
+                        <table class="sub-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-1">Time</th>
+                                    <th class="col-1">Process Time</th>
+                                    <th>Seq</th>
+                                    <th>Ack</th>
+                                    <th>Flags</th>
+                                    <th class="col-3">Hotkey</th>
+                                    <th>Version</th>
+                                    <th>Neuron Version</th>
+                                    <th>Action</th>
+                                    <th>Payload</th>
+                                </tr>
+                            </thead>
+                            <tbody id="packets-table-${request.request_id}">
+                                ${packets.map((packet, index) => {
+                                    const className = index % 2 === 0 ? "row-background" : "";
+                                    return `
+                                        <tr class=${className}>
+                                            <td class="symbol col-1">${new Date(packet.current_time * 1000).toLocaleString()}</td>
+                                            <td class="process-time col-1">${humanizeDuration(packet.process_time)}</td>
+                                            <td>${packet.seq}</td>
+                                            <td>${packet.ack}</td>
+                                            <td>${packet.flags}</td>
+                                            <td class="col-3">${packet.dendrite.hotkey || ''}</td>
+                                            <td>${packet.dendrite.version || ''}</td>
+                                            <td>${packet.dendrite.neuron_version || ''}</td>
+                                            <td class="action" style="color: ${packet.status === 'allow' ? '#4CAF50' : '#F44336'}">${packet.status}</td>
+                                            <td class="copy">${packet.flags.includes('PA') ? `<button onclick="copyPayload('${packet.payload}')">Copy</button>` : ''}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function copyPayload(payload) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(payload).then(function() {
+                    console.log('Payload copied to clipboard');
+                }).catch(function(error) {
+                    console.error('Failed to copy payload: ', error);
+                    fallbackCopyTextToClipboard(payload);
+                });
+            } else {
+                fallbackCopyTextToClipboard(payload);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";  // Avoid scrolling to bottom
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                var successful = document.execCommand('copy');
+                var msg = successful ? 'successful' : 'unsuccessful';
+                console.log('Fallback: Copying text command was ' + msg);
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+            }
+
+            document.body.removeChild(textArea);
+        }
+
+        function renderRows() {
+            const containerHeight = tableContainer.clientHeight - tableHead.clientHeight;
+            const scrollTop = tableContainer.scrollTop;
+            const filteredData = applyFilters(requestsData);
+            
+            let spacerHeight = filteredData.length * estimatedRowHeight - (tableContainer.clientHeight - (estimatedRowHeight * 0))
+            spacerHeight = ((spacerHeight / estimatedRowHeight) | 0) * estimatedRowHeight
+
+            const startRow = Math.max(0, Math.floor(scrollTop / estimatedRowHeight) - buffer);
+            const endRow = Math.min(filteredData.length, Math.ceil((scrollTop + containerHeight) / estimatedRowHeight) + buffer);
+
+            // Display the number of requests
+            const counterElement = document.getElementById('request-counter');
+            if (counterElement) {
+                counterElement.innerHTML = filteredData.length;
+            }
+
+            const newVisibleRows = filteredData.slice(startRow, endRow);
+
+            // Find the differences between current and new visible rows
+            const newVisibleRowIds = newVisibleRows.map(row => row.request_id);
+            const currentVisibleRowIds = visibleRows.map(row => row.request_id);
+
+            const rowsToAdd = newVisibleRows.filter(row => !currentVisibleRowIds.includes(row.request_id));
+            const rowsToRemove = visibleRows.filter(row => !newVisibleRowIds.includes(row.request_id));
+
+            // Remove old rows
+            elementsToRemove = []
+            rowsToRemove.forEach(request => {
+                const mainRow = document.getElementById(`${request.request_id}-main`);
+                if (mainRow) {
+                    mainRow.nextElementSibling.remove()
+                    mainRow.remove();
+                }
+            });
+
+            // Add new rows based on the scroll direction
+            const isScrollingDown = scrollTop > lastScrollTop;
+            rowsHTML = rowsToAdd.map(request =>  createRowHTML(request, filteredData.indexOf(request))).join('\n')
+            tableBody.insertAdjacentHTML(isScrollingDown ? 'beforeend' : 'afterbegin', rowsHTML);
+
+            // Update row that has the number of packets changed
+            rowsToUpdate = newVisibleRows.filter(
+                request => {
+                    hasChanged = currentVisibleRowIds.includes(request.request_id)
+                    && arePacketsDifferent(request.request_id, previousPackets, packetsMap)
+                    if (!hasChanged) {
+                        return
+                    }
+
+                    const rowHTML = createRowHTML(request, filteredData.indexOf(request));
+
+                    const mainRow = document.getElementById(`${request.request_id}-main`);
+                    if (mainRow) {
+                        mainRow.nextElementSibling.remove()
+                        mainRow.outerHTML = rowHTML;
+                    }
+                }
+            )
+
+            // Update visible rows array
+            visibleRows = newVisibleRows;
+            previousPackets = deepCopyMap(packetsMap);
+
+            // Update the spacer height
+            spacer.style.height = `${spacerHeight}px`;
+
+            // Restore scroll position
+            tableContainer.scrollTop = scrollTop;
+
+            // Update lastScrollTop
+            lastScrollTop = scrollTop;
+
+            // Adjust body position
+            tableBody.style.position = 'relative'
+            tableBody.style.top = `${(startRow + 1) * estimatedRowHeight}px`;
+
+            // Update the row background 
+            update_row_background()
+
+            let element = document.getElementById("rows-counter")
+            if (element) {
+                requests_count = document.querySelectorAll("#virtual-table-body > tr:not(.details)").length
+                element.innerText = requests_count
+            }
+
+            element = document.getElementById("rows-details-counter")
+            if (element) {
+                requests_count = document.querySelectorAll("#virtual-table-body > tr.details").length
+                element.innerText = requests_count
+            }
+        }
+
+        function throttle(func, wait) {
+            let timeout = null;
+            return function(...args) {
+                if (!timeout) {
+                    timeout = setTimeout(() => {
+                        func(...args);
+                        timeout = null;
+                    }, wait);
+                }
+            };
+        }
+
+        const throttledRenderRows = throttle(() => {
+            requestAnimationFrame(renderRows);
+        }, 100);
+
+        function handleScroll() {
+            throttledRenderRows();
+        }
+
+        function process_data(data) {
+            hasChanges = false 
+
+            if (data.type === 'log') {
+                const packet = data.data;
+                const requestId = packet.request_id;
+
+                if (!packetsMap.has(requestId)) {
+                    packetsMap.set(requestId, []);
+                    requestsData.unshift(packet);
+                    hasChanges = true;
+                }
+
+                const packetsArray = packetsMap.get(requestId);
+                const packetExists = packetsArray.some(existingPacket => existingPacket.id === packet.id);
+                if (!packetExists) {
+                    packetsArray.push(packet);
+                    hasChanges = true;
+                }
+
+            } else if (data.type === 'clean') {
+                data.data.forEach(request_id => {
+                    const index = requestsData.findIndex(row => row.request_id === request_id);
+                    if (index !== -1) {
+                        requestsData.splice(index, 1);
+                        packetsMap.delete(request_id);
+                        hasChanges = true;
+                    }
+                });
+            }
+
+            return hasChanges
+        }
+
+        function showNotification(message, status) {
+            notificationBar.textContent = message;
+            notificationBar.classList.remove('up', 'down');
+            notificationBar.classList.add(status);
+            notificationBar.style.display = 'block';
+        }
+
+        function hideNotification() {
+            notificationBar.style.display = 'none';
+        }
+        
+        function processEventsInChunks(items, chunkSize) {
+            let index = 0;
+
+            function processChunk() {
+                const chunk = items.slice(index, index + chunkSize);
+                let hasChanges = false;
+                chunk.forEach(data => { 
+                    hasChanges = process_data(data) || hasChanges 
+                });
+                index += chunkSize;
+
+                if (index < items.length) {
+                    setTimeout(processChunk, 0);
+                }
+            }
+
+            processChunk();
+        }
+
+        function initializeEventSource() {
+            if (typeof(Worker) !== "undefined") {
+                if (typeof(w) == "undefined") {
+                    worker = new Worker("firewall-worker.js");
+                    worker.postMessage(EVENT_SOURCE_URL);
+                }
+
+                worker.onmessage = function(event) {
+                    if (event.data.type === 'status') {
+                        if (event.data.status === 'open') {
+                            console.log("Connection to server opened.");
+                            showNotification("Connected to server", 'up');
+                            setTimeout(hideNotification, 3000);
+                        } else if (event.data.status === 'error') {
+                            console.error("Unable to connect to the server.");
+                            showNotification("Unable to connect to the server.", 'down');
+                            reset();
+                        }
+                    } else if (event.data.type === 'events') {
+                        const item = event.data.data
+                        process_data(item)
+                        // processEventsInChunks(items, processChunkSize); 
+                    }
+                };
+            } else {
+                console.log("Sorry, your browser does not support Web Workers...");
+            }
+        }
+        
+        document.getElementById('toggle-fetch').addEventListener('click', function() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                worker.terminate();
+                worker = undefined;
+                this.textContent = 'Resume';
+                showNotification("Connection paused", 'down');
+            } else {
+                initializeEventSource();
+                this.textContent = 'Pause';
+            }
+        });
+
+        tableContainer.addEventListener('scroll', handleScroll);
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                requestAnimationFrame(renderRows);
+            }
+        });
+
+        setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                requestAnimationFrame(renderRows);
+            }
+        }, RENDER_INTERVAL); 
+
+        initializeEventSource();
+
+        requestAnimationFrame(renderRows);
+    </script>
+</body>
+</html>

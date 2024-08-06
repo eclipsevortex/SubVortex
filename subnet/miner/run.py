@@ -1,4 +1,5 @@
 import time
+import traceback
 import bittensor as bt
 from substrateinterface import SubstrateInterface
 
@@ -33,12 +34,52 @@ def run(self):
         KeyboardInterrupt: If the miner is stopped by a manual interruption.
         Exception: For unforeseen errors during the miner's operation, which are logged for diagnosis.
     """
-    block_handler_substrate = SubstrateInterface(
-        ss58_format=bt.__ss58_format__,
-        use_remote_preset=True,
-        url=self.subtensor.chain_endpoint,
-        type_registry=bt.__type_registry__,
-    )
+    def initialize_substrate_interface():
+        return SubstrateInterface(
+            ss58_format=bt.__ss58_format__,
+            use_remote_preset=True,
+            url=self.subtensor.chain_endpoint,
+            type_registry=bt.__type_registry__,
+        )
+
+    def handler(obj, update_nr, subscription_id):
+        try:
+            current_block = obj["header"]["number"]
+            bt.logging.debug(f"New block #{current_block}")
+            bt.logging.debug(
+                f"Blocks since epoch: {(current_block + netuid + 1) % (tempo + 1)}"
+            )
+
+            # --- Check to resync the metagraph.
+            should_sync = self.should_sync_metagraph()
+            bt.logging.debug(f"should_sync_metagraph() {should_sync}")
+            if should_sync:
+                self.metagraph.sync(subtensor=self.subtensor)
+                bt.logging.info("Metagraph resynced")
+
+                if self.firewall:
+                    self.update_firewall()
+
+            # --- Check for registration every 100 blocks (20 minutes).
+            if current_block % 100 == 0:
+                check_registration(self.subtensor, self.wallet, netuid)
+
+            if should_upgrade(self.config.auto_update, self.last_upgrade_check):
+                bt.logging.debug("Checking upgrade")
+                must_restart = self.version_control.upgrade()
+                if must_restart:
+                    self.version_control.restart()
+                    return
+
+                self.last_upgrade_check = time.time()
+
+            if self.should_exit:
+                return True
+
+        except Exception as e:
+            bt.logging.error(f"Error in block handler: {e}")
+            bt.logging.error(traceback.format_exc())
+            return True
 
     netuid = self.config.netuid
 
@@ -47,41 +88,27 @@ def run(self):
     # Keep a track of last upgrade check
     self.last_upgrade_check = 0
 
-    # --- Check for registration.
-    check_registration(self.subtensor, self.wallet, netuid)
+    while not self.should_exit:
+        try:
+            # Initialize the SubstrateInterface
+            block_handler_substrate = initialize_substrate_interface()
 
-    tempo = block_handler_substrate.query(
-        module="SubtensorModule", storage_function="Tempo", params=[netuid]
-    ).value
-
-    def handler(obj, update_nr, subscription_id):
-        current_block = obj["header"]["number"]
-        bt.logging.debug(f"New block #{current_block}")
-        bt.logging.debug(
-            f"Blocks since epoch: {(current_block + netuid + 1) % (tempo + 1)}"
-        )
-
-        # --- Check to resync the metagraph.
-        should_sync = self.should_sync_metagraph()
-        bt.logging.debug(f"should_sync_metagraph() {should_sync}")
-        if should_sync:
-            self.metagraph.sync(subtensor=self.subtensor)
-            bt.logging.info("Metagraph resynced")
-
-        # --- Check for registration every 100 blocks (20 minutes).
-        if current_block % 100 == 0:
+            # --- Check for registration.
             check_registration(self.subtensor, self.wallet, netuid)
 
-        if should_upgrade(self.config.auto_update, self.last_upgrade_check):
-            bt.logging.debug("Checking upgrade")
-            must_restart = self.version_control.upgrade()
-            if must_restart:
-                self.version_control.restart()
-                return
+            tempo = block_handler_substrate.query(
+                module="SubtensorModule", storage_function="Tempo", params=[netuid]
+            ).value
 
-            self.last_upgrade_check = time.time()
+            # Subscribe to block headers
+            block_handler_substrate.subscribe_block_headers(handler)
 
-        if self.should_exit:
-            return True
-
-    block_handler_substrate.subscribe_block_headers(handler)
+        except (BrokenPipeError, ConnectionError, TimeoutError) as e:
+            bt.logging.error(f"[Subtensor] Connection error: {e}")
+            bt.logging.error(traceback.format_exc())
+            bt.logging.info("[Subtensor] Reconnecting in 5 seconds...")
+            time.sleep(5)
+        except Exception as e:
+            bt.logging.error(f"[Subtensor] Unhandled error: {e}")
+            bt.logging.error(traceback.format_exc())
+            break

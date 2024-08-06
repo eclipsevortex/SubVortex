@@ -24,7 +24,7 @@ class BaseVersionControl:
         with self._lock:
             self._upgrading = value
 
-    def upgrade_subnet(self, version: str):
+    def upgrade_subnet(self, version: str = None, tag: str = None, branch: str = None):
         """
         Upgrade the subnet with the requested version or the latest one
         Version has to follow the format major.minor.patch
@@ -32,13 +32,23 @@ class BaseVersionControl:
         try:
             bt.logging.info("[Subnet] Upgrading...")
 
-            # Pull the branch
-            self.github.get_tag(f"v{version}")
+            if branch is not None:
+                # Pull the branch
+                self.github.get_branch(branch)
+            else:
+                # Pull the tag
+                github_tag = f"v{version or tag}"
+                self.github.get_tag(github_tag)
 
             # Install dependencies
-            self.interpreter.upgrade_dependencies()
+            self.interpreter.install_dependencies()
 
-            bt.logging.success(f"[Subnet] Upgrade to {version} successful")
+            if branch:
+                bt.logging.success(f"[Subnet] Upgrade to branch {branch} successful")
+            elif tag:
+                bt.logging.success(f"[Subnet] Upgrade to tag {tag} successful")
+            else:
+                bt.logging.success(f"[Subnet] Upgrade to {version} successful")
 
             return True
         except Exception as err:
@@ -56,7 +66,7 @@ class BaseVersionControl:
             self.github.get_tag(f"v{version}")
 
             # Install dependencies
-            self.interpreter.upgrade_dependencies()
+            self.interpreter.install_dependencies()
 
             bt.logging.success(f"[Subnet] Downgrade to {version} successful")
 

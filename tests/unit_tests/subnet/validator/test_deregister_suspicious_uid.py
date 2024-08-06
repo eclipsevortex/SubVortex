@@ -1,12 +1,12 @@
 import copy
-import unittest
 
 from subnet.validator.utils import deregister_suspicious_uid
 
+from tests.unit_tests.test_case import TestCase
 from tests.unit_tests.mocks import mock_miners
 
 
-class TestDeregisterSuspiciousUid(unittest.TestCase):
+class TestDeregisterSuspiciousUid(TestCase):
     def test_a_miner_not_suspicious_should_return_the_initial_score(
         self,
     ):

@@ -163,9 +163,9 @@ If the miner is blocked here (see this log for 10 seconds)
 
 ```
 54|miner-9  | 2024-05-14 13:50:43.801 |       INFO       |  - Attaching forward functions to axon. -
-54|miner-9  | 2024-05-14 13:50:43.810 |       INFO       |  - Serving axon Axon([::], 8091, 5GhDs7dTbrGauKnMnUrgWSVmwvX2VdqSnVoqVbEEXrd1Vd81, stopped, ['Synapse', 'Score']) on network: ws://127.0.0.1:9944 with netuid: 92 -
+54|miner-9  | 2024-05-14 13:50:43.810 |       INFO       |  - Serving axon Axon([::], 8091, 5GhDs7dTbrGauKnMnUrgWSVmwvX2VdqSnVoqVbEEXrd1Vd81, stopped, ['Synapse', 'Score']) on network: ws://127.0.0.1:9944 with netuid: 7 -
 54|miner-9  | 2024-05-14 13:50:43.811 |      DEBUG       |  - Checking axon ... -
-54|miner-9  | 2024-05-14 13:50:43.847 |      DEBUG       |  - Serving axon with: AxonInfo(5GhDs7dTbrGauKnMnUrgWSVmwvX2VdqSnVoqVbEEXrd1Vd81,155.133.26.129:8091) -> local:92 -
+54|miner-9  | 2024-05-14 13:50:43.847 |      DEBUG       |  - Serving axon with: AxonInfo(5GhDs7dTbrGauKnMnUrgWSVmwvX2VdqSnVoqVbEEXrd1Vd81,155.133.26.129:8091) -> local:7 -
 ```
 
 Just restart your miner

@@ -16,11 +16,11 @@
 # DEALINGS IN THE SOFTWARE.
 
 import typing
-import bittensor as bt
+from subnet.bittensor.synapse import Synapse
 
 
-class Score(bt.Synapse):
-    validator_uid: typing.Optional[int]
+class Score(Synapse):
+    validator_uid: typing.Optional[int] = None
     availability: float
     latency: float
     reliability: float

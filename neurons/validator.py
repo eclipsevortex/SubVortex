@@ -29,12 +29,14 @@ from subnet import __version__ as THIS_VERSION
 
 from subnet.monitor.monitor import Monitor
 from subnet.country.country import CountryService
+from subnet.file.file_monitor import FileMonitor
 
 from subnet.shared.checks import check_registration
 from subnet.shared.utils import get_redis_password, should_upgrade
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
 from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
+from subnet.bittensor.dendrite import SubVortexDendrite
 
 from subnet.validator.config import config, check_config, add_args
 from subnet.validator.forward import forward
@@ -143,7 +145,11 @@ class Validator:
 
         # Setup database
         bt.logging.info(f"loading database")
-        redis_password = get_redis_password(self.config.database.redis_password)
+        redis_password = (
+            get_redis_password(self.config.database.redis_password)
+            if not self.config.mock
+            else None
+        )
         self.database = aioredis.StrictRedis(
             host=self.config.database.host,
             port=self.config.database.port,
@@ -165,7 +171,7 @@ class Validator:
         if self.config.neuron.mock_dendrite_pool:
             self.dendrite = MockDendrite(wallet=self.wallet)
         else:
-            self.dendrite = bt.dendrite(wallet=self.wallet)
+            self.dendrite = SubVortexDendrite(wallet=self.wallet)
         bt.logging.debug(str(self.dendrite))
 
         # Init the event loop.
@@ -191,13 +197,18 @@ class Validator:
         dump_path = self.config.database.redis_dump_path
         self.version_control = VersionControl(self.database, dump_path)
 
+        # File monitor
+        self.file_monitor = FileMonitor()
+        self.file_monitor.start()
+
         # Monitor miners
         self.monitor = Monitor(self.config.netuid)
-        self.monitor.start()
+        self.file_monitor.add_file_provider(self.monitor.provider)
+        self.monitor.wait()
 
         # Country service
         self.country_service = CountryService(self.config.netuid)
-        self.country_service.start()
+        self.file_monitor.add_file_provider(self.country_service.provider)
         self.country_service.wait()
 
         # Get the validator country
@@ -257,16 +268,8 @@ class Validator:
                 )
 
                 # Run multiple forwards.
-                async def run_forward():
-                    coroutines = [
-                        forward(self)
-                        for _ in range(
-                            1
-                        )  # IMPORTANT: do not change it. we are going to work to make it concurrent tasks asap!
-                    ]
-                    await asyncio.gather(*coroutines)
-
-                self.loop.run_until_complete(run_forward())
+                coroutines = [forward(self)]
+                await asyncio.gather(*coroutines)
 
                 # Set the weights on chain.
                 bt.logging.info("Checking if should set weights")
@@ -312,11 +315,15 @@ class Validator:
 
         # After all we have to ensure subtensor connection is closed properly
         finally:
-            if self.monitor:
-                self.monitor.stop()
+            if self.file_monitor:
+                self.file_monitor.stop()
 
-            if self.country_service:
-                self.country_service.stop()
+            if self.loop.is_running():
+                self.loop.stop()
+
+            if not self.loop.is_closed():
+                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+                self.loop.close()
 
             if hasattr(self, "subtensor"):
                 bt.logging.debug("Closing subtensor connection")

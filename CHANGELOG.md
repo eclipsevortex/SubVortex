@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.7 / 2024-08-07
+
+## What's Changed
+* fix the challenge by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/78
+* fix os scripts by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/80
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.6...v2.2.7
+
 ## 2.2.6 / 2024-08-06
 
 ## What's Changed

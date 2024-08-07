@@ -132,7 +132,7 @@ This reward incentivizes miners to effectively distribute subtensors across diff
 
 ## Firewall
 
-To know more on the firewall, refer to the [firewall guide](./docs/features/firewall/firewall.md)
+To know more on the firewall, refer to the [firewall guide](./docs/features/firewall.md)
 
 ## Value Proposition
 
@@ -357,7 +357,7 @@ pm2 start neurons/miner.py \
 
 > IMPORTANT: Do not run more than one miner per machine. Running multiple miners will result in the loss of incentive and emissions on all miners.
 
-To enable the firewall, add the `--firewall.on` flag. It is highly recommended to enable the firewall to protect your miner from attacks that could impact your score. For more details about the firewall, please refer to our [firewall guide](./docs/features/firewall/firewall.md)
+To enable the firewall, add the `--firewall.on` flag. It is highly recommended to enable the firewall to protect your miner from attacks that could impact your score. For more details about the firewall, please refer to our [firewall guide](./docs/features/firewall.md)
 
 ### Running a Validator
 

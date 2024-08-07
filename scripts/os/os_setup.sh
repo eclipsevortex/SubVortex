@@ -73,12 +73,12 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # Install common packages
     install_linux_package "git"
     install_linux_package "python3-pip"
+    install_linux_package "libnetfilter-queue-dev"
 
     if [[ "$TYPE" == "miner" ]]; then
         # Dependencies to use nfqueue
         install_linux_package "build-essential"
         install_linux_package "python3-dev"
-        install_linux_package "libnetfilter-queue-dev"
     fi
 
     echo -e "\\e[32mLinux prerequisites installed\\e[0m"

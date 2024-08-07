@@ -56,17 +56,16 @@ uninstall_package() {
     fi
 }
 
-# Uninstall common packages
-uninstall_package "git"
-uninstall_package "python3-pip"
-
 # Linux specific uninstallations
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    uninstall_package "git"
+    uninstall_package "python3-pip"
+    uninstall_package "libnetfilter-queue-dev"
+    
     if [[ "$TYPE" == "miner" ]]; then
         # Dependencies to use nfqueue
         uninstall_package "build-essential"
         uninstall_package "python3-dev"
-        uninstall_package "libnetfilter-queue-dev"
     fi
 fi
 

@@ -348,9 +348,9 @@ pm2 start neurons/miner.py \
   --name MINER_NAME \
   --interpreter <PATH_TO_PYTHON_LIBRARY> -- \
   --netuid <SUBNET_UID> \
-  --subtensor.network local \
   --wallet.name YOUR_WALLET_NAME \
   --wallet.hotkey YOUR_HOTKEY_NAME \
+  --subtensor.network local \
   --logging.debug \
   --auto-update
 ```
@@ -362,6 +362,8 @@ To enable the firewall, add the `--firewall.on` flag. It is highly recommended t
 ### Running a Validator
 
 > IMPORTANT: Before running a validator, be sure you have a redis up and running. Please see the [Redis guide](./scripts/redis/README.md) for more details.
+
+> IMPORTANT: Before running a validator, be sure you have a local subtensor up and running. Please see the [Subtensor guide](./scripts/subtensor/README.md) for more details.
 
 > IMPORTANT: By default wandb is enabled when running a validator. It is **HIGHLY RECOMMANDED** to not disable it as it enables everyone to access various statistics for better performance on the subnet but if you want to do it, just add `--wandb.off` to the followed pm2 command. If you want to keep wandb enabled, please refer to the [Wandb guide](./docs/wandb/wandb.md) for more details as there are some manually steps to go throught before running the validator.
 
@@ -376,6 +378,7 @@ pm2 start neurons/validator.py \
   --netuid <SUBNET_UID> \
   --wallet.name YOUR_WALLET_NAME \
   --wallet.hotkey YOUR_HOTKEY_NAME \
+  --subtensor.network local \
   --logging.debug \
   --auto-update
 ```

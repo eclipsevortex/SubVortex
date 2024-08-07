@@ -109,13 +109,11 @@ async def challenge_data(self):
     locations = self.country_service.get_locations()
 
     # Execute the challenges
-    tasks = [handle_synapse(self, uid) for uid in uids]
-    reasons = await asyncio.gather(*tasks)
-    # tasks = []
-    # reasons = []
-    # for uid in uids:
-    #     tasks.append(asyncio.create_task(handle_synapse(self, uid)))
-    #     reasons = await asyncio.gather(*tasks)
+    tasks = []
+    reasons = []
+    for uid in uids:
+        tasks.append(asyncio.create_task(handle_synapse(self, uid)))
+        reasons = await asyncio.gather(*tasks)
 
     # Initialise the rewards object
     rewards: torch.FloatTensor = torch.zeros(len(uids), dtype=torch.float32).to(

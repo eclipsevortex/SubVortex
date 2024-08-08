@@ -91,8 +91,8 @@ Then, you can use `https://www.base64decode.org/` to decode the encoded content.
 
 By default, the UI will display all the requests that went through the firewall. Some filtering are available to narrow the focus
 
-- Filter by source ip: `http://<SERVER_IP>:8080?sip=x.x.x.x`
-- Filter by ddestination port: `http://<SERVER_IP>:8080?dport=8091`
+- Filter by source ip: `http://<SERVER_IP>:8080?ip=x.x.x.x`
+- Filter by ddestination port: `http://<SERVER_IP>:8080?port=8091`
 - Filter by action: `http://<SERVER_IP>:8080?status=allow`
 
 <br />

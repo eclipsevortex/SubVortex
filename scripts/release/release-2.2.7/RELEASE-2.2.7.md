@@ -120,11 +120,11 @@ If any issues arise during or after the rollout, follow these steps to perform a
    pm2 logs miner-7
    ```
 
-4. **Activate firewall**: refer to the section [Activate Firewall](#activate-firewall)
+4. **Activate firewall**: refer to the [Firewall Guide](../../../docs/features/firewall.md)
 
 ## Rollback Process <a id="miner-rollback-process"></a>
 
-1. **Deacivate firewall**: refer to the section [Deactivate Firewall](#deactivate-firewall)
+1. **Deacivate firewall**: refer to the [Firewall Guide](../../../docs/features/firewall.md)
 
 2. **Downgrade Subnet**: Checkout the previous release tag
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.8 / 2024-08-20
+
+## What's Changed
+* Update README.md by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/83
+* Update README.md by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/84
+* Update RELEASE-2.2.7.md by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/85
+* Bittensor release by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/86
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.7...v2.2.8
+
 ## 2.2.7 / 2024-08-07
 
 ## What's Changed

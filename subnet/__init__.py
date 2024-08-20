@@ -50,6 +50,6 @@ class SubnetVersion:
         )
 
 
-__version__ = "2.2.7"
+__version__ = "2.2.8"
 version = SubnetVersion.from_string(__version__)
 __spec_version__ = version.to_spec_version()

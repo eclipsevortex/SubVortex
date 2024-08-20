@@ -1,7 +1,7 @@
 Flask==3.0.3
 Requests==2.32.3
 aioredis==2.0.1
-bittensor==7.3.0
+bittensor==7.3.1
 cryptography==42.0.5
 fastapi==0.110.1
 ipwhois==1.2.0

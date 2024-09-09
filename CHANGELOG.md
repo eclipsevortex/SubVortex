@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.9 / 2024-09-09
+
+## What's Changed
+* Implement a challenge more random by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/88
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.8...v2.2.9
+
 ## 2.2.8 / 2024-08-20
 
 ## What's Changed

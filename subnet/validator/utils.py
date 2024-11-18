@@ -14,14 +14,14 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
-import bittensor as bt
 import random as pyrandom
+import bittensor.core.metagraph as btcm
+import bittensor.utils.btlogging as btul
 from typing import List
 from Crypto.Random import random
 
 from subnet.constants import DEFAULT_CHUNK_SIZE
-from subnet.bittensor.synapse import Synapse
+from subnet.core_bittensor.synapse import Synapse
 from subnet.validator.models import Miner
 from subnet.validator.database import get_selected_miners, set_selection
 
@@ -43,18 +43,18 @@ def current_block_hash(self):
         if block_hash is not None:
             return block_hash
     except Exception as e:
-        bt.logging.warning(
+        btul.logging.warning(
             f"Failed to get block hash: {e}. Returning a random hash value."
         )
     return int(str(random.randint(2 << 32, 2 << 64)))
 
 
 def check_uid_availability(
-    metagraph: "bt.metagraph.Metagraph", uid: int, vpermit_tao_limit: int
+    metagraph: "btcm.Metagraph", uid: int, vpermit_tao_limit: int
 ) -> bool:
     """Check if uid is available. The UID should be available if it is serving and has less than vpermit_tao_limit stake
     Args:
-        metagraph (:obj: bt.metagraph.Metagraph): Metagraph object
+        metagraph (:obj: btcm.Metagraph): Metagraph object
         uid (int): uid to be checked
         vpermit_tao_limit (int): Validator permit tao limit
     Returns:
@@ -82,7 +82,7 @@ def get_block_seed(self):
         int: The block seed.
     """
     block_hash = current_block_hash(self)
-    bt.logging.trace(f"block hash in get_block_seed: {block_hash}")
+    btul.logging.trace(f"block hash in get_block_seed: {block_hash}")
     return int(block_hash, 16)
 
 
@@ -100,7 +100,7 @@ def get_available_uids(self, exclude: list = None):
         )
         if uid_is_available and (exclude is None or uid not in exclude):
             avail_uids.append(uid)
-    bt.logging.debug(f"returning available uids: {avail_uids}")
+    btul.logging.debug(f"returning available uids: {avail_uids}")
     return avail_uids
 
 
@@ -122,7 +122,7 @@ def get_pseudorandom_uids(self, uids, k):
     k = min(k, len(uids))
 
     sampled = pyrandom.sample(uids, k=k)
-    bt.logging.debug(f"get_pseudorandom_uids() sampled: {k} | {sampled}")
+    btul.logging.debug(f"get_pseudorandom_uids() sampled: {k} | {sampled}")
     return sampled
 
 
@@ -138,7 +138,7 @@ def get_available_query_miners(self, k, exclude: List[int] = None):
     """
     # Determine miner axons to query from metagraph with pseudorandom block_hash seed
     muids = get_available_uids(self, exclude=exclude)
-    bt.logging.debug(f"get_available_query_miners() available uids: {muids}")
+    btul.logging.debug(f"get_available_query_miners() available uids: {muids}")
     return get_pseudorandom_uids(self, muids, k=k)
 
 
@@ -163,7 +163,7 @@ async def ping_uid(self, uid):
 
         return status_code == 200, status_message
     except Exception as e:
-        bt.logging.error(f"Dendrite ping failed: {e}")
+        btul.logging.error(f"Dendrite ping failed: {e}")
 
     return False, None
 
@@ -171,7 +171,7 @@ async def ping_uid(self, uid):
 async def get_next_uids(self, ss58_address: str, k: int = DEFAULT_CHUNK_SIZE):
     # Get the list of uids already selected
     uids_already_selected = await get_selected_miners(ss58_address, self.database)
-    bt.logging.debug(f"get_next_uids() uids already selected: {uids_already_selected}")
+    btul.logging.debug(f"get_next_uids() uids already selected: {uids_already_selected}")
 
     # Get the list of available uids
     uids_selected = get_available_query_miners(self, k=k, exclude=uids_already_selected)
@@ -179,22 +179,22 @@ async def get_next_uids(self, ss58_address: str, k: int = DEFAULT_CHUNK_SIZE):
     # If no uids available we start again
     if len(uids_selected) < k:
         uids_already_selected = []
-        bt.logging.debug(f"get_next_uids() not enough uids selected: {uids_selected}")
+        btul.logging.debug(f"get_next_uids() not enough uids selected: {uids_selected}")
 
         # Complete the selection with k - len(uids_selected) elements
         # We always to have k miners selected
         new_uids_selected = get_available_query_miners(self, k=k, exclude=uids_selected)
         new_uids_selected = new_uids_selected[: k - len(uids_selected)]
-        bt.logging.debug(f"get_next_uids() extra uids selected: {new_uids_selected}")
+        btul.logging.debug(f"get_next_uids() extra uids selected: {new_uids_selected}")
 
         uids_selected = uids_selected + new_uids_selected
 
-    bt.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
+    btul.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
 
     # Store the new selection in the database
     selection = ",".join(str(uid) for uid in uids_already_selected + uids_selected)
     await set_selection(ss58_address, selection, self.database)
-    bt.logging.debug(f"get_next_uids() new uids selection stored: {selection}")
+    btul.logging.debug(f"get_next_uids() new uids selection stored: {selection}")
 
     return uids_selected
 

@@ -17,7 +17,7 @@
 import json
 import struct
 import socket
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 
 from subnet.shared.type import get_key_from_value, get_enum_name_from_value
 from subnet.shared.encoder import encodeBase64, decodeBase64
@@ -219,7 +219,7 @@ class FirewallPacket:
             elif self.status == "deny":
                 self._packet.drop()
         except Exception as err:
-            bt.logging.error(err)
+            btul.logging.error(err)
             return False
 
     def to_dict(self):

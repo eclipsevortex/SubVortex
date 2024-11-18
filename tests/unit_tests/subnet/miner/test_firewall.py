@@ -22,7 +22,7 @@ from unittest.mock import patch, MagicMock
 
 from subnet.firewall.firewall_model import RuleType
 from subnet.miner.firewall import Firewall
-from subnet.bittensor.synapse import Synapse
+from subnet.core_bittensor.synapse import Synapse
 from subnet.protocol import Score
 
 from tests.unit_tests.test_case import TestCase
@@ -66,10 +66,10 @@ class TestFirewall(TestCase):
         self.mock_keypair = self.mock_keypair_class.return_value
         self.mock_keypair.verify.return_value = True
         self.mock_logging_success = patch(
-            "subnet.miner.firewall.bt.logging.success"
+            "subnet.miner.firewall.btul.logging.success"
         ).start()
         self.mock_logging_warning = patch(
-            "subnet.miner.firewall.bt.logging.warning"
+            "subnet.miner.firewall.btul.logging.warning"
         ).start()
 
     def tearDown(self):

@@ -16,7 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 import os
 import json
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 from redis import asyncio as aioredis
 
 
@@ -35,12 +35,12 @@ async def get_hotkey_statistics(ss58_address: str, database: aioredis.Redis):
     try:
         statistics = await database.hgetall(f"stats:{ss58_address}")
         if statistics is None:
-            bt.logging.trace(f"No statistics metadata found in hash {ss58_address}.")
+            btul.logging.trace(f"No statistics metadata found in hash {ss58_address}.")
             return None
 
         return statistics
     except Exception as ex:
-        bt.logging.error(
+        btul.logging.error(
             f"Failed to execute get_hotkey_statistics() on {ss58_address}: {ex}"
         )
 
@@ -56,7 +56,7 @@ async def update_hotkey_statistics(
     try:
         await database.hmset(f"stats:{ss58_address}", mapping)
     except Exception as ex:
-        bt.logging.error(
+        btul.logging.error(
             f"Failed to execute update_hotkey_statistics() on {ss58_address}: {ex}, {mapping}"
         )
 
@@ -72,10 +72,10 @@ async def remove_hotkey_stastitics(ss58_address: str, database: aioredis.Redis):
 
         await database.delete(f"stats:{ss58_address}")
     except Exception as ex:
-        bt.logging.error(
+        btul.logging.error(
             f"Failed to execute remove_hotkey_stastitics() on {ss58_address}: {ex}"
         )
-        bt.logging.info("Use redis_clean_old_key.py script to clean them.")
+        btul.logging.info("Use redis_clean_old_key.py script to clean them.")
 
 
 async def get_selected_miners(ss58_address: str, database: aioredis.Redis):
@@ -83,7 +83,7 @@ async def get_selected_miners(ss58_address: str, database: aioredis.Redis):
         # Get the uids selection
         value = await database.get(f"selection:{ss58_address}")
         if value is None:
-            bt.logging.debug(f"get_selected_miners() no uids")
+            btul.logging.debug(f"get_selected_miners() no uids")
             return []
 
         # Get the uids already selected
@@ -92,7 +92,7 @@ async def get_selected_miners(ss58_address: str, database: aioredis.Redis):
 
         return uids
     except Exception as err:
-        bt.logging.error(
+        btul.logging.error(
             f"Failed to execute get_selected_miners() on {ss58_address}: {err}"
         )
 

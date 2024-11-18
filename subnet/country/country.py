@@ -1,8 +1,24 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import copy
 import time
 import threading
 import ipaddress
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 from typing import List
 
 from subnet.country.country_constants import (
@@ -98,7 +114,7 @@ class CountryService:
         if country:
             return country
 
-        bt.logging.warning(
+        btul.logging.warning(
             f"Could not get the country of the ip {ip_ipv4}: Api 1: {reason1} / Api 2: {reason2} / Api 3: {reason3} / Api 4: {reason4}"
         )
         return None
@@ -109,7 +125,7 @@ class CountryService:
         """
         attempt = 1
         while self.first_try and attempt <= COUNTRY_ATTEMPTS:
-            bt.logging.debug(f"[{COUNTRY_LOGGING_NAME}][{attempt}] Waiting file to be process...")
+            btul.logging.debug(f"[{COUNTRY_LOGGING_NAME}][{attempt}] Waiting file to be process...")
             time.sleep(1)
             attempt += 1
 
@@ -119,6 +135,6 @@ class CountryService:
 
         self.first_try = False
 
-        bt.logging.success(
+        btul.logging.success(
             f"[{COUNTRY_LOGGING_NAME}] File proceed successfully",
         )

@@ -1,13 +1,14 @@
 Flask==3.0.3
 Requests==2.32.3
 aioredis==2.0.1
-bittensor==7.3.1
-cryptography==42.0.5
+bittensor==8.3.1
+bittensor-wallet==2.1.1
+cryptography==43.0.1
 fastapi==0.110.1
 ipwhois==1.2.0
 loguru==0.7.0
 netfilterqueue==1.1.0; sys_platform == 'linux'
-numpy==1.26.4
+numpy==2.0.1
 pycryptodome==3.20.0
 pydantic==2.8.2
 pytest==8.2.2
@@ -15,10 +16,9 @@ python-dotenv==1.0.1
 redis==5.0.1
 scalecodec==1.2.11
 scapy==2.5.0
-setuptools==65.5.0
+setuptools==70.0.0
 starlette==0.37.2
 substrate_interface==1.7.9
-torch==2.0.1
-transformers==4.42.4
+torch==2.5.1
 uvicorn==0.30.0
-wandb==0.16.5
+wandb==0.18.7

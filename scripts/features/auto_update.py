@@ -1,5 +1,6 @@
 import argparse
-import bittensor as bt
+import bittensor.core.config as btcc
+import bittensor.utils.btlogging as btul
 
 from subnet.validator.version import VersionControl as ValidatorVersionControl
 from subnet.miner.version import VersionControl as MinerVersionControl
@@ -9,7 +10,7 @@ def main(config):
     version_control = None
 
     if config.neuron is None:
-        bt.logging.warning(f"Provide a neuron (miner or validator) to upgrade")
+        btul.logging.warning(f"Provide a neuron (miner or validator) to upgrade")
         return
 
     # Create version control instance
@@ -25,7 +26,7 @@ def main(config):
 if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser()
-        bt.logging.add_args(parser)
+        btul.logging.add_args(parser)
         parser.add_argument(
             "--neuron",
             type=str,
@@ -45,11 +46,11 @@ if __name__ == "__main__":
             default=None,
         )
 
-        config = bt.config(parser)
-        bt.logging(config=config, debug=True)
+        config = btcc.Config(parser)
+        btul.logging(config=config, debug=True)
 
         main(config)
     except KeyboardInterrupt:
-        bt.logging.debug("KeyboardInterrupt")
+        btul.logging.debug("KeyboardInterrupt")
     except ValueError as e:
-        bt.logging.error(f"The configuration file is incorrect: {e}")
+        btul.logging.error(f"The configuration file is incorrect: {e}")

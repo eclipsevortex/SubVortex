@@ -20,6 +20,7 @@ import bittensor_wallet.wallet as btw
 from torch import Tensor
 from typing import Tuple
 
+from subnet.constants import SET_WEIGHTS_RETRY
 from subnet.shared.substrate import get_weights_min_stake
 
 
@@ -101,16 +102,32 @@ def set_weights(
         Exception: If there's an error while setting weights, the exception is logged for diagnosis.
     """
     try:
-        # --- Set weights.
-        success, message = subtensor.set_weights(
-            wallet=wallet,
-            netuid=netuid,
-            uids=uids,
-            weights=weights,
-            wait_for_inclusion=wait_for_inclusion,
-            wait_for_finalization=wait_for_finalization,
-            version_key=version_key,
-        )
+        retry = SET_WEIGHTS_RETRY
+        success = False
+        message = None
+
+        while not success:
+            # --- Set weights.
+            success, message = subtensor.set_weights(
+                wallet=wallet,
+                netuid=netuid,
+                uids=uids,
+                weights=weights,
+                wait_for_inclusion=wait_for_inclusion,
+                wait_for_finalization=wait_for_finalization,
+                version_key=version_key,
+            )
+
+            if success or message != "Timed out waiting for extrinsic submission":
+                # Set weight successful or no timeout
+                break
+
+            retry = retry - 1
+            if retry <= 0:
+                # No retry available
+                break
+
+            btul.logging.debug(f"Setting weights - Retry #{SET_WEIGHTS_RETRY - retry}")
 
         return success, message
     except Exception as e:

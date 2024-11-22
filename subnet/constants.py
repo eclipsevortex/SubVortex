@@ -37,3 +37,6 @@ MAIN_SUBNET_UID = 7
 
 # Selectiom
 DEFAULT_CHUNK_SIZE = 10
+
+# of retry to set weight
+SET_WEIGHTS_RETRY = 1

@@ -14,7 +14,6 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
 import torch
 import bittensor.core.subtensor as btcs
 import bittensor.core.metagraph as btcm
@@ -132,7 +131,8 @@ def set_weights_for_validator(
     btul.logging.debug("uint_uids", uint_uids)
 
     # Set the weights on chain via our subtensor connection.
-    success, message = subtensor.set_weights(
+    success, message = set_weights(
+        subtensor=subtensor,
         wallet=wallet,
         netuid=netuid,
         uids=uint_uids,

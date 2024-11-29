@@ -1,7 +1,5 @@
-import time
 import argparse
-import traceback
-from websocket import create_connection
+from websockets.sync import client as ws_client
 from substrateinterface.base import SubstrateInterface
 import bittensor.core.config as btcc
 import bittensor.core.settings as btcse
@@ -55,8 +53,10 @@ class Checker:
             # Attempt to connect to the subtensor
             try:
                 # Create the websocket
-                websocket = create_connection(
-                    url=f"ws://{ip}:9944", timeout=DEFAULT_PROCESS_TIME
+                websocket = ws_client.connect(
+                    f"ws://{ip}:9944",
+                    open_timeout=DEFAULT_PROCESS_TIME,
+                    max_size=2**32,
                 )
 
                 # Create the substrate
@@ -71,22 +71,20 @@ class Checker:
                 reason = "Failed to connect to Subtensor node at the given IP."
                 return (verified, reason)
 
-            # Set the socket timeout
-            substrate.websocket.settimeout(DEFAULT_PROCESS_TIME)
-
             # Execute the challenge
             neuron = None
             try:
                 neuron = get_neuron_for_uid_lite(
                     substrate=substrate, netuid=netuid, uid=uid, block=block
                 )
+                btul.logging.error(neuron)
             except KeyError:
                 reason = "Invalid netuid or uid provided."
                 return (verified, reason)
             except ValueError:
                 reason = "Invalid or unavailable block number."
                 return (verified, reason)
-            except Exception:
+            except (Exception, BaseException):
                 reason = "Failed to retrieve neuron details."
                 return (verified, reason)
 

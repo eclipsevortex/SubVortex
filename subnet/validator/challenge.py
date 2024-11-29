@@ -194,7 +194,7 @@ def challenge_subtensor(miner: Miner, challenge):
         except ValueError:
             reason = "Invalid or unavailable block number."
             return (verified, reason, process_time)
-        except Exception:
+        except (Exception, BaseException):
             reason = "Failed to retrieve neuron details."
             return (verified, reason, process_time)
 

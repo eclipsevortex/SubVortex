@@ -1,12 +1,14 @@
+import asyncio
 import argparse
 import bittensor.core.config as btcc
 import bittensor.utils.btlogging as btul
 
 from subnet.validator.version import VersionControl as ValidatorVersionControl
 from subnet.miner.version import VersionControl as MinerVersionControl
+from subnet.shared.utils import get_redis_password
 
 
-def main(config):
+async def main(config):
     version_control = None
 
     if config.neuron is None:
@@ -17,16 +19,28 @@ def main(config):
     if config.neuron == "miner":
         version_control = MinerVersionControl()
     else:
-        version_control = ValidatorVersionControl()
+        # Create database
+        redis_password = get_redis_password(config.database.redis_password)
+        database = aioredis.StrictRedis(
+            host=config.database.host,
+            port=config.database.port,
+            db=config.database.index,
+            password=redis_password,
+        )
+
+        version_control = ValidatorVersionControl(
+            database, config.database.redis_dump_path
+        )
 
     # Upgrade the neuron
-    version_control.upgrade(tag=config.tag, branch=config.branch)
+    await version_control.upgrade(tag=config.tag, branch=config.branch)
 
 
 if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser()
         btul.logging.add_args(parser)
+        
         parser.add_argument(
             "--neuron",
             type=str,
@@ -49,7 +63,7 @@ if __name__ == "__main__":
         config = btcc.Config(parser)
         btul.logging(config=config, debug=True)
 
-        main(config)
+        asyncio.run(main(config))
     except KeyboardInterrupt:
         btul.logging.debug("KeyboardInterrupt")
     except ValueError as e:

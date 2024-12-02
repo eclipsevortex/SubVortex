@@ -25,7 +25,16 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-REDIS_CONF=redis.conf
+# Get the base path
+current_dir=$(pwd)
+relative_dir="SubVortex/scripts/redis"
+if [[ $current_dir != *"SubVortex"* ]]; then
+    BASE="${current_dir%/}/${relative_dir%/}"
+else
+    BASE="${current_dir%/}/${relative_dir#*/}"
+fi
+
+REDIS_CONF="$BASE/docker/redis.conf"
 REDIS_PORT=6379
 REDIS_DATA="/var/lib/redis"
 
@@ -69,4 +78,4 @@ export REDIS_PASSWORD=$REDIS_PASSWORD
 export REDIS_PORT=$REDIS_PORT
 
 # Start redis container
-docker-compose up -d redis
+docker compose up -d redis

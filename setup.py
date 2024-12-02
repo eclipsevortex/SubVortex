@@ -22,7 +22,6 @@ from os import path
 from io import open
 from setuptools import setup, find_packages
 
-
 def read_requirements(path):
     with open(path, "r") as f:
         requirements = f.read().splitlines()
@@ -72,6 +71,7 @@ setup(
     license="MIT",
     python_requires=">=3.8",
     install_requires=requirements,
+    # dependency_links=["https://download.pytorch.org/whl/cpu"],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

@@ -1,4 +1,20 @@
-import bittensor as bt
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+import bittensor.utils.btlogging as btul
 from typing import List
 
 from subnet.validator.models import Miner
@@ -33,7 +49,7 @@ async def get_all_miners(self) -> List[Miner]:
 
     # Get all the ipds from the miners
 
-    bt.logging.debug("get_all_miners() load miners")
+    btul.logging.debug("get_all_miners() load miners")
     uids = get_available_uids(self)
 
     # Get all the ips from available miners
@@ -167,7 +183,7 @@ async def resync_miners(self):
     """
 
     # Focus on the changes in the metagraph
-    bt.logging.info("resync_miners() processing metagraph changes")
+    btul.logging.info("resync_miners() processing metagraph changes")
     for uid, axon in enumerate(self.metagraph.axons):
         # Get details
         hotkey = self.metagraph.hotkeys[uid]
@@ -180,7 +196,7 @@ async def resync_miners(self):
         if not is_available:
             removed = await remove_miner(self, uid, hotkey)
             if removed:
-                bt.logging.success(
+                btul.logging.success(
                     f"[{uid}] Miner {hotkey} has been removed from the list"
                 )
             continue
@@ -190,19 +206,19 @@ async def resync_miners(self):
         # Check a new miner registered to the subnet
         if miner is None:
             miner = await add_new_miner(self, uid, ip, hotkey)
-            bt.logging.success(f"[{miner.uid}] New miner {hotkey} added to the list")
+            btul.logging.success(f"[{miner.uid}] New miner {hotkey} added to the list")
 
         # Check a new miner is replacing an old one
         if miner.hotkey != hotkey:
             old_hotkey = await replace_old_miner(self, ip, hotkey, miner)
-            bt.logging.success(
+            btul.logging.success(
                 f"[{miner.uid}] Old miner {old_hotkey} has been replaced by the miner {hotkey}"
             )
 
         # Check the miner has been moved to another VPS
         if miner.ip != ip:
             previous_ip = move_miner(self, ip, miner)
-            bt.logging.success(
+            btul.logging.success(
                 f"[{miner.uid}] Miner moved from {previous_ip} to {miner.ip}"
             )
 
@@ -211,18 +227,18 @@ async def resync_miners(self):
         if country_overrided and miner.country != country_overrided:
             previous_country = miner.country
             miner.country = country_overrided
-            bt.logging.success(
+            btul.logging.success(
                 f"[{miner.uid}][{previous_country}] Miner's country overrided by {miner.country}"
             )
 
     # Focus on impacts resulting of these changes
-    bt.logging.debug("resync_miners() refreshing ip occurences")
+    btul.logging.debug("resync_miners() refreshing ip occurences")
     ips = [miner.ip for miner in self.miners]
     for miner in self.miners:
         # Refresh the miners ip occurrences
         miner.ip_occurences = get_miner_ip_occurences(miner.ip, ips)
 
-    bt.logging.debug("resync_miners() refreshing scores")
+    btul.logging.debug("resync_miners() refreshing scores")
     locations = self.country_service.get_locations()
     for miner in self.miners:
         # Refresh the availability score
@@ -244,7 +260,7 @@ async def resync_miners(self):
 
 
 async def reset_reliability_score(self, miners: List[Miner]):
-    bt.logging.info("reset_reliability_score() reset reliability statistics.")
+    btul.logging.info("reset_reliability_score() reset reliability statistics.")
 
     for miner in miners:
         miner.challenge_attempts = 0

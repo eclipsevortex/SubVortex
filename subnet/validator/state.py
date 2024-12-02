@@ -14,16 +14,14 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
-# Utils for checkpointing and saving the model.
 import os
 import re
-import torch
 import copy
 import wandb
-from wandb.apis import public
+import torch
 import shutil
-import bittensor as bt
+import bittensor.utils.btlogging as btul
+from wandb.apis import public
 from typing import List
 from datetime import datetime
 
@@ -43,7 +41,7 @@ def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
 
 async def resync_metagraph_and_miners(self, force_refresh=False):
     """Checkpoints the training process."""
-    bt.logging.info("checkpoint()")
+    btul.logging.info("checkpoint()")
     resynched = resync_metagraph(self)
 
     if resynched or force_refresh:
@@ -59,7 +57,7 @@ async def resync_metagraph_and_miners(self, force_refresh=False):
 
 def resync_metagraph(self: "validator.neuron.neuron"):
     """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph."""
-    bt.logging.info("resync_metagraph()")
+    btul.logging.info("resync_metagraph()")
 
     # Copies state of metagraph before syncing.
     previous_metagraph = copy.deepcopy(self.metagraph)
@@ -69,17 +67,17 @@ def resync_metagraph(self: "validator.neuron.neuron"):
 
     # Check if the metagraph axon info has changed.
     metagraph_axon_info_updated = previous_metagraph.axons != self.metagraph.axons
-    bt.logging.debug(f"metagraph_axon_info_updated: {metagraph_axon_info_updated}")
+    btul.logging.debug(f"metagraph_axon_info_updated: {metagraph_axon_info_updated}")
 
     if not metagraph_axon_info_updated:
         return False
 
-    bt.logging.info("resync_metagraph() Metagraph updated, re-syncing moving averages")
+    btul.logging.info("resync_metagraph() Metagraph updated, re-syncing moving averages")
 
     # Zero out all hotkeys that have been replaced.
     for uid, hotkey in enumerate(previous_metagraph.hotkeys):
         if hotkey != self.metagraph.hotkeys[uid]:
-            bt.logging.debug(
+            btul.logging.debug(
                 f"resync_metagraph() old hotkey {hotkey} | uid {uid} has been replaced by {self.metagraph.hotkeys[uid]}"
             )
             self.moving_averaged_scores[uid] = 0  # hotkey has been replaced
@@ -87,7 +85,7 @@ def resync_metagraph(self: "validator.neuron.neuron"):
     # Check to see if the metagraph has changed size.
     # If so, we need to add new hotkeys and moving averages.
     if len(self.moving_averaged_scores) < len(self.metagraph.hotkeys):
-        bt.logging.info(
+        btul.logging.info(
             "resync_metagraph() Metagraph has grown, adding new hotkeys and moving averages"
         )
         # Update the size of the moving average scores.
@@ -101,15 +99,15 @@ def resync_metagraph(self: "validator.neuron.neuron"):
 
 def save_state(self):
     r"""Save hotkeys, neuron model and moving average scores to filesystem."""
-    bt.logging.info("save_state()")
+    btul.logging.info("save_state()")
     try:
         neuron_state_dict = {
             "neuron_weights": self.moving_averaged_scores.to("cpu").tolist(),
         }
         torch.save(neuron_state_dict, f"{self.config.neuron.full_path}/model.torch")
-        bt.logging.success(f"Save model {self.config.neuron.full_path }/model.torch")
+        btul.logging.success(f"Save model {self.config.neuron.full_path }/model.torch")
     except Exception as e:
-        bt.logging.warning(f"Failed to save model with error: {e}")
+        btul.logging.warning(f"Failed to save model with error: {e}")
 
     # empty cache
     torch.cuda.empty_cache()
@@ -117,13 +115,13 @@ def save_state(self):
 
 def load_state(self):
     r"""Load hotkeys and moving average scores from filesystem."""
-    bt.logging.info("load_state()")
+    btul.logging.info("load_state()")
     try:
         state_dict = torch.load(f"{self.config.neuron.full_path}/model.torch")
         neuron_weights = torch.tensor(state_dict["neuron_weights"])
         # Check to ensure that the size of the neruon weights matches the metagraph size.
         if neuron_weights.shape != (self.metagraph.n,):
-            bt.logging.warning(
+            btul.logging.warning(
                 f"Neuron weights shape {neuron_weights.shape} does not match metagraph n {self.metagraph.n}"
                 "Populating new moving_averaged_scores IDs with zeros"
             )
@@ -133,11 +131,11 @@ def load_state(self):
         # Check for nans in saved state dict
         elif not torch.isnan(neuron_weights).any():
             self.moving_averaged_scores = neuron_weights.to(self.device)
-        bt.logging.success(
+        btul.logging.success(
             f"Reloaded model {self.config.neuron.full_path }/model.torch"
         )
     except Exception as e:
-        bt.logging.warning(f"Failed to load model with error: {e}")
+        btul.logging.warning(f"Failed to load model with error: {e}")
 
 
 def log_miners_table(self, miners: List[Miner], commit=False):
@@ -178,7 +176,7 @@ def log_miners_table(self, miners: List[Miner], commit=False):
     )
 
     wandb.run.log({"02. Miners/miners": miners}, commit=commit)
-    bt.logging.trace(f"log_miners_table() {len(data)} miners")
+    btul.logging.trace(f"log_miners_table() {len(data)} miners")
 
 
 def log_distribution(miners: List[Miner], verified=True, commit=False):
@@ -217,9 +215,9 @@ def log_distribution(miners: List[Miner], verified=True, commit=False):
     )
 
     if verified:
-        bt.logging.trace(f"log_distribution() {len(data)} verified countries")
+        btul.logging.trace(f"log_distribution() {len(data)} verified countries")
     else:
-        bt.logging.trace(f"log_distribution() {len(data)} countries")
+        btul.logging.trace(f"log_distribution() {len(data)} countries")
 
 
 def log_score(self, name: str, uids: List[int], miners: List[Miner], commit=False):
@@ -236,7 +234,7 @@ def log_score(self, name: str, uids: List[int], miners: List[Miner], commit=Fals
 
     # Create the graph
     wandb.run.log({f"04. Scores/{name}_score": data}, commit=commit)
-    bt.logging.trace(f"log_score() {name} {len(data)} scores")
+    btul.logging.trace(f"log_score() {name} {len(data)} scores")
 
 
 def log_moving_averaged_score(
@@ -258,7 +256,7 @@ def log_moving_averaged_score(
 
     # Create the graph
     wandb.run.log({"04. Scores/moving_averaged_score": data}, commit=commit)
-    bt.logging.trace(f"log_moving_averaged_score() {len(data)} moving averaged scores")
+    btul.logging.trace(f"log_moving_averaged_score() {len(data)} moving averaged scores")
 
 
 def log_completion_times(self, uids: List[int], miners: List[Miner], commit=False):
@@ -276,14 +274,14 @@ def log_completion_times(self, uids: List[int], miners: List[Miner], commit=Fals
 
     # Create the graph
     wandb.run.log({"05. Miscellaneous/completion_times": data}, commit=commit)
-    bt.logging.trace(f"log_completion_times() {len(data)} completion times")
+    btul.logging.trace(f"log_completion_times() {len(data)} completion times")
 
 
 def log_event(self, uids: List[int], step_length=None):
     if self.config.wandb.off or wandb.run is None:
         return
 
-    bt.logging.info("log_event()")
+    btul.logging.info("log_event()")
 
     try:
         miners: List[Miner] = self.miners
@@ -313,7 +311,7 @@ def log_event(self, uids: List[int], step_length=None):
         # Add miscellaneous
         log_completion_times(self, uids, miners, True)
     except Exception as err:
-        bt.logging.warning(f"log_event() send data to wandb failed: {err}")
+        btul.logging.warning(f"log_event() send data to wandb failed: {err}")
 
 
 def init_wandb(self):
@@ -349,7 +347,7 @@ def init_wandb(self):
             "subvortex-team"
         ):
             project_name = "test-subvortex-team"
-        bt.logging.debug(
+        btul.logging.debug(
             f"Wandb project {project_name} used for Subnet {self.config.netuid}"
         )
 
@@ -381,17 +379,17 @@ def init_wandb(self):
             name=name,
         )
 
-        bt.logging.debug(f"[Wandb] {len(runs)} run(s) exist")
+        btul.logging.debug(f"[Wandb] {len(runs)} run(s) exist")
 
         # Remove old runs - We keep only the new run
         if len(runs) >= 1:
-            bt.logging.debug(f"[Wandb] Removing the {len(runs)} oldest run(s)")
+            btul.logging.debug(f"[Wandb] Removing the {len(runs)} oldest run(s)")
             for i in range(0, len(runs)):
                 run: public.Run = runs[i]
 
                 # Remove remote run
                 run.delete(True)
-                bt.logging.debug(f"[Wandb] Run {run.name} removed remotely")
+                btul.logging.debug(f"[Wandb] Run {run.name} removed remotely")
 
                 # Remove local run
                 wandb_base = wandb.run.settings.wandb_dir
@@ -409,7 +407,7 @@ def init_wandb(self):
                         continue
 
                     run_local_path = f"{wandb_base}{matches[0]}"
-                    bt.logging.debug("[Wandb] Local path computed")
+                    btul.logging.debug("[Wandb] Local path computed")
                 else:
                     # Get the run started at time
                     startedAt = run.metadata["startedAt"]
@@ -424,25 +422,25 @@ def init_wandb(self):
 
                     # Local path to the run files
                     run_local_path = f"{wandb_base}run-{output_datetime_str}-{run.id}"
-                    bt.logging.debug("[Wandb] Local path retrieve from metadata")
+                    btul.logging.debug("[Wandb] Local path retrieve from metadata")
 
                 # Remove local run
                 if os.path.exists(run_local_path):
                     shutil.rmtree(run_local_path)
-                    bt.logging.debug(
+                    btul.logging.debug(
                         f"[Wandb] Run {run.name} removed locally {run_local_path}"
                     )
                 else:
-                    bt.logging.warning(
+                    btul.logging.warning(
                         f"[Wandb] Run local directory {run_local_path} does not exist. Please check it has been removed."
                     )
 
-        bt.logging.success(
+        btul.logging.success(
             prefix="Started a new wandb run",
             suffix=f"<blue> {wandb.run.name} </blue>",
         )
     except Exception as err:
-        bt.logging.warning(f"init_wandb() initialising wandb failed: {err}")
+        btul.logging.warning(f"init_wandb() initialising wandb failed: {err}")
 
 
 def should_reinit_wandb(self):
@@ -459,8 +457,8 @@ def finish_wandb():
     Finish the current wandb run
     """
     try:
-        bt.logging.debug("Finishing wandb run")
+        btul.logging.debug("Finishing wandb run")
         wandb.finish()
         assert wandb.run is None
     except Exception as err:
-        bt.logging.warning(f"finish_wandb() finishing wandb failed: {err}")
+        btul.logging.warning(f"finish_wandb() finishing wandb failed: {err}")

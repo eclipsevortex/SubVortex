@@ -1,6 +1,6 @@
 import asyncio
 import argparse
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 from redis import asyncio as aioredis
 
 from subnet.shared.utils import get_redis_password
@@ -9,7 +9,7 @@ from subnet.validator.database import create_dump, restore_dump
 
 async def create(args):
     try:
-        bt.logging.info(
+        btul.logging.info(
             f"Loading database from {args.database_host}:{args.database_port}"
         )
         redis_password = get_redis_password(args.redis_password)
@@ -20,18 +20,18 @@ async def create(args):
             password=redis_password,
         )
 
-        bt.logging.info("Create dump starting")
+        btul.logging.info("Create dump starting")
 
         await create_dump(args.dump_path, database)
 
-        bt.logging.success("Create dump successful")
+        btul.logging.success("Create dump successful")
     except Exception as e:
-        bt.logging.error(f"Error during rollout: {e}")
+        btul.logging.error(f"Error during rollout: {e}")
 
 
 async def restore(args):
     try:
-        bt.logging.info(
+        btul.logging.info(
             f"Loading database from {args.database_host}:{args.database_port}"
         )
         redis_password = get_redis_password(args.redis_password)
@@ -42,14 +42,14 @@ async def restore(args):
             password=redis_password,
         )
 
-        bt.logging.info("Restore dump starting")
+        btul.logging.info("Restore dump starting")
 
         await restore_dump(args.dump_path, database)
 
-        bt.logging.success("Restore dump successful")
+        btul.logging.success("Restore dump successful")
 
     except Exception as e:
-        bt.logging.error(f"Error during rollback: {e}")
+        btul.logging.error(f"Error during rollback: {e}")
 
 
 async def main(args):

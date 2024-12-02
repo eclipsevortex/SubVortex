@@ -1,5 +1,21 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import threading
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 
 from subnet.version.github_controller import Github
 from subnet.version.interpreter_controller import Interpreter
@@ -30,7 +46,10 @@ class BaseVersionControl:
         Version has to follow the format major.minor.patch
         """
         try:
-            bt.logging.info("[Subnet] Upgrading...")
+            btul.logging.info("[Subnet] Upgrading...")
+
+            # Get the packages from the previous version
+            initial_packages = self.interpreter.get_requirements()
 
             if branch is not None:
                 # Pull the branch
@@ -40,19 +59,28 @@ class BaseVersionControl:
                 github_tag = f"v{version or tag}"
                 self.github.get_tag(github_tag)
 
+            # Get the packages from the previous version
+            new_packages = self.interpreter.get_requirements()
+
+            # Find package to uninstall
+            packages_to_uninstall = initial_packages - new_packages
+
+            # Uninstall packages
+            self.interpreter.uninstall_packages(packages_to_uninstall)
+
             # Install dependencies
             self.interpreter.install_dependencies()
 
             if branch:
-                bt.logging.success(f"[Subnet] Upgrade to branch {branch} successful")
+                btul.logging.success(f"[Subnet] Upgrade to branch {branch} successful")
             elif tag:
-                bt.logging.success(f"[Subnet] Upgrade to tag {tag} successful")
+                btul.logging.success(f"[Subnet] Upgrade to tag {tag} successful")
             else:
-                bt.logging.success(f"[Subnet] Upgrade to {version} successful")
+                btul.logging.success(f"[Subnet] Upgrade to {version} successful")
 
             return True
         except Exception as err:
-            bt.logging.error(f"[Subnet] Failed to upgrade the subnet: {err}")
+            btul.logging.error(f"[Subnet] Failed to upgrade the subnet: {err}")
 
         return False
 
@@ -68,10 +96,10 @@ class BaseVersionControl:
             # Install dependencies
             self.interpreter.install_dependencies()
 
-            bt.logging.success(f"[Subnet] Downgrade to {version} successful")
+            btul.logging.success(f"[Subnet] Downgrade to {version} successful")
 
             return True
         except Exception as err:
-            bt.logging.error(f"[Subnet] Failed to upgrade the subnet: {err}")
+            btul.logging.error(f"[Subnet] Failed to upgrade the subnet: {err}")
 
         return False

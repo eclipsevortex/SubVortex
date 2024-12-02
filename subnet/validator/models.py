@@ -1,3 +1,19 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 class Miner:
     uid: int = -1
     hotkey: str = None
@@ -88,18 +104,18 @@ class Miner:
         # index because we do not need
         # ip/hotkey because we do not to keep a track of them
         return {
-            "uid": self.uid,
+            "uid": f"{self.uid}",
             "version": self.version,
             "country": self.country,
-            "verified": int(self.verified),
-            "score": self.score,
-            "availability_score": self.availability_score,
-            "latency_score": self.latency_score,
-            "reliability_score": self.reliability_score,
-            "distribution_score": self.distribution_score,
-            "challenge_successes": self.challenge_successes,
-            "challenge_attempts": self.challenge_attempts,
-            "process_time": self.process_time,
+            "verified": f"{int(self.verified)}",
+            "score": f"{self.score}",
+            "availability_score": f"{self.availability_score}",
+            "latency_score": f"{self.latency_score}",
+            "reliability_score": f"{self.reliability_score}",
+            "distribution_score": f"{self.distribution_score}",
+            "challenge_successes": f"{self.challenge_successes}",
+            "challenge_attempts": f"{self.challenge_attempts}",
+            "process_time": f"{self.process_time}",
         }
 
     def __str__(self):

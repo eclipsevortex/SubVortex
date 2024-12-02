@@ -14,34 +14,35 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-from abc import ABC, abstractmethod
+import bittensor.core.axon as btca
+import bittensor.core.synapse as btcs
+from typing import Optional
+from pydantic import (
+    Field,
+    field_validator,
+)
 
 
-class FileProvider(ABC):
-    def __init__(self, logger_name: str, check_interval: int) -> None:
-        self._logger_name = logger_name
-        self._check_interval = check_interval
-        self.skip_check_interval = True
+class TerminalInfo(btca.TerminalInfo):
+    # The bittensor version on the terminal as an int.
+    neuron_version: Optional[int] = Field(
+        title="neuron_version",
+        description="The neuron version",
+        examples=[111],
+        default=None,
+        frozen=False,
+    )
 
-    @property
-    def logger_name(self):
-        return self._logger_name
+    # Extract the bittensor version on the terminal as an int.
+    _extract_version = field_validator("neuron_version", mode="before")(btcs.cast_int)
 
-    @property
-    def check_interval(self):
-        if self.skip_check_interval:
-            return 0
 
-        return self._check_interval
-
-    @abstractmethod
-    def check_file_updated(self):
-        pass
-
-    @abstractmethod
-    def load_file(self):
-        pass
-
-    @abstractmethod
-    def notify(self, data):
-        pass
+class Synapse(btca.Synapse):
+    dendrite: Optional[TerminalInfo] = Field(
+        title="dendrite",
+        description="Dendrite Terminal Information",
+        examples=["TerminalInfo"],
+        default=TerminalInfo(),
+        frozen=False,
+        repr=False,
+    )

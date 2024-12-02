@@ -1,11 +1,29 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import torch
 import time
 import random
 import asyncio
 import traceback
-import bittensor as bt
+import bittensor.core.subtensor as btcs
+import bittensor.core.settings as btcse
+import bittensor.utils.btlogging as btul
 from substrateinterface.base import SubstrateInterface
-from websocket import create_connection
+from websockets.sync import client as ws_client
 
 from subnet.constants import DEFAULT_PROCESS_TIME
 from subnet.protocol import Synapse
@@ -59,7 +77,7 @@ VALIDATOR_PROPERTIES = [
 ]
 
 
-def create_subtensor_challenge(subtensor: bt.subtensor):
+def create_subtensor_challenge(subtensor: btcs.Subtensor):
     """
     Create the challenge that the miner subtensor will have to execute
     """
@@ -95,8 +113,8 @@ def create_subtensor_challenge(subtensor: bt.subtensor):
 
         return (block, subnet_uid, neuron_uid, neuron_property, neuron_value)
     except Exception as err:
-        bt.logging.warning(f"Could not create the challenge: {err}")
-        bt.logging.warning(traceback.format_exc())
+        btul.logging.warning(f"Could not create the challenge: {err}")
+        btul.logging.warning(traceback.format_exc())
         return None
 
 
@@ -144,24 +162,23 @@ def challenge_subtensor(miner: Miner, challenge):
         # Attempt to connect to the subtensor
         try:
             # Create the websocket
-            websocket = create_connection(
-                url=f"ws://{miner.ip}:9944", timeout=DEFAULT_PROCESS_TIME
+            websocket = ws_client.connect(
+                f"ws://{miner.ip}:9944",
+                open_timeout=DEFAULT_PROCESS_TIME,
+                max_size=2**32,
             )
 
             # Create the substrate
             substrate = SubstrateInterface(
-                ss58_format=bt.__ss58_format__,
+                ss58_format=btcse.SS58_FORMAT,
                 use_remote_preset=True,
-                type_registry=bt.__type_registry__,
+                type_registry=btcse.TYPE_REGISTRY,
                 websocket=websocket,
             )
 
         except Exception:
             reason = "Failed to connect to Subtensor node at the given IP."
             return (verified, reason, process_time)
-
-        # Set the socket timeout
-        substrate.websocket.settimeout(DEFAULT_PROCESS_TIME)
 
         # Start the timer
         start_time = time.time()
@@ -177,7 +194,7 @@ def challenge_subtensor(miner: Miner, challenge):
         except ValueError:
             reason = "Invalid or unavailable block number."
             return (verified, reason, process_time)
-        except Exception:
+        except (Exception, BaseException):
             reason = "Failed to retrieve neuron details."
             return (verified, reason, process_time)
 
@@ -204,7 +221,7 @@ def challenge_subtensor(miner: Miner, challenge):
 
 
 async def handle_challenge(self, uid: int, challenge):
-    bt.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Challenging...")
+    btul.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Challenging...")
 
     # Get the miner
     miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
@@ -213,12 +230,12 @@ async def handle_challenge(self, uid: int, challenge):
     process_time: float = DEFAULT_CHALLENGE_PROCESS_TIME
 
     # Challenge Miner - Ping time
-    bt.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging miner")
+    btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging miner")
     miner_verified, miner_reason = await challenge_miner(self, miner)
     if miner_verified:
-        bt.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
+        btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
     else:
-        bt.logging.warning(
+        btul.logging.warning(
             f"[{CHALLENGE_NAME}][{miner.uid}] Miner not verified - {miner_reason}"
         )
 
@@ -226,15 +243,15 @@ async def handle_challenge(self, uid: int, challenge):
     subtensor_verified, subtensor_reason = (False, None)
     if miner_verified:
         # Challenge Subtensor - Process time + check the challenge
-        bt.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging subtensor")
+        btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging subtensor")
         subtensor_verified, subtensor_reason, subtensor_time = challenge_subtensor(
             miner, challenge
         )
         if subtensor_verified:
-            bt.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
+            btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
             process_time = subtensor_time
         else:
-            bt.logging.warning(
+            btul.logging.warning(
                 f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor not verified - {subtensor_reason}"
             )
 
@@ -253,25 +270,25 @@ async def handle_challenge(self, uid: int, challenge):
 
 async def challenge_data(self):
     start_time = time.time()
-    bt.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
     # Create the challenge
     challenge = create_subtensor_challenge(self.subtensor)
     if not challenge:
         return
 
-    bt.logging.debug(
+    btul.logging.debug(
         f"[{CHALLENGE_NAME}] Challenge created - Block: {challenge[0]}, Netuid: {challenge[1]}, Uid: {challenge[2]}: Property: {challenge[3]}, Value: {challenge[4]}"
     )
 
     # Select the miners
     val_hotkey = self.metagraph.hotkeys[self.uid]
     uids = await get_next_uids(self, val_hotkey)
-    bt.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
     # Get the misbehavior miners
     suspicious_uids = self.monitor.get_suspicious_uids()
-    bt.logging.debug(f"[{CHALLENGE_NAME}] Suspicious uids {suspicious_uids}")
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Suspicious uids {suspicious_uids}")
 
     # Get the locations
     locations = self.country_service.get_locations()
@@ -288,38 +305,38 @@ async def challenge_data(self):
         self.device
     )
 
-    bt.logging.info(f"[{CHALLENGE_NAME}] Starting evaluation")
+    btul.logging.info(f"[{CHALLENGE_NAME}] Starting evaluation")
 
     # Compute the score
     for idx, (uid) in enumerate(uids):
         # Get the miner
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
 
-        bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
-        bt.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Country {miner.country}")
+        btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
+        btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Country {miner.country}")
 
         # Check if the miner is suspicious
         miner.suspicious, miner.penalty_factor = is_miner_suspicious(
             miner, suspicious_uids
         )
         if miner.suspicious:
-            bt.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is suspicious")
+            btul.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is suspicious")
 
         # Check if the miner/subtensor are verified
         if not miner.verified:  # or not miner.sync:
-            bt.logging.warning(
+            btul.logging.warning(
                 f"[{CHALLENGE_NAME}][{miner.uid}] Not verified: {reasons[idx]}"
             )
 
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
         if miner.has_ip_conflicts:
-            bt.logging.warning(
+            btul.logging.warning(
                 f"[{CHALLENGE_NAME}][{miner.uid}] {miner.ip_occurences} miner(s) associated with the ip"
             )
 
         # Compute score for availability
         miner.availability_score = compute_availability_score(miner)
-        bt.logging.debug(
+        btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Availability score {miner.availability_score}"
         )
 
@@ -327,26 +344,26 @@ async def challenge_data(self):
         miner.latency_score = compute_latency_score(
             self.country_code, miner, self.miners, locations
         )
-        bt.logging.debug(
+        btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Latency score {miner.latency_score}"
         )
 
         # Compute score for reliability
         miner.reliability_score = await compute_reliability_score(miner)
-        bt.logging.debug(
+        btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Reliability score {miner.reliability_score}"
         )
 
         # Compute score for distribution
         miner.distribution_score = compute_distribution_score(miner, self.miners)
-        bt.logging.debug(
+        btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Distribution score {miner.distribution_score}"
         )
 
         # Compute final score
         miner.score = compute_final_score(miner)
         rewards[idx] = miner.score
-        bt.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Final score {miner.score}")
+        btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Final score {miner.score}")
 
         # Send the score details to the miner
         miner.version = await send_scope(self, miner)
@@ -354,7 +371,7 @@ async def challenge_data(self):
         # Save miner snapshot in database
         await update_statistics(self, miner)
 
-    bt.logging.trace(f"[{CHALLENGE_NAME}] Rewards: {rewards}")
+    btul.logging.trace(f"[{CHALLENGE_NAME}] Rewards: {rewards}")
 
     # Compute forward pass rewards
     scattered_rewards: torch.FloatTensor = (
@@ -366,7 +383,7 @@ async def challenge_data(self):
         )
         .to(self.device)
     )
-    bt.logging.trace(f"[{CHALLENGE_NAME}] Scattered rewards: {scattered_rewards}")
+    btul.logging.trace(f"[{CHALLENGE_NAME}] Scattered rewards: {scattered_rewards}")
 
     # Update moving_averaged_scores with rewards produced by this step.
     # alpha of 0.05 means that each new score replaces 5% of the weight of the previous weights
@@ -374,19 +391,19 @@ async def challenge_data(self):
     self.moving_averaged_scores = alpha * scattered_rewards + (
         1 - alpha
     ) * self.moving_averaged_scores.to(self.device)
-    bt.logging.trace(
+    btul.logging.trace(
         f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
     )
 
     # Suspicious miners - moving weight to 0 for deregistration
     deregister_suspicious_uid(self.miners, self.moving_averaged_scores)
-    bt.logging.trace(
+    btul.logging.trace(
         f"[{CHALLENGE_NAME}] Deregistered moving avg scores: {self.moving_averaged_scores}"
     )
 
     # Display step time
     forward_time = time.time() - start_time
-    bt.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")
 
     # Log event
     log_event(self, uids, forward_time)

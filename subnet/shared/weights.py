@@ -1,10 +1,26 @@
-import bittensor as bt
-from bittensor import logging as bt_logging
-from bittensor import subtensor
-from bittensor import wallet
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+import bittensor.core.subtensor as btcs
+import bittensor.utils.btlogging as btul
+import bittensor_wallet.wallet as btw
 from torch import Tensor
 from typing import Tuple
 
+from subnet.constants import SET_WEIGHTS_RETRY
 from subnet.shared.substrate import get_weights_min_stake
 
 
@@ -33,7 +49,7 @@ def should_set_weights(
     weight_min_stake = get_weights_min_stake(self.subtensor.substrate)
     has_enough_stake = validator_stake >= weight_min_stake
     if has_enough_stake == False:
-        bt.logging.warning(
+        btul.logging.warning(
             f"Not enough stake t{validator_stake} to set weight, require a minimum of t{weight_min_stake}. Please stake more if you do not want to be de-registered!"
         )
         return False
@@ -42,8 +58,8 @@ def should_set_weights(
 
 
 def set_weights(
-    subtensor: "subtensor",
-    wallet: "wallet",
+    subtensor: "btcs.Subtensor",
+    wallet: "btw.Wallet",
     netuid: int,
     uids: "Tensor",
     weights: "Tensor",
@@ -65,12 +81,12 @@ def set_weights(
     4. Optionally logs the weight-setting operation to Weights & Biases (wandb) for monitoring.
 
     Args:
-        subtensor (bt.subtensor): The Bittensor object managing the blockchain connection.
-        wallet (bt.wallet): The miner's wallet holding cryptographic information.
+        subtensor (btcs.Subtensor): The Bittensor object managing the blockchain connection.
+        wallet (btw.Wallet): The miner's wallet holding cryptographic information.
         netuid (int): The unique identifier for the chain subnet.
         uids (torch.Tensor): miners UIDs on the network.
         weights (torch.Tensor): weights to sent for UIDs on the network.
-        metagraph (bt.metagraph): Bittensor metagraph.
+        metagraph (btcm.Metagraph): Bittensor metagraph.
         wandb_on (bool, optional): Flag to determine if logging to Weights & Biases is enabled. Defaults to False.
         wait_for_inclusion (bool, optional): Wether to wait for the extrinsic to enter a block.
         wait_for_finalization (bool, optional): Wether to wait for the extrinsic to be finalized on the chain.
@@ -86,18 +102,34 @@ def set_weights(
         Exception: If there's an error while setting weights, the exception is logged for diagnosis.
     """
     try:
-        # --- Set weights.
-        success, message = subtensor.set_weights(
-            wallet=wallet,
-            netuid=netuid,
-            uids=uids,
-            weights=weights,
-            wait_for_inclusion=wait_for_inclusion,
-            wait_for_finalization=wait_for_finalization,
-            version_key=version_key,
-        )
+        retry = SET_WEIGHTS_RETRY
+        success = False
+        message = None
+
+        while not success:
+            # --- Set weights.
+            success, message = subtensor.set_weights(
+                wallet=wallet,
+                netuid=netuid,
+                uids=uids,
+                weights=weights,
+                wait_for_inclusion=wait_for_inclusion,
+                wait_for_finalization=wait_for_finalization,
+                version_key=version_key,
+            )
+
+            if success or message != "Timed out waiting for extrinsic submission":
+                # Set weight successful or no timeout
+                break
+
+            retry = retry - 1
+            if retry <= 0:
+                # No retry available
+                break
+
+            btul.logging.debug(f"Setting weights - Retry #{SET_WEIGHTS_RETRY - retry}")
 
         return success, message
     except Exception as e:
-        bt_logging.error(f"Failed to set weights on chain with exception: { e }")
+        btul.logging.error(f"Failed to set weights on chain with exception: { e }")
         return False, message

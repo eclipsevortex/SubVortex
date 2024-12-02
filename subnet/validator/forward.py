@@ -14,9 +14,8 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
 import time
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 
 from subnet.constants import RELIABILLITY_RESET
 from subnet.shared.subtensor import get_current_block
@@ -25,13 +24,13 @@ from subnet.validator.miner import reset_reliability_score
 
 
 async def forward(self):
-    bt.logging.info(f"forward step: {self.step}")
+    btul.logging.info(f"forward step: {self.step}")
 
     # Record forward time
     start = time.time()
 
     # Send synapse to get challenge
-    bt.logging.info("initiating challenge")
+    btul.logging.info("initiating challenge")
     await challenge_data(self)
 
     # Reset reliability statistics every 3 epochs
@@ -40,4 +39,4 @@ async def forward(self):
 
     # Display step time
     forward_time = time.time() - start
-    bt.logging.info(f"forward step time: {forward_time:.2f}s")
+    btul.logging.info(f"forward step time: {forward_time:.2f}s")

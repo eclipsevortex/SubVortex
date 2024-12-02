@@ -20,7 +20,7 @@ import json
 import queue
 import threading
 import traceback
-import bittensor as bt
+import bittensor.utils.btlogging as btuli
 from typing import Dict, List
 from datetime import timedelta
 
@@ -121,8 +121,8 @@ class FirewallMonitor(threading.Thread):
                 # Clean the queues
                 self._queue_manager.cleanup()
         except Exception as e:
-            bt.logging.error(f"[Firewall] Error in FirewallMonitor thread: {e}")
-            bt.logging.error(traceback.format_exc())
+            btuli.logging.error(f"[Firewall] Error in FirewallMonitor thread: {e}")
+            btuli.logging.error(traceback.format_exc())
 
     def emit(self, event: dict):
         self._log_packets_emitted()
@@ -142,8 +142,8 @@ class FirewallMonitor(threading.Thread):
             # Broadcast the event to the firewall stream
             self._sse.broadcast("firewall", event)
         except Exception as err:
-            bt.logging.error(f"[Firewall] Broadcasting failed {err}")
-            bt.logging.error(traceback.format_exc())
+            btuli.logging.error(f"[Firewall] Broadcasting failed {err}")
+            btuli.logging.error(traceback.format_exc())
             pass
 
     def _process_events(self, events: List[dict]):
@@ -212,7 +212,7 @@ class FirewallMonitor(threading.Thread):
         self.packet_consume += 1
 
         if self._is_difference_one_hour(self.packet_consume_start):
-            bt.logging.debug(
+            btuli.logging.debug(
                 f"[Firewall] {self.packet_consume} packets received in the last hour"
             )
             self.packet_consume_start = time.time()
@@ -223,7 +223,7 @@ class FirewallMonitor(threading.Thread):
         self.packet_emit_start = self.packet_emit_start
 
         if self._is_difference_one_hour(self.packet_emit_start):
-            bt.logging.debug(
+            btuli.logging.debug(
                 f"[Firewall] {self.packet_emit} packets emitted in the last hour"
             )
             self.packet_emit_start = time.time()

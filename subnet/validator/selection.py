@@ -1,11 +1,25 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import math
 import random
+import bittensor.utils.btlogging as btul
 from typing import List
-import bittensor as bt
-from redis import asyncio as aioredis
 
 from subnet.validator.models import Miner
-from subnet.validator.database import get_selected_miners
 
 
 DEFAULT_CHUNK_SIZE = 10
@@ -27,12 +41,12 @@ def select_uids(
     """
     Return the uids selection for the current block and validator
     """
-    bt.logging.debug(f"select_uids() {step} {seed} {k}")
+    btul.logging.debug(f"select_uids() {step} {seed} {k}")
 
     if len(miners) == 0:
         return []
 
-    bt.logging.debug(f"Miners available {len(miners)}: {[x.uid for x in miners]}")
+    btul.logging.debug(f"Miners available {len(miners)}: {[x.uid for x in miners]}")
 
     # Determinate the chunk size
     chunk_size = k or max(DEFAULT_CHUNK_SIZE, math.floor(len(miners) / len(vuids)))
@@ -49,7 +63,7 @@ def select_uids(
         miners[exclusion_start_index : min(len(miners), exclusion_end_index)]
         + miners[0 : max(0, exclusion_end_index - len(miners))]
     )
-    bt.logging.debug(
+    btul.logging.debug(
         f"Miners excluded from selection {len(exclusion)}: {[x.uid for x in exclusion]}"
     )
 
@@ -60,13 +74,13 @@ def select_uids(
     max_index = min(len(vuids) * chunk_size, len(miners))
     uids = list(set(miners) - set(exclusion))[:max_index]
     uids_random.shuffle(uids)
-    bt.logging.debug(f"Miners selected {len(uids)}: {[x.uid for x in uids]}")
+    btul.logging.debug(f"Miners selected {len(uids)}: {[x.uid for x in uids]}")
 
     # Get the uids selection at the validator position amongs the validators ones
     val_idx = next((index for index, _vuid in enumerate(vuids) if _vuid == vuid), None)
     selection = uids[chunk_size * val_idx : chunk_size * (val_idx + 1)]
     random.shuffle(selection)
-    bt.logging.debug(
+    btul.logging.debug(
         f"Miners selected for validator {vuid}: {len(selection)}: {[x.uid for x in selection]}"
     )
 

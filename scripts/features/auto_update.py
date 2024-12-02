@@ -1,7 +1,7 @@
 import asyncio
 import argparse
-from redis import asyncio as aioredis
-import bittensor as bt
+import bittensor.core.config as btcc
+import bittensor.utils.btlogging as btul
 
 from subnet.validator.version import VersionControl as ValidatorVersionControl
 from subnet.miner.version import VersionControl as MinerVersionControl
@@ -12,7 +12,7 @@ async def main(config):
     version_control = None
 
     if config.neuron is None:
-        bt.logging.warning(f"Provide a neuron (miner or validator) to upgrade")
+        btul.logging.warning(f"Provide a neuron (miner or validator) to upgrade")
         return
 
     # Create version control instance
@@ -39,7 +39,8 @@ async def main(config):
 if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser()
-        bt.logging.add_args(parser)
+        btul.logging.add_args(parser)
+        
         parser.add_argument(
             "--neuron",
             type=str,
@@ -59,37 +60,11 @@ if __name__ == "__main__":
             default=None,
         )
 
-        parser.add_argument(
-            "--database.host",
-            default="localhost",
-            help="The host of the redis database.",
-        )
-        parser.add_argument(
-            "--database.port", default=6379, help="The port of the redis database."
-        )
-        parser.add_argument(
-            "--database.index",
-            default=1,
-            help="The database number of the redis database.",
-        )
-        parser.add_argument(
-            "--database.redis_password",
-            type=str,
-            default=None,
-            help="The redis password.",
-        )
-        parser.add_argument(
-            "--database.redis_dump_path",
-            type=str,
-            help="Redis directory where to store dumps.",
-            default="/etc/redis/",
-        )
-
-        config = bt.config(parser)
-        bt.logging(config=config, debug=True)
+        config = btcc.Config(parser)
+        btul.logging(config=config, debug=True)
 
         asyncio.run(main(config))
     except KeyboardInterrupt:
-        bt.logging.debug("KeyboardInterrupt")
+        btul.logging.debug("KeyboardInterrupt")
     except ValueError as e:
-        bt.logging.error(f"The configuration file is incorrect: {e}")
+        btul.logging.error(f"The configuration file is incorrect: {e}")

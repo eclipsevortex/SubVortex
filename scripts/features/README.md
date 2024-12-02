@@ -26,6 +26,14 @@ Options
 - `--tag` - Specify the tag to update to.
 - `--branch` - Specify the branch to update to.
 
+Options for validator (only)
+
+- `--database.host` - Host of the redis database, by default `localhost`.
+- `--database.port` - Port of the redis database, by default `6379`.
+- `--database.index` - Index of the redis database, by default `1`.
+- `--database.redis_password` - Password of the redis database, use `$(sudo grep -Po '^requirepass \K.*' /etc/redis/redis.conf)` or `docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'"`
+- `--database.redis_dump_path` - Directory where to store dumps, by default `/etc/redis/`.
+
 Only one of these arguments can be used at a time.
 
 The `--branch` argument is used by the SubVortex team during development, so please do not use it on the mainnet.

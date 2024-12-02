@@ -16,7 +16,7 @@ def main(config):
     if config.neuron == "miner":
         version_control = MinerVersionControl()
     else:
-        version_control = ValidatorVersionControl()
+        version_control = ValidatorVersionControl(config.database.redis_dump_path)
 
     # Upgrade the neuron
     version_control.upgrade(tag=config.tag, branch=config.branch)
@@ -43,6 +43,13 @@ if __name__ == "__main__":
             type=str,
             help="Branch to pull. Use by SubVortex team only",
             default=None,
+        )
+
+        parser.add_argument(
+            "--database.redis_dump_path",
+            type=str,
+            help="Redis directory where to store dumps.",
+            default="/etc/redis/",
         )
 
         config = bt.config(parser)

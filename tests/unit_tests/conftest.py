@@ -14,6 +14,7 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import os
 import pytest
 import aioredis
 import bittensor.utils.btlogging as btul
@@ -22,6 +23,8 @@ from unittest.mock import AsyncMock
 from neurons.validator import Validator
 from neurons.miner import Miner
 
+# Use torch in metagraph
+os.environ["USE_TORCH"] = "0"
 
 @pytest.fixture(scope="session", autouse=False)
 def validator():

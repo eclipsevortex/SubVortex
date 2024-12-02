@@ -48,6 +48,9 @@ class BaseVersionControl:
         try:
             btul.logging.info("[Subnet] Upgrading...")
 
+            # Get the packages from the previous version
+            initial_packages = self.interpreter.get_requirements()
+
             if branch is not None:
                 # Pull the branch
                 self.github.get_branch(branch)
@@ -55,6 +58,15 @@ class BaseVersionControl:
                 # Pull the tag
                 github_tag = f"v{version or tag}"
                 self.github.get_tag(github_tag)
+
+            # Get the packages from the previous version
+            new_packages = self.interpreter.get_requirements()
+
+            # Find package to uninstall
+            packages_to_uninstall = initial_packages - new_packages
+
+            # Uninstall packages
+            self.interpreter.uninstall_packages(packages_to_uninstall)
 
             # Install dependencies
             self.interpreter.install_dependencies()

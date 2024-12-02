@@ -70,6 +70,9 @@ class Github:
         # Pull branch
         subprocess.run(["git", "reset", "--hard", f"origin/{branch_name}"], check=True)
 
+        # Pull the branch 
+        subprocess.run(["git", "pull"], check=True)
+
         # Stash if there is any local changes just in case
         subprocess.run(["git", "stash"], check=True)
 

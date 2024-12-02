@@ -142,32 +142,13 @@ class Validator:
         btul.logging.debug(f"wallet: {str(self.wallet)}")
 
         # Init metagraph.
-        metagraph_type = (
-            "Torch"
-            if isinstance(btcm.BaseClass, torch.nn.Module)
-            else ("NonTorch" if isinstance(btcm.BaseClass, object) else "Unknown")
-        )
-        btul.logging.debug(
-            f"loading metagraph - use torch? {btcm.use_torch()} {metagraph_type}"
-        )
+        btul.logging.debug("loading metagraph")
         self.metagraph = (
             MockMetagraph(self.config.netuid, subtensor=self.subtensor)
             if self.config.mock
             else btcm.Metagraph(
                 netuid=self.config.netuid, network=self.subtensor.network, sync=False
             )
-        )
-        metagraph_type = (
-            "TorchMetaGraph"
-            if isinstance(self.metagraph, btcm.TorchMetaGraph)
-            else (
-                "NonTorchMetaGraph"
-                if isinstance(self.metagraph, btcm.NonTorchMetagraph)
-                else "Unknown"
-            )
-        )
-        btul.logging.debug(
-            f"loading metagraph - use torch? {btcm.use_torch()} {metagraph_type}"
         )
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
         btul.logging.debug(str(self.metagraph))
@@ -315,6 +296,7 @@ class Validator:
                 if validator_should_set_weights:
                     btul.logging.debug(f"Setting weights {self.moving_averaged_scores}")
                     set_weights_for_validator(
+                        uid=self.uid,
                         subtensor=self.subtensor,
                         wallet=self.wallet,
                         metagraph=self.metagraph,

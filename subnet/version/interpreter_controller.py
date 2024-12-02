@@ -66,16 +66,19 @@ class Interpreter:
         subprocess.run(["pip", "install", "-e", "."])
         btul.logging.info(f"Source installed successfully")
 
-    def get_requirements(self):
+    def get_requirements(self) -> dict:
         """
         Parse requirements.txt and return a set of package names.
         """
-        with open("requirements.txt", "r") as f:
-            return {
-                line.strip().split("==")[0].lower()
-                for line in f
-                if line.strip() and not line.startswith("#")
-            }
+        try:
+            with open("requirements.txt", "r") as f:
+                return [
+                    line.strip().split("==")[0].lower()
+                    for line in f
+                    if line.strip() and not line.startswith("#")
+                ]
+        except Exception:
+            return []
 
     def uninstall_packages(self, packages):
         """

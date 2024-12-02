@@ -63,7 +63,7 @@ class BaseVersionControl:
             new_packages = self.interpreter.get_requirements()
 
             # Find package to uninstall
-            packages_to_uninstall = initial_packages - new_packages
+            packages_to_uninstall = list(set(initial_packages) - set(new_packages))
 
             # Uninstall packages
             self.interpreter.uninstall_packages(packages_to_uninstall)

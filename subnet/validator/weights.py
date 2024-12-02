@@ -26,6 +26,7 @@ from subnet.shared.weights import set_weights
 
 
 def set_weights_for_validator(
+    uid: int,
     subtensor: "btcs.Subtensor",
     wallet: "btw.Wallet",
     netuid: int,
@@ -132,6 +133,7 @@ def set_weights_for_validator(
 
     # Set the weights on chain via our subtensor connection.
     success, message = set_weights(
+        uid=uid,
         subtensor=subtensor,
         wallet=wallet,
         netuid=netuid,
@@ -143,8 +145,10 @@ def set_weights_for_validator(
     )
 
     if success is True:
-        btul.logging.info("Set weights on chain successfully!")
+        btul.logging.success(f"[green]Set weights on chain successfully![/green] ")
     else:
-        btul.logging.error(f"Set weights failed {message}.")
+        btul.logging.error(
+            f":cross_mark: [red]Set weights on chain failed[/red]: {message}"
+        )
 
     return success, message, uint_weights

@@ -60,7 +60,7 @@ done
 
 # We change the default value of the subnet if testnet network is choosen
 # and no subtensor is provided
-if [[ $NETWORK == "testnet" ]]; then
+if [[ $NETWORK == "testnet" ]] && [[ $SUBTENSOR != "local" ]]; then
     SUBTENSOR='test'
 fi
 
@@ -233,7 +233,7 @@ if [[ "$TYPE" == "validator" ]]; then
     
     # Set the redis password
     if [[ $VALIDATOR_EXEC_TYPE == "docker" ]]; then
-        export REDIS_PASSWORD=$(docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
+        export REDIS_PASSWORD=$(docker exec subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
     fi
     
     # Run the validator

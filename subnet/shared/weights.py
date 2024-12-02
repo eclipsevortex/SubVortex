@@ -58,6 +58,7 @@ def should_set_weights(
 
 
 def set_weights(
+    uid: int,
     subtensor: "btcs.Subtensor",
     wallet: "btw.Wallet",
     netuid: int,
@@ -107,6 +108,13 @@ def set_weights(
         message = None
 
         while not success:
+            if retry < SET_WEIGHTS_RETRY:
+                btul.logging.debug(
+                    f"Setting weights - Retry #{SET_WEIGHTS_RETRY - retry}"
+                )
+
+            last_update = subtensor.blocks_since_last_update(netuid=netuid, uid=uid)
+
             # --- Set weights.
             success, message = subtensor.set_weights(
                 wallet=wallet,
@@ -118,16 +126,22 @@ def set_weights(
                 version_key=version_key,
             )
 
-            if success or message != "Timed out waiting for extrinsic submission":
+            if success:
                 # Set weight successful or no timeout
                 break
 
-            retry = retry - 1
-            if retry <= 0:
-                # No retry available
+            # Get the new last update which will compare to the one before setting weight
+            # If the new one ie lower that means the weight has been set
+            new_last_update = subtensor.blocks_since_last_update(netuid=netuid, uid=uid)
+            if new_last_update < last_update:
+                success, message = (True, None)
                 break
 
-            btul.logging.debug(f"Setting weights - Retry #{SET_WEIGHTS_RETRY - retry}")
+            retry = retry - 1
+            if retry < 0:
+                # No retry available
+                message = "Could not set weight after one retry"
+                break
 
         return success, message
     except Exception as e:

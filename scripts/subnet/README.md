@@ -25,10 +25,10 @@ Before installing the subnet, you have to install some prerequisites
 apt-get update
 
 # Install git
-apt-get install git
+apt-get install -y git
 
 # Install pip
-apt-get install python3-pip
+apt-get install -y python3-pip
 ```
 
 Then, you have to clone the **SubVortex** repository

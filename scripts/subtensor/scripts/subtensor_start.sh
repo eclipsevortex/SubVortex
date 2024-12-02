@@ -13,16 +13,11 @@ function run_command()
     # Different command options by network and node type
     MAINNET_CHAIN='--chain ./raw_spec_finney.json'
     TESTNET_CHAIN='--chain ./raw_spec_testfinney.json'
-    # MAINNET_BOOTNODE='--bootnodes /dns/bootnode.finney.opentensor.ai/tcp/30333/ws/p2p/12D3KooWRwbMb85RWnT8DSXSYMWQtuDwh4LJzndoRrTDotTR5gDC'
-    # MAINNET_BOOTNODE='--bootnodes /ip4/13.58.175.193/tcp/30333/p2p/12D3KooWDe7g2JbNETiKypcKT1KsCEZJbTzEHCn8hpd4PHZ6pdz5'
     MAINNET_BOOTNODE='--bootnodes /dns/bootnode.finney.chain.opentensor.ai/tcp/30333/ws/p2p/12D3KooWRwbMb85RWnT8DSXSYMWQtuDwh4LJzndoRrTDotTR5gDC'
     TESTNET_BOOTNODE='--bootnodes /dns/bootnode.test.finney.opentensor.ai/tcp/30333/ws/p2p/12D3KooWPM4mLcKJGtyVtkggqdG84zWrd7Rij6PGQDoijh1X86Vr'
-    
-    TESTNET_BOOTNODE='--bootnodes /dns/bootnode.test.finney.opentensor.ai/tcp/30333/p2p/12D3KooWPM4mLcKJGtyVtkggqdG84zWrd7Rij6PGQDoijh1X86Vr'
     NODE_TYPE_ARCHIVE='--pruning=archive'
     NODE_TYPE_LITE='--sync warp'
-    
-    
+
     # Options by the type of node we offer
     MAINNET_ARCHIVE_OPTIONS="$MAINNET_CHAIN $MAINNET_BOOTNODE $NODE_TYPE_ARCHIVE"
     MAINNET_LITE_OPTIONS="$MAINNET_CHAIN $MAINNET_BOOTNODE $NODE_TYPE_LITE"

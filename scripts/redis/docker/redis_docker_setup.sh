@@ -104,7 +104,7 @@ $BASE/scripts/redis_set_firewall.sh -p $REDIS_PORT $OPTIONS
 
 # Build redis image
 export REDIS_CONF=redis.conf
-docker-compose build redis
+docker compose build redis &> /dev/null
 ! $SILENT && echo -e "\\033[32mRedis built\\033[0m"
 
 # Clean temporary files

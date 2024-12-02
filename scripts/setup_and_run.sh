@@ -60,7 +60,7 @@ done
 
 # We change the default value of the subnet if testnet network is choosen
 # and no subtensor is provided
-if [[ $NETWORK == "testnet" ]] && [[ $SUBTENSOR == "finney" ]]; then
+if [[ $NETWORK == "testnet" ]]; then
     SUBTENSOR='test'
 fi
 

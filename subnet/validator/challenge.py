@@ -23,7 +23,6 @@ import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
 import bittensor.utils.btlogging as btul
 from substrateinterface.base import SubstrateInterface
-from websockets.sync import client as ws_client
 
 from subnet.constants import DEFAULT_PROCESS_TIME
 from subnet.protocol import Synapse
@@ -161,24 +160,20 @@ def challenge_subtensor(miner: Miner, challenge):
 
         # Attempt to connect to the subtensor
         try:
-            # Create the websocket
-            websocket = ws_client.connect(
-                f"ws://{miner.ip}:9944",
-                open_timeout=DEFAULT_PROCESS_TIME,
-                max_size=2**32,
-            )
-
             # Create the substrate
             substrate = SubstrateInterface(
                 ss58_format=btcse.SS58_FORMAT,
                 use_remote_preset=True,
                 type_registry=btcse.TYPE_REGISTRY,
-                websocket=websocket,
+                url=f"ws://{miner.ip}:9944",
             )
 
         except Exception:
             reason = "Failed to connect to Subtensor node at the given IP."
             return (verified, reason, process_time)
+
+        # Set the socket timeout
+        substrate.websocket.settimeout(DEFAULT_PROCESS_TIME)
 
         # Start the timer
         start_time = time.time()

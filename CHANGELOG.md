@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.3.0 / 2024-12-03
+
+## What's Changed
+* Enable wss connectivity by @Subvortex-mail in https://github.com/eclipsevortex/SubVortex/pull/90
+* fix subtensor scripts by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/91
+* fix docker subtensor scripts by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/94
+* fix redis docker by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/98
+* Validator autoupdate by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/99
+* Bittensor 831 by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/100
+
+## New Contributors
+* @Subvortex-mail made their first contribution in https://github.com/eclipsevortex/SubVortex/pull/90
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.2.9...v2.3.0
+
 ## 2.2.9 / 2024-09-09
 
 ## What's Changed

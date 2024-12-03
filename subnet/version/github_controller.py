@@ -1,7 +1,24 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import requests
 import subprocess
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 from os import path
+
 from subnet.shared.utils import get_version
 
 
@@ -53,10 +70,13 @@ class Github:
         # Pull branch
         subprocess.run(["git", "reset", "--hard", f"origin/{branch_name}"], check=True)
 
+        # Pull the branch 
+        subprocess.run(["git", "pull"], check=True)
+
         # Stash if there is any local changes just in case
         subprocess.run(["git", "stash"], check=True)
 
-        bt.logging.info(f"Successfully pulled source code for branch '{branch_name}'.")
+        btul.logging.info(f"Successfully pulled source code for branch '{branch_name}'.")
 
     def get_tag(self, tag):
         """
@@ -67,8 +87,8 @@ class Github:
 
         # Fetch tags
         subprocess.run(["git", "fetch", "--tags", "--force"], check=True)
-        bt.logging.info(f"Fetch tags.")
+        btul.logging.info(f"Fetch tags.")
 
         # Checkout tags
         subprocess.run(["git", "checkout", f"tags/{tag}"], check=True)
-        bt.logging.info(f"Successfully pulled source code for tag '{tag}'.")
+        btul.logging.info(f"Successfully pulled source code for tag '{tag}'.")

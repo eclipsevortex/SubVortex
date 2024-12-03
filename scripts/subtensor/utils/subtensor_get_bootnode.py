@@ -1,13 +1,15 @@
 import argparse
-import bittensor as bt
+import bittensor.core.config as btcc
+import bittensor.core.subtensor as btcs
+import bittensor.utils.btlogging as btul
 
 
 def main(_config):
-    bt.logging.check_config(_config)
-    bt.logging(config=_config, debug=True, trace=True)
+    btul.logging.check_config(_config)
+    btul.logging(config=_config, debug=True, trace=True)
 
-    bt.logging.info(f"loading subtensor")
-    subtensor = bt.subtensor(config=config)
+    btul.logging.info(f"loading subtensor")
+    subtensor = btcs.Subtensor(config=config)
 
     json_body = subtensor.substrate.rpc_request(
         "system_localListenAddresses", params=[]
@@ -23,15 +25,15 @@ def main(_config):
         ),
         None,
     )
-    bt.logging.info(f"get_bootnode() {ip}")
+    btul.logging.info(f"get_bootnode() {ip}")
 
 
 if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser()
-        bt.subtensor.add_args(parser)
-        bt.logging.add_args(parser)
-        config = bt.config(parser)
+        btcs.Subtensor.add_args(parser)
+        btul.logging.add_args(parser)
+        config = btcc.Config(parser)
 
         main(config)
     except KeyboardInterrupt:

@@ -1,5 +1,21 @@
-import numpy as np
-import bittensor as bt
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+import torch
+import bittensor.utils.btlogging as btul
 from typing import List
 
 from subnet.validator.models import Miner
@@ -27,7 +43,7 @@ def check_multiple_miners_on_same_ip(miner: Miner, miners: List[Miner]):
     """
     count = sum(1 for item in miners if item.ip == miner.ip)
     if count > 1:
-        bt.logging.warning(
+        btul.logging.warning(
             f"[{miner.uid}][Score][Multiple Ip] {count} miner(s) associated with the ip"
         )
 
@@ -71,10 +87,10 @@ async def compute_reliability_score(miner: Miner):
     is_successful = miner.verified and not miner.has_ip_conflicts
     miner.challenge_successes = miner.challenge_successes + int(is_successful)
     miner.challenge_attempts = miner.challenge_attempts + 1
-    bt.logging.trace(
+    btul.logging.trace(
         f"[{miner.uid}][Score][Reliability] # challenge attempts {miner.challenge_attempts}"
     )
-    bt.logging.trace(
+    btul.logging.trace(
         f"[{miner.uid}][Score][Reliability] # challenge succeeded {miner.challenge_successes}"
     )
 
@@ -100,7 +116,9 @@ def compute_latency_score(
     if not can_compute_latency_score(miner):
         return LATENCY_FAILURE_REWARD
 
-    bt.logging.trace(f"[{miner.uid}][Score][Latency] Process time {miner.process_time}")
+    btul.logging.trace(
+        f"[{miner.uid}][Score][Latency] Process time {miner.process_time}"
+    )
 
     # Step 1: Get the localisation of the validator
     validator_localisation = locations.get(validator_country)
@@ -124,12 +142,12 @@ def compute_latency_score(
             )
         else:
             if validator_localisation is None:
-                bt.logging.warning(
+                btul.logging.warning(
                     f"[{miner.uid}][Score][Latency] The validator's country '{validator_country}' could not be found. No tolerance applied."
                 )
 
             if location is None:
-                bt.logging.warning(
+                btul.logging.warning(
                     f"[{miner.uid}][Score][Latency] The country '{item.country}' could not be found. No tolerance applied."
                 )
 
@@ -141,34 +159,34 @@ def compute_latency_score(
 
         if miner_index == -1 and item.uid == miner.uid:
             miner_index = len(process_times) - 1
-    bt.logging.trace(
+    btul.logging.trace(
         f"[{miner.uid}][Score][Latency] Process times with tolerance {process_times}"
     )
 
     # Step 3: Baseline Latency Calculation
-    baseline_latency = np.mean(process_times)
-    bt.logging.trace(f"[{miner.uid}][Score][Latency] Base latency {baseline_latency}")
+    baseline_latency = sum(process_times) / len(process_times) 
+    btul.logging.trace(f"[{miner.uid}][Score][Latency] Base latency {baseline_latency}")
 
     # Step 4: Relative Latency Score Calculation
     relative_latency_scores = []
     for process_time in process_times:
         relative_latency_score = 1 - (process_time / baseline_latency)
         relative_latency_scores.append(relative_latency_score)
-    bt.logging.trace(
+    btul.logging.trace(
         f"[{miner.uid}][Score][Latency] Relative scores {relative_latency_scores}"
     )
 
     # Step 5: Normalization
     min_score = min(relative_latency_scores)
-    bt.logging.trace(
+    btul.logging.trace(
         f"[{miner.uid}][Score][Latency] Minimum relative score {min_score}"
     )
     max_score = max(relative_latency_scores)
-    bt.logging.trace(
+    btul.logging.trace(
         f"[{miner.uid}][Score][Latency] Maximum relative score {max_score}"
     )
     score = relative_latency_scores[miner_index]
-    bt.logging.trace(f"[{miner.uid}][Score][Latency] Relative score {score}")
+    btul.logging.trace(f"[{miner.uid}][Score][Latency] Relative score {score}")
 
     if min_score == max_score == score:
         # Only one uid with process time
@@ -206,7 +224,7 @@ def compute_distribution_score(miner: Miner, miners: List[Miner]):
     for item in conform_miners:
         if item.country == country:
             count = count + 1
-    bt.logging.trace(f"[{miner.uid}][Score][Distribution] {count} uids in {country}")
+    btul.logging.trace(f"[{miner.uid}][Score][Distribution] {count} uids in {country}")
 
     # Step 4: Compute the score
     score = 1 / count if count > 0 else 0
@@ -238,7 +256,7 @@ def compute_final_score(miner: Miner):
 
     if miner.suspicious:
         penalty_factor = miner.penalty_factor or 0
-        bt.logging.debug(
+        btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Applying penalty factor of {penalty_factor}"
         )
         score = penalty_factor * score

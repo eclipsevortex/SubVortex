@@ -1,6 +1,22 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import asyncio
 import threading
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 from enum import Enum
 
 from subnet.file.file_provider import FileProvider
@@ -32,7 +48,7 @@ class FileMonitor(threading.Thread):
                 # Wait a specific time before starting
                 await asyncio.sleep(file.check_interval)
 
-                bt.logging.debug(
+                btul.logging.debug(
                     f"[{LOGGER_NAME}][{file.logger_name}] Checking file..."
                 )
 
@@ -41,7 +57,7 @@ class FileMonitor(threading.Thread):
 
                 # Check file has been updated
                 if not file.check_file_updated():
-                    bt.logging.debug(
+                    btul.logging.debug(
                         f"[{LOGGER_NAME}][{file.logger_name}] File has not changed"
                     )
                     continue
@@ -57,7 +73,7 @@ class FileMonitor(threading.Thread):
             except Exception as err:
                 error_message = f"[{LOGGER_NAME}][{file.logger_name}] Failed processing file: {err} {type(err)}"
                 if error_message != self.last_error_shown:
-                    bt.logging.error(error_message)
+                    btul.logging.error(error_message)
                     self.last_error_shown = error_message
 
     async def _run_async(self):
@@ -75,7 +91,7 @@ class FileMonitor(threading.Thread):
                     f"[{LOGGER_NAME}] Failed checking files: {err} {type(err)}"
                 )
                 if error_message != self.last_error_shown:
-                    bt.logging.error(error_message)
+                    btul.logging.error(error_message)
                     self.last_error_shown = error_message
 
     def run(self):
@@ -86,13 +102,13 @@ class FileMonitor(threading.Thread):
             self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             self.loop.close()
 
-        bt.logging.debug(f"[{LOGGER_NAME}] run ended")
+        btul.logging.debug(f"[{LOGGER_NAME}] run ended")
 
     def start(self):
         super().start()
-        bt.logging.debug(f"[{LOGGER_NAME}] started")
+        btul.logging.debug(f"[{LOGGER_NAME}] started")
 
     def stop(self):
         self.stop_flag.set()
         super().join()
-        bt.logging.debug(f"[{LOGGER_NAME}] stopped")
+        btul.logging.debug(f"[{LOGGER_NAME}] stopped")

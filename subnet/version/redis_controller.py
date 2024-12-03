@@ -1,4 +1,20 @@
-import bittensor as bt
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+import bittensor.utils.btlogging as btul
 from os import path
 
 from subnet.version.utils import get_migrations, get_migration_module
@@ -40,7 +56,7 @@ class Redis:
                 # Load the migration module
                 module = get_migration_module(migration[2])
                 if not module:
-                    bt.logging.error(
+                    btul.logging.error(
                         f"[Redis] Could not found the migration file {migration[2]}"
                     )
                     return
@@ -49,14 +65,14 @@ class Redis:
                 await module.rollout(self.database)
 
                 # Log to keep track
-                bt.logging.debug(f"[Redis] Rollout to {version} successful")
+                btul.logging.debug(f"[Redis] Rollout to {version} successful")
 
             # Update the version in the database
-            bt.logging.success(f"[Redis] Rollout to {to_version} successful")
+            btul.logging.success(f"[Redis] Rollout to {to_version} successful")
 
             return True
         except Exception as err:
-            bt.logging.error(f"[Redis] Failed to upgrade to {version}: {err}")
+            btul.logging.error(f"[Redis] Failed to upgrade to {version}: {err}")
 
         return False
 
@@ -78,7 +94,7 @@ class Redis:
                 # Load the migration module
                 module = get_migration_module(migration[2])
                 if not module:
-                    bt.logging.error(
+                    btul.logging.error(
                         f"[Redis] Could not found the migration file {migration[2]}"
                     )
                     return
@@ -88,15 +104,15 @@ class Redis:
 
                 # Log to keep track
                 if version:
-                    bt.logging.debug(f"[Redis] Rollback from {version} successful")
+                    btul.logging.debug(f"[Redis] Rollback from {version} successful")
                 else:
-                    bt.logging.debug("[Redis] Rollback successful")
+                    btul.logging.debug("[Redis] Rollback successful")
 
             # Update the version in the database
-            bt.logging.success(f"[Redis] Rollback to {to_version} successful")
+            btul.logging.success(f"[Redis] Rollback to {to_version} successful")
 
             return True
         except Exception as err:
-            bt.logging.error(f"[Redis] Failed to downgrade to {version}: {err}")
+            btul.logging.error(f"[Redis] Failed to downgrade to {version}: {err}")
 
         return False

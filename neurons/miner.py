@@ -15,15 +15,24 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import os
+
+# Use torch in metagraph
+os.environ["USE_TORCH"] = "1"
+
 import sys
 import time
 import copy
 import torch
 import typing
 import asyncio
-import bittensor as bt
 import threading
 import traceback
+import bittensor.core.config as btcc
+import bittensor.core.subtensor as btcs
+import bittensor.utils.btlogging as btul
+import bittensor.utils.networking as btun
+import bittensor_wallet.wallet as btw
+import bittensor_wallet.mock as btwm
 
 from subnet import __version__ as THIS_VERSION
 from subnet.protocol import Score
@@ -33,9 +42,9 @@ from subnet.shared.subtensor import get_hyperparameter_value
 from subnet.shared.substrate import get_weights_min_stake
 from subnet.shared.mock import MockMetagraph, MockSubtensor, MockAxon
 
-from subnet.bittensor.metagraph import SubVortexMetagraph
-from subnet.bittensor.axon import SubVortexAxon
-from subnet.bittensor.synapse import Synapse
+from subnet.core_bittensor.metagraph import SubVortexMetagraph
+from subnet.core_bittensor.axon import SubVortexAxon
+from subnet.core_bittensor.synapse import Synapse
 
 from subnet.sse.sse_thread import SSEThread
 
@@ -56,7 +65,7 @@ from subnet.miner.utils import load_request_log
 
 class Miner:
     @classmethod
-    def check_config(cls, config: "bt.Config"):
+    def check_config(cls, config: "btcc.Config"):
         """
         Adds neuron-specific arguments to the argument parser.
 
@@ -85,15 +94,15 @@ class Miner:
         Retrieves the configuration for the neuron.
 
         Returns:
-            bt.Config: The configuration object for the neuron.
+            btcc.Config: The configuration object for the neuron.
 
         This class method returns the neuron's configuration, which is used throughout the neuron's lifecycle
         for various functionalities and operations.
         """
         return config(cls)
 
-    subtensor: "bt.subtensor"
-    wallet: "bt.wallet"
+    subtensor: "btcs.Subtensor"
+    wallet: "btw.Wallet"
     metagraph: SubVortexMetagraph
 
     def __init__(self, config=None):
@@ -101,26 +110,21 @@ class Miner:
         self.config = Miner.config()
         self.config.merge(base_config)
         self.check_config(self.config)
-        bt.logging(
+        btul.logging(
             config=self.config,
             logging_dir=self.config.miner.full_path,
             debug=True,
         )
-        bt.logging.set_trace(self.config.logging.trace)
-        bt.logging._stream_formatter.set_trace(self.config.logging.trace)
-        bt.logging.info(f"{self.config}")
+        btul.logging.set_trace(self.config.logging.trace)
+        btul.logging._stream_formatter.set_trace(self.config.logging.trace)
+        btul.logging.info(f"{self.config}")
 
         # Show the pid
         pid = os.getpid()
-        bt.logging.debug(f"miner PID: {pid}")
+        btul.logging.debug(f"miner PID: {pid}")
 
         # Show miner version
-        bt.logging.debug(f"miner version {THIS_VERSION}")
-
-        # Init device.
-        bt.logging.debug("loading device")
-        self.device = torch.device(self.config.miner.device)
-        bt.logging.debug(str(self.device))
+        btul.logging.debug(f"miner version {THIS_VERSION}")
 
         # File monitor
         self.file_monitor = FileMonitor()
@@ -134,7 +138,7 @@ class Miner:
         # Firewall
         self.firewall = None
         if self.config.firewall.on:
-            bt.logging.debug(
+            btul.logging.debug(
                 f"Starting firewall on interface {self.config.firewall.interface}"
             )
             port = (
@@ -154,30 +158,30 @@ class Miner:
             self.firewall.start()
 
         # Init wallet.
-        bt.logging.debug("loading wallet")
+        btul.logging.debug("loading wallet")
         self.wallet = (
-            bt.MockWallet(config=self.config)
+            btwm.MockWallet(config=self.config)
             if self.config.mock
-            else bt.wallet(config=self.config)
+            else btw.Wallet(config=self.config)
         )
         self.wallet.create_if_non_existent()
-        bt.logging.debug(f"wallet: {str(self.wallet)}")
+        btul.logging.debug(f"wallet: {str(self.wallet)}")
 
         # Init subtensor
-        bt.logging.debug("loading subtensor")
+        btul.logging.debug("loading subtensor")
         self.subtensor = (
             MockSubtensor(self.config.netuid, wallet=self.wallet)
             if self.config.miner.mock_subtensor
-            else bt.subtensor(config=self.config, network="local")
+            else btcs.Subtensor(config=self.config, network="local")
         )
-        bt.logging.debug(str(self.subtensor))
+        btul.logging.debug(str(self.subtensor))
         self.current_block = self.subtensor.get_current_block()
 
-        bt.logging.debug("checking wallet registration")
+        btul.logging.debug("checking wallet registration")
         check_registration(self.subtensor, self.wallet, self.config.netuid)
 
         # Init metagraph.
-        bt.logging.debug("loading metagraph")
+        btul.logging.debug("loading metagraph")
         self.metagraph = (
             MockMetagraph(self.config.netuid, subtensor=self.subtensor)
             if self.config.mock
@@ -187,32 +191,32 @@ class Miner:
         )
 
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
-        bt.logging.debug(str(self.metagraph))
+        btul.logging.debug(str(self.metagraph))
 
         self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
-        bt.logging.info(f"Running miner on uid: {self.uid}")
+        btul.logging.info(f"Running miner on uid: {self.uid}")
 
         # The axon handles request processing, allowing validators to send this process requests.
         self.axon = (
             MockAxon(
                 wallet=self.wallet,
                 config=self.config,
-                external_ip=bt.utils.networking.get_external_ip(),
+                external_ip=btun.get_external_ip(),
                 blacklist_fn=self._blacklist,
             )
             if self.config.mock
             else SubVortexAxon(
                 wallet=self.wallet,
                 config=self.config,
-                external_ip=bt.utils.networking.get_external_ip(),
+                external_ip=btun.get_external_ip(),
                 blacklist_fn=self._blacklist,
             )
         )
-        bt.logging.info(f"Axon {self.axon}")
-        bt.logging.info(f"Axon version {self.axon.info().version}")
+        btul.logging.info(f"Axon {self.axon}")
+        btul.logging.info(f"Axon version {self.axon.info().version}")
 
         # Attach determiners which functions are called when servicing a request.
-        bt.logging.info("Attaching forward functions to axon.")
+        btul.logging.info("Attaching forward functions to axon.")
         self.axon.attach(
             forward_fn=self._score,
             blacklist_fn=self._blacklist_score,
@@ -220,18 +224,18 @@ class Miner:
 
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip have changed.
-        bt.logging.info(
+        btul.logging.info(
             f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
         self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
 
         # Check there is not another miner running on the machine
-        bt.logging.debug(f"Checking number of miners on same ip")
+        btul.logging.debug(f"Checking number of miners on same ip")
         number_of_miners = len(
             [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]
         )
         if number_of_miners > 1:
-            bt.logging.error(
+            btul.logging.error(
                 "At least one miner is already running on this machine. If you run more than one miner you will penalise all of your miners until you get de-registered or start each miner on a unique machine"
             )
             sys.exit(1)
@@ -241,7 +245,7 @@ class Miner:
         self.file_monitor.start()
 
         # Start  starts the miner's axon, making it active on the network.
-        bt.logging.info(f"Starting axon server on port: {self.config.axon.port}")
+        btul.logging.info(f"Starting axon server on port: {self.config.axon.port}")
         self.axon.start()
 
         # Init the event loop.
@@ -272,7 +276,7 @@ class Miner:
 
         # Block hotkeys that are not an active validator hotkey
         if not validator:
-            bt.logging.debug(
+            btul.logging.debug(
                 f"Blacklisted a {synapse_type} request from a unrecognized hotkey {caller}"
             )
             return True, "Unrecognized hotkey"
@@ -282,7 +286,7 @@ class Miner:
             self.subtensor, "weights_version", self.config.netuid
         )
         if caller_version < active_version:
-            bt.logging.debug(
+            btul.logging.debug(
                 f"Blacklisted a {synapse_type} request from a non-updated hotkey {caller}"
             )
             return True, "Non-updated hotkey"
@@ -290,27 +294,31 @@ class Miner:
         # Block hotkeys that do not have the minimum require stake to set weight
         weights_min_stake = get_weights_min_stake(self.subtensor.substrate)
         if validator[2] < weights_min_stake:
-            bt.logging.debug(
+            btul.logging.debug(
                 f"Blacklisted a {synapse_type} request from a not enought stake hotkey {caller}"
             )
             return True, "Not enough stake hotkey"
 
-        bt.logging.trace(f"Not Blacklisting recognized hotkey {caller}")
+        btul.logging.trace(f"Not Blacklisting recognized hotkey {caller}")
         return False, "Hotkey recognized!"
 
     def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
         if synapse.count > 1:
-            bt.logging.error(
+            btul.logging.error(
                 f"[{validator_uid}] {synapse.count} miners are running on this machine"
             )
 
-        bt.logging.info(f"[{validator_uid}] Availability score {synapse.availability}")
-        bt.logging.info(f"[{validator_uid}] Latency score {synapse.latency}")
-        bt.logging.info(f"[{validator_uid}] Reliability score {synapse.reliability}")
-        bt.logging.info(f"[{validator_uid}] Distribution score {synapse.distribution}")
-        bt.logging.success(f"[{validator_uid}] Score {synapse.score}")
+        btul.logging.info(
+            f"[{validator_uid}] Availability score {synapse.availability}"
+        )
+        btul.logging.info(f"[{validator_uid}] Latency score {synapse.latency}")
+        btul.logging.info(f"[{validator_uid}] Reliability score {synapse.reliability}")
+        btul.logging.info(
+            f"[{validator_uid}] Distribution score {synapse.distribution}"
+        )
+        btul.logging.success(f"[{validator_uid}] Score {synapse.score}")
 
         synapse.version = THIS_VERSION
 
@@ -328,23 +336,23 @@ class Miner:
         This is useful for non-blocking operations.
         """
         if not self.is_running:
-            bt.logging.debug("Starting miner in background thread.")
+            btul.logging.debug("Starting miner in background thread.")
             self.should_exit = False
             self.thread = threading.Thread(target=self.run, daemon=True)
             self.thread.start()
             self.is_running = True
-            bt.logging.debug("Started")
+            btul.logging.debug("Started")
 
     def stop_run_thread(self):
         """
         Stops the miner's operations that are running in the background thread.
         """
         if self.is_running:
-            bt.logging.debug("Stopping miner in background thread.")
+            btul.logging.debug("Stopping miner in background thread.")
             self.should_exit = True
             self.thread.join(5)
             self.is_running = False
-            bt.logging.debug("Stopped")
+            btul.logging.debug("Stopped")
 
     def __enter__(self):
         """
@@ -398,7 +406,7 @@ class Miner:
             "synapses": self.axon.forward_class_types,
             "hotkey": self.wallet.hotkey.ss58_address,
         }
-        bt.logging.debug(f"Firewall specifications {specifications}")
+        btul.logging.debug(f"Firewall specifications {specifications}")
 
         # Define the valid validators
         validators = self.metagraph.get_validators(weights_min_stake)
@@ -409,7 +417,7 @@ class Miner:
             specifications=specifications,
             whitelist_hotkeys=valid_validators,
         )
-        bt.logging.debug("Firewall updated")
+        btul.logging.debug("Firewall updated")
 
 
 def run_miner():
@@ -427,11 +435,11 @@ def run_miner():
         while 1:
             time.sleep(1)
     except KeyboardInterrupt:
-        bt.logging.info("Keyboard interrupt detected, exiting.")
+        btul.logging.info("Keyboard interrupt detected, exiting.")
         sys.exit(0)
     except Exception as e:
-        bt.logging.error(traceback.format_exc())
-        bt.logging.error(f"Unhandled exception: {e}")
+        btul.logging.error(traceback.format_exc())
+        btul.logging.error(f"Unhandled exception: {e}")
         sys.exit(1)
     finally:
         if miner and miner.sse:
@@ -444,7 +452,7 @@ def run_miner():
             miner.file_monitor.stop()
 
         if miner:
-            bt.logging.info("Stopping axon")
+            btul.logging.info("Stopping axon")
             miner.axon.stop()
 
 

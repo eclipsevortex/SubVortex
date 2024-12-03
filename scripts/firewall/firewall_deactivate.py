@@ -3,7 +3,8 @@ import json
 import time
 import argparse
 import subprocess
-import bittensor as bt
+import bittensor.core.config as btcc
+import bittensor.utils.btlogging as btul
 from typing import List
 
 from subnet.firewall.firewall_factory import create_firewall_tool
@@ -18,7 +19,7 @@ def run_command(command, stdout=subprocess.DEVNULL):
             stderr=subprocess.DEVNULL,
         )
     except subprocess.CalledProcessError as e:
-        bt.logging.error(f"Error running command: {e}")
+        btul.logging.error(f"Error running command: {e}")
         return None
 
 
@@ -31,7 +32,7 @@ def check_pm2_process_status(process_name: str):
             if process["name"] == process_name:
                 return process["pm2_env"]["status"]
     except subprocess.CalledProcessError as e:
-        bt.logging.error(f"Failed to get the process status: {e}")
+        btul.logging.error(f"Failed to get the process status: {e}")
         return None
 
 
@@ -69,7 +70,7 @@ def get_pm2_process_args(process_name: str):
 
         return (None, None, None)
     except subprocess.CalledProcessError as e:
-        bt.logging.error(f"Failed to get the process args: {e}")
+        btul.logging.error(f"Failed to get the process args: {e}")
         return (None, None, None)
 
 
@@ -105,23 +106,23 @@ def main(config):
     tool = create_firewall_tool()
 
     # Change the policy to allow
-    bt.logging.debug(f"Change the INPUT policy to allow by default")
+    btul.logging.debug(f"Change the INPUT policy to allow by default")
     tool.create_allow_policy()
 
     # Flush the INPUT chain
-    bt.logging.debug(f"Flush the INPUT chain")
+    btul.logging.debug(f"Flush the INPUT chain")
     tool.flush_input_chain()
 
     # Remove the firewall events nsjon file
-    bt.logging.debug(f"Removing events file")
+    btul.logging.debug(f"Removing events file")
     if os.path.exists("firewall-events.json"):
         os.remove("firewall-events.json")
 
-    bt.logging.debug(f"Updating process arguments")
+    btul.logging.debug(f"Updating process arguments")
     process_path, process_interpreter, process_args = get_pm2_process_args(process_name)
     process_args = update_firewall_args(process_args)
 
-    bt.logging.debug(f"Restart miner")
+    btul.logging.debug(f"Restart miner")
     restart_pm2_process(
         process_name=process_name,
         process_path=process_path,
@@ -141,24 +142,24 @@ def main(config):
             break
 
     if status == "online":
-        bt.logging.success("Firewall has been deactivated")
+        btul.logging.success("Firewall has been deactivated")
     else:
-        bt.logging.warning("Firewall could not restart correctly")
+        btul.logging.warning("Firewall could not restart correctly")
 
 
 if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser()
-        bt.logging.add_args(parser)
+        btul.logging.add_args(parser)
         parser.add_argument(
             "--process.name", type=str, help="Name of the miner in pm2", default=None
         )
 
-        config = bt.config(parser)
-        bt.logging(config=config, debug=True)
+        config = btcc.Config(parser)
+        btul.logging(config=config, debug=True)
 
         main(config)
     except KeyboardInterrupt:
-        bt.logging.debug("KeyboardInterrupt")
+        btul.logging.debug("KeyboardInterrupt")
     except ValueError as e:
-        bt.logging.error(f"The configuration file is incorrect: {e}")
+        btul.logging.error(f"The configuration file is incorrect: {e}")

@@ -14,18 +14,22 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
 import os
 import torch
 import argparse
 import datetime
-import bittensor as bt
+import bittensor.core.config as btcc
+import bittensor.core.axon as btca
+import bittensor.core.subtensor as btcs
+import bittensor.utils.btlogging as btul
+import bittensor_wallet.wallet as btw
+
 from loguru import logger
 
 
-def check_config(cls, config: "bt.Config"):
+def check_config(cls, config: "btcc.Config"):
     r"""Checks/validates the config namespace object."""
-    bt.logging.check_config(config)
+    btul.logging.check_config(config)
 
     if config.mock:
         config.wallet._mock = True
@@ -109,7 +113,7 @@ def check_config(cls, config: "bt.Config"):
             os.path.join(config.neuron.full_path + "/" + "total_storage.csv")
         )
 
-    bt.logging.info(f"Loaded config in fullpath: {config.neuron.full_path}")
+    btul.logging.info(f"Loaded config in fullpath: {config.neuron.full_path}")
 
 
 def add_args(cls, parser):
@@ -265,9 +269,9 @@ def add_args(cls, parser):
 
 def config(cls):
     parser = argparse.ArgumentParser()
-    bt.wallet.add_args(parser)
-    bt.subtensor.add_args(parser)
-    bt.logging.add_args(parser)
-    bt.axon.add_args(parser)
+    btw.Wallet.add_args(parser)
+    btcs.Subtensor.add_args(parser)
+    btul.logging.add_args(parser)
+    btca.Axon.add_args(parser)
     cls.add_args(parser)
-    return bt.config(parser)
+    return btcc.Config(parser)

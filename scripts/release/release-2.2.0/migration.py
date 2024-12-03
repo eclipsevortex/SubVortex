@@ -1,6 +1,6 @@
 import asyncio
 import argparse
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 from redis import asyncio as aioredis
 
 from subnet.shared.utils import get_redis_password
@@ -11,14 +11,14 @@ def check_redis(args):
     try:
         asyncio.run(check_environment(args.redis_conf_path))
     except AssertionError as e:
-        bt.logging.warning(
+        btul.logging.warning(
             f"Something is missing in your environment: {e}. Please check your configuration, use the README for help, and try again."
         )
 
 
 async def rollout(args):
     try:
-        bt.logging.info(
+        btul.logging.info(
             f"Loading database from {args.database_host}:{args.database_port}"
         )
         redis_password = get_redis_password(args.redis_password)
@@ -29,7 +29,7 @@ async def rollout(args):
             password=redis_password,
         )
 
-        bt.logging.info("Rollout starting")
+        btul.logging.info("Rollout starting")
         async for key in database.scan_iter("*"):
             metadata_dict = await database.hgetall(key)
 
@@ -72,9 +72,9 @@ async def rollout(args):
                 await database.hset(key, b"challenge_attempts", 0)
             if b"process_time" not in metadata_dict:
                 await database.hset(key, b"process_time", 0)
-        bt.logging.info("Rollout done")
+        btul.logging.info("Rollout done")
 
-        bt.logging.info("Checking rollout...")
+        btul.logging.info("Checking rollout...")
         checked = True
         async for key in database.scan_iter("*"):
             # Do not do anything if not a stats key
@@ -107,19 +107,19 @@ async def rollout(args):
 
             diff = list(set(properties_added) - set(keys))
             if len(diff) > 0:
-                bt.logging.warning(f"Some stats key(s) {diff} have not been created.")
+                btul.logging.warning(f"Some stats key(s) {diff} have not been created.")
                 checked = False
                 break
 
         if checked:
-            bt.logging.info("Rollout checked successfully")
+            btul.logging.info("Rollout checked successfully")
     except Exception as e:
-        bt.logging.error(f"Error during rollout: {e}")
+        btul.logging.error(f"Error during rollout: {e}")
 
 
 async def rollback(args):
     try:
-        bt.logging.info(
+        btul.logging.info(
             f"Loading database from {args.database_host}:{args.database_port}"
         )
         redis_password = get_redis_password(args.redis_password)
@@ -130,7 +130,7 @@ async def rollback(args):
             password=redis_password,
         )
 
-        bt.logging.info("Rollback starting")
+        btul.logging.info("Rollback starting")
         # Remove uids selection key
         async for key in database.scan_iter("selection:*"):
             await database.delete(key)
@@ -166,15 +166,15 @@ async def rollback(args):
                 await database.hset(key, b"challenge_successes", 0)
             if b"challenge_attempts" not in metadata_dict:
                 await database.hset(key, b"challenge_attempts", 0)
-        bt.logging.info("Rollback done")
+        btul.logging.info("Rollback done")
 
-        bt.logging.info("Checking rollback...")
+        btul.logging.info("Checking rollback...")
         checked = True
         async for key in database.scan_iter("*"):
             # Check selection key has been removed
             if key.decode().startswith("selection:"):
                 checked = False
-                bt.logging.warning(f"The selection key {key} still exist.")
+                btul.logging.warning(f"The selection key {key} still exist.")
                 break
 
             # Do not do anything if not a stats key
@@ -205,7 +205,7 @@ async def rollback(args):
 
             diff = list(set(properties_removed) - set(keys))
             if len(keys) > 0:
-                bt.logging.warning(f"The stats key(s) {diff} still exist.")
+                btul.logging.warning(f"The stats key(s) {diff} still exist.")
                 checked = False
                 break
 
@@ -222,15 +222,15 @@ async def rollback(args):
 
             diff = list(set(properties_added) - set(keys))
             if len(keys) > 0:
-                bt.logging.warning(f"The stats key(s) {diff} does not exist.")
+                btul.logging.warning(f"The stats key(s) {diff} does not exist.")
                 checked = False
                 break
 
         if checked:
-            bt.logging.info("Rollback checked successfully")
+            btul.logging.info("Rollback checked successfully")
 
     except Exception as e:
-        bt.logging.error(f"Error during rollback: {e}")
+        btul.logging.error(f"Error during rollback: {e}")
 
 
 async def main(args):

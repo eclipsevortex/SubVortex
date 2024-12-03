@@ -14,9 +14,8 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
 import math
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 
 from subnet.constants import *
 from subnet.validator.models import Miner
@@ -43,7 +42,7 @@ def wilson_score_interval(successes, total):
 
     wilson_score = (max(0, lower_bound) + min(upper_bound, 1)) / 2
 
-    bt.logging.trace(
+    btul.logging.trace(
         f"Wilson score interval with {successes} / {total}: {wilson_score}"
     )
     return wilson_score

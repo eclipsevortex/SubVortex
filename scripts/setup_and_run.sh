@@ -60,7 +60,7 @@ done
 
 # We change the default value of the subnet if testnet network is choosen
 # and no subtensor is provided
-if [[ $NETWORK == "testnet" ]] && [[ $SUBTENSOR == "finney" ]]; then
+if [[ $NETWORK == "testnet" ]] && [[ $SUBTENSOR != "local" ]]; then
     SUBTENSOR='test'
 fi
 
@@ -169,10 +169,10 @@ fi
 if [[ $ACTION_ON_COLDKEY == 'yes' ]]; then
     if [[ $NEW_COLDKEY == 'yes' ]]; then
         # Generate a new coldkey
-        btcli w new_coldkey --wallet.name $WALLET_NAME
+        btcli w new_coldkey --wallet.name $WALLET_NAME --wallet.path "~/.bittensor/wallets/"
     else
         # Re-generate an existing coldkey
-        btcli w regen_coldkey --wallet.name $WALLET_NAME --mnemonic $COLDKEY_MNEMONIC
+        btcli w regen_coldkey --wallet.name $WALLET_NAME --mnemonic "$COLDKEY_MNEMONIC" --wallet.path "~/.bittensor/wallets/"
     fi
 fi
 
@@ -180,10 +180,10 @@ fi
 if [[ $ACTION_ON_HOTKEY == 'yes' ]]; then
     if [[ $NEW_HOTKEY == 'yes' ]]; then
         # Generate a new hotkey
-        btcli w new_hotkey --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME
+        btcli w new_hotkey --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --wallet.path "~/.bittensor/wallets/"
     else
         # Re-generate an existing hotkey
-        btcli w regen_hotkey --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --mnemonic $HOTKEY_MNEMONIC
+        btcli w regen_hotkey --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --mnemonic "$HOTKEY_MNEMONIC" --wallet.path "~/.bittensor/wallets/"
     fi
 fi
 
@@ -233,7 +233,7 @@ if [[ "$TYPE" == "validator" ]]; then
     
     # Set the redis password
     if [[ $VALIDATOR_EXEC_TYPE == "docker" ]]; then
-        export REDIS_PASSWORD=$(docker exec -it subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
+        export REDIS_PASSWORD=$(docker exec subvortex-redis /bin/sh -c "grep -Eo '^requirepass[[:space:]]+(.*)$' /etc/redis/redis.conf | awk '{print \$2}'")
     fi
     
     # Run the validator

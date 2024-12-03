@@ -1,10 +1,26 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import os
 import glob
 import site
 import shutil
-from os import path
 import subprocess
-import bittensor as bt
+import bittensor.utils.btlogging as btul
+from os import path
 
 here = path.abspath(path.dirname(__file__))
 
@@ -35,17 +51,42 @@ class Interpreter:
     def install_dependencies(self):
         self.remove_egg_directory()
         self.remove_egg_link()
-        bt.logging.info(f"Artifacts removed successfully")
+        btul.logging.info(f"Artifacts removed successfully")
 
         subprocess.run(["pip", "install", "-r", "requirements.txt"])
-        bt.logging.info(f"Dependencies installed successfully")
+        btul.logging.info(f"Dependencies installed successfully")
 
         subprocess.run(["pip", "install", "-e", "."])
-        bt.logging.info(f"Source installed successfully")
+        btul.logging.info(f"Source installed successfully")
 
     def upgrade_dependencies(self):
         subprocess.run(["pip", "install", "--upgrade", "SubVortex"])
-        bt.logging.info(f"Dependencies installed successfully")
+        btul.logging.info(f"Dependencies installed successfully")
 
         subprocess.run(["pip", "install", "-e", "."])
-        bt.logging.info(f"Source installed successfully")
+        btul.logging.info(f"Source installed successfully")
+
+    def get_requirements(self) -> dict:
+        """
+        Parse requirements.txt and return a set of package names.
+        """
+        try:
+            with open("requirements.txt", "r") as f:
+                return [
+                    line.strip().split("==")[0].lower()
+                    for line in f
+                    if line.strip() and not line.startswith("#")
+                ]
+        except Exception:
+            return []
+
+    def uninstall_packages(self, packages):
+        """
+        Uninstall a list of packages.
+        """
+        if not packages:
+            return
+
+        for package in packages:
+            subprocess.run(["pip", "uninstall", "-y", package], check=True)
+            btul.logging.debug(f"Package {package} uninstall successfully")

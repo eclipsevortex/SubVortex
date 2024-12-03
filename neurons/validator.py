@@ -15,13 +15,23 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+import os
+
+# Use torch in metagraph
+os.environ["USE_TORCH"] = "1"
+
 import time
 import copy
 import torch
 import asyncio
-from redis import asyncio as aioredis
 import threading
-import bittensor as bt
+import bittensor.core.config as btcc
+import bittensor.core.subtensor as btcs
+import bittensor.core.metagraph as btcm
+import bittensor.utils.btlogging as btul
+import bittensor_wallet.wallet as btw
+import bittensor_wallet.mock as btwm
+from redis import asyncio as aioredis
 from typing import List
 from traceback import print_exception
 
@@ -36,7 +46,7 @@ from subnet.shared.utils import get_redis_password, should_upgrade
 from subnet.shared.subtensor import get_current_block
 from subnet.shared.weights import should_set_weights
 from subnet.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
-from subnet.bittensor.dendrite import SubVortexDendrite
+from subnet.core_bittensor.dendrite import SubVortexDendrite
 
 from subnet.validator.config import config, check_config, add_args
 from subnet.validator.forward import forward
@@ -63,15 +73,15 @@ class Validator:
     while also participating in the network consensus.
 
     Attributes:
-        subtensor (bt.subtensor): The interface to the Bittensor network's blockchain.
-        wallet (bt.wallet): Cryptographic wallet containing keys for transactions and encryption.
-        metagraph (bt.metagraph): Graph structure storing the state of the network.
+        subtensor (bt_subtensor.Subtensor): The interface to the Bittensor network's blockchain.
+        wallet (btw.wallet): Cryptographic wallet containing keys for transactions and encryption.
+        metagraph (btcm.metagraph): Graph structure storing the state of the network.
         database (redis.StrictRedis): Database instance for storing metadata and proofs.
         moving_averaged_scores (torch.Tensor): Tensor tracking performance scores of other nodes.
     """
 
     @classmethod
-    def check_config(cls, config: "bt.Config"):
+    def check_config(cls, config: "btcc.Config"):
         check_config(cls, config)
 
     @classmethod
@@ -82,69 +92,69 @@ class Validator:
     def config(cls):
         return config(cls)
 
-    subtensor: "bt.subtensor"
-    wallet: "bt.wallet"
-    metagraph: "bt.metagraph"
+    subtensor: "btcs.Subtensor"
+    wallet: "btw.Wallet"
+    metagraph: "btcm.Metagraph"
 
     def __init__(self, config=None):
         base_config = copy.deepcopy(config or Validator.config())
         self.config = Validator.config()
         self.config.merge(base_config)
         self.check_config(self.config)
-        bt.logging(
+        btul.logging(
             config=self.config,
             logging_dir=self.config.neuron.full_path,
             debug=True,
         )
-        bt.logging.set_trace(self.config.logging.trace)
-        bt.logging._stream_formatter.set_trace(self.config.logging.trace)
-        bt.logging.info(f"{self.config}")
+        btul.logging.set_trace(self.config.logging.trace)
+        btul.logging._stream_formatter.set_trace(self.config.logging.trace)
+        btul.logging.info(f"{self.config}")
 
         # Show miner version
-        bt.logging.debug(f"validator version {THIS_VERSION}")
+        btul.logging.debug(f"validator version {THIS_VERSION}")
 
         # Init device.
-        bt.logging.debug("loading device")
+        btul.logging.debug("loading device")
         self.device = torch.device(self.config.neuron.device)
-        bt.logging.debug(str(self.device))
+        btul.logging.debug(str(self.device))
 
         # Init validator wallet.
-        bt.logging.debug("loading wallet")
+        btul.logging.debug(f"loading wallet")
         self.wallet = (
-            bt.MockWallet(config=self.config)
+            btwm.get_mock_wallet()
             if self.config.mock
-            else bt.wallet(config=self.config)
+            else btw.Wallet(config=self.config)
         )
         self.wallet.create_if_non_existent()
 
         # Init subtensor
-        bt.logging.debug("loading subtensor")
+        btul.logging.debug("loading subtensor")
         self.subtensor = (
             MockSubtensor(self.config.netuid, wallet=self.wallet)
             if self.config.mock
-            else bt.subtensor(config=self.config)
+            else btcs.Subtensor(config=self.config)
         )
-        bt.logging.debug(str(self.subtensor))
+        btul.logging.debug(str(self.subtensor))
 
         # Check registration
         check_registration(self.subtensor, self.wallet, self.config.netuid)
 
-        bt.logging.debug(f"wallet: {str(self.wallet)}")
+        btul.logging.debug(f"wallet: {str(self.wallet)}")
 
         # Init metagraph.
-        bt.logging.debug("loading metagraph")
+        btul.logging.debug("loading metagraph")
         self.metagraph = (
             MockMetagraph(self.config.netuid, subtensor=self.subtensor)
             if self.config.mock
-            else bt.metagraph(
+            else btcm.Metagraph(
                 netuid=self.config.netuid, network=self.subtensor.network, sync=False
             )
         )
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
-        bt.logging.debug(str(self.metagraph))
+        btul.logging.debug(str(self.metagraph))
 
         # Setup database
-        bt.logging.info(f"loading database")
+        btul.logging.info("loading database")
         redis_password = (
             get_redis_password(self.config.database.redis_password)
             if not self.config.mock
@@ -159,20 +169,20 @@ class Validator:
         self.db_semaphore = asyncio.Semaphore()
 
         # Init Weights.
-        bt.logging.debug("loading moving_averaged_scores")
+        btul.logging.debug("loading moving_averaged_scores")
         self.moving_averaged_scores = torch.zeros((self.metagraph.n)).to(self.device)
-        bt.logging.debug(str(self.moving_averaged_scores))
+        btul.logging.debug(str(self.moving_averaged_scores))
 
         self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
-        bt.logging.info(f"Running validator on uid: {self.uid}")
+        btul.logging.info(f"Running validator on uid: {self.uid}")
 
         # Dendrite pool for querying the network.
-        bt.logging.debug("loading dendrite_pool")
+        btul.logging.debug("loading dendrite_pool")
         if self.config.neuron.mock_dendrite_pool:
             self.dendrite = MockDendrite(wallet=self.wallet)
         else:
             self.dendrite = SubVortexDendrite(wallet=self.wallet)
-        bt.logging.debug(str(self.dendrite))
+        btul.logging.debug(str(self.dendrite))
 
         # Init the event loop.
         self.loop = asyncio.get_event_loop()
@@ -191,7 +201,7 @@ class Validator:
         self.last_upgrade_country = None
 
     async def run(self):
-        bt.logging.info("run()")
+        btul.logging.info("run()")
 
         # Initi versioin control
         dump_path = self.config.database.redis_dump_path
@@ -213,16 +223,16 @@ class Validator:
 
         # Get the validator country
         self.country_code = self.country_service.get_country(self.dendrite.external_ip)
-        bt.logging.debug(f"Validator based in {self.country_code}")
+        btul.logging.debug(f"Validator based in {self.country_code}")
 
         # Init wandb.
         if not self.config.wandb.off:
-            bt.logging.debug("loading wandb")
+            btul.logging.debug("loading wandb")
             init_wandb(self)
 
         # Init miners
         self.miners = await get_all_miners(self)
-        bt.logging.debug(f"Miners loaded {len(self.miners)}")
+        btul.logging.debug(f"Miners loaded {len(self.miners)}")
 
         # Load the state
         load_state(self)
@@ -231,7 +241,7 @@ class Validator:
             while 1:
                 # Start the upgrade process every 10 minutes
                 if should_upgrade(self.config.auto_update, self.last_upgrade_check):
-                    bt.logging.debug("Checking upgrade")
+                    btul.logging.debug("Checking upgrade")
                     must_restart = await self.version_control.upgrade()
                     if must_restart:
                         finish_wandb()
@@ -263,7 +273,7 @@ class Validator:
                         f"Validator is not registered - hotkey {self.wallet.hotkey.ss58_address} not in metagraph"
                     )
 
-                bt.logging.info(
+                btul.logging.info(
                     f"step({self.step}) block({get_current_block(self.subtensor)})"
                 )
 
@@ -272,7 +282,7 @@ class Validator:
                 await asyncio.gather(*coroutines)
 
                 # Set the weights on chain.
-                bt.logging.info("Checking if should set weights")
+                btul.logging.info("Checking if should set weights")
                 validator_should_set_weights = should_set_weights(
                     self,
                     get_current_block(self.subtensor),
@@ -280,12 +290,13 @@ class Validator:
                     self.config.neuron.epoch_length,
                     self.config.neuron.disable_set_weights,
                 )
-                bt.logging.debug(
+                btul.logging.debug(
                     f"Should validator check weights? -> {validator_should_set_weights}"
                 )
                 if validator_should_set_weights:
-                    bt.logging.debug(f"Setting weights {self.moving_averaged_scores}")
+                    btul.logging.debug(f"Setting weights {self.moving_averaged_scores}")
                     set_weights_for_validator(
+                        uid=self.uid,
                         subtensor=self.subtensor,
                         wallet=self.wallet,
                         metagraph=self.metagraph,
@@ -297,20 +308,20 @@ class Validator:
 
                 # Rollover wandb to a new run.
                 if should_reinit_wandb(self):
-                    bt.logging.info("Reinitializing wandb")
+                    btul.logging.info("Reinitializing wandb")
                     finish_wandb()
                     init_wandb(self)
 
                 self.prev_step_block = get_current_block(self.subtensor)
                 if self.config.neuron.verbose:
-                    bt.logging.debug(f"block at end of step: {self.prev_step_block}")
-                    bt.logging.debug(f"Step took {time.time() - start_epoch} seconds")
+                    btul.logging.debug(f"block at end of step: {self.prev_step_block}")
+                    btul.logging.debug(f"Step took {time.time() - start_epoch} seconds")
 
                 self.step += 1
 
         except Exception as err:
-            bt.logging.error("Error in training loop", str(err))
-            bt.logging.debug(print_exception(type(err), err, err.__traceback__))
+            btul.logging.error("Error in training loop", str(err))
+            btul.logging.debug(print_exception(type(err), err, err.__traceback__))
             finish_wandb()
 
         # After all we have to ensure subtensor connection is closed properly
@@ -326,7 +337,7 @@ class Validator:
                 self.loop.close()
 
             if hasattr(self, "subtensor"):
-                bt.logging.debug("Closing subtensor connection")
+                btul.logging.debug("Closing subtensor connection")
                 self.subtensor.close()
 
 

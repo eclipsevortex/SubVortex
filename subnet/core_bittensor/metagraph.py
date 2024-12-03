@@ -14,34 +14,28 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-from abc import ABC, abstractmethod
+import bittensor.core.metagraph as btcm
 
 
-class FileProvider(ABC):
-    def __init__(self, logger_name: str, check_interval: int) -> None:
-        self._logger_name = logger_name
-        self._check_interval = check_interval
-        self.skip_check_interval = True
+class SubVortexMetagraph(btcm.Metagraph):
+    def get_validators(self, weights_min_stake: int = 0):
+        """
+        Return the list of active validator.
+        An active validator is a validator staking the minimum required
+        """
+        validators = []
 
-    @property
-    def logger_name(self):
-        return self._logger_name
+        for neuron in self.neurons:
+            stake = self.S[neuron.uid]
+            if stake < weights_min_stake:
+                # Skip any validator that has not enough stake to set weight
+                continue
 
-    @property
-    def check_interval(self):
-        if self.skip_check_interval:
-            return 0
+            validator = (
+                neuron.uid,
+                neuron.hotkey,
+                stake,
+            )
+            validators.append(validator)
 
-        return self._check_interval
-
-    @abstractmethod
-    def check_file_updated(self):
-        pass
-
-    @abstractmethod
-    def load_file(self):
-        pass
-
-    @abstractmethod
-    def notify(self, data):
-        pass
+        return validators

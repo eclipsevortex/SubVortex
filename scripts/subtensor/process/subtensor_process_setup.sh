@@ -62,10 +62,7 @@ function install_linux_dependencies() {
     apt-get update
     
     # Necessary libraries for Rust execution
-    apt install build-essential
-    apt-get install clang curl git make
-    apt install --assume-yes git clang curl libssl-dev protobuf-compiler
-    apt install --assume-yes git clang curl libssl-dev llvm libudev-dev make protobuf-compiler
+    apt-get install -y build-essential clang curl git make libssl-dev llvm libudev-dev protobuf-compiler
     rm -rf /var/lib/apt/lists/*
     echo -e '\e[32mRust dependencies installed\e[0m'
 }
@@ -125,11 +122,11 @@ echo -e '\e[32mWASM buils environment initialized\e[0m'
 # Compile the subtensor binary
 if [[ $NETWORK == "testnet" ]]; then
     echo "Compiling subtensor on network $NETWORK..."
-    cargo build --release --features pow-faucet --features runtime-benchmarks --locked
+    cargo build -p node-subtensor --profile=production --features pow-faucet --features=runtime-benchmarks
     echo -e "\e[32mSubtensor on network $NETWORK is compiled\e[0m"
     elif [[ $NETWORK == "mainnet" ]]; then
     echo "Compiling subtensor on network $NETWORK..."
-    cargo build --release --features runtime-benchmarks --locked
+    cargo build -p node-subtensor --profile=production --features=runtime-benchmarks
     echo -e "\e[32mSubtensor on network $NETWORK is compiled\e[0m"
 fi
 

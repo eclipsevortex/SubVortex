@@ -1,8 +1,24 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import os
 import sys
 import subprocess
 from os import path
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 
 from subnet.shared.version import BaseVersionControl
 
@@ -12,7 +28,7 @@ here = path.abspath(path.dirname(__file__))
 
 class VersionControl(BaseVersionControl):
     def restart(self):
-        bt.logging.info(f"Restarting miner...")
+        btul.logging.info(f"Restarting miner...")
         python = sys.executable
         os.execl(python, python, *sys.argv)
 
@@ -27,11 +43,11 @@ class VersionControl(BaseVersionControl):
             )
 
             if result.returncode == 0:
-                bt.logging.success(f"[OS] Upgrade successful")
+                btul.logging.success(f"[OS] Upgrade successful")
             else:
-                bt.logging.warning(f"[OS] Upgrade failed {result.stderr}")
+                btul.logging.warning(f"[OS] Upgrade failed {result.stderr}")
         except subprocess.CalledProcessError as err:
-            bt.logging.error(f"[OS] Upgrade failed: {err}")
+            btul.logging.error(f"[OS] Upgrade failed: {err}")
 
     def upgrade_miner(self, tag=None, branch=None):
         current_version = None
@@ -39,18 +55,18 @@ class VersionControl(BaseVersionControl):
         try:
             # Get the remote version
             remote_version = self.github.get_latest_version()
-            bt.logging.debug(f"[Subnet] Remote version: {remote_version}")
+            btul.logging.debug(f"[Subnet] Remote version: {remote_version}")
 
             # Get the local version
             current_version = self.github.get_version()
-            bt.logging.debug(f"[Subnet] Local version: {current_version}")
+            btul.logging.debug(f"[Subnet] Local version: {current_version}")
 
             # True if there is a custom tag or branch, false otherwise
             is_custom_version = tag is not None or branch is not None
 
             # Check if the subnet has to be upgraded
             if not is_custom_version and current_version == remote_version:
-                bt.logging.success(f"[Subnet] Already using {current_version}")
+                btul.logging.success(f"[Subnet] Already using {current_version}")
                 return
 
             self.must_restart = True
@@ -68,8 +84,8 @@ class VersionControl(BaseVersionControl):
             if not success:
                 self.downgrade_subnet(current_version)
         except Exception as err:
-            bt.logging.error(f"[Subnet] Upgrade failed: {err}")
-            bt.logging.info(f"[Subnet] Rolling back to {current_version}...")
+            btul.logging.error(f"[Subnet] Upgrade failed: {err}")
+            btul.logging.info(f"[Subnet] Rolling back to {current_version}...")
             self.downgrade_subnet(current_version)
 
     def upgrade(self, tag=None, branch=None):
@@ -85,7 +101,7 @@ class VersionControl(BaseVersionControl):
 
             return self.must_restart
         except Exception as ex:
-            bt.logging.error(f"Could not upgrade the miner: {ex}")
+            btul.logging.error(f"Could not upgrade the miner: {ex}")
         finally:
             # Unflag to resume miner activity
             self.upgrading = False

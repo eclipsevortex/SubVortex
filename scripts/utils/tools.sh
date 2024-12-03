@@ -7,7 +7,7 @@ function install_npm() {
     fi
     
     # Install npm
-    sudo apt-get install nodejs npm
+    sudo apt-get install -y nodejs npm
 }
 
 function install_pm2() {

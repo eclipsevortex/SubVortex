@@ -66,7 +66,7 @@ fi
 sudo apt-get update
 
 # Install necessary packages
-sudo apt install lsb-release curl gpg
+sudo apt install -y lsb-release curl gpg
 
 # Download and store Redis GPG key in binary format
 curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
@@ -75,7 +75,7 @@ curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyr
 echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
 
 # Install Redis server package with automatic "yes" response to prompts
-sudo apt-get install redis -y
+sudo apt-get install -y redis
 
 # Set the password
 $BASE/scripts/redis_set_password.sh -c $REDIS_CONF -a $REDIS_PASSWORD 

@@ -19,7 +19,7 @@ import time
 import threading
 import traceback
 import numpy as np
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 from datetime import datetime
 from typing import List
 from collections import defaultdict
@@ -101,13 +101,13 @@ class Firewall(threading.Thread):
     def start(self):
         self.monitor.start()
         super().start()
-        bt.logging.debug(f"{FIREWALL_LOGGING_NAME} started")
+        btul.logging.debug(f"{FIREWALL_LOGGING_NAME} started")
 
     def stop(self):
         self.observer.stop()
         self.monitor.stop()
         super().join()
-        bt.logging.debug(f"{FIREWALL_LOGGING_NAME} stopped")
+        btul.logging.debug(f"{FIREWALL_LOGGING_NAME} stopped")
 
     def wait(self):
         """
@@ -115,7 +115,7 @@ class Firewall(threading.Thread):
         """
         attempt = 1
         while self.first_try and attempt <= FIREWALL_ATTEMPTS:
-            bt.logging.debug(
+            btul.logging.debug(
                 f"[{FIREWALL_LOGGING_NAME}][{attempt}] Waiting file to be process..."
             )
             time.sleep(1)
@@ -222,7 +222,7 @@ class Firewall(threading.Thread):
 
         self.first_try = False
 
-        bt.logging.success(
+        btul.logging.success(
             f"[{FIREWALL_LOGGING_NAME}] File proceed successfully: {len(data)} rules loaded"
         )
 
@@ -385,12 +385,12 @@ class Firewall(threading.Thread):
         #     new_keys = list(new_sources.keys())
         #     initial_keys = list(initial_sources.keys())
 
-        #     bt.logging.warning(
+        #     btul.logging.warning(
         #         f"[CHECKING] Old sources {len(old_sources)} + New Sources {len(new_sources)} != Sources {len(initial_sources)}"
         #     )
-        #     bt.logging.warning(initial_keys)
-        #     bt.logging.warning(old_keys)
-        #     bt.logging.warning(new_keys)
+        #     btul.logging.warning(initial_keys)
+        #     btul.logging.warning(old_keys)
+        #     btul.logging.warning(new_keys)
         #     return False
 
         for id, requests in new_sources.items():
@@ -414,7 +414,7 @@ class Firewall(threading.Thread):
                 ):
                     continue
 
-                bt.logging.warning(
+                btul.logging.warning(
                     f"[CHECKING][{id}] {len(to_remove)} requests ({len(requests)}) exceed {max_time_set} seconds between {self.display_date(min_time)} and {self.display_date(max_time)} ({self.display_date(max_to_remove)})"
                 )
                 return False
@@ -721,7 +721,7 @@ class Firewall(threading.Thread):
                     else "Packet data" if is_data_packet else "Packet unknown"
                 )
 
-                bt.logging.trace(
+                btul.logging.trace(
                     f"[{packet.id}][{packet.protocol}][{packet.flags}][{current_request.id}][{packet.current_time}] {copyright} dropped"
                 )
 
@@ -731,7 +731,7 @@ class Firewall(threading.Thread):
                 if has_state_changed:
                     current_request.notified = True
                     packet.notified = True
-                    bt.logging.warning(
+                    btul.logging.warning(
                         f"Blocking {packet.protocol} {packet.sip}/{packet.dport}: {packet.reason}"
                     )
             else:
@@ -744,7 +744,7 @@ class Firewall(threading.Thread):
                     if is_sync_packet
                     else "Packet data" if is_data_packet else "Packet unknown"
                 )
-                bt.logging.trace(
+                btul.logging.trace(
                     f"[{packet.id}][{packet.protocol}][{packet.flags}][{current_request.id}][{packet.current_time}] {copyright} allowed"
                 )
 
@@ -757,7 +757,7 @@ class Firewall(threading.Thread):
                 if has_state_changed:
                     current_request.notified = True
                     packet.notified = True
-                    bt.logging.success(
+                    btul.logging.success(
                         f"Unblocking {packet.protocol} {packet.sip}/{packet.dport}"
                     )
 
@@ -785,11 +785,11 @@ class Firewall(threading.Thread):
                 self._sources[packet.queue_num] = sources2
 
         except Exception as ex:
-            bt.logging.warning(
+            btul.logging.warning(
                 f"[{FIREWALL_LOGGING_NAME}] Failed to proceed firewall packet: {ex}"
             )
-            bt.logging.info(f"[{FIREWALL_LOGGING_NAME}] Packet metadata: {metadata}")
-            bt.logging.debug(traceback.format_exc())
+            btul.logging.info(f"[{FIREWALL_LOGGING_NAME}] Packet metadata: {metadata}")
+            btul.logging.debug(traceback.format_exc())
 
         finally:
             try:
@@ -811,13 +811,13 @@ class Firewall(threading.Thread):
                 # before starting processing the next one
                 packet.commit()
             except Exception as err:
-                bt.logging.error(f"[{packet.id}] Error {err}")
-                bt.logging.error(traceback.format_exc())
+                btul.logging.error(f"[{packet.id}] Error {err}")
+                btul.logging.error(traceback.format_exc())
                 raise err
 
     def run(self):
         # Reload the previous ips blocked
-        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Loading events")
+        btul.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Loading events")
         packets = load_njson_file("firewall-events.json") or []
 
         # Group by request id
@@ -845,17 +845,17 @@ class Firewall(threading.Thread):
             for group_dict in sources.values()
             for request_list in group_dict.values()
         )
-        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Loading {total_requests} requests")
+        btul.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Loading {total_requests} requests")
 
         # Update the cache
         with self._lock:
             self._sources = sources
 
-        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating allow rule for loopback")
+        btul.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating allow rule for loopback")
         self.tool.create_allow_loopback_rule()
 
         # Create Allow rules
-        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating allow rules")
+        btul.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating allow rules")
         self.tool.create_allow_rule(dport=22, protocol="tcp")
         self.tool.create_allow_rule(dport=443, protocol="tcp")
         self.tool.create_allow_rule(sport=443, protocol="tcp")
@@ -863,7 +863,7 @@ class Firewall(threading.Thread):
         self.tool.create_allow_rule(sport=53, protocol="udp")
 
         # Create queue rules
-        bt.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating queue rules")
+        btul.logging.debug(f"[{FIREWALL_LOGGING_NAME}] Creating queue rules")
         self.tool.create_allow_rule(dport=8091, protocol="tcp", queue=1)
         self.tool.create_allow_rule(dport=9944, protocol="tcp", queue=2)
         self.tool.create_allow_rule(dport=9933, protocol="tcp", queue=3)
@@ -871,7 +871,7 @@ class Firewall(threading.Thread):
         self.tool.create_allow_rule(sport=30333, protocol="tcp")
 
         # Change the policy to deny
-        bt.logging.debug(
+        btul.logging.debug(
             f"[{FIREWALL_LOGGING_NAME}] Change the INPUT policy to deny by default"
         )
         self.tool.create_deny_policy()

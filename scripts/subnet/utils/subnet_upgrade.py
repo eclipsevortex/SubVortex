@@ -1,7 +1,6 @@
-import asyncio
 import argparse
 import subprocess
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 
 from subnet.miner.version import VersionControl as MinerVersionControl
 from subnet.validator.version import VersionControl as ValidatorVersionControl
@@ -38,7 +37,7 @@ def get_current_branch_or_tag():
 
 def get_tags():
     subprocess.run(["git", "fetch", "--tags", "--force"], check=True)
-    bt.logging.info(f"Fetch tags.")
+    btul.logging.info(f"Fetch tags.")
 
 
 def upgrade_to_tag(tag: str):
@@ -47,7 +46,7 @@ def upgrade_to_tag(tag: str):
 
     # Check if the requested tag is already pulled
     if tag_or_branch == tag:
-        bt.logging.warning(f"The tag {tag} is already pulled")
+        btul.logging.warning(f"The tag {tag} is already pulled")
         return
 
     # Stash if there is any local changes just in case
@@ -55,11 +54,11 @@ def upgrade_to_tag(tag: str):
 
     # Fetch all tags
     subprocess.run(["git", "fetch", "--tags", "--force"], check=True)
-    bt.logging.debug(f"Fetch tags")
+    btul.logging.debug(f"Fetch tags")
 
     # Pull the requested tag
     subprocess.run(["git", "checkout", f"tags/{tag}"], check=True)
-    bt.logging.success(f"Successfully pulled source code for tag '{tag}'.")
+    btul.logging.success(f"Successfully pulled source code for tag '{tag}'.")
 
 
 def upgrade_to_branch(branch: str):
@@ -68,7 +67,7 @@ def upgrade_to_branch(branch: str):
 
     # Check if the requested tag is already pulled
     if tag_or_branch == branch:
-        bt.logging.warning(f"The branch {branch} is already pulled")
+        btul.logging.warning(f"The branch {branch} is already pulled")
         return
 
     # Stash if there is any local changes just in case
@@ -76,18 +75,18 @@ def upgrade_to_branch(branch: str):
 
     # Checkout the branch
     subprocess.run(["git", "checkout", "-B", branch], check=True)
-    bt.logging.debug(f"Checkout the branch {branch}")
+    btul.logging.debug(f"Checkout the branch {branch}")
 
     # Pull the branch
     subprocess.run(["git", "pull", "origin", branch], check=True)
-    bt.logging.debug(f"Pull the branch {branch}")
+    btul.logging.debug(f"Pull the branch {branch}")
 
-    bt.logging.success(f"Successfully pulled source code for {branch} branch'.")
+    btul.logging.success(f"Successfully pulled source code for {branch} branch'.")
 
 
 def main(args):
     if not args.tag and not args.branch:
-        bt.logging.error(f"Please provide a tag or a branch to upgrade to")
+        btul.logging.error(f"Please provide a tag or a branch to upgrade to")
         return
     
     version_control = MinerVersionControl()

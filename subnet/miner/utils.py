@@ -18,7 +18,7 @@
 import os
 import json
 import shutil
-import bittensor as bt
+import bittensor.utils.btlogging as btul
 
 
 def load_request_log(request_log_path: str) -> dict:
@@ -38,7 +38,7 @@ def load_request_log(request_log_path: str) -> dict:
             with open(request_log_path, "r") as f:
                 request_log = json.load(f)
         except Exception as e:
-            bt.logging.error(f"Error loading request log: {e}. Resetting.")
+            btul.logging.error(f"Error loading request log: {e}. Resetting.")
             request_log = {}
     else:
         request_log = {}

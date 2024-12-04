@@ -297,6 +297,7 @@ class Validator:
                     btul.logging.debug(f"Setting weights {self.moving_averaged_scores}")
                     set_weights_for_validator(
                         uid=self.uid,
+                        device=self.device,
                         subtensor=self.subtensor,
                         wallet=self.wallet,
                         metagraph=self.metagraph,

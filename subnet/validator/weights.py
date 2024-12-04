@@ -27,6 +27,7 @@ from subnet.shared.weights import set_weights
 
 def set_weights_for_validator(
     uid: int,
+    device: torch.device,
     subtensor: "btcs.Subtensor",
     wallet: "btw.Wallet",
     netuid: int,
@@ -115,7 +116,7 @@ def set_weights_for_validator(
         processed_weight_uids,
         processed_weights,
     ) = btuw.process_weights_for_netuid(
-        uids=metagraph.uids,
+        uids=metagraph.uids.to(device),
         weights=raw_weights,
         netuid=netuid,
         subtensor=subtensor,

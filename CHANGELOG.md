@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.1 / 2024-12-04
+
+## What's Changed
+* fix set weight and websocket connection by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/101
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.3.0...v2.3.1
+
 ## 2.3.0 / 2024-12-03
 
 ## What's Changed

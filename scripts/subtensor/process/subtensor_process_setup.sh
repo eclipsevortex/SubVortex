@@ -62,7 +62,7 @@ function install_linux_dependencies() {
     apt-get update
     
     # Necessary libraries for Rust execution
-    apt-get install -y build-essential clang curl git make libssl-dev llvm libudev-dev protobuf-compiler
+    apt-get install -y build-essential clang curl git make libssl-dev llvm libudev-dev protobuf-compiler pkg-config
     rm -rf /var/lib/apt/lists/*
     echo -e '\e[32mRust dependencies installed\e[0m'
 }

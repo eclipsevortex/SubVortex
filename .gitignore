@@ -168,3 +168,5 @@ ips_blocked.json
 *-skip*
 
 firewall-events.json
+.DS_Store
+DS_Store

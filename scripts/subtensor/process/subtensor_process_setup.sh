@@ -7,12 +7,13 @@ cat << EOF
 Usage: ${0##*/} [-n ARG] [-h] -- Install the subtensor as binary
 
     -n | --network ARG      network to run the local subtensor on (e.g localnet, testnet and mainnet), default mainnet
+    -b | --branch ARG       branch of the subtensor repository to pull, by default main
     -h | --help             display the help
 EOF
 }
 
-OPTIONS="n:h"
-LONGOPTIONS="network:,help:"
+OPTIONS="n:b:h"
+LONGOPTIONS="network:,branch:,help:"
 
 # Parse the options and their arguments
 params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
@@ -23,11 +24,16 @@ if [ $? -ne 0 ]; then
 fi
 
 NETWORK="mainnet"
+BRANCH="main"
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -n | --network)
             NETWORK="$2"
+            shift 2
+        ;;
+        -b | --branch)
+            BRANCH="$2"
             shift 2
         ;;
         -h | --help)
@@ -100,15 +106,15 @@ fi
 cd subtensor
 
 # Checkout main branch
-git checkout main
-echo -e '\e[32mCheckout main branch\e[0m'
+git checkout $BRANCH
+echo -e "\\e[32mCheckout $BRANCH branch\\e[0m"
 
 # Remove previous chain state:
 rm -rf /tmp/blockchain
 echo -e '\e[32mRemove chain state\e[0m'
 
 # Get the latest version
-git pull origin main
+git pull origin $BRANCH
 echo -e '\e[32mLast version pulled\e[0m'
 
 # Install Rust toolchain

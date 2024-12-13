@@ -4,15 +4,32 @@
 # Helper functions
 #
 
+function get_file_path() {
+    local base_name=$1
+    local file1="./${base_name}.json"
+    local file2="./chainspecs/${base_name}.json"
+    
+    if [[ -f "$file1" ]]; then
+        echo "$file1"
+    elif [[ -f "$file2" ]]; then
+        echo "$file2"
+    else
+        echo ""  # Return an empty string if neither file exists
+    fi
+}
+
 function run_command()
 {
     F_NETWORK=$1
     F_NODE_TYPE=$2
     F_BIN_PATH=$3
+
+    MAINNET_CHAIN_NAME=$(get_file_path "raw_spec_finney")
+    TESTNET_CHAIN_NAME=$(get_file_path "raw_spec_testfinney")
     
     # Different command options by network and node type
-    MAINNET_CHAIN='--chain ./raw_spec_finney.json'
-    TESTNET_CHAIN='--chain ./raw_spec_testfinney.json'
+    MAINNET_CHAIN="--chain $MAINNET_CHAIN_NAME"
+    TESTNET_CHAIN="--chain $TESTNET_CHAIN_NAME"
     MAINNET_BOOTNODE='--bootnodes /dns/bootnode.finney.chain.opentensor.ai/tcp/30333/ws/p2p/12D3KooWRwbMb85RWnT8DSXSYMWQtuDwh4LJzndoRrTDotTR5gDC'
     TESTNET_BOOTNODE='--bootnodes /dns/bootnode.test.finney.opentensor.ai/tcp/30333/ws/p2p/12D3KooWPM4mLcKJGtyVtkggqdG84zWrd7Rij6PGQDoijh1X86Vr'
     NODE_TYPE_ARCHIVE='--pruning=archive'

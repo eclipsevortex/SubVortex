@@ -89,16 +89,29 @@ def create_subtensor_challenge(subtensor: btcs.Subtensor):
             current_block - LITE_NODE_BLOCK_LOWER_LIMIT,
             current_block - LITE_NODE_BLOCK_UPPER_LIMIT,
         )
+        btul.logging.trace(f"Block chosen: {block}")
 
-        # Select the subnet
-        subnet_count = max(subtensor.get_subnets(block=block))
-        subnet_uid = random.randint(0, subnet_count)
+        # Be sure we select a subnet that at least one neuron
+        subnet_to_exclude = []
+        subnet_uid = None
+        neurons = []
+        while len(neurons) == 0:
+            if subnet_uid is not None:
+                subnet_to_exclude.append(subnet_uid)
 
-        # Select the neuron
-        neurons = subtensor.neurons_lite(block=block, netuid=subnet_uid)
+            # Select the subnet
+            subnet_count = max(subtensor.get_subnets(block=block))
+            subnets = [i for i in range(subnet_count + 1) if i not in subnet_to_exclude]
+            subnet_uid = random.choice(subnets)
+
+            # Select the neuron
+            neurons = subtensor.neurons_lite(block=block, netuid=subnet_uid)
+        btul.logging.trace(f"Subnet chosen: {subnet_uid}")
+
         neuron_index = random.randint(0, len(neurons) - 1)
         neuron = neurons[neuron_index]
         neuron_uid = neuron.uid
+        btul.logging.trace(f"Neuron chosen: {neuron_uid}")
 
         # Select the property
         properties = (
@@ -106,6 +119,7 @@ def create_subtensor_challenge(subtensor: btcs.Subtensor):
         )
         property_index = random.randint(0, len(properties) - 1)
         neuron_property = properties[property_index]
+        btul.logging.trace(f"Property chosen: {neuron_property}")
 
         # Get the property value
         neuron_value = getattr(neuron, neuron_property)

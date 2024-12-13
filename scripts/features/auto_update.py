@@ -1,4 +1,5 @@
 import asyncio
+import aioredis
 import argparse
 import bittensor.core.config as btcc
 import bittensor.utils.btlogging as btul
@@ -18,6 +19,9 @@ async def main(config):
     # Create version control instance
     if config.neuron == "miner":
         version_control = MinerVersionControl()
+
+        # Upgrade the neuron
+        version_control.upgrade(tag=config.tag, branch=config.branch)
     else:
         # Create database
         redis_password = get_redis_password(config.database.redis_password)
@@ -32,8 +36,9 @@ async def main(config):
             database, config.database.redis_dump_path
         )
 
-    # Upgrade the neuron
-    await version_control.upgrade(tag=config.tag, branch=config.branch)
+        # Upgrade the neuron
+        await version_control.upgrade(tag=config.tag, branch=config.branch)
+
 
 
 if __name__ == "__main__":
@@ -58,6 +63,37 @@ if __name__ == "__main__":
             type=str,
             help="Branch to pull. Use by SubVortex team only",
             default=None,
+        )
+
+        # Redis arguments
+        parser.add_argument(
+            "--database.host", default="localhost", help="The host of the redis database."
+        )
+        parser.add_argument(
+            "--database.port", default=6379, help="The port of the redis database."
+        )
+        parser.add_argument(
+            "--database.index",
+            default=1,
+            help="The database number of the redis database.",
+        )
+        parser.add_argument(
+            "--database.redis_password",
+            type=str,
+            default=None,
+            help="The redis password.",
+        )
+        parser.add_argument(
+            "--database.redis_conf_path",
+            type=str,
+            help="Redis configuration path.",
+            default="/etc/redis/redis.conf",
+        )
+        parser.add_argument(
+            "--database.redis_dump_path",
+            type=str,
+            help="Redis directory where to store dumps.",
+            default="/etc/redis/",
         )
 
         config = btcc.Config(parser)

@@ -28,17 +28,33 @@ from scalecodec.type_registry import load_type_registry_preset
 from substrateinterface import SubstrateInterface
 
 
+def _get_weights_min_stake(substrate: SubstrateInterface, storage_function: str):
+    weight_min_stake = None
+
+    try:
+        weight_min_stake = substrate.query(
+            module="SubtensorModule", storage_function=storage_function, params=[]
+        )
+    except:
+        pass
+
+    return weight_min_stake
+
+
 def get_weights_min_stake(substrate: SubstrateInterface):
     """
     Return the minimum of TAO a validator need to have the set weight
     """
-    weight_min_stake = substrate.query(
-        module="SubtensorModule", storage_function="WeightsMinStake", params=[]
-    )
+    # WeightsMinStake has been renamed StakeThreshold
+    result = _get_weights_min_stake("StakeThreshold")
+    if result is None:
+        result = _get_weights_min_stake("WeightsMinStake")
+
+    weight_min_stake = result.value if result is not None else 0
     btul.logging.debug(f"get_weights_min_stake() {weight_min_stake}")
 
     # Convert Rao to Tao
-    return int(float(weight_min_stake.value) * 10**-9)
+    return int(float(weight_min_stake) * 10**-9)
 
 
 def get_neuron_for_uid_lite(

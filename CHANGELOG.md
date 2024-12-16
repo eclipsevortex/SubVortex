@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.3.2 / 2024-12-16
+
+## What's Changed
+* use subtensor run script instead of our by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/105
+* update bittensor by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/104
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.3.1...v2.3.2
+
 ## 2.3.1 / 2024-12-04
 
 ## What's Changed

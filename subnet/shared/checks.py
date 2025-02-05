@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 import subprocess
 import asyncio
+import bittensor.core.subtensor as btcs
 import bittensor.utils.btlogging as btul
 from redis import asyncio as aioredis
 
@@ -158,7 +159,7 @@ def _get_redis_password(redis_conf_path):
     return None
 
 
-def check_registration(subtensor, wallet, netuid):
+def check_registration(subtensor: btcs.Subtensor, wallet, netuid):
     if not subtensor.is_hotkey_registered(
         netuid=netuid,
         hotkey_ss58=wallet.hotkey.ss58_address,

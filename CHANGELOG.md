@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.3 / 2025-02-13
+
+## What's Changed
+* make the challenge unique by @eclipsevortex in https://github.com/eclipsevortex/SubVortex/pull/107
+
+
+**Full Changelog**: https://github.com/eclipsevortex/SubVortex/compare/v2.3.2...v2.3.3
+
 ## 2.3.2 / 2024-12-16
 
 ## What's Changed

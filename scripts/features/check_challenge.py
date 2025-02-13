@@ -78,11 +78,11 @@ class Checker:
             except KeyError:
                 reason = "Invalid netuid or uid provided."
                 return (verified, reason)
-            except ValueError as e:
-                reason = f"Invalid or unavailable block number. - {e}"
+            except ValueError:
+                reason = f"Invalid or unavailable block number."
                 return (verified, reason)
-            except (Exception, BaseException) as e:
-                reason = f"Failed to retrieve neuron details. - {e}"
+            except (Exception, BaseException):
+                reason = f"Failed to retrieve neuron details."
                 return (verified, reason)
 
             # Access the specified property

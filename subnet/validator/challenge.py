@@ -24,7 +24,7 @@ import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
 import bittensor.utils.btlogging as btul
 
-from subnet.constants import DEFAULT_PROCESS_TIME, DEFAULT_CHUNK_SIZE
+from subnet.constants import DEFAULT_PROCESS_TIME
 from subnet.protocol import Synapse
 from subnet.validator.models import Miner
 from subnet.validator.synapse import send_scope
@@ -286,17 +286,14 @@ async def challenge_data(self):
     start_time = time.time()
     btul.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
-    # Create the challenges
-    challenges = [
-        create_subtensor_challenge(self.subtensor) for _ in range(DEFAULT_CHUNK_SIZE)
-    ]
-    if len(challenges) < DEFAULT_CHUNK_SIZE:
-        btul.logging.warning(
-            f"[{CHALLENGE_NAME}] Only {len(challenges)} challenges on {DEFAULT_CHUNK_SIZE} have been created. Please check your local subtensor."
-        )
+    # Create the challenge
+    challenge = create_subtensor_challenge(self.subtensor)
+    if not challenge:
         return
-
-    btul.logging.debug(f"[{CHALLENGE_NAME}] Challenges created")
+    
+    btul.logging.debug(
+        f"[{CHALLENGE_NAME}] Challenge created - Block: {challenge[0]}, Netuid: {challenge[1]}, Uid: {challenge[2]}: Property: {challenge[3]}, Value: {challenge[4]}"
+    )
 
     # Select the miners
     val_hotkey = self.metagraph.hotkeys[self.uid]
@@ -313,13 +310,7 @@ async def challenge_data(self):
     # Execute the challenges
     tasks = []
     reasons = []
-    for i, (uid) in enumerate(uids):
-        # Log the challenge for the miner
-        challenge = challenges[i]
-        btul.logging.debug(
-            f"[{CHALLENGE_NAME}][{uid}] Challenge - Block: {challenge[0]}, Netuid: {challenge[1]}, Uid: {challenge[2]}: Property: {challenge[3]}, Value: {challenge[4]}"
-        )
-
+    for uid in uids:
         # Send the challenge to the miner
         tasks.append(asyncio.create_task(handle_challenge(self, uid, challenge)))
         reasons = await asyncio.gather(*tasks)

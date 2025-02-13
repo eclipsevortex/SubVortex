@@ -79,7 +79,7 @@ def run(self):
 
             # --- Check for registration every 100 blocks (20 minutes).
             if current_block % 100 == 0:
-                check_registration(self.subtensor, self.wallet, netuid)
+                check_registration(self.subtensor, self.wallet, self.config.netuid)
 
             if should_upgrade(self.config.auto_update, self.last_upgrade_check):
                 btul.logging.debug("Checking upgrade")

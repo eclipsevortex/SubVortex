@@ -1,13 +1,12 @@
 import argparse
-from websockets.sync import client as ws_client
-from substrateinterface.base import SubstrateInterface
+import bittensor.core.chain_data as btccd
 import bittensor.core.config as btcc
+import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
 import bittensor.utils.networking as btun
 import bittensor.utils.btlogging as btul
 
 from subnet.constants import DEFAULT_PROCESS_TIME
-from subnet.shared.substrate import get_neuron_for_uid_lite
 
 
 class Checker:
@@ -15,7 +14,6 @@ class Checker:
         self.config = config
 
     def run(self):
-        substrate = None
         verified = False
         reason = None
 
@@ -52,19 +50,12 @@ class Checker:
         try:
             # Attempt to connect to the subtensor
             try:
-                # Create the websocket
-                websocket = ws_client.connect(
-                    f"ws://{ip}:9944",
-                    open_timeout=DEFAULT_PROCESS_TIME,
-                    max_size=2**32,
-                )
-
                 # Create the substrate
-                substrate = SubstrateInterface(
+                substrate = btcs.SubstrateInterface(
+                    url=f"ws://{ip}:9944",
                     ss58_format=btcse.SS58_FORMAT,
                     use_remote_preset=True,
                     type_registry=btcse.TYPE_REGISTRY,
-                    websocket=websocket,
                 )
 
             except Exception:
@@ -74,18 +65,24 @@ class Checker:
             # Execute the challenge
             neuron = None
             try:
-                neuron = get_neuron_for_uid_lite(
-                    substrate=substrate, netuid=netuid, uid=uid, block=block
+                # Get the block hash
+                block_hash = substrate.get_block_hash(block)
+
+                # Get the neuron lite details
+                result = substrate.runtime_call(
+                    "NeuronInfoRuntimeApi", "get_neuron_lite", [netuid, uid], block_hash
                 )
-                btul.logging.error(neuron)
+
+                # Convert to a neuron entity
+                neuron = btccd.NeuronInfoLite.from_dict(result.value)
             except KeyError:
                 reason = "Invalid netuid or uid provided."
                 return (verified, reason)
             except ValueError:
-                reason = "Invalid or unavailable block number."
+                reason = f"Invalid or unavailable block number."
                 return (verified, reason)
             except (Exception, BaseException):
-                reason = "Failed to retrieve neuron details."
+                reason = f"Failed to retrieve neuron details."
                 return (verified, reason)
 
             # Access the specified property
@@ -97,6 +94,7 @@ class Checker:
 
             # Verify the challenge
             verified = property_value == f"{miner_value}"
+            btul.logging.info(f"{property_value} {miner_value}")
 
         except Exception as err:
             reason = f"An unexpected error occurred: {str(err)}"

@@ -48,7 +48,6 @@ async def get_all_miners(self) -> List[Miner]:
     miners: List[Miner] = []
 
     # Get all the ipds from the miners
-
     btul.logging.debug("get_all_miners() load miners")
     uids = get_available_uids(self)
 
@@ -181,7 +180,6 @@ async def resync_miners(self):
     """
     Resync the miners following a metagraph resynchronisation
     """
-
     # Focus on the changes in the metagraph
     btul.logging.info("resync_miners() processing metagraph changes")
     for uid, axon in enumerate(self.metagraph.axons):
@@ -190,9 +188,7 @@ async def resync_miners(self):
         ip = axon.ip
 
         # Check the miner is unavailable
-        is_available = check_uid_availability(
-            self.metagraph, uid, self.config.neuron.vpermit_tao_limit
-        )
+        is_available = check_uid_availability(self.metagraph, uid)
         if not is_available:
             removed = await remove_miner(self, uid, hotkey)
             if removed:

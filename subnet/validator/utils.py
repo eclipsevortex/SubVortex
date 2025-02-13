@@ -49,24 +49,18 @@ def current_block_hash(self):
     return int(str(random.randint(2 << 32, 2 << 64)))
 
 
-def check_uid_availability(
-    metagraph: "btcm.Metagraph", uid: int, vpermit_tao_limit: int
-) -> bool:
-    """Check if uid is available. The UID should be available if it is serving and has less than vpermit_tao_limit stake
+def check_uid_availability(metagraph: "btcm.Metagraph", uid: int) -> bool:
+    """Check if uid is available. The UID should be available if it is serving
     Args:
         metagraph (:obj: btcm.Metagraph): Metagraph object
         uid (int): uid to be checked
-        vpermit_tao_limit (int): Validator permit tao limit
     Returns:
         bool: True if uid is available, False otherwise
     """
     # Filter non serving axons.
     if not metagraph.axons[uid].is_serving:
         return False
-    # Filter validator permit > 1024 stake.
-    if metagraph.validator_permit[uid]:
-        if metagraph.S[uid] > vpermit_tao_limit:
-            return False
+
     # Available otherwise.
     return True
 
@@ -95,9 +89,7 @@ def get_available_uids(self, exclude: list = None):
     avail_uids = []
 
     for uid in range(self.metagraph.n.item()):
-        uid_is_available = check_uid_availability(
-            self.metagraph, uid, self.config.neuron.vpermit_tao_limit
-        )
+        uid_is_available = check_uid_availability(self.metagraph, uid)
         if uid_is_available and (exclude is None or uid not in exclude):
             avail_uids.append(uid)
     btul.logging.debug(f"returning available uids: {avail_uids}")
@@ -171,7 +163,9 @@ async def ping_uid(self, uid):
 async def get_next_uids(self, ss58_address: str, k: int = DEFAULT_CHUNK_SIZE):
     # Get the list of uids already selected
     uids_already_selected = await get_selected_miners(ss58_address, self.database)
-    btul.logging.debug(f"get_next_uids() uids already selected: {uids_already_selected}")
+    btul.logging.debug(
+        f"get_next_uids() uids already selected: {uids_already_selected}"
+    )
 
     # Get the list of available uids
     uids_selected = get_available_query_miners(self, k=k, exclude=uids_already_selected)

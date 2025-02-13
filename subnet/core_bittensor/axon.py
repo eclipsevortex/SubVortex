@@ -58,16 +58,16 @@ class SubVortexAxon(btca.Axon):
         if config is None:
             config = btca.Axon.config()
         config = copy.deepcopy(config)
-        config.axon.ip = ip or btcs.DEFAULTS.axon.ip
-        config.axon.port = port or btcs.DEFAULTS.axon.port
-        config.axon.external_ip = external_ip or btcs.DEFAULTS.axon.external_ip
-        config.axon.external_port = external_port or btcs.DEFAULTS.axon.external_port
-        config.axon.max_workers = max_workers or btcs.DEFAULTS.axon.max_workers
+        config.axon.ip = ip or config.axon.ip
+        config.axon.port = port or config.axon.port
+        config.axon.external_ip = external_ip or config.axon.external_ip
+        config.axon.external_port = external_port or config.axon.external_port
+        config.axon.max_workers = max_workers or config.axon.max_workers
         btca.Axon.check_config(config)
         self.config = config  # type: ignore
 
         # Get wallet or use default.
-        self.wallet = wallet or btw.Wallet()
+        self.wallet = wallet or btw.Wallet(config=self.config)
 
         # Build axon objects.
         self.uuid = str(uuid.uuid1())

@@ -19,12 +19,12 @@ import time
 import random
 import asyncio
 import traceback
+import bittensor.core.chain_data as btccd
 import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
 import bittensor.utils.btlogging as btul
-from substrateinterface.base import SubstrateInterface
 
-from subnet.constants import DEFAULT_PROCESS_TIME
+from subnet.constants import DEFAULT_PROCESS_TIME, DEFAULT_CHUNK_SIZE
 from subnet.protocol import Synapse
 from subnet.validator.models import Miner
 from subnet.validator.synapse import send_scope
@@ -43,7 +43,6 @@ from subnet.validator.score import (
     compute_final_score,
 )
 from subnet.validator.constants import CHALLENGE_NAME
-from subnet.shared.substrate import get_neuron_for_uid_lite
 
 DEFAULT_CHALLENGE_PROCESS_TIME = 60
 
@@ -60,7 +59,6 @@ MINER_PROPERTIES = [
     "consensus",
     "trust",
     "last_update",
-    "axon_info",
 ]
 
 VALIDATOR_PROPERTIES = [
@@ -72,7 +70,6 @@ VALIDATOR_PROPERTIES = [
     "validator_trust",
     "dividends",
     "last_update",
-    "axon_info",
 ]
 
 
@@ -81,6 +78,7 @@ def create_subtensor_challenge(subtensor: btcs.Subtensor):
     Create the challenge that the miner subtensor will have to execute
     """
     try:
+
         # Get the current block from the miner subtensor
         current_block = subtensor.get_current_block()
 
@@ -175,7 +173,7 @@ def challenge_subtensor(miner: Miner, challenge):
         # Attempt to connect to the subtensor
         try:
             # Create the substrate
-            substrate = SubstrateInterface(
+            substrate = btcs.SubstrateInterface(
                 ss58_format=btcse.SS58_FORMAT,
                 use_remote_preset=True,
                 type_registry=btcse.TYPE_REGISTRY,
@@ -187,16 +185,23 @@ def challenge_subtensor(miner: Miner, challenge):
             return (verified, reason, process_time)
 
         # Set the socket timeout
-        substrate.websocket.settimeout(DEFAULT_PROCESS_TIME)
+        substrate.ws.socket.settimeout(DEFAULT_PROCESS_TIME)
 
         # Start the timer
         start_time = time.time()
 
         # Execute the challenge
         try:
-            neuron = get_neuron_for_uid_lite(
-                substrate=substrate, netuid=netuid, uid=uid, block=block
+            # Get the block hash
+            block_hash = substrate.get_block_hash(block)
+
+            # Get the neuron lite details
+            result = substrate.runtime_call(
+                "NeuronInfoRuntimeApi", "get_neuron_lite", [netuid, uid], block_hash
             )
+
+            # Convert to a neuron entity
+            neuron = btccd.NeuronInfoLite.from_dict(result.value)
         except KeyError:
             reason = "Invalid netuid or uid provided."
             return (verified, reason, process_time)
@@ -281,14 +286,17 @@ async def challenge_data(self):
     start_time = time.time()
     btul.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
-    # Create the challenge
-    challenge = create_subtensor_challenge(self.subtensor)
-    if not challenge:
+    # Create the challenges
+    challenges = [
+        create_subtensor_challenge(self.subtensor) for _ in range(DEFAULT_CHUNK_SIZE)
+    ]
+    if len(challenges) < DEFAULT_CHUNK_SIZE:
+        btul.logging.warning(
+            f"[{CHALLENGE_NAME}] Only {len(challenges)} challenges on {DEFAULT_CHUNK_SIZE} have been created. Please check your local subtensor."
+        )
         return
 
-    btul.logging.debug(
-        f"[{CHALLENGE_NAME}] Challenge created - Block: {challenge[0]}, Netuid: {challenge[1]}, Uid: {challenge[2]}: Property: {challenge[3]}, Value: {challenge[4]}"
-    )
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Challenges created")
 
     # Select the miners
     val_hotkey = self.metagraph.hotkeys[self.uid]
@@ -305,7 +313,14 @@ async def challenge_data(self):
     # Execute the challenges
     tasks = []
     reasons = []
-    for uid in uids:
+    for i, (uid) in enumerate(uids):
+        # Log the challenge for the miner
+        challenge = challenges[i]
+        btul.logging.debug(
+            f"[{CHALLENGE_NAME}][{uid}] Challenge - Block: {challenge[0]}, Netuid: {challenge[1]}, Uid: {challenge[2]}: Property: {challenge[3]}, Value: {challenge[4]}"
+        )
+
+        # Send the challenge to the miner
         tasks.append(asyncio.create_task(handle_challenge(self, uid, challenge)))
         reasons = await asyncio.gather(*tasks)
 

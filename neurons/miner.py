@@ -282,10 +282,8 @@ class Miner:
             return True, "Unrecognized hotkey"
 
         # Block hotkeys that do not have the latest version
-        active_version = get_hyperparameter_value(
-            self.subtensor, "weights_version", self.config.netuid
-        )
-        if caller_version < active_version:
+        hyperparameters = self.subtensor.get_subnet_hyperparameters(self.config.netuid)
+        if caller_version < hyperparameters.weights_version:
             btul.logging.debug(
                 f"Blacklisted a {synapse_type} request from a non-updated hotkey {caller}"
             )

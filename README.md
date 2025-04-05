@@ -145,16 +145,10 @@ The team comprises individuals with diverse backgrounds and extensive experience
 Team responsabilities
 
 - **EclipseVortex** - Development and technology
-- **Ch3RNØbØG** - Operations and business development
-- **CryptoMinedMind** - Strategy and public relations
-- **HcL-CO** - QA Lead and support
 
 Team timezone
 
 - **EclipseVortex** - GMT (United-Kingdom)
-- **Ch3RNØbØG** - CST (USA)
-- **tww9** - MST (Canada)
-- **HcL-CO** - EST (Canada)
 
 ## Road Map
 

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=70.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subvortex-miner"
+version = "3.0.0"
+description = "SubVortex Miner"
+dynamic = ["dependencies"]
+
+[tool.setuptools.packages.find]
+where = ["../../"]
+include = ["miner/neuron/src/*", "core/*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[project.scripts]
+miner = "neuron.src.main:main"

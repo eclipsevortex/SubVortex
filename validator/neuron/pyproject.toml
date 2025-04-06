@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=70.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subvortex-validator"
+version = "3.0.0"
+description = "SubVortex Validator"
+dynamic = ["dependencies"]
+
+[tool.setuptools.packages.find]
+where = ["../../"]
+include = ["validator/neuron/src/*", "core/*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[project.scripts]
+validator = "neuron.src.main:main"

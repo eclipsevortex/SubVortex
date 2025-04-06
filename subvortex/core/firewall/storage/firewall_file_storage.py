@@ -14,41 +14,18 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
-import pytest
-import aioredis
-import bittensor.utils.btlogging as btul
-from unittest.mock import AsyncMock
-
-from neurons.validator import Validator
-from neurons.miner import Miner
+from subvortex.core.firewall.storage.firewall_storage import FileStorage
 
 
-@pytest.fixture(scope="session", autouse=False)
-def validator():
-    config = Validator.config()
-    config.mock = True
-    config.wandb.off = True
-    config.neuron.dont_save_events = True
-    validator = Validator(config)
-    validator.country_code = "GB"
-    btul.logging.off()
+class FirewallFileStorage(FileStorage):
+    def get_all():
+        pass
 
-    mock = AsyncMock(aioredis.Redis)
-    mock_instance = mock.return_value
-    validator.database = mock_instance
+    def get(key: str):
+        pass
 
-    yield validator
+    def add(key: str, value: str):
+        pass
 
-
-@pytest.fixture(scope="session", autouse=False)
-def miner():
-    config = Miner.config()
-    config.mock = True
-    config.wallet._mock = True
-    config.miner.mock_subtensor = True
-    config.netuid = 1
-    miner = Miner(config)
-    btul.logging.off()
-
-    yield miner
+    def remove(key: str, value: str):
+        pass

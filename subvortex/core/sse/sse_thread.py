@@ -14,41 +14,39 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
-import pytest
-import aioredis
+import threading
 import bittensor.utils.btlogging as btul
-from unittest.mock import AsyncMock
 
-from neurons.validator import Validator
-from neurons.miner import Miner
-
-
-@pytest.fixture(scope="session", autouse=False)
-def validator():
-    config = Validator.config()
-    config.mock = True
-    config.wandb.off = True
-    config.neuron.dont_save_events = True
-    validator = Validator(config)
-    validator.country_code = "GB"
-    btul.logging.off()
-
-    mock = AsyncMock(aioredis.Redis)
-    mock_instance = mock.return_value
-    validator.database = mock_instance
-
-    yield validator
+from subvortex.core.sse.sse_server import SSEServer
+from subvortex.core.firewall.firewall_factory import create_firewall_tool
 
 
-@pytest.fixture(scope="session", autouse=False)
-def miner():
-    config = Miner.config()
-    config.mock = True
-    config.wallet._mock = True
-    config.miner.mock_subtensor = True
-    config.netuid = 1
-    miner = Miner(config)
-    btul.logging.off()
+class SSEThread(threading.Thread):
+    def __init__(self, ip: str = None, port: int = 5000) -> None:
+        super().__init__(daemon=True)
+        self.ip = ip
+        self.port = port
 
-    yield miner
+        # Create the server
+        self._server = SSEServer(port=port)
+
+        # Create the firewall rule
+        self.tool = create_firewall_tool()
+        self.tool.create_allow_rule(ip=ip, dport=port, protocol="tcp")
+
+    @property
+    def server(self):
+        return self._server
+
+    def stop(self) -> None:
+        # Remove the firewall rule
+        btul.logging.warning(f"Shutting down SSE Server {self.ip}:{self.port}")
+        self.tool.remove_rule(ip=self.ip, dport=self.port, protocol="tcp")
+
+        # Shutdown the server
+        self._server.shutdown()
+
+        super().join()
+
+    def run(self) -> None:
+        self._server.serve_forever()

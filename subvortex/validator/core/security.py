@@ -14,41 +14,25 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
-import pytest
-import aioredis
-import bittensor.utils.btlogging as btul
-from unittest.mock import AsyncMock
+from typing import List
 
-from neurons.validator import Validator
-from neurons.miner import Miner
+from subvortex.validator.core.models import Miner
 
 
-@pytest.fixture(scope="session", autouse=False)
-def validator():
-    config = Validator.config()
-    config.mock = True
-    config.wandb.off = True
-    config.neuron.dont_save_events = True
-    validator = Validator(config)
-    validator.country_code = "GB"
-    btul.logging.off()
-
-    mock = AsyncMock(aioredis.Redis)
-    mock_instance = mock.return_value
-    validator.database = mock_instance
-
-    yield validator
-
-
-@pytest.fixture(scope="session", autouse=False)
-def miner():
-    config = Miner.config()
-    config.mock = True
-    config.wallet._mock = True
-    config.miner.mock_subtensor = True
-    config.netuid = 1
-    miner = Miner(config)
-    btul.logging.off()
-
-    yield miner
+def is_miner_suspicious(miner: Miner, suspicious_uids: List[int]):
+    """
+    True if the miner is in in the suspicious list, false otherwise
+    the penalise factor will be returned too if there is one
+    """
+    return next(
+        (
+            (
+                suspicious is not None,
+                (suspicious.get("penalty_factor") if suspicious else None) or 0,
+            )
+            for suspicious in suspicious_uids
+            if suspicious.get("uid") == miner.uid
+            and suspicious.get("hotkey") == miner.hotkey
+        ),
+        (False, 0),
+    )

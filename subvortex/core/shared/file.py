@@ -15,40 +15,56 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import os
-import pytest
-import aioredis
+import json
 import bittensor.utils.btlogging as btul
-from unittest.mock import AsyncMock
 
-from neurons.validator import Validator
-from neurons.miner import Miner
+from subvortex.core.shared.encoder import EnumEncoder
 
 
-@pytest.fixture(scope="session", autouse=False)
-def validator():
-    config = Validator.config()
-    config.mock = True
-    config.wandb.off = True
-    config.neuron.dont_save_events = True
-    validator = Validator(config)
-    validator.country_code = "GB"
-    btul.logging.off()
-
-    mock = AsyncMock(aioredis.Redis)
-    mock_instance = mock.return_value
-    validator.database = mock_instance
-
-    yield validator
+def save_json_file(file: str, items):
+    """
+    Save the items in a json file
+    """
+    try:
+        with open(file, "w") as file:
+            data = json.dumps(items, indent=4, cls=EnumEncoder)
+            file.write(data)
+    except Exception as err:
+        btul.logging.warning(f"Could not save the data in {file}: {err}")
 
 
-@pytest.fixture(scope="session", autouse=False)
-def miner():
-    config = Miner.config()
-    config.mock = True
-    config.wallet._mock = True
-    config.miner.mock_subtensor = True
-    config.netuid = 1
-    miner = Miner(config)
-    btul.logging.off()
+def load_njson_file(file: str):
+    """
+    Load the njson file
+    """
+    data = []
 
-    yield miner
+    if not os.path.exists(file):
+        return data
+
+    try:
+        with open(file, "r") as file:
+            for line in file:
+                data.append(json.loads(line))
+    except Exception as err:
+        btul.logging.warning(f"Could not load the data from {file}: {err}")
+
+    return data
+
+
+def load_json_file(file: str):
+    """
+    Load the json file
+    """
+    data = None
+
+    if not os.path.exists(file):
+        return data
+
+    try:
+        with open(file, "r") as file:
+            data = json.load(file)
+    except Exception as err:
+        btul.logging.warning(f"Could not load the data from {file}: {err}")
+
+    return data

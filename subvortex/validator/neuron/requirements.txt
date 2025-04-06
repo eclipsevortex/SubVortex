@@ -1,0 +1,11 @@
+aioredis==2.0.1
+bittensor==9.0.4
+bittensor-wallet==3.0.4
+loguru==0.7.0
+numpy==2.0.1
+pydantic==2.8.2
+python-dotenv==1.0.1
+redis==5.0.1
+setuptools==70.0.0
+substrate_interface==1.7.9
+wandb==0.18.7

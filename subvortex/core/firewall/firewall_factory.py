@@ -14,41 +14,22 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
-import pytest
-import aioredis
-import bittensor.utils.btlogging as btul
-from unittest.mock import AsyncMock
-
-from neurons.validator import Validator
-from neurons.miner import Miner
+from subvortex.core.firewall.firewall_linux_tool import FirewallLinuxTool
+from subvortex.core.firewall.firewall_observer import FirewallObserver
+from subvortex.core.firewall.firewall_linux_observer import FirewallLinuxObserver
+from subvortex.core.firewall.firewall_tool import FirewallTool
+from subvortex.core.shared.platform import is_linux_platform, get_os
 
 
-@pytest.fixture(scope="session", autouse=False)
-def validator():
-    config = Validator.config()
-    config.mock = True
-    config.wandb.off = True
-    config.neuron.dont_save_events = True
-    validator = Validator(config)
-    validator.country_code = "GB"
-    btul.logging.off()
+def create_firewall_tool(*args, **kwargs) -> FirewallTool:
+    if is_linux_platform():
+        return FirewallLinuxTool(*args, **kwargs)
 
-    mock = AsyncMock(aioredis.Redis)
-    mock_instance = mock.return_value
-    validator.database = mock_instance
-
-    yield validator
+    raise ValueError(f"No firewall tool implemented for {get_os()}")
 
 
-@pytest.fixture(scope="session", autouse=False)
-def miner():
-    config = Miner.config()
-    config.mock = True
-    config.wallet._mock = True
-    config.miner.mock_subtensor = True
-    config.netuid = 1
-    miner = Miner(config)
-    btul.logging.off()
+def create_firewall_observer(*args, **kwargs) -> FirewallObserver:
+    if is_linux_platform():
+        return FirewallLinuxObserver(*args, **kwargs)
 
-    yield miner
+    raise ValueError(f"No firewall observer implemented for {get_os()}")

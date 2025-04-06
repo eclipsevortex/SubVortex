@@ -14,41 +14,38 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
-import pytest
-import aioredis
 import bittensor.utils.btlogging as btul
-from unittest.mock import AsyncMock
+from typing import List
 
-from neurons.validator import Validator
-from neurons.miner import Miner
-
-
-@pytest.fixture(scope="session", autouse=False)
-def validator():
-    config = Validator.config()
-    config.mock = True
-    config.wandb.off = True
-    config.neuron.dont_save_events = True
-    validator = Validator(config)
-    validator.country_code = "GB"
-    btul.logging.off()
-
-    mock = AsyncMock(aioredis.Redis)
-    mock_instance = mock.return_value
-    validator.database = mock_instance
-
-    yield validator
+from subvortex.core import protocol
+from subvortex.core.constants import DEFAULT_PROCESS_TIME
+from subvortex.validator.core.models import Miner
 
 
-@pytest.fixture(scope="session", autouse=False)
-def miner():
-    config = Miner.config()
-    config.mock = True
-    config.wallet._mock = True
-    config.miner.mock_subtensor = True
-    config.netuid = 1
-    miner = Miner(config)
-    btul.logging.off()
+async def send_scope(self, miner: Miner):
+    """
+    Send the scope synapse to the miner and return the version
+    """
+    try:
+        # Send the score details to the miner
+        response: List[protocol.Score] = await self.dendrite(
+            axons=[self.metagraph.axons[miner.uid]],
+            synapse=protocol.Score(
+                validator_uid=self.uid,
+                count=miner.ip_occurences,
+                availability=miner.availability_score,
+                latency=miner.latency_score,
+                reliability=miner.reliability_score,
+                distribution=miner.distribution_score,
+                score=miner.score,
+            ),
+            deserialize=True,
+            timeout=DEFAULT_PROCESS_TIME,
+        )
 
-    yield miner
+        version = response[0] if len(response) > 0 else None
+        return version or "0.0.0"
+    except Exception as err:
+        btul.logging.warning(f"[{miner.uid}] send_scope() Sending scope failed: {err}")
+
+    return "0.0.0"

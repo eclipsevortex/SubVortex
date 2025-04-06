@@ -14,41 +14,35 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+
 import os
-import pytest
-import aioredis
+import json
+import time
 import bittensor.utils.btlogging as btul
-from unittest.mock import AsyncMock
+from os import path
 
-from neurons.validator import Validator
-from neurons.miner import Miner
+# Check if there is an update every 5 minutes
+# Github Rate Limit 60 requests per hour / per ip (Reference: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28)
+CHECK_UPDATE_FREQUENCY = 5 * 60
 
-
-@pytest.fixture(scope="session", autouse=False)
-def validator():
-    config = Validator.config()
-    config.mock = True
-    config.wandb.off = True
-    config.neuron.dont_save_events = True
-    validator = Validator(config)
-    validator.country_code = "GB"
-    btul.logging.off()
-
-    mock = AsyncMock(aioredis.Redis)
-    mock_instance = mock.return_value
-    validator.database = mock_instance
-
-    yield validator
+here = path.abspath(path.dirname(__file__))
 
 
-@pytest.fixture(scope="session", autouse=False)
-def miner():
-    config = Miner.config()
-    config.mock = True
-    config.wallet._mock = True
-    config.miner.mock_subtensor = True
-    config.netuid = 1
-    miner = Miner(config)
-    btul.logging.off()
+def should_upgrade(auto_update: bool, last_upgrade_check: float):
+    """
+    True if it is time to upgrade, false otherwise
+    """
+    time_since_last_update = time.time() - last_upgrade_check
+    return time_since_last_update >= CHECK_UPDATE_FREQUENCY and auto_update
 
-    yield miner
+
+def load_json_file(file_path):
+    try:
+        if not os.path.exists(file_path):
+            return None
+
+        with open(file_path, "r") as file:
+            config = json.load(file)
+        return config
+    except Exception:
+        btul.logging.warning(f"Could not load the json file {file_path}")

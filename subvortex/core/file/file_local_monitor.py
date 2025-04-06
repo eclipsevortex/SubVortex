@@ -15,40 +15,35 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import os
-import pytest
-import aioredis
-import bittensor.utils.btlogging as btul
-from unittest.mock import AsyncMock
 
-from neurons.validator import Validator
-from neurons.miner import Miner
+from subvortex.core.shared.file import load_json_file
+from subvortex.core.file.file_provider import FileProvider
 
 
-@pytest.fixture(scope="session", autouse=False)
-def validator():
-    config = Validator.config()
-    config.mock = True
-    config.wandb.off = True
-    config.neuron.dont_save_events = True
-    validator = Validator(config)
-    validator.country_code = "GB"
-    btul.logging.off()
+class FileLocalMonitor(FileProvider):
+    """
+    Class to get the up to date data from any local file
+    Only json file is possible for now
+    """
 
-    mock = AsyncMock(aioredis.Redis)
-    mock_instance = mock.return_value
-    validator.database = mock_instance
+    def __init__(self, logger_name, file_path, check_interval, callback) -> None:
+        super().__init__(logger_name, check_interval)
+        self._file_path = file_path
+        self._callback = callback
+        self.last_modified = None
 
-    yield validator
+    def check_file_updated(self):
+        current_time = os.path.getmtime(self._file_path)
+        has_changed = current_time != self.last_modified
+        self.last_modified = current_time if has_changed else self.last_modified
+        return has_changed
 
+    def load_file(self):
+        data = load_json_file(self._file_path)
+        return data
 
-@pytest.fixture(scope="session", autouse=False)
-def miner():
-    config = Miner.config()
-    config.mock = True
-    config.wallet._mock = True
-    config.miner.mock_subtensor = True
-    config.netuid = 1
-    miner = Miner(config)
-    btul.logging.off()
+    def notify(self, data):
+        if not self._callback:
+            return
 
-    yield miner
+        self._callback(data)

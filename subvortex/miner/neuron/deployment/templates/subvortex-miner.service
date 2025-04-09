@@ -3,9 +3,9 @@ Description=SubVortex Miner
 After=network.target
 
 [Service]
-WorkingDirectory=/root/subvortex/miner/neuron
-EnvironmentFile=/root/subvortex/miner/neuron/.env
-ExecStart=/root/subvortex/miner/neuron/venv/bin/python3 -m subvortex.miner.neuron.src.main --netuid $SUBVORTEX_NETUID
+WorkingDirectory=/root/subvortex/subvortex/miner/neuron
+EnvironmentFile=/root/subvortex/subvortex/miner/neuron/.env
+ExecStart=/root/subvortex/subvortex/miner/neuron/venv/bin/python3 -m subvortex.miner.neuron.src.main
 StandardOutput=append:/var/log/subvortex-miner/subvortex-miner.log
 StandardError=append:/var/log/subvortex-miner/subvortex-miner-error.log
 Environment=PYTHONUNBUFFERED=1

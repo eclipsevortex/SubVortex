@@ -33,7 +33,6 @@ import bittensor.utils.networking as btun
 import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
 
-from subvortex.core import __version__ as THIS_VERSION
 from subvortex.core.protocol import Score
 
 from subvortex.core.shared.checks import check_registration
@@ -52,6 +51,7 @@ from subvortex.core.firewall.firewall_factory import (
     create_firewall_tool,
     create_firewall_observer,
 )
+from subvortex.miner.version import __version__ as THIS_VERSION
 from subvortex.miner.core.run import run
 from subvortex.miner.core.firewall import Firewall
 from subvortex.miner.core.config import (

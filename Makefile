@@ -35,7 +35,7 @@ endef
 # =====================
 
 # Initialize phony targets
-TARGETS :=
+TARGETS := ${ACTIONS_miner}
 
 # Generate 3-part rules: <action>-<component>-<service>
 $(foreach comp,$(COMPONENTS),\

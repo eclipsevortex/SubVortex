@@ -3,22 +3,30 @@ requires = ["setuptools>=70"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "subvortex-validator"
-version = "3.0.0"
+name = "subvortex"
+dynamic = ["version"]
 description = "SubVortex Validator"
 authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
 readme = "README.md"
-license = "MIT"
+
+[tool.setuptools.dynamic]
+version = { attr = "subvortex.validator.version.__version__" }
+
+[project.license]
+text = "MIT"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["validator", "validator.*"]
 
 [tool.setuptools.package-data]
-"miner" = ["neuron/deployment/**"]
-
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
+"*" = [
+    "deployment/**/*",
+    "requirements.txt",
+    "README.md",
+    "pyproject.toml",
+    "env.template",
+    "version.py",
+]

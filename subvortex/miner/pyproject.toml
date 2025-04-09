@@ -3,8 +3,8 @@ requires = ["setuptools>=70"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "subvortex-miner"
-version = "3.0.0"
+name = "subvortex"
+dynamic = ["version"]
 description = "SubVortex Miner"
 authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
 readme = "README.md"
@@ -24,6 +24,9 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
+[tool.setuptools.dynamic]
+version = { attr = "subvortex.miner.version.__version__" }
+
 [project.license]
 text = "MIT"
 
@@ -34,4 +37,11 @@ include-package-data = true
 where = ["."]
 
 [tool.setuptools.package-data]
-"*" = ["deployment/**/*", "requirements.txt", "README.md", "pyproject.toml", "env.template"]
+"*" = [
+    "deployment/**/*",
+    "requirements.txt",
+    "README.md",
+    "pyproject.toml",
+    "env.template",
+    "version.py",
+]

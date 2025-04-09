@@ -6,26 +6,54 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+resolve_path() {
+  local path="$1"
+  
+  if command -v realpath >/dev/null 2>&1; then
+    realpath "$path"
+  else
+    # Fallback for macOS (readlink -f may not exist)
+    # Uses Python to resolve real path
+    python3 -c "import os; print(os.path.realpath('$path'))"
+  fi
+}
+
 # Activate virtual environment
 source venv/bin/activate
 
 # Load environment variables
 export $(grep -v '^#' .env | xargs)
 
-# Start building the argument list
-ARGS=()
+# Define deployment paths
+DEPLOY_SOURCE="$SCRIPT_DIR/../../../../../"
+DEPLOY_SOURCE=$(resolve_path "$DEPLOY_SOURCE")
+DEPLOY_LINK="$HOME/subvortex"
 
-# Prefix to look for
+# Create parent directory if needed
+mkdir -p "$(dirname "$DEPLOY_LINK")"
+
+# Atomically update symlink
+TEMP_LINK="${DEPLOY_LINK}.tmp"
+
+# Create/update the temp symlink
+ln -sfn "$DEPLOY_SOURCE" "$TEMP_LINK"
+
+# On macOS and Linux: remove old symlink and rename temp
+if [ -L "$DEPLOY_LINK" ] || [ -e "$DEPLOY_LINK" ]; then
+  rm -rf "$DEPLOY_LINK"
+fi
+mv "$TEMP_LINK" "$DEPLOY_LINK"
+
+echo "🔗 Symlink set: $DEPLOY_LINK → $DEPLOY_SOURCE"
+
+# Build CLI args from SUBVORTEX_ environment variables
+ARGS=()
 PREFIX="SUBVORTEX_"
 
-# Loop through all environment variables starting with SUBVORTEX_
 while IFS='=' read -r key value; do
   if [[ $key == ${PREFIX}* ]]; then
-    # Remove prefix and convert to CLI format: UPPER_SNAKE → --lower.dotted
-    key_suffix="${key#$PREFIX}"                      # Strip prefix
+    key_suffix="${key#$PREFIX}"
     cli_key="--$(echo "$key_suffix" | tr '[:upper:]' '[:lower:]' | tr '_' '.')"
-
-    # Check if value is boolean true
     if [[ "$(echo "$value" | tr '[:upper:]' '[:lower:]')" == "true" ]]; then
       ARGS+=("$cli_key")
     else
@@ -34,10 +62,17 @@ while IFS='=' read -r key value; do
   fi
 done < <(env)
 
-# Start with PM2
-pm2 start src/main.py \
-  --name subvortex-miner \
-  --interpreter python3 -- \
-  "${ARGS[@]}"
+# Start or reload PM2
+SERVICE_NAME="subvortex-miner"
+if pm2 list | grep -q "$SERVICE_NAME"; then
+  echo "🔁 Reloading $SERVICE_NAME"
+  pm2 reload "$SERVICE_NAME" --update-env
+else
+  echo "🚀 Starting $SERVICE_NAME"
+  pm2 start "$DEPLOY_LINK/subvortex/miner/neuron/src/main.py" \
+    --name "$SERVICE_NAME" \
+    --interpreter python3 -- \
+    "${ARGS[@]}"
+fi
 
-echo "✅ Miner started successfully"
+echo "✅ $SERVICE_NAME is running"

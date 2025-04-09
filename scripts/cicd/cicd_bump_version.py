@@ -6,6 +6,7 @@ from pathlib import Path
 # Config
 # =====================
 pyproject_path = Path("pyproject.toml")
+comp_version_file_path = Path("version.py")
 version_file_path = Path("VERSION")
 
 # =====================
@@ -21,11 +22,21 @@ def write_version_to_pyproject(new_version):
     updated = re.sub(r'version\s*=\s*"([^"]+)"', f'version = "{new_version}"', content)
     pyproject_path.write_text(updated)
 
+def read_comp_version_from_file():
+    content = comp_version_file_path.read_text().strip()
+    match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
+    return match.group(1) if match else None
+
 def read_version_from_file():
     return version_file_path.read_text().strip()
 
 def write_version_to_file(new_version):
     version_file_path.write_text(f"{new_version}\n")
+
+def write_comp_version_to_file(new_version):
+    content = comp_version_file_path.read_text()
+    updated = re.sub(r'__version__\s*=\s*"([^"]+)"', f'__version__ = "{new_version}"', content)
+    comp_version_file_path.write_text(updated)
 
 def parse_version(version):
     pattern = r'^(\d+)\.(\d+)\.(\d+)(?:-([a-z]+)\.(\d+))?$'
@@ -48,7 +59,10 @@ def build_version_string(major, minor, patch, suffix=None, suffix_num=None):
 cmd = sys.argv[1] if len(sys.argv) > 1 else "patch"
 
 source = None
-if version_file_path.exists():
+if comp_version_file_path.exists():
+    version = read_comp_version_from_file()
+    source = "comp"
+elif version_file_path.exists():
     version = read_version_from_file()
     source = "file"
 elif pyproject_path.exists():
@@ -92,6 +106,8 @@ new_version = build_version_string(major, minor, patch, suffix, suffix_num)
 
 if source == "file":
     write_version_to_file(new_version)
+elif source == "comp":
+    write_comp_version_to_file(new_version)
 elif source == "pyproject":
     write_version_to_pyproject(new_version)
 

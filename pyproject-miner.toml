@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subvortex"
-version = "3.0.0"
+dynamic = ["version"]
 description = "SubVortex Miner"
 authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
 readme = "README.md"
@@ -25,6 +25,9 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+
+[tool.setuptools.dynamic]
+version = { attr = "subvortex.miner.version.__version__" }
 
 [project.license]
 text = "MIT"
@@ -47,3 +50,8 @@ include = ["subvortex", "subvortex.core", "subvortex.miner"]
     "**/env.template",
 ]
 "subvortex.core" = ["**/*.py"]
+
+[tool.setuptools.exclude-package-data]
+"subvortex" = ["**/venv/*", "**/.venv/*"]
+"subvortex.miner" = ["**/venv/*", "**/.venv/*"]
+"subvortex.core" = ["**/venv/*", "**/.venv/*"]

@@ -1,44 +1,67 @@
-ARG SUBVORTEX_OBSERVER_TYPE=file
+# syntax=docker/dockerfile:1.4
 
-# Use the official Python image from the Docker Hub
+########################################
+# Stage 0 — Build wheels using wheel-builder
+########################################
+FROM wheelbuilder AS wheels
+
+WORKDIR /build
+
+COPY ./subvortex/miner/neuron/requirements.txt ./requirements.txt
+
+RUN pip wheel -r requirements.txt -w /wheels \
+    && rm -rf ~/.cache/pip
+
+########################################
+# Stage 1 — Final runtime image
+########################################
 FROM python:3.11-slim
 
-# Re-declare the ARG after FROM if you want to use it in this stage
-ARG SUBVORTEX_OBSERVER_TYPE=file
+# ---------- Metadata & Labels ----------
+ARG MAINTAINER="subvortex.bt@gmail.com"
+ARG VERSION="0.0.0"
+ARG COMPONENT_VERSION="0.0.0"
+LABEL maintainer=$MAINTAINER
+LABEL version=$VERSION
+LABEL miner.version=$COMPONENT_VERSION
 
-# Set the env var
+# ---------- Environment ----------
+ENV PYTHONUNBUFFERED=1
+ARG SUBVORTEX_OBSERVER_TYPE=file
 ENV SV_OBSERVER_TYPE=${SUBVORTEX_OBSERVER_TYPE}
 
-# Set the working directory in the container
-WORKDIR /app
-
-# Install Rust using rustup
+# ✅ Install required runtime libraries
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    build-essential \
+    libnfnetlink0 \
+    libnetfilter-queue1 \
+    iptables \
+    libcap2-bin \
     && rm -rf /var/lib/apt/lists/*
 
-# Add Cargo in path
-ENV PATH="/root/.cargo/bin:${PATH}"
+WORKDIR /app
 
-# Install the dependencies
-COPY ./neuron/requirements.txt ./neuron/
-RUN pip install --upgrade pip && pip install -r ./neuron/requirements.txt --no-cache-dir
+# 🧱 Copy only built wheels from Stage 0
+COPY --from=wheels /wheels /tmp/wheels
 
-# Copy files
-COPY ./core/utils ./core/utils
-COPY ./neuron/src ./neuron/src
-COPY ./neuron/pyproject.toml ./neuron
-COPY ./neuron/entrypoint.sh ./neuron/entrypoint.sh
+# ✅ Only copy wheels and install, discard after
+COPY --from=wheels /wheels /tmp/wheels
+COPY ./subvortex/miner/neuron/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir --find-links=/tmp/wheels -r requirements.txt \
+    && rm -rf /tmp/wheels ~/.cache/pip
 
-WORKDIR /app/neuron
+# 📁 Copy source code
+COPY ./pyproject-miner.toml ./pyproject.toml
+COPY ./subvortex/pyproject.toml ./subvortex/pyproject.toml
+COPY ./subvortex/core ./subvortex/core
+COPY ./subvortex/miner/version.py ./subvortex/miner/version.py
+COPY ./subvortex/miner/core ./subvortex/miner/core
+COPY ./subvortex/miner/neuron/src ./subvortex/miner/neuron/src
+COPY ./subvortex/miner/neuron/entrypoint.sh ./subvortex/miner/neuron/entrypoint.sh
+COPY ./subvortex/miner/neuron/pyproject.toml ./subvortex/miner/neuron/pyproject.toml
 
-# Install the observer dependencies
-RUN pip install ".[observer-${SV_OBSERVER_TYPE}]"
+# 🧩 Install project (editable)
+RUN pip install "./subvortex/miner/neuron[observer-${SV_OBSERVER_TYPE}]" \
+    && pip install -e . \
+    && rm -rf ~/.cache/pip
 
-# Install the dependencies
-RUN pip install -e .
-
-# Specify the command to run your application
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "./subvortex/miner/neuron/entrypoint.sh"]

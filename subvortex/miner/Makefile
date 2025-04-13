@@ -3,7 +3,7 @@
 # =====================
 
 # Actions per component
-ACTIONS := major minor patch alpha rc version clean prerelease release
+ACTIONS := bump-major bump-minor bump-patch bump-alpha bump-rc clean
 
 # Services per component
 SERVICES := neuron
@@ -36,32 +36,25 @@ $(foreach action,$(ACTIONS),\
 	)\
 )
 
-patch:
+bump-patch:
 	@python3 $(VERSION_SCRIPT) patch
 
-minor:
+bump-minor:
 	@python3 $(VERSION_SCRIPT) minor
 
-major:
+bump-major:
 	@python3 $(VERSION_SCRIPT) major
 
-alpha:
+bump-alpha:
 	@python3 $(VERSION_SCRIPT) alpha
 
-rc:
+bump-rc:
 	@python3 $(VERSION_SCRIPT) rc
 
-version:
-	@python3 $(VERSION_SCRIPT) new-prerelease
+clean:
+	rm -rf $(DIST_DIR) *.egg-info **/*.egg-info build/
 
 # =====================
 # Declare all targets as .PHONY
 # =====================
 .PHONY: $(TARGETS)
-
-# =====================
-# Optional: help target
-# =====================
-help:
-	@echo "📦 Available targets:"
-	@$(foreach t,$(sort $(TARGETS)), echo "  $(t)";)

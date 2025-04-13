@@ -6,6 +6,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+# Load environment variables
+export $(grep -v '^#' .env | xargs)
+
 # Check which command is available
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
     DOCKER_CMD="docker compose"
@@ -16,6 +19,10 @@ else
     exit 1
 fi
 
-$DOCKER_CMD -f ../docker-compose.yml down miner --rmi all
+if [ -n "$SUBVORTEX_LOCAL" ]; then
+    $DOCKER_CMD -f ../docker-compose.local.yml down validator-neuron --rmi all
+else
+    $DOCKER_CMD -f ../docker-compose.local.yml down validator-neuron --rmi all
+fi
 
-echo "✅ Miner teardown completed successfully."
+echo "✅ Validator teardown completed successfully."

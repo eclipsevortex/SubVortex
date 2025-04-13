@@ -1,0 +1,49 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Test and coverage
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.pytest_cache/
+tests/__pycache__/
+
+# Git and other version control
+.git/
+.gitignore
+
+# Docker and CI/CD
+.dockerignore
+.docker/
+.envrc
+*.sh
+*.bak

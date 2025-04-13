@@ -2,14 +2,14 @@
 
 set -e
 
-SERVICE_NAME=miner
-PACKAGE_NAME="subvortex-validator"
+SERVICE_NAME=subvortex-validator
+PACKAGE_NAME=subvortex
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-# Stop and delete the miner process
+# Stop and delete the validator process
 if pm2 list | grep -q "$SERVICE_NAME"; then
     echo "Stopping PM2 process $SERVICE_NAME..."
     

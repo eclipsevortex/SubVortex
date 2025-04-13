@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 
 # Resolve the path two levels up from the current file
 env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), f"../.env"))
-print(f"ENV FILE PATH: {env_path}")
 
 # Load the env file
 load_dotenv(dotenv_path=env_path)
@@ -47,9 +46,10 @@ class RedisMigration(ABC):
         # Set mode to dual so app reads/writes both if needed
         if self.down_revision is not None:
             await self.database.set("version", self.down_revision)
-            await self.database.set(f"migration_mode:{self.down_revision}", "legacy")
+            await self.database.set(f"migration_mode:{self.revision}", "legacy")
         else:
             await self.database.set("version", "0.0.0")
+            
 
     @abstractmethod
     def _rollout(self):

@@ -49,6 +49,7 @@ include = ["scripts", "subvortex", "subvortex.core", "subvortex.validator"]
     "**/requirements.txt",
     "**/README.md",
     "**/env.template",
+    "**/docker-compose.yml",
 ]
 "subvortex.core" = ["**/*.py"]
 

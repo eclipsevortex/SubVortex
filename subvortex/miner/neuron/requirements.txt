@@ -7,4 +7,3 @@ pydantic==2.8.2
 python-dotenv==1.0.1
 setuptools==70.0.0
 substrate_interface==1.7.9
-torch==2.5.1

@@ -2,15 +2,15 @@
 
 set -e
 
-# Include files
-source ${BASH_SOURCE%/*}/../../../../../scripts/utils/machine.sh
-
-# Get the OS
-os=$(get_os)
-
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
+
+# Include files
+source ../../../scripts/utils/machine.sh
+
+# Get the OS
+os=$(get_os)
 
 # Load environment variables
 export $(grep -v '^#' .env | xargs)
@@ -24,14 +24,14 @@ install_redis_ubuntu() {
         sudo apt install -y redis-server
         sudo systemctl enable redis-server
     fi
-
-    if [[ -n "$REDIS_PASSWORD" ]]; then
+    
+    if [[ -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
         echo "Setting Redis password..."
         REDIS_CONF="/etc/redis/redis.conf"
         if grep -q "^requirepass" "$REDIS_CONF"; then
-            sudo sed -i "s/^requirepass .*/requirepass $REDIS_PASSWORD/" "$REDIS_CONF"
+            sudo sed -i "s/^requirepass .*/requirepass $SUBVORTEX_REDIS_PASSWORD/" "$REDIS_CONF"
         else
-            sudo sed -i "/^# requirepass/a requirepass $REDIS_PASSWORD" "$REDIS_CONF"
+            sudo sed -i "/^# requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
         fi
         sudo systemctl restart redis-server
     fi
@@ -48,14 +48,14 @@ install_redis_macos() {
         fi
         brew install redis
     fi
-
-    if [[ -n "$REDIS_PASSWORD" ]]; then
+    
+    if [[ -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
         echo "Setting Redis password..."
         REDIS_CONF="/opt/homebrew/etc/redis.conf"
         if grep -q "^requirepass" "$REDIS_CONF"; then
-            sed -i '' "s/^requirepass .*/requirepass $REDIS_PASSWORD/" "$REDIS_CONF"
+            sed -i '' "s/^requirepass .*/requirepass $SUBVORTEX_REDIS_PASSWORD/" "$REDIS_CONF"
         else
-            sed -i '' "s/^# requirepass .*/requirepass $REDIS_PASSWORD/" "$REDIS_CONF"
+            sed -i '' "s/^# requirepass .*/requirepass $SUBVORTEX_REDIS_PASSWORD/" "$REDIS_CONF"
         fi
     fi
 }
@@ -71,14 +71,14 @@ case "$os" in
                 exit 1
             fi
         fi
-        ;;
+    ;;
     "macos")
         install_redis_macos
-        ;;
+    ;;
     *)
         echo "Unsupported operating system: $OS"
         exit 1
-        ;;
+    ;;
 esac
 
 echo "✅ Validator Redis setup successfully"

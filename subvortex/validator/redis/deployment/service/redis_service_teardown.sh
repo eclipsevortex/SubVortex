@@ -2,22 +2,29 @@
 
 set -e
 
+# Determine script directory dynamically to ensure everything runs in ./scripts/api/
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/../.."
+
 # Include files
-source ${BASH_SOURCE%/*}/../../../../../scripts/utils/machine.sh
+source ../../../scripts/utils/machine.sh
 
 # Get the OS
 os=$(get_os)
 
-# Determine script directory dynamically to ensure everything runs in ./scripts/api/
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/../.."
+# Load environment variables
+export $(grep -v '^#' .env | xargs)
 
 uninstall_redis_ubuntu() {
     echo "Stopping and uninstalling Redis on Ubuntu..."
     sudo systemctl stop redis-server
     sudo systemctl disable redis-server
-    sudo apt remove -y redis-server
+    sudo apt purge -y redis-server
     sudo apt autoremove -y
+    sudo rm -rf /etc/redis /var/lib/redis /var/log/redis
+    sudo systemctl daemon-reload
+    sudo systemctl reset-failed
+
     echo "Redis uninstallation complete on Ubuntu."
 }
 
@@ -34,15 +41,7 @@ uninstall_redis_macos() {
 
 case "$os" in
     "linux")
-        if [ -f /etc/os-release ]; then
-            . /etc/os-release
-            if [[ "$ID" == "ubuntu" ]]; then
-                uninstall_redis_ubuntu
-            else
-                echo "Unsupported Linux distribution. Please uninstall Redis manually."
-                exit 1
-            fi
-        fi
+        uninstall_redis_ubuntu
     ;;
     "macos")
         uninstall_redis_macos
@@ -53,4 +52,4 @@ case "$os" in
     ;;
 esac
 
-echo "✅ Validator teardown completed successfully."
+echo "✅ Validator Redis teardown completed successfully."

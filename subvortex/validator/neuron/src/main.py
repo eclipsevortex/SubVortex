@@ -14,17 +14,12 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
 import os
-
-# Use torch in metagraph
-os.environ["USE_TORCH"] = "1"
-
 import time
 import copy
-import torch
 import asyncio
 import threading
+import numpy as np
 import bittensor.core.config as btcc
 import bittensor.core.subtensor as btcs
 import bittensor.core.metagraph as btcm
@@ -40,18 +35,19 @@ from subvortex.core.monitor.monitor import Monitor
 from subvortex.core.country.country import CountryService
 from subvortex.core.file.file_monitor import FileMonitor
 
-from subvortex.core.shared.utils import get_redis_password, should_upgrade
 from subvortex.core.shared.subtensor import get_current_block
 from subvortex.core.shared.weights import should_set_weights
 from subvortex.core.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
 from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
 
 from subvortex.validator.version import __version__ as THIS_VERSION
-from subvortex.validator.core.checks import check_registration
+from subvortex.validator.core.checks import (
+    check_registration,
+    check_database_connection,
+)
 from subvortex.validator.core.config import config, check_config, add_args
 from subvortex.validator.core.forward import forward
 from subvortex.validator.core.models import Miner
-from subvortex.validator.core.version import VersionControl
 from subvortex.validator.core.miner import get_all_miners
 from subvortex.validator.core.state import (
     resync_metagraph_and_miners,
@@ -77,7 +73,7 @@ class Validator:
         wallet (btw.wallet): Cryptographic wallet containing keys for transactions and encryption.
         metagraph (btcm.metagraph): Graph structure storing the state of the network.
         database (redis.StrictRedis): Database instance for storing metadata and proofs.
-        moving_averaged_scores (torch.Tensor): Tensor tracking performance scores of other nodes.
+        moving_averaged_scores: Tensor tracking performance scores of other nodes.
     """
 
     @classmethod
@@ -112,11 +108,6 @@ class Validator:
 
         # Show miner version
         btul.logging.debug(f"validator version {THIS_VERSION}")
-
-        # Init device.
-        btul.logging.debug("loading device")
-        self.device = torch.device(self.config.neuron.device)
-        btul.logging.debug(str(self.device))
 
         # Init validator wallet.
         btul.logging.debug(f"loading wallet")
@@ -155,22 +146,18 @@ class Validator:
 
         # Setup database
         btul.logging.info("loading database")
-        redis_password = (
-            get_redis_password(self.config.database.redis_password)
-            if not self.config.mock
-            else None
-        )
         self.database = aioredis.StrictRedis(
             host=self.config.database.host,
             port=self.config.database.port,
             db=self.config.database.index,
-            password=redis_password,
+            password=self.config.database.password,
         )
+        check_database_connection(port=self.config.database.port)
         self.db_semaphore = asyncio.Semaphore()
 
         # Init Weights.
         btul.logging.debug("loading moving_averaged_scores")
-        self.moving_averaged_scores = torch.zeros((self.metagraph.n)).to(self.device)
+        self.moving_averaged_scores = np.zeros((self.metagraph.n))
         btul.logging.debug(str(self.moving_averaged_scores))
 
         self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
@@ -197,7 +184,6 @@ class Validator:
         self.last_registered_block = 0
         self.rebalance_queue = []
         self.miners: List[Miner] = []
-        self.last_upgrade_check = 0
         self.last_upgrade_country = None
 
     async def run(self):
@@ -205,7 +191,6 @@ class Validator:
 
         # Initi versioin control
         dump_path = self.config.database.redis_dump_path
-        self.version_control = VersionControl(self.database, dump_path)
 
         # File monitor
         self.file_monitor = FileMonitor()
@@ -239,17 +224,6 @@ class Validator:
 
         try:
             while 1:
-                # Start the upgrade process every 10 minutes
-                if should_upgrade(self.config.auto_update, self.last_upgrade_check):
-                    btul.logging.debug("Checking upgrade")
-                    must_restart = await self.version_control.upgrade()
-                    if must_restart:
-                        finish_wandb()
-                        self.version_control.restart()
-                        return
-
-                    self.last_upgrade_check = time.time()
-
                 start_epoch = time.time()
 
                 # Check if the coutry changed
@@ -297,7 +271,6 @@ class Validator:
                     btul.logging.debug(f"Setting weights {self.moving_averaged_scores}")
                     set_weights_for_validator(
                         uid=self.uid,
-                        device=self.device,
                         subtensor=self.subtensor,
                         wallet=self.wallet,
                         metagraph=self.metagraph,

@@ -6,6 +6,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+# Load environment variables
+export $(grep -v '^#' .env | xargs)
+
 # Check which command is available
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
     DOCKER_CMD="docker compose"
@@ -16,10 +19,10 @@ else
     exit 1
 fi
 
-# Load environment variables
-export $(grep -v '^#' .env | xargs)
+if [ -n "$SUBVORTEX_LOCAL" ]; then
+    $DOCKER_CMD -f ../docker-compose.local.yml down validator-redis --rmi all
+else
+    $DOCKER_CMD -f ../docker-compose.yml down validator-redis --rmi all
+fi
 
-# Remove the image
-$DOCKER_CMD -f ../docker-compose.yml down miner-redis --rmi all
-
-echo "✅ Validator teardown completed successfully."
+echo "✅ Validator Redis teardown completed successfully."

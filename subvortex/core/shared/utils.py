@@ -20,7 +20,6 @@ import re
 import json
 import time
 import codecs
-import subprocess
 import bittensor.utils.btlogging as btul
 from os import path
 
@@ -29,31 +28,6 @@ from os import path
 CHECK_UPDATE_FREQUENCY = 5 * 60
 
 here = path.abspath(path.dirname(__file__))
-
-
-def get_redis_password(
-    redis_password: str = None, redis_conf: str = "/etc/redis/redis.conf"
-) -> str:
-    redis_password = os.getenv("REDIS_PASSWORD") or redis_password
-    if redis_password is None:
-        try:
-            redis_password = subprocess.check_output(
-                ["sudo", "grep", "-Po", "^requirepass \K.*", redis_conf],
-                text=True,
-            ).strip()
-        except Exception as e:
-            btul.logging.error(
-                f"No Redis password set in Redis config file: {redis_conf}"
-            )
-    if redis_password == "" or redis_password is None:
-        btul.logging.error(
-            "Redis password not found! This must be set as either an env var `REDIS_PASSWORD`, passed via CLI in `--database.redis_pasword`, or parsed from /etc/redis/redis.conf."
-            "Please ensure it is set by running `. ./scripts/redis/set_redis_password.sh` and try again."
-            f"You may also run: `sudo grep -Po '^requirepass \K.*' {redis_conf}` to discover this manually and pass to the cli."
-        )
-        exit(1)
-
-    return redis_password
 
 
 def should_upgrade(auto_update: bool, last_upgrade_check: float):

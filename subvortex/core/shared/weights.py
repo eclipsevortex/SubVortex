@@ -14,10 +14,10 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import numpy as np
 import bittensor.core.subtensor as btcs
 import bittensor.utils.btlogging as btul
 import bittensor_wallet.wallet as btw
-from torch import Tensor
 from typing import Tuple
 
 from subvortex.core.constants import SET_WEIGHTS_RETRY
@@ -62,8 +62,8 @@ def set_weights(
     subtensor: "btcs.Subtensor",
     wallet: "btw.Wallet",
     netuid: int,
-    uids: "Tensor",
-    weights: "Tensor",
+    uids: "np.NDArray",
+    weights: "np.NDArray",
     version_key: int,
     wait_for_inclusion: bool = False,
     wait_for_finalization: bool = False,
@@ -85,8 +85,8 @@ def set_weights(
         subtensor (btcs.Subtensor): The Bittensor object managing the blockchain connection.
         wallet (btw.Wallet): The miner's wallet holding cryptographic information.
         netuid (int): The unique identifier for the chain subnet.
-        uids (torch.Tensor): miners UIDs on the network.
-        weights (torch.Tensor): weights to sent for UIDs on the network.
+        uids (np.NDArray): miners UIDs on the network.
+        weights (np.NDArray): weights to sent for UIDs on the network.
         metagraph (btcm.Metagraph): Bittensor metagraph.
         wandb_on (bool, optional): Flag to determine if logging to Weights & Biases is enabled. Defaults to False.
         wait_for_inclusion (bool, optional): Wether to wait for the extrinsic to enter a block.

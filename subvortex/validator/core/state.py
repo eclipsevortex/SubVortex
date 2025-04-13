@@ -18,8 +18,8 @@ import os
 import re
 import copy
 import wandb
-import torch
 import shutil
+import numpy as np
 import bittensor.utils.btlogging as btul
 from wandb.apis import public
 from typing import List
@@ -28,10 +28,10 @@ from datetime import datetime
 from subvortex.core.constants import TESTNET_SUBNET_UID, MAIN_SUBNET_UID
 
 import subvortex.validator.core as validator
+from subvortex.core.version import to_spec_version
 from subvortex.validator.version import __version__ as THIS_VERSION
 from subvortex.validator.core.models import Miner
 from subvortex.validator.core.miner import resync_miners
-from subvortex.validator.core.version import to_spec_version
 
 THIS_SPEC_VERSION = to_spec_version(THIS_VERSION)
 
@@ -93,7 +93,7 @@ def resync_metagraph(self: "validator.neuron.neuron"):
             "resync_metagraph() Metagraph has grown, adding new hotkeys and moving averages"
         )
         # Update the size of the moving average scores.
-        new_moving_average = torch.zeros((self.metagraph.n)).to(self.device)
+        new_moving_average = np.zeros((self.metagraph.n))
         min_len = min(len(self.metagraph.hotkeys), len(self.moving_averaged_scores))
         new_moving_average[:min_len] = self.moving_averaged_scores[:min_len]
         self.moving_averaged_scores = new_moving_average
@@ -106,38 +106,40 @@ def save_state(self):
     btul.logging.info("save_state()")
     try:
         neuron_state_dict = {
-            "neuron_weights": self.moving_averaged_scores.to("cpu").tolist(),
+            "neuron_weights": self.moving_averaged_scores,
         }
-        torch.save(neuron_state_dict, f"{self.config.neuron.full_path}/model.torch")
-        btul.logging.success(f"Save model {self.config.neuron.full_path }/model.torch")
+
+        # Save the state using numpy's .npz format
+        np.savez(f"{self.config.neuron.full_path}/model.npz", **neuron_state_dict)
+        btul.logging.success(f"Saved model {self.config.neuron.full_path}/model.npz")
     except Exception as e:
         btul.logging.warning(f"Failed to save model with error: {e}")
-
-    # empty cache
-    torch.cuda.empty_cache()
 
 
 def load_state(self):
     r"""Load hotkeys and moving average scores from filesystem."""
     btul.logging.info("load_state()")
     try:
-        state_dict = torch.load(f"{self.config.neuron.full_path}/model.torch")
-        neuron_weights = torch.tensor(state_dict["neuron_weights"])
+        # Load state_dict from a .npz file
+        state_file = f"{self.config.neuron.full_path}/model.npz"
+        if not os.path.exists(state_file):
+            raise FileNotFoundError(f"{state_file} does not exist.")
+
+        state_dict = np.load(state_file)
+        neuron_weights = state_dict["neuron_weights"]
+ 
         # Check to ensure that the size of the neruon weights matches the metagraph size.
         if neuron_weights.shape != (self.metagraph.n,):
             btul.logging.warning(
-                f"Neuron weights shape {neuron_weights.shape} does not match metagraph n {self.metagraph.n}"
-                "Populating new moving_averaged_scores IDs with zeros"
+                f"Neuron weights shape {neuron_weights.shape} does not match metagraph n {self.metagraph.n}."
+                " Populating new moving_averaged_scores IDs with zeros."
             )
-            self.moving_averaged_scores[: len(neuron_weights)] = neuron_weights.to(
-                self.device
-            )
-        # Check for nans in saved state dict
-        elif not torch.isnan(neuron_weights).any():
-            self.moving_averaged_scores = neuron_weights.to(self.device)
-        btul.logging.success(
-            f"Reloaded model {self.config.neuron.full_path }/model.torch"
-        )
+            self.moving_averaged_scores[: len(neuron_weights)] = neuron_weights
+        # Check for NaNs in saved state dict
+        elif not np.isnan(neuron_weights).any():
+            self.moving_averaged_scores = neuron_weights
+
+        btul.logging.success(f"Reloaded model {self.config.neuron.full_path}/model.npz")
     except Exception as e:
         btul.logging.warning(f"Failed to load model with error: {e}")
 

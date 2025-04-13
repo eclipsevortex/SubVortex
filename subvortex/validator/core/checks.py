@@ -14,6 +14,7 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import os
 import asyncio
 import subprocess
 from redis import asyncio as aioredis
@@ -47,8 +48,8 @@ def _check_redis_settings(redis_conf_path):
         _check_redis_setting(redis_conf_path, setting, expected_values)
 
 
-async def _check_redis_connection(redis_conf_path, port):
-    redis_password = _get_redis_password(redis_conf_path)
+async def check_database_connection(port, redis_conf: str = "/etc/redis/redis.conf"):
+    redis_password = _get_redis_password(redis_conf)
 
     assert port is not None, "Redis server port not found"
     try:
@@ -146,11 +147,16 @@ def _get_redis_setting(file_path, setting):
 
 def _get_redis_password(redis_conf_path):
     try:
+        redis_password = os.getenv("SUBVORTEX_REDIS_PASSWORD") or redis_password
+        if redis_password:
+            return redis_password
+
         cmd = f"sudo grep -Po '^requirepass \K.*' {redis_conf_path}"
         result = subprocess.run(
             cmd, shell=True, text=True, capture_output=True, check=True
         )
         return result.stdout.strip()
+
     except subprocess.CalledProcessError as e:
         assert False, f"Command failed: {e}"
     except Exception as e:

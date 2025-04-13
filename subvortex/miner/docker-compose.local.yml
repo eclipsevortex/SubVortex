@@ -1,0 +1,24 @@
+services:
+  miner-neuron:
+    build:
+      context: ../../
+      dockerfile: ./subvortex/miner/neuron/Dockerfile
+      additional_contexts:
+        wheelbuilder: docker-image://subvortex/subvortex-wheel-builder:latest
+    container_name: subvortex-miner-neuron
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    env_file:
+      - ./neuron/.env
+    volumes:
+      - ~/.bittensor/wallets:/root/.bittensor/wallets
+      - /var/log:/app/logs
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+networks:
+  subvortex:
+    driver: bridge

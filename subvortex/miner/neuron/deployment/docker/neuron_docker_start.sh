@@ -16,6 +16,6 @@ else
     exit 1
 fi
 
-$DOCKER_CMD -f ../docker-compose.yml up miner -d --no-deps
+$DOCKER_CMD -f ../docker-compose.yml up miner-neuron -d --no-deps
 
 echo "✅ Miner started successfully"

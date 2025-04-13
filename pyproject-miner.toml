@@ -48,6 +48,7 @@ include = ["subvortex", "subvortex.core", "subvortex.miner"]
     "**/requirements.txt",
     "**/README.md",
     "**/env.template",
+    "**/docker-compose.yml",
 ]
 "subvortex.core" = ["**/*.py"]
 

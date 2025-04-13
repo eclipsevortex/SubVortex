@@ -16,6 +16,6 @@ else
     exit 1
 fi
 
-$DOCKER_CMD -f ../docker-compose.yml down miner --rmi all
+$DOCKER_CMD -f ../docker-compose.yml down miner-neuron --rmi all
 
 echo "✅ Miner teardown completed successfully."

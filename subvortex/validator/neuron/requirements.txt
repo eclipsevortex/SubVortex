@@ -8,5 +8,4 @@ python-dotenv==1.0.1
 redis==5.0.1
 setuptools==70.0.0
 substrate_interface==1.7.9
-torch==2.5.1
 wandb==0.18.7

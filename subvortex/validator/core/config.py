@@ -15,7 +15,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import os
-import torch
 import argparse
 import datetime
 import bittensor.core.config as btcc
@@ -127,12 +126,6 @@ def add_args(cls, parser):
         default="subvortex_validator",
     )
     parser.add_argument(
-        "--neuron.device",
-        type=str,
-        help="Device to run the validator on.",
-        default="cuda" if torch.cuda.is_available() else "cpu",
-    )
-    parser.add_argument(
         "--neuron.epoch_length",
         type=int,
         help="The default epoch length (how often we set weights, measured in 12 second blocks).",
@@ -206,7 +199,7 @@ def add_args(cls, parser):
         help="The database number of the redis database.",
     )
     parser.add_argument(
-        "--database.redis_password",
+        "--database.password",
         type=str,
         default=None,
         help="The redis password.",

@@ -23,8 +23,6 @@ from substrateinterface import SubstrateInterface
 from subvortex.core.shared.checks import check_registration
 from subvortex.core.shared.utils import should_upgrade
 
-from subvortex.miner.core.version import VersionControl
-
 
 def run(self):
     """
@@ -82,15 +80,6 @@ def run(self):
             if current_block % 100 == 0:
                 check_registration(self.subtensor, self.wallet, self.config.netuid)
 
-            if should_upgrade(self.config.auto_update, self.last_upgrade_check):
-                btul.logging.debug("Checking upgrade")
-                must_restart = self.version_control.upgrade()
-                if must_restart:
-                    self.version_control.restart()
-                    return
-
-                self.last_upgrade_check = time.time()
-
             if self.should_exit:
                 return True
 
@@ -100,11 +89,6 @@ def run(self):
             return True
 
     netuid = self.config.netuid
-
-    self.version_control = VersionControl()
-
-    # Keep a track of last upgrade check
-    self.last_upgrade_check = 0
 
     while not self.should_exit:
         try:

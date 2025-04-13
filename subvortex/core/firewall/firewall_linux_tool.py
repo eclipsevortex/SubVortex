@@ -23,7 +23,7 @@ class FirewallLinuxTool(FirewallTool):
     def rule_exists(
         self, ip=None, sport=None, dport=None, protocol="tcp", allow=True, queue=None
     ):
-        commands = ["sudo", "iptables", "-C", "INPUT"]
+        commands = ["iptables", "-C", "INPUT"]
 
         if ip is not None:
             commands += ["-s", ip]
@@ -47,7 +47,7 @@ class FirewallLinuxTool(FirewallTool):
         return result.returncode == 0
 
     def flush_input_chain(self):
-        commands = ["sudo", "iptables", "-F", "INPUT"]
+        commands = ["iptables", "-F", "INPUT"]
 
         subprocess.run(
             commands,
@@ -58,7 +58,7 @@ class FirewallLinuxTool(FirewallTool):
         return True
 
     def create_deny_policy(self):
-        commands = ["sudo", "iptables", "-P", "INPUT", "DROP"]
+        commands = ["iptables", "-P", "INPUT", "DROP"]
 
         subprocess.run(
             commands,
@@ -69,7 +69,7 @@ class FirewallLinuxTool(FirewallTool):
         return True
 
     def create_allow_policy(self):
-        commands = ["sudo", "iptables", "-P", "INPUT", "ACCEPT"]
+        commands = ["iptables", "-P", "INPUT", "ACCEPT"]
 
         subprocess.run(
             commands,
@@ -80,7 +80,7 @@ class FirewallLinuxTool(FirewallTool):
         return True
 
     def create_allow_loopback_rule(self):
-        commands = ["sudo", "iptables", "-C", "INPUT", "-i", "lo", "-j", "ACCEPT"]
+        commands = ["iptables", "-C", "INPUT", "-i", "lo", "-j", "ACCEPT"]
         result = subprocess.run(
             commands, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
@@ -88,7 +88,7 @@ class FirewallLinuxTool(FirewallTool):
         if result.returncode == 0:
             return
 
-        commands = ["sudo", "iptables", "-A", "INPUT", "-i", "lo", "-j", "ACCEPT"]
+        commands = ["iptables", "-A", "INPUT", "-i", "lo", "-j", "ACCEPT"]
 
         subprocess.run(
             commands,
@@ -109,7 +109,7 @@ class FirewallLinuxTool(FirewallTool):
         ):
             return False
 
-        commands = ["sudo", "iptables", "-A", "INPUT"]
+        commands = ["iptables", "-A", "INPUT"]
         if ip is not None:
             commands += ["-s", ip]
 
@@ -143,7 +143,7 @@ class FirewallLinuxTool(FirewallTool):
         ):
             return False
 
-        commands = ["sudo", "iptables", "-I", "INPUT"]
+        commands = ["iptables", "-I", "INPUT"]
         if ip is not None:
             commands += ["-s", ip]
 
@@ -176,7 +176,7 @@ class FirewallLinuxTool(FirewallTool):
         ):
             return False
 
-        commands = ["sudo", "iptables", "-D", "INPUT"]
+        commands = ["iptables", "-D", "INPUT"]
         if ip is not None:
             commands += ["-s", ip]
 

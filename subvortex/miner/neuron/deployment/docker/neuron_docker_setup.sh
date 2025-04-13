@@ -16,7 +16,6 @@ else
     exit 1
 fi
 
-# Build the image
-$DOCKER_CMD -f ../docker-compose.yml build miner
+$DOCKER_CMD -f ../docker-compose.yml build miner-neuron
 
 echo "✅ Miner setup successfully"

@@ -14,11 +14,11 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import torch
 import time
 import random
 import asyncio
 import traceback
+import numpy as np
 import bittensor.core.chain_data as btccd
 import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
@@ -290,7 +290,7 @@ async def challenge_data(self):
     challenge = create_subtensor_challenge(self.subtensor)
     if not challenge:
         return
-    
+
     btul.logging.debug(
         f"[{CHALLENGE_NAME}] Challenge created - Block: {challenge[0]}, Netuid: {challenge[1]}, Uid: {challenge[2]}: Property: {challenge[3]}, Value: {challenge[4]}"
     )
@@ -316,9 +316,7 @@ async def challenge_data(self):
         reasons = await asyncio.gather(*tasks)
 
     # Initialise the rewards object
-    rewards: torch.FloatTensor = torch.zeros(len(uids), dtype=torch.float32).to(
-        self.device
-    )
+    rewards = np.zeros(len(uids), dtype=np.float32)
 
     btul.logging.info(f"[{CHALLENGE_NAME}] Starting evaluation")
 
@@ -389,23 +387,16 @@ async def challenge_data(self):
     btul.logging.trace(f"[{CHALLENGE_NAME}] Rewards: {rewards}")
 
     # Compute forward pass rewards
-    scattered_rewards: torch.FloatTensor = (
-        self.moving_averaged_scores.to(self.device)
-        .scatter(
-            0,
-            torch.tensor(uids).to(self.device),
-            rewards.to(self.device),
-        )
-        .to(self.device)
-    )
+    scattered_rewards = self.moving_averaged_scores.copy()
+    np.put(scattered_rewards, uids, rewards)
     btul.logging.trace(f"[{CHALLENGE_NAME}] Scattered rewards: {scattered_rewards}")
 
     # Update moving_averaged_scores with rewards produced by this step.
     # alpha of 0.05 means that each new score replaces 5% of the weight of the previous weights
     alpha: float = 0.1
-    self.moving_averaged_scores = alpha * scattered_rewards + (
-        1 - alpha
-    ) * self.moving_averaged_scores.to(self.device)
+    self.moving_averaged_scores = (
+        alpha * scattered_rewards + (1 - alpha) * self.moving_averaged_scores
+    )
     btul.logging.trace(
         f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
     )

@@ -20,10 +20,6 @@ if pm2 list | grep -q "$SERVICE_NAME"; then
     pm2 delete $SERVICE_NAME
 fi
 
-echo $SCRIPT_DIR
-
-ls .
-
 # Uninstall dependencies if virtual environment exists
 if [[ -d "venv" ]]; then
     echo "Activating virtual environment to uninstall dependencies..."

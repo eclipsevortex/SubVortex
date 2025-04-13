@@ -34,4 +34,11 @@ include-package-data = true
 where = ["."]
 
 [tool.setuptools.package-data]
-"*" = ["deployment/**/*", "requirements.txt", "README.md", "pyproject.toml", "env.template"]
+"*" = [
+    "deployment/**/*",
+    "requirements.txt",
+    "README.md",
+    "pyproject.toml",
+    "env.template",
+    "docker-compose.yml",
+]

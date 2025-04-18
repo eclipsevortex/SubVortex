@@ -147,7 +147,7 @@ def _get_redis_setting(file_path, setting):
 
 def _get_redis_password(redis_conf_path):
     try:
-        redis_password = os.getenv("SUBVORTEX_REDIS_PASSWORD") or redis_password
+        redis_password = os.getenv("SUBVORTEX_REDIS_PASSWORD")
         if redis_password:
             return redis_password
 

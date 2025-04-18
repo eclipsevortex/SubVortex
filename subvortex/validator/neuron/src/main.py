@@ -14,7 +14,6 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
 import time
 import copy
 import asyncio
@@ -152,7 +151,6 @@ class Validator:
             db=self.config.database.index,
             password=self.config.database.password,
         )
-        check_database_connection(port=self.config.database.port)
         self.db_semaphore = asyncio.Semaphore()
 
         # Init Weights.
@@ -189,8 +187,8 @@ class Validator:
     async def run(self):
         btul.logging.info("run()")
 
-        # Initi versioin control
-        dump_path = self.config.database.redis_dump_path
+        # Check if the connection to the database is successful
+        await check_database_connection(port=self.config.database.port)
 
         # File monitor
         self.file_monitor = FileMonitor()

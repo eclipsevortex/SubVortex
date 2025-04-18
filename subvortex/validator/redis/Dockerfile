@@ -1,6 +1,5 @@
 FROM redis:7.2.4-alpine
 
-
 # ---------- Metadata & Labels ----------
 ARG MAINTAINER="subvortex.bt@gmail.com"
 ARG VERSION="0.0.0"

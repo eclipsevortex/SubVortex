@@ -20,10 +20,12 @@ FROM python:3.11-slim
 # ---------- Metadata & Labels ----------
 ARG MAINTAINER="subvortex.bt@gmail.com"
 ARG VERSION="0.0.0"
+ARG ROLE_VERSION="0.0.0"
 ARG COMPONENT_VERSION="0.0.0"
 LABEL maintainer=$MAINTAINER
 LABEL version=$VERSION
-LABEL validator.version=$COMPONENT_VERSION
+LABEL validator.version=$ROLE_VERSION
+LABEL validator.neuron.version=$COMPONENT_VERSION
 
 # ---------- Environment ----------
 ENV PYTHONUNBUFFERED=1

@@ -81,11 +81,6 @@ jobs:
 
           echo "🔍 Final matrix ready."
 
-      - name: Debut Section
-        run: |
-          echo "Event: ${{ github.event_name }}"
-          echo "Event Type: ${{ github.event.ref_type }}"
-
   wheel-builder:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -182,10 +177,31 @@ jobs:
           SERVICE=${{ matrix.service }}
           IMAGE="subvortex/subvortex-$COMP-$SERVICE"
           WHEEL_IMAGE="${{ needs.wheel-builder.outputs.tag }}"
-          RAW_VERSION_TAG="${{ steps.taginfo.outputs.version_tag }}"
-          VERSION_TAG="${RAW_VERSION_TAG#v}"
+          VERSION_TAG="${{ steps.taginfo.outputs.version_tag }}"
+          VERSION="${VERSION_TAG#v}"
           DOCKERFILE="subvortex/$COMP/$SERVICE/Dockerfile"
 
+          echo "📦 Extracting role version from subvortex/$COMP/version.py"
+          ROLE_VERSION=$(python -c "import ast; f=open('subvortex/$COMP/version.py'); print([n.value.s for n in ast.walk(ast.parse(f.read())) if isinstance(n, ast.Assign) and n.targets[0].id == '__version__'][0])")
+
+          echo "🔍 Searching for component version..."
+          COMPONENT_PATH="subvortex/$COMP/$SERVICE"
+          if [ -f "$COMPONENT_PATH/pyproject.toml" ]; then
+            echo "✅ Found pyproject.toml"
+            COMPONENT_VERSION=$(grep -E '^version\s*=' "$COMPONENT_PATH/pyproject.toml" | head -1 | sed -E 's/version\s*=\s*"([^"]+)"/\1/')
+          elif [ -f "$COMPONENT_PATH/version.py" ]; then
+            echo "✅ Found version.py"
+            COMPONENT_VERSION=$(python -c "import ast; f=open('$COMPONENT_PATH/version.py'); print([n.value.s for n in ast.walk(ast.parse(f.read())) if isinstance(n, ast.Assign) and n.targets[0].id == '__version__'][0])")
+          else
+            echo "❌ No version file found for component"
+            exit 1
+          fi
+
+          echo "🧾 Final versions:"
+          echo "VERSION=$VERSION"
+          echo "ROLE_VERSION=$ROLE_VERSION"
+          echo "COMPONENT_VERSION=$COMPONENT_VERSION"
+          
           echo "🚀 Building image $IMAGE:$VERSION_TAG"
 
           docker buildx build \
@@ -193,6 +209,7 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             --build-context wheelbuilder=docker-image://$WHEEL_IMAGE \
             --build-arg VERSION=$VERSION_TAG \
+            --build-arg ROLE_VERSION=$VERSION_TAG \
             --build-arg COMPONENT_VERSION=$VERSION_TAG \
             --cache-from=type=gha,scope=wheels_${COMP}_${SERVICE}_${ARCH} \
             --cache-to=type=gha,mode=max,scope=wheels_${COMP}_${SERVICE}_${ARCH} \

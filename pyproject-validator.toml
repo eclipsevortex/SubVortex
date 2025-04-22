@@ -45,6 +45,7 @@ include = ["scripts", "subvortex", "subvortex.core", "subvortex.validator"]
 "subvortex.validator" = [
     "**/*.py",
     "**/deployment/**/*",
+    "**/scripts/**/*",
     "**/pyproject.toml",
     "**/requirements.txt",
     "**/README.md",

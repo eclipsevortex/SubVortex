@@ -44,6 +44,7 @@ include = ["subvortex", "subvortex.core", "subvortex.miner"]
 "subvortex.miner" = [
     "**/*.py",
     "**/deployment/**/*",
+    "**/scripts/**/*",
     "**/pyproject.toml",
     "**/requirements.txt",
     "**/README.md",

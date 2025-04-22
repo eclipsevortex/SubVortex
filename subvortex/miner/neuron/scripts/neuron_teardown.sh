@@ -2,6 +2,10 @@
 
 set -e
 
+# Determine script directory dynamically to ensure everything runs in ./scripts/api/
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
 # Help function
 show_help() {
     echo "Usage: $0 [--execution=process|container|service]"
@@ -44,14 +48,14 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Load environment variables
-export $(grep -v '^#' ./subvortex/miner/neuron/.env | xargs)
+export $(grep -v '^#' .env | xargs)
 
 # 🧠 Function: Setup for process mode
 setup_process() {
     echo "⚙️  Setting up for 'process' mode..."
     
     # Setup the auto upgrade as process
-    ./subvortex/miner/neuron/deployment/process/neuron_process_teardown.sh
+    ./deployment/process/neuron_process_teardown.sh
     
     # Add any other logic specific to process mode here
     echo "✅ Process setup complete."
@@ -62,7 +66,7 @@ setup_container() {
     echo "🐳 Setting up for 'container' mode..."
     
     # Setup the auto upgrade as container
-    ./subvortex/miner/neuron/deployment/docker/neuron_docker_teardown.sh
+    ./deployment/docker/neuron_docker_teardown.sh
     
     # Add any other container-specific logic here
     echo "✅ Container setup complete."
@@ -73,7 +77,7 @@ setup_service() {
     echo "🧩 Setting up for 'service' mode..."
     
     # Setup the auto upgrade as service
-    ./subvortex/miner/neuron/deployment/service/neuron_service_teardown.sh
+    ./deployment/service/neuron_service_teardown.sh
     
     # Add logic for systemd, service checks, etc. if needed
     echo "✅ Service setup complete."

@@ -2,6 +2,10 @@
 
 set -e
 
+# Determine script directory dynamically to ensure everything runs in ./scripts/api/
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
 # Help function
 show_help() {
     echo "Usage: $0 [--execution=process|container|service]"
@@ -44,9 +48,9 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Setup and start redis 
-./subvortex/validator/redis/scripts/redis_setup.sh --execution $EXECUTION
-./subvortex/validator/redis/scripts/redis_start.sh --execution $EXECUTION
+./redis/scripts/redis_setup.sh --execution $EXECUTION
+./redis/scripts/redis_start.sh --execution $EXECUTION
 
 # Setup and start neuron
-./subvortex/validator/neuron/scripts/neuron_setup.sh --execution $EXECUTION
-./subvortex/validator/neuron/scripts/neuron_start.sh --execution $EXECUTION
+./neuron/scripts/neuron_setup.sh --execution $EXECUTION
+./neuron/scripts/neuron_start.sh --execution $EXECUTION

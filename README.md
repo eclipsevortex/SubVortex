@@ -32,19 +32,19 @@
 - [Firewall](#firewall)
 - [Value Proposition](#value-proposition)
 - [Team Composition](#team-composition)
-- [Road Map](#road-map)
 - [Credits](#credits)
 - [Conclusion](#conclusion)
 - [Machine Requirements](#machine-requirements)
   - [Validator](#validator-requirements)
   - [Miner](#miner-requirements)
-- [Fast Setup and Run](#fast-setup-and-run)
-  - [Validator](#validator-fast-setup-and-run)
-  - [Miner](#miner-fast-setup-and-run)
+- [Quick Start](#quick-start)
+  - [Validator](#quick-start-validator)
+  - [Miner](#quick-start-miner)
+- [Quick Stop](#quick-stop)
+  - [Validator](#quick-stop-validator)
+  - [Miner](#quick-stop-miner)
 - [Installation](#installation)
-  - [Install SubVortex](#install-subvortex)
   - [Install Subtensor](#install-local-subtensor)
-  - [Install Redis](#install-redis)
   - [Install Wandb](#install-wandb)
 - [Registering your wallet](#registering-your-wallet)
 - [Running a Miner](#running-a-miner)
@@ -156,31 +156,6 @@ Team timezone
 - **tww9** - MST (Canada)
 - **HcL-CO** - EST (Canada)
 
-## Road Map
-
-### Phase 1
-
-- Create a subnet in testnet and perform internal testing of the incentive mechanism
-- Register subnet on mainnet
-- Release preliminary information publicly
-
-### Phase 2:
-
-- Internal testing on mainnet. Bug fixes, etc.
-- Public launch and allow key registrations.
-- Performance-based emission structure
-
-### Phase 3:
-
-- Public Frontend
-- Public Backend
-
-### Phase 4
-
-- Public SubVortex load balancer
-
-> Note: The Road Map will be updated if there are any changes
-
 ## Credits
 
 Bittensor technology is still new and promising, and participants are eager to support each other. That's why the SubVortex team would like to express our gratitude to everyone who has helped us reach where we are today:
@@ -219,72 +194,67 @@ For validator, you need a CPU machine (no GPU needed!).
 
 For more information, take a look on the [min requirements](./min_compute.yml)
 
-## Fast Setup and Run
+## 🚀 Quick Start <a id="quick-start"></a>
 
-For a quick and seamless setup, we provide a comprehensive script that installs and runs a miner or validator, taking care of everything from installation to execution.
+Before running a validator and/or a miner, you have to
 
-### Setup and run a miner <a id="miner-fast-setup-and-run"></a>
+1. Create or recreate your wallets (coldkey + hotkey) - [more details](#registering-your-wallet)
+2. Register to the subnet - [more details](#registering-your-wallet)
+3. Copy the template to .env in the same directory and update the values for your specific setup.
 
-> **IMPORTANT** <br />
-> To use the full script, you have to follow the steps to install the subnet (**EXCEPT** executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
+Each `.env` file maps directly to the arguments used by the service. Use the format `SUBVORTEX_<ARG>` based on the command-line flag. For example, `--database.password` becomes `SUBVORTEX_DATABASE_PASSWORD`.
 
-Be sure you are in the **SubVortex** directory, if not
+There’s one `env.template` per service (e.g. miner/neuron/env.template, validator/redis/env.template, etc.), so make sure to configure each role accordingly.
 
-```
-cd SubVortex
-```
+### Validator <a id="quick-start-validator"></a>
 
-Then, you can run the script
+To start the SubVortex validator in a quick way, you can run
 
-```
-./scripts/setup_and_run.sh -t miner
-```
-
-> IMPORTANT
->
-> - If you any prompts, just confirm them
-> - Other options are available, pleaser take a look
-
-Check the available options by running
-
-```
-./scripts/setup_and_run.sh -h
+```bash
+./subvortex/validator/scripts/quick_start.sh
 ```
 
-Once the script is successfully executed, you'll have a miner up and running—nothing else required!
+It will install and start the validator as service which is the default mode.
 
-Of course, if you have specific settings in mind, you can use this script as a base and update anything you want to tailor your experience to your needs.
+Use `-h` to see the options
 
-Finally, if you prefer setup and run the miner in a more controlled way, you can follow the different sections below.
+### Miner <a id="quick-start-miner"></a>
 
-### Setup and run a validator <a id="validator-fast-setup-and-run"></a>
+To start the SubVortex miner in a quick way, you can run
 
-> **IMPORTANT** <br />
-> To use the full script, you have to follow the steps to install the subnet (**EXCEPT** executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
-
-Be sure you are in the **SubVortex** directory, if not
-
-```
-cd SubVortex
+```bash
+./subvortex/miner/scripts/quick_start.sh
 ```
 
-Then, you can run the script
+It will install and start the miner as service which is the default mode.
 
+Use `-h` to see the options
+
+## 🛑 Quick Stop <a id="quick-stop"></a>
+
+### Validator <a id="quick-stop-validator"></a>
+
+To stop the SubVortex validator in a quick way, you can run
+
+```bash
+./subvortex/validator/scripts/quick_stop.sh
 ```
-./scripts/setup_and_run.sh -t validator
+
+It will stop and teardown the validator.
+
+Use `-h` to see the options
+
+### Miner <a id="quick-stop-miner"></a>
+
+To stop the SubVortex miner in a quick way, you can run
+
+```bash
+./subvortex/miner/scripts/quick_stop.sh
 ```
 
-Check the available options by running
+It will stop and teardown the miner.
 
-```
-./scripts/setup_and_run.sh -h
-```
-
-Once the script is successfully executed, you'll have a validator up and running—nothing else required!
-
-Of course, if you have specific settings in mind, you can use this script as a base and update anything you want to tailor your experience to your needs.
-
-Finally, if you prefer setup and run the validator in a more controlled way, you can follow the different sections below.
+Use `-h` to see the options
 
 ## Installation
 
@@ -293,17 +263,9 @@ Finally, if you prefer setup and run the validator in a more controlled way, you
 - Local Subtensor is mandatory for all miners, and highly recommended for validators.
 - Validators will need to install and configure Redis
 
-### Install SubVortex
-
-To install the subnet, refer to the [Subnet guide](./scripts/subnet/README.md)
-
 ### Install Local Subtensor
 
 To install a local subtensor, refer to the [Subtensor guide](./scripts/subtensor/README.md)
-
-### Install Redis
-
-To install redis, refer to the [Redis guide](./scripts/redis/README.md)
 
 ### Install Wandb
 

@@ -22,7 +22,7 @@ fi
 if [ -n "$SUBVORTEX_LOCAL" ]; then
     $DOCKER_CMD -f ../docker-compose.local.yml up validator-neuron -d --no-deps
 else
-    $DOCKER_CMD -f ../docker-compose.local.yml up validator-neuron -d --no-deps
+    $DOCKER_CMD -f ../docker-compose.yml up validator-neuron -d --no-deps
 fi
 
 echo "✅ Validator started successfully"

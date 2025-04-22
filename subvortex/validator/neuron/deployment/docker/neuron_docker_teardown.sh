@@ -22,7 +22,7 @@ fi
 if [ -n "$SUBVORTEX_LOCAL" ]; then
     $DOCKER_CMD -f ../docker-compose.local.yml down validator-neuron --rmi all
 else
-    $DOCKER_CMD -f ../docker-compose.local.yml down validator-neuron --rmi all
+    $DOCKER_CMD -f ../docker-compose.yml down validator-neuron --rmi all
 fi
 
 echo "✅ Validator teardown completed successfully."

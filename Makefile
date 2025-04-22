@@ -2,6 +2,11 @@
 # Config
 # =====================
 
+# Export environment variables to all targets
+include .env
+DOCKER_PASSWORD := $(SUBVORTEX_DOCKER_TOKEN)
+export DOCKER_PASSWORD
+
 # Actions per component
 ACTIONS_miner := bump-major bump-minor bump-patch bump-alpha bump-rc
 ACTIONS_validator := bump-major bump-minor bump-patch bump-alpha bump-rc
@@ -251,7 +256,7 @@ unprerelease:
 		for service in $$services; do \
 			service_path="$$comp/$$service"; \
 			if [ -f "$$service_path/pyproject.toml" ] || [ -f "$$service_path/version.py" ]; then \
-				.github/scripts/on_release_deleted.sh "$$comp" "$$service" "$$TAG"; \
+				.github/scripts/on_release_deleted.sh "$$comp_name" "$$service" "$$TAG"; \
 			fi; \
 		done; \
 	done
@@ -288,7 +293,7 @@ unrelease:
 		for service in $$services; do \
 			service_path="$$comp/$$service"; \
 			if [ -f "$$service_path/pyproject.toml" ] || [ -f "$$service_path/version.py" ]; then \
-				.github/scripts/on_release_deleted.sh "$$comp" "$$service" "$$TAG"; \
+				.github/scripts/on_release_deleted.sh "$$comp_name" "$$service" "$$TAG"; \
 			fi; \
 		done; \
 	done

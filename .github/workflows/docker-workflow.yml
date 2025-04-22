@@ -2,6 +2,7 @@ name: Docker Build & Push All Services
 
 on:
   delete:
+      
   push:
     tags:
       - "v*.*.*"
@@ -10,6 +11,17 @@ on:
     types: [published]
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔍 Show event name and action
+        run: |
+          echo "ref ${{ github.ref }}"
+          echo "event_ref ${{ github.event.ref }}"
+          echo "ref_type: ${{ github.event.ref_type }}"
+          echo "event_name: ${{ github.event_name }}"
+          echo "event_action: ${{ github.event.action }}"
+
   discover:
     runs-on: ubuntu-latest
     outputs:
@@ -80,7 +92,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      
+
       - name: 🧠 Generate build tag from hash
         id: meta
         run: |

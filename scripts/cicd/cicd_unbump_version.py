@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import re
 from pathlib import Path
@@ -54,7 +55,7 @@ def parse_version(version):
     return major, minor, patch, suffix, int(suffix_num) if suffix_num else None
 
 def build_version_string(major, minor, patch, suffix=None, suffix_num=None):
-    if suffix:
+    if suffix and suffix_num and suffix_num > 0:
         return f"{major}.{minor}.{patch}-{suffix}.{suffix_num}"
     return f"{major}.{minor}.{patch}"
 
@@ -66,7 +67,6 @@ cmd = sys.argv[2] if len(sys.argv) > 2 else "patch"
 
 target_path = Path(target_path_str).resolve()
 
-# Try reading version from various files in the target path
 version, source = None, None
 
 if (target_path / "version.py").exists():
@@ -85,49 +85,43 @@ if not version:
 
 major, minor, patch, suffix, suffix_num = parse_version(version)
 
-# Handle bump or unbump
+# Apply downbump
 if cmd == "major":
-    major += 1
+    if major == 0:
+        print("❌ Cannot unbump major version below 0")
+        sys.exit(1)
+    major -= 1
     minor = patch = 0
     suffix = suffix_num = None
 elif cmd == "minor":
-    minor += 1
+    if minor == 0:
+        print("❌ Cannot unbump minor version below 0")
+        sys.exit(1)
+    minor -= 1
     patch = 0
     suffix = suffix_num = None
 elif cmd == "patch":
-    patch += 1
+    if patch == 0:
+        print("❌ Cannot unbump patch version below 0")
+        sys.exit(1)
+    patch -= 1
     suffix = suffix_num = None
-elif cmd == "unmajor":
-    if major > 0:
-        major -= 1
-        minor = patch = 0
-        suffix = suffix_num = None
-elif cmd == "unminor":
-    if minor > 0:
-        minor -= 1
-        patch = 0
-        suffix = suffix_num = None
-elif cmd == "unpatch":
-    if patch > 0:
-        patch -= 1
-        suffix = suffix_num = None
 elif cmd in ["alpha", "rc", "beta"]:
-    if suffix == cmd:
-        suffix_num = (suffix_num or 1) + 1
+    expected_suffix = cmd
+    if suffix != expected_suffix:
+        print(f"❌ Current suffix is not {expected_suffix}, cannot unbump")
+        sys.exit(1)
+    if suffix_num is None or suffix_num <= 1:
+        suffix = suffix_num = None
     else:
-        suffix = cmd
-        suffix_num = 1
-elif cmd == "new-prerelease":
-    suffix = suffix or "alpha"
-    suffix_num = (suffix_num or 0) + 1
+        suffix_num -= 1
 else:
-    print(f"❌ Unknown bump type: {cmd}")
+    print(f"❌ Unknown unbump type: {cmd}")
     sys.exit(1)
 
-# Compose new version
+# Write version back
 new_version = build_version_string(major, minor, patch, suffix, suffix_num)
 
-# Write version back
 if source == "version.py":
     write_version_to_comp_file(target_path, new_version)
 elif source == "VERSION":
@@ -135,4 +129,4 @@ elif source == "VERSION":
 elif source == "pyproject.toml":
     write_version_to_pyproject(target_path, new_version)
 
-print(f"✅ Version updated to: {new_version} ({source} in {target_path_str})")
+print(f"✅ Version downbumped to: {new_version} ({source} in {target_path_str})")

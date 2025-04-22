@@ -73,13 +73,16 @@ for FTAG in dev stable latest; do
   fi
 
   TARGET="${TARGET#v}"
-  if [[ -n "$TARGET" ]]; then
-    echo "🏷️  Re-tagging $IMAGE:$FTAG → $IMAGE:$TARGET"
-    docker buildx imagetools create \
-      --tag "$IMAGE:$FTAG" \
-      "$IMAGE:$TARGET"
-  else
-    echo "⚠️ No valid candidate for $FTAG — will attempt cleanup"
+  echo "🔍 Checking if image $IMAGE:$TARGET exists..."
+
+  if ! docker buildx imagetools inspect "$IMAGE:$TARGET" > /dev/null 2>&1; then
+    echo "⚠️ Image $IMAGE:$TARGET not found — deleting stale floating tag $FTAG"
     delete_docker_tag "$FTAG"
+    continue
   fi
+
+  echo "🏷️  Re-tagging $IMAGE:$FTAG → $IMAGE:$TARGET"
+  docker buildx imagetools create \
+    --tag "$IMAGE:$FTAG" \
+    "$IMAGE:$TARGET"
 done

@@ -214,56 +214,50 @@ clean: $(foreach comp,$(COMPONENTS),clean-$(comp))
 # ============
 # 🏷️ Tag/Untag
 # ============
-define create_github_tag
+TARGETS += tag untag
+tag: 
 	@VERSION=$(call get_version_shell, .); \
 	echo "🏷️ Creating GitHub tag v$$VERSION"; \
 	git tag -a "v$$VERSION" -m "Release version $$VERSION"; \
 	git push origin "v$$VERSION";
-endef
 
-define delete_github_tag
+untag: 
 	@VERSION=$(call get_version_shell, .); \
 	echo "🗑️ Deleting GitHub tag v$$VERSION"; \
 	git tag -d "v$$VERSION"; \
 	git push origin ":refs/tags/v$$VERSION";
-endef
-
-# Github
-$(foreach comp,$(COMPONENTS), \
-	$(eval TARGETS += tag-$(comp) untag-${comp}) \
-	$(eval tag-$(comp): ; $$(call create_github_tag,$(comp))) \
-	$(eval untag-$(comp): ; $$(call delete_github_tag,$(comp))) \
-)
-
-# Global
-tag: tag-auto_upgrader
-untag: untag-auto_upgrader
-
 
 # ====================
 # 🚀 Release/UnRelease
 # ====================
-define github_release
+TARGETS += release unrelease prerelease unprerelease
+unprerelease:
 	@VERSION=$$(cat VERSION); \
  	TAG=v$$VERSION; \
- 	echo "🚀 Creating GitHub release..."; \
- 	gh release create $$TAG \
- 		--title "$$TAG" \
- 		--notes "Release $$TAG" \
- 		--target $(CURRENT_BRANCH) \
- 		$(DIST_DIR)/*.tar.gz \
- 		$(DIST_DIR)/*.whl || true
-endef
+	\
+	(gh release view "$$TAG" &>/dev/null && \
+	  echo "🗑️  Deleting GitHub prerelease $$TAG..." && \
+	  gh release delete "$$TAG" --yes || \
+	  echo "⚠️ Failed to delete or prerelease not found — continuing..."); \
+	\
+	for comp in subvortex/*; do \
+		[ -d "$$comp" ] || continue; \
+		comp_name=$$(basename "$$comp"); \
+		case $$comp_name in \
+			miner) services="neuron" ;; \
+			validator) services="neuron redis" ;; \
+			*) services="$$comp_name" ;; \
+		esac; \
+		for service in $$services; do \
+			service_path="$$comp/$$service"; \
+			if [ -f "$$service_path/pyproject.toml" ] || [ -f "$$service_path/version.py" ]; then \
+				.github/scripts/on_release_deleted.sh "$$comp" "$$service" "$$TAG"; \
+			fi; \
+		done; \
+	done
 
-define github_unrelease
-	@COMP=$(1); \
-	VERSION=$$(call get_version,subvortex/$$$$COMP); \
-	echo "🗑️ Deleting GitHub release v$$VERSION for $$$$COMP"; \
-	gh release delete "v$$VERSION" --yes || true;
-endef
-
-define github_prerelease
- 	@VERSION=$$(cat VERSION); \
+prerelease:
+	@VERSION=$$(cat VERSION); \
  	TAG=v$$VERSION; \
  	echo "🚀 Creating GitHub prerelease..."; \
  	gh release create $$TAG \
@@ -273,33 +267,41 @@ define github_prerelease
  		--prerelease \
  		$(DIST_DIR)/*.tar.gz \
  		$(DIST_DIR)/*.whl || true
-endef
 
-define github_unprerelease
- 	@VERSION=$$(cat VERSION); \
+unrelease:
+	@VERSION=$$(cat VERSION); \
  	TAG=v$$VERSION; \
-	echo "🗑️ Deleting GitHub prerelease v$$VERSION"; \
-	gh release delete $$TAG --yes || true;
-endef
-
-# Auto-generate rules per component
-$(foreach comp,$(COMPONENTS), \
-  $(eval TARGETS += release-$(comp) prerelease-$(comp) unrelease-$(comp) unprerelease-$(comp)) \
-  $(eval release-github-$(comp): ; $$(call github_release,$(comp))) \
-  $(eval prerelease-github-$(comp): ; $$(call github_prerelease,$(comp))) \
-  $(eval unrelease-github-$(comp): ; $$(call github_unrelease,$(comp))) \
-  $(eval unprerelease-github-$(comp): ; $$(call github_unprerelease,$(comp))) \
-)
-
-# Githug
-release-github: $(foreach comp,$(COMPONENTS),release-github-$(comp))
-prerelease-github: $(foreach comp,$(COMPONENTS),prerelease-github-$(comp))
-unrelease-github: $(foreach comp,$(COMPONENTS),unrelease-github-$(comp))
-unprerelease-github: $(foreach comp,$(COMPONENTS),unprerelease-github-$(comp))
-
-# Global
-release: release-github
-unrelease: unrelease-github
+	\
+	(gh release view "$$TAG" &>/dev/null && \
+	  echo "🗑️  Deleting GitHub release $$TAG..." && \
+	  gh release delete "$$TAG" --yes || \
+	  echo "⚠️ Failed to delete or release not found — continuing..."); \
+	\
+	for comp in subvortex/*; do \
+		[ -d "$$comp" ] || continue; \
+		comp_name=$$(basename "$$comp"); \
+		case $$comp_name in \
+			miner) services="neuron" ;; \
+			validator) services="neuron redis" ;; \
+			*) services="$$comp_name" ;; \
+		esac; \
+		for service in $$services; do \
+			service_path="$$comp/$$service"; \
+			if [ -f "$$service_path/pyproject.toml" ] || [ -f "$$service_path/version.py" ]; then \
+				.github/scripts/on_release_deleted.sh "$$comp" "$$service" "$$TAG"; \
+			fi; \
+		done; \
+	done
+release:
+	@VERSION=$$(cat VERSION); \
+ 	TAG=v$$VERSION; \
+ 	echo "🚀 Creating GitHub release..."; \
+ 	gh release create $$TAG \
+ 		--title "$$TAG" \
+ 		--notes "Release $$TAG" \
+ 		--target $(CURRENT_BRANCH) \
+ 		$(DIST_DIR)/*.tar.gz \
+ 		$(DIST_DIR)/*.whl || true
 
 # =====================
 # Add the last target
@@ -339,40 +341,15 @@ help:
 	@echo "  build                         – Build all components"
 	@echo "  clean                         – Clean all components"
 	@echo ""
-	@echo "  build-[role]                  – Build [role]"
-	@echo "  clean-[role]                  – Clean [role]"
-	@echo ""
-	@echo "  build-[executor]              – Build all components using [executor]"
-	@echo "  clean-[executor]              – Clean all components using [executor]"
-	@echo ""
-	@echo "  build-[executor]-[role]       – Build [role] using [executor]"
-	@echo "  clean-[executor]-[role]       – Clean [role] using [executor]"
-	@echo ""
 	@echo "🏷️ Tag/Untag:"
-	@echo "  tag                           – Tag all (Docker + GitHub)"
-	@echo "  untag                         – Untag all (Docker + GitHub)"
-	@echo ""
-	@echo "  tag-[executor]                – Tag all with [executor] (Docker + Github)"
-	@echo "  untag-[executor]              – Untag all with [executor] (Docker + Github)"
-	@echo ""
-	@echo "  tag-[executor]-[role]         – Tag [role] with [executor] (Docker)"
-	@echo "  untag-[executor]-[role]       – Untag [role] with [executor] (Docker)"
+	@echo "  tag                           – Tag all components"
+	@echo "  untag                         – Untag all components"
 	@echo ""
 	@echo "🚀 Release/Unrelease:"
-	@echo "  release                       – Release all (GitHub + Docker)"
-	@echo "  unrelease                     – Unrelease all (GitHub + Docker)"
-	@echo "  release-github                – Create GitHub releases"
-	@echo "  unrelease-github              – Remove GitHub releases"
-	@echo "  release-docker                – Push Docker image tags to the registry"
-	@echo "  unrelease-docker              – Remove Docker image tags from the registry"
-	@echo "  release-github-miner          – Release GitHub for miner"
-	@echo "  unrelease-github-miner        – Remove release GitHub for miner"
-	@echo "  release-docker-miner		   – Push Docker miner image tag to the registry"
-	@echo "  unrelease-docker-miner        – Remove Docker miner image tag from the registry"
-	@echo "  release-github-validator      – Release GitHub for validator"
-	@echo "  unrelease-github-validator    – Remove release GitHub for validator"
-	@echo "  release-docker-validator      – Push Docker validator image tag to the registry"
-	@echo "  unrelease-docker-validator    – Remove Docker validator image tag from the registry"
+	@echo "  release                       – Release all components"
+	@echo "  unrelease                     – Unrelease all components"
+	@echo "  prerelease                    – Release all components"
+	@echo "  unprerelease                  – Unrelease all components"
 
 targets:
 	@echo "📋 Available Dynamic Targets:"

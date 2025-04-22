@@ -23,13 +23,13 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-METHOD=service
+EXECUTION=service
 
 # Parse arguments
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -e |--execution)
-            METHOD="$2"
+            EXECUTION="$2"
             shift 2
         ;;
         -h | --help)
@@ -44,9 +44,9 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Stop and teardown redis 
-./subvortex/validator/redis/scripts/redis_stop.sh --execution $METHOD
-./subvortex/validator/redis/scripts/redis_teardown.sh --execution $METHOD
+./subvortex/validator/redis/scripts/redis_stop.sh --execution $EXECUTION
+./subvortex/validator/redis/scripts/redis_teardown.sh --execution $EXECUTION
 
 # Stop and teardown neuron
-./subvortex/validator/neuron/scripts/neuron_stop.sh --execution $METHOD
-./subvortex/validator/neuron/scripts/neuron_teardown.sh --execution $METHOD
+./subvortex/validator/neuron/scripts/neuron_stop.sh --execution $EXECUTION
+./subvortex/validator/neuron/scripts/neuron_teardown.sh --execution $EXECUTION

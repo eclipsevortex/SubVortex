@@ -43,6 +43,8 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-# Stop and teardown neuron
-./subvortex/miner/neuron/scripts/neuron_stop.sh --execution $EXECUTION
-./subvortex/miner/neuron/scripts/neuron_teardown.sh --execution $EXECUTION
+# Setup and start redis 
+./subvortex/validator/redis/scripts/redis_start.sh --execution $EXECUTION
+
+# Setup and start neuron
+./subvortex/validator/neuron/scripts/neuron_start.sh --execution $EXECUTION

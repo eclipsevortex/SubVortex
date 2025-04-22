@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR/../.."
 # Load environment variables
 export $(grep -v '^#' .env | xargs)
 
-# Check which command is available
+# Check which docker command is available
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
     DOCKER_CMD="docker compose"
     elif command -v docker-compose &> /dev/null; then
@@ -19,10 +19,23 @@ else
     exit 1
 fi
 
+# Choose appropriate compose file
 if [ -n "$SUBVORTEX_LOCAL" ]; then
-    $DOCKER_CMD -f ../docker-compose.local.yml up validator-neuron -d --no-deps --force-recreate
+    COMPOSE_FILE="../docker-compose.local.yml"
 else
-    $DOCKER_CMD -f ../docker-compose.yml up validator-neuron -d --no-deps --force-recreate
+    COMPOSE_FILE="../docker-compose.yml"
+fi
+
+# Check if validator-neuron container is running
+IS_RUNNING=$($DOCKER_CMD -f "$COMPOSE_FILE" ps -q validator-neuron | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null || echo "false")
+
+# Build and run command
+if [ "$IS_RUNNING" != "true" ]; then
+    echo "🔄 Container not running — forcing recreate..."
+    $DOCKER_CMD -f "$COMPOSE_FILE" up validator-neuron -d --no-deps --force-recreate
+else
+    echo "⚙️  Container already running — starting without recreate..."
+    $DOCKER_CMD -f "$COMPOSE_FILE" up validator-neuron -d --no-deps
 fi
 
 echo "✅ Validator started successfully"

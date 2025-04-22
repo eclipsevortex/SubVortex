@@ -16,6 +16,10 @@ else
     exit 1
 fi
 
-$DOCKER_CMD -f ../docker-compose.yml up miner-neuron -d --no-deps
+if [ -n "$SUBVORTEX_LOCAL" ]; then
+    $DOCKER_CMD -f ../docker-compose.local.yml up miner-neuron -d --no-deps --force-recreate
+else
+    $DOCKER_CMD -f ../docker-compose.yml up miner-neuron -d --no-deps --force-recreate
+fi
 
 echo "✅ Miner started successfully"

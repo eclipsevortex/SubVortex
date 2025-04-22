@@ -39,6 +39,7 @@ where = ["."]
 [tool.setuptools.package-data]
 "*" = [
     "deployment/**/*",
+    "scripts/**/*",
     "requirements.txt",
     "README.md",
     "pyproject.toml",

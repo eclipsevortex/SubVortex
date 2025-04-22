@@ -16,6 +16,10 @@ else
     exit 1
 fi
 
-$DOCKER_CMD -f ../docker-compose.yml down miner-neuron --rmi all
+if [ -n "$SUBVORTEX_LOCAL" ]; then
+    $DOCKER_CMD -f ../docker-compose.local.yml down miner-neuron --rmi all
+else
+    $DOCKER_CMD -f ../docker-compose.yml down miner-neuron --rmi all
+fi
 
 echo "✅ Miner teardown completed successfully."

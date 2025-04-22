@@ -12,17 +12,17 @@ export $(grep -v '^#' .env | xargs)
 # Check which command is available
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
     DOCKER_CMD="docker compose"
-elif command -v docker-compose &> /dev/null; then
+    elif command -v docker-compose &> /dev/null; then
     DOCKER_CMD="docker-compose"
 else
-    echo "Neither 'docker compose' nor 'docker-compose' is installed. Please install Docker Compose."
+    echo "❌ Neither 'docker compose' nor 'docker-compose' is installed. Please install Docker Compose."
     exit 1
 fi
 
 if [ -n "$SUBVORTEX_LOCAL" ]; then
-    $DOCKER_CMD -f ../docker-compose.local.yml up validator-redis -d --no-deps --force-recreate
+    $DOCKER_CMD -f ../docker-compose.local.yml stop miner-neuron
 else
-    $DOCKER_CMD -f ../docker-compose.yml up validator-redis -d --no-deps --force-recreate
+    $DOCKER_CMD -f ../docker-compose.yml stop miner-neuron
 fi
 
-echo "✅ Validator Redis started successfully"
+echo "✅ Miner started successfully"

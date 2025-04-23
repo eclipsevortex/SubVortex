@@ -6,12 +6,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
+source ../scripts/utils/utils.sh
+
 # Help function
 show_help() {
     echo "Usage: $0 [--execution=process|container|service]"
     echo
     echo "Description:"
-    echo "  This script start the miner's components"
+    echo "  This script restart the miner's components"
     echo
     echo "Options:"
     echo "  --execution   Specify the execution method (default: service)"
@@ -21,15 +23,7 @@ show_help() {
 }
 
 OPTIONS="e:rh"
-LONGOPTIONS="execution:recreate,help"
-
-# Parse the options and their arguments
-params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
-
-# Check for getopt errors
-if [ $? -ne 0 ]; then
-    exit 1
-fi
+LONGOPTIONS="execution:,recreate,help"
 
 EXECUTION=service
 RECREATE=false
@@ -49,12 +43,19 @@ while [ "$#" -gt 0 ]; do
             show_help
             exit 0
         ;;
+        --)
+            shift
+            break
+            ;;
         *)
             echo "Unrecognized option '$1'"
             exit 1
         ;;
     esac
 done
+
+# Check maandatory args
+check_required_args EXECUTION
 
 # Build the command and arguments
 CMD="./neuron/scripts/neuron_start.sh --execution $EXECUTION"

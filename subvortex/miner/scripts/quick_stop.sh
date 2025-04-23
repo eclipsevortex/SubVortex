@@ -6,9 +6,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
+source ../scripts/utils/utils.sh
+
 # Help function
 show_help() {
     echo "Usage: $0 [--execution=process|container|service]"
+    echo
+    echo "Description:"
+    echo "  This script stop the miner's components"
     echo
     echo "Options:"
     echo "  --execution   Specify the execution method (default: service)"
@@ -18,14 +23,6 @@ show_help() {
 
 OPTIONS="e:h"
 LONGOPTIONS="execution:,help:"
-
-# Parse the options and their arguments
-params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
-
-# Check for getopt errors
-if [ $? -ne 0 ]; then
-    exit 1
-fi
 
 EXECUTION=service
 
@@ -40,12 +37,19 @@ while [ "$#" -gt 0 ]; do
             show_help
             exit 0
         ;;
+        --)
+            shift
+            break
+            ;;
         *)
             echo "Unrecognized option '$1'"
             exit 1
         ;;
     esac
 done
+
+# Check maandatory args
+check_required_args EXECUTION
 
 # Stop and teardown neuron
 ./neuron/scripts/neuron_stop.sh --execution $EXECUTION

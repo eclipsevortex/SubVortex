@@ -6,6 +6,48 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+show_help() {
+    echo "Usage: $0 [--recreate]"
+    echo
+    echo "Description:"
+    echo "  This script start the miner neuron"
+    echo
+    echo "Options:"
+    echo "  --recreate    True if you want to recreate the container, false otherwise. Used when .env or volume have changed"
+    echo "  --help        Show this help message"
+    exit 0
+}
+
+OPTIONS=":rh"
+LONGOPTIONS=":recreate,help"
+
+# Parse the options and their arguments
+params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+# Set defaults from env (can be overridden by arguments)
+RECREATE=false
+
+# Parse command-line arguments
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -r|--recreate)
+            RECREATE=true
+            shift
+        ;;
+        -h | --help)
+            show_help
+            exit 0
+        ;;
+        *)
+            echo "Unrecognized option '$1'"
+            exit 1
+        ;;
+    esac
+done
+
 # Load environment variables
 export $(grep -v '^#' .env | xargs)
 
@@ -26,16 +68,13 @@ else
     COMPOSE_FILE="../docker-compose.yml"
 fi
 
-# Check if the miner-neuron container is running
-IS_RUNNING=$($DOCKER_CMD -f "$COMPOSE_FILE" ps -q miner-neuron | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null || echo "false")
-
-# Build the docker command with or without --force-recreate
-if [ "$IS_RUNNING" != "true" ]; then
-    echo "🔄 Container not running — forcing recreate..."
-    $DOCKER_CMD -f "$COMPOSE_FILE" up miner-neuron -d --no-deps --force-recreate
-else
-    echo "⚙️  Container already running — starting without recreate..."
-    $DOCKER_CMD -f "$COMPOSE_FILE" up miner-neuron -d --no-deps
+# Clean the workspace with --remove if requested
+CMD="$DOCKER_CMD -f "$COMPOSE_FILE" up miner-neuron -d --no-deps"
+if [[ "$RECREATE" == "true" || "$RECREATE" == "True" ]]; then
+    CMD+=" --recreate"
 fi
+
+# Execute the command
+eval "$CMD"
 
 echo "✅ Miner started successfully"

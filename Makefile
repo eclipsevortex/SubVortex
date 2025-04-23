@@ -256,7 +256,7 @@ unprerelease:
 		for service in $$services; do \
 			service_path="$$comp/$$service"; \
 			if [ -f "$$service_path/pyproject.toml" ] || [ -f "$$service_path/version.py" ]; then \
-				.github/scripts/on_release_deleted.sh "$$comp_name" "$$service" "$$TAG"; \
+				.github/scripts/on_release_deleted.sh"$$comp_name" "$$service" "$$TAG"; \
 			fi; \
 		done; \
 	done
@@ -293,7 +293,7 @@ unrelease:
 		for service in $$services; do \
 			service_path="$$comp/$$service"; \
 			if [ -f "$$service_path/pyproject.toml" ] || [ -f "$$service_path/version.py" ]; then \
-				.github/scripts/on_release_deleted.sh "$$comp_name" "$$service" "$$TAG"; \
+				.github/scripts/on_release_deleted.sh"$$comp_name" "$$service" "$$TAG"; \
 			fi; \
 		done; \
 	done

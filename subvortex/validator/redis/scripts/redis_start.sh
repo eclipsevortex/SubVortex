@@ -10,8 +10,12 @@ cd "$SCRIPT_DIR/.."
 show_help() {
     echo "Usage: $0 [--execution=process|container|service]"
     echo
+    echo "Description:"
+    echo "  This script start the validator redis"
+    echo
     echo "Options:"
     echo "  --execution   Specify the execution method (default: service)"
+    echo "  --recreate    True if you want to recreate the container when starting it, false otherwise."
     echo "  --help        Show this help message"
     exit 0
 }
@@ -28,6 +32,7 @@ if [ $? -ne 0 ]; then
 fi
 
 METHOD=service
+RECREATE=false
 
 # Parse arguments
 while [ "$#" -gt 0 ]; do
@@ -35,6 +40,10 @@ while [ "$#" -gt 0 ]; do
         -e |--execution)
             METHOD="$2"
             shift 2
+        ;;
+        -r|--recreate)
+            RECREATE=true
+            shift
         ;;
         -h | --help)
             show_help
@@ -65,9 +74,15 @@ setup_process() {
 setup_container() {
     echo "🐳 Setting up for 'container' mode..."
     
-    # Setup the auto upgrade as container
-    ./deployment/docker/redis_docker_start.sh
+    # Build the command and arguments
+    CMD="./deployment/docker/redis_docker_start.sh"
+    if [[ "$RECREATE" == "true" || "$RECREATE" == "True" ]]; then
+        CMD+=" --recreate"
+    fi
     
+    # Setup the auto upgrade as container
+    eval "$CMD"
+
     # Add any other container-specific logic here
     echo "✅ Container setup complete."
 }

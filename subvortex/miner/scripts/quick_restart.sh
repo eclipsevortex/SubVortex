@@ -10,14 +10,18 @@ cd "$SCRIPT_DIR/.."
 show_help() {
     echo "Usage: $0 [--execution=process|container|service]"
     echo
+    echo "Description:"
+    echo "  This script start the miner's components"
+    echo
     echo "Options:"
     echo "  --execution   Specify the execution method (default: service)"
+    echo "  --recreate    True if you want to recreate the container when starting it, false otherwise."
     echo "  --help        Show this help message"
     exit 0
 }
 
-OPTIONS="e:h"
-LONGOPTIONS="execution:,help:"
+OPTIONS="e:rh"
+LONGOPTIONS="execution:recreate,help"
 
 # Parse the options and their arguments
 params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
@@ -28,6 +32,7 @@ if [ $? -ne 0 ]; then
 fi
 
 EXECUTION=service
+RECREATE=false
 
 # Parse arguments
 while [ "$#" -gt 0 ]; do
@@ -35,6 +40,10 @@ while [ "$#" -gt 0 ]; do
         -e |--execution)
             EXECUTION="$2"
             shift 2
+        ;;
+        -r|--recreate)
+            RECREATE=true
+            shift
         ;;
         -h | --help)
             show_help
@@ -47,6 +56,11 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Build the command and arguments
+CMD="./neuron/scripts/neuron_start.sh --execution $EXECUTION"
+if [[ "$RECREATE" == "true" || "$RECREATE" == "True" ]]; then
+    CMD+=" --recreate"
+fi
 
-# Setup and start neuron
-./neuron/scripts/neuron_start.sh --execution $EXECUTION
+# Setup the auto upgrade as container
+eval "$CMD"

@@ -2,6 +2,7 @@
 
 # **SubVortex** <!-- omit in toc -->
 
+[![Build & Push](https://github.com/eclipsevortex/SubVortex/actions/workflows/docker-workflow.yml/badge.svg)](https://github.com/eclipsevortex/SubVortex/actions/workflows/docker-workflow.yml)
 [![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 

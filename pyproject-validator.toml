@@ -37,7 +37,13 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["scripts", "subvortex", "subvortex.core", "subvortex.validator"]
+include = [
+    "scripts",
+    "subvortex",
+    "subvortex.core",
+    "subvortex.validator",
+    "subvortex.scripts",
+]
 
 [tool.setuptools.package-data]
 "scripts" = ["**/utils/*.sh"]
@@ -53,6 +59,7 @@ include = ["scripts", "subvortex", "subvortex.core", "subvortex.validator"]
     "**/docker-compose.yml",
 ]
 "subvortex.core" = ["**/*.py"]
+"subvortex.scripts" = ["**/*.sh"]
 
 [tool.setuptools.exclude-package-data]
 "subvortex" = ["**/venv/*", "**/.venv/*"]

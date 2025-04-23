@@ -148,7 +148,7 @@ jobs:
       - name: 🧹 Remove version-tagged image (on tag delete)
         if: github.event_name == 'delete' && github.event.ref_type == 'tag'
         run: |
-          .github/scripts/on_tag_deleted.sh"${{ matrix.component }}" "${{ matrix.service }}" "${{ github.event.ref }}"
+          .github/scripts/on_tag_deleted.sh "${{ matrix.component }}" "${{ matrix.service }}" "${{ github.event.ref }}"
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

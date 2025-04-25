@@ -18,8 +18,8 @@ show_help() {
     exit 0
 }
 
-OPTIONS=":rh"
-LONGOPTIONS=":recreate,help"
+OPTIONS="rh"
+LONGOPTIONS="recreate,help"
 
 # Parse the options and their arguments
 params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
@@ -71,7 +71,7 @@ fi
 # Clean the workspace with --remove if requested
 CMD="$DOCKER_CMD -f "$COMPOSE_FILE" up validator-neuron -d --no-deps"
 if [[ "$RECREATE" == "true" || "$RECREATE" == "True" ]]; then
-    CMD+=" --recreate"
+    CMD+=" --force-recreate"
 fi
 
 # Execute the command

@@ -9,6 +9,8 @@ services:
       - NET_RAW
     env_file:
       - ./neuron/.env
+    depends_on:
+      - validator-redis
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets
       - /var/log:/app/logs

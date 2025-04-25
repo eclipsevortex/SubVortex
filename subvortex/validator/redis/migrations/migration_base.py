@@ -1,31 +1,17 @@
-import os
 from redis import asyncio as aioredis
-from dotenv import load_dotenv
 from abc import ABC, abstractmethod
-
-# Resolve the path two levels up from the current file
-env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), f"../.env"))
-
-# Load the env file
-load_dotenv(dotenv_path=env_path)
 
 
 class RedisMigration(ABC):
     revision: str
     down_revision: str | None
 
-    def __init__(self):
+    def __init__(self, database: aioredis.StrictRedis):
+        self.database = database
+
         # Promote class attributes to instance attributes
         self.revision = type(self).revision
         self.down_revision = type(self).down_revision
-
-        # Create the instance of redis
-        self.database = aioredis.StrictRedis(
-            host=os.getenv("SUBVORTEX_REDIS_HOST", "localhost"),
-            port=os.getenv("SUBVORTEX_REDIS_PORT", 6379),
-            db=os.getenv("SUBVORTEX_REDIS_INDEX", 0),
-            password=os.getenv("SUBVORTEX_REDIS_PASSWORD"),
-        )
 
     async def rollout(self):
         # Set mode to dual so app reads/writes both if needed
@@ -49,7 +35,6 @@ class RedisMigration(ABC):
             await self.database.set(f"migration_mode:{self.revision}", "legacy")
         else:
             await self.database.set("version", "0.0.0")
-            
 
     @abstractmethod
     def _rollout(self):

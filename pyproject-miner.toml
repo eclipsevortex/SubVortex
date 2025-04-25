@@ -55,6 +55,7 @@ include = [
     "**/README.md",
     "**/env.template",
     "**/docker-compose.yml",
+    "**/metadata.json",
 ]
 "subvortex.core" = ["**/*.py"]
 "subvortex.scripts" = ["**/*.sh"]

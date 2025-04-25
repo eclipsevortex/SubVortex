@@ -62,10 +62,4 @@ else
     echo "No egg-info directory found."
 fi
 
-# Remove Python if installed via script
-if [[ -f "../../../python/python_setup.sh" ]]; then
-    echo "Removing Python setup script reference."
-    rm -f "../../../python/python_setup.sh"
-fi
-
 echo "✅ Validator teardown completed successfully."

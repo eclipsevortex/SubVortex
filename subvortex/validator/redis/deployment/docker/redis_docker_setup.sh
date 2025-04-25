@@ -22,7 +22,7 @@ fi
 if [ -n "$SUBVORTEX_LOCAL" ]; then
     $DOCKER_CMD -f ../docker-compose.local.yml build validator-redis
 else
-    $DOCKER_CMD -f ../docker-compose.yml build validator-redis
+    $DOCKER_CMD -f ../docker-compose.yml pull validator-redis
 fi
 
 echo "✅ Validator Redis setup successfully"

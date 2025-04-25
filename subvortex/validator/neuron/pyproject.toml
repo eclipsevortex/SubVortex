@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subvortex-validator-neuron"
-version = "3.0.0-alpha.14"
+version = "3.0.0-alpha.15"
 description = "SubVortex Validator Neuron"
 authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
 readme = "README.md"
@@ -34,4 +34,12 @@ include-package-data = true
 where = ["."]
 
 [tool.setuptools.package-data]
-"*" = ["deployment/**/*", "requirements.txt", "README.md", "pyproject.toml"]
+"*" = [
+    "deployment/**/*",
+    "requirements.txt",
+    "README.md",
+    "pyproject.toml",
+    "env.template",
+    "docker-compose.yml",
+    "metadata.json",
+]

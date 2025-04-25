@@ -45,5 +45,6 @@ where = ["."]
     "pyproject.toml",
     "env.template",
     "version.py",
-    "docker-compose.yml"
+    "docker-compose.yml",
+    "**/metadata.json",
 ]

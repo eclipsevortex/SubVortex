@@ -180,6 +180,15 @@ $(foreach comp,$(COMPONENTS),\
   ) \
 )
 
+# ===========
+# 🧾 Metadata
+# ===========
+TARGETS += metadata
+
+metadata:
+	@echo "🔧 Running metadata updater script..."
+	@.github/scripts/generate_metadata.sh
+
 # ========
 # 🧪 Build
 # ========
@@ -342,15 +351,21 @@ help:
 	@echo "  bump-[role]-[service]-alpha   – Alpha bump for [role]/[service]"
 	@echo "  bump-[role]-[service]-rc      – RC bump for [role]/[service]"
 	@echo ""
+	@echo "🧾 Metadata:"
+	@echo "  metadata                      – Update the metadata to add the version"
+	@echo ""
 	@echo "🧪 Build/Clean:"
+	@echo ""
 	@echo "  build                         – Build all components"
 	@echo "  clean                         – Clean all components"
 	@echo ""
 	@echo "🏷️ Tag/Untag:"
+	@echo ""
 	@echo "  tag                           – Tag all components"
 	@echo "  untag                         – Untag all components"
 	@echo ""
 	@echo "🚀 Release/Unrelease:"
+	@echo ""
 	@echo "  release                       – Release all components"
 	@echo "  unrelease                     – Unrelease all components"
 	@echo "  prerelease                    – Release all components"

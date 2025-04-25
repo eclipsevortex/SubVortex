@@ -19,7 +19,7 @@ fi
 if [ -n "$SUBVORTEX_LOCAL" ]; then
     $DOCKER_CMD -f ../docker-compose.local.yml build miner-neuron
 else
-    $DOCKER_CMD -f ../docker-compose.yml build miner-neuron
+    $DOCKER_CMD -f ../docker-compose.yml pull miner-neuron
 fi
 
 echo "✅ Miner setup successfully"

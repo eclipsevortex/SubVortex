@@ -22,7 +22,7 @@ fi
 if [ -n "$SUBVORTEX_LOCAL" ]; then
     $DOCKER_CMD -f ../docker-compose.local.yml build validator-neuron
 else
-    $DOCKER_CMD -f ../docker-compose.yml build validator-neuron
+    $DOCKER_CMD -f ../docker-compose.yml pull validator-neuron
 fi
 
 echo "✅ Validator setup successfully"

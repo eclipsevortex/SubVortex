@@ -6,12 +6,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-# Install python if not already done
-if ! command -v python3 &> /dev/null; then
-    echo "Python3 not found. Installing..."
-    bash "../../python/python_setup.sh"
-fi
-
 # Create virtual environment
 python3 -m venv venv
 

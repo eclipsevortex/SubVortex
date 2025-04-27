@@ -1,9 +1,9 @@
 {
   "id": "validator-neuron",
   "name": "subvortex-validator-neuron",
-  "version": "3.0.0-alpha.18",
-  "validator.version": "3.0.0-alpha.18",
-  "validator.neuron.version": "3.0.0-alpha.18",
+  "version": "3.0.0-alpha.19",
+  "validator.version": "3.0.0-alpha.19",
+  "validator.neuron.version": "3.0.0-alpha.19",
   "depends_on": [
     "validator-redis"
   ]

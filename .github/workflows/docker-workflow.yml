@@ -159,12 +159,12 @@ jobs:
             "${{ steps.meta.outputs.tag }}" \
             "${{ steps.taginfo.outputs.version_tag }}"
 
-      - name: 🧹 Remove version-tagged image (on tag delete)
-        if: github.event_name == 'delete' && github.event.ref_type == 'tag'
-        run: |
-          .github/scripts/on_tag_deleted.sh "${{ matrix.component }}" "${{ matrix.service }}" "${{ github.event.ref }}"
-        env:
-          GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      # - name: 🧹 Remove version-tagged image (on tag delete)
+      #   if: github.event_name == 'delete' && github.event.ref_type == 'tag'
+      #   run: |
+      #     .github/scripts/on_tag_deleted.sh "${{ matrix.component }}" "${{ matrix.service }}" "${{ github.event.ref }}"
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
   release:
     if: github.event_name == 'release'

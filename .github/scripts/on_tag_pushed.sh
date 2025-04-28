@@ -6,10 +6,11 @@ SERVICE="$2"
 WHEEL_IMAGE="$3"
 VERSION_TAG="$4"
 
-REPO_NAME="subvortex-$COMPONENT-${SERVICE//_/-}"
-IMAGE="subvortex/$REPO_NAME"
 VERSION="${VERSION_TAG#v}"
 DOCKERFILE="subvortex/$COMPONENT/$SERVICE/Dockerfile"
+REPO_OWNER="${GITHUB_REPOSITORY_OWNER:-eclipsevortex}"
+REPO_NAME="subvortex-$COMPONENT-${SERVICE//_/-}"
+IMAGE="ghcr.io/$REPO_OWNER/$REPO_NAME"
 
 echo "🔍 Building image for component: $COMPONENT"
 echo "📦 Image name: $IMAGE"
@@ -47,7 +48,7 @@ if [[ "$EXISTING_COMPONENT_VERSION" == "$COMPONENT_VERSION" ]]; then
   exit 0
 fi
 
-echo "🚀 Building and pushing Docker image: $IMAGE:$VERSION"
+echo "🚀 Building and pushing image: $IMAGE:$VERSION"
 
 docker buildx build \
   --squash \
@@ -56,6 +57,7 @@ docker buildx build \
   --build-arg VERSION="$VERSION" \
   --build-arg ROLE_VERSION=$ROLE_VERSION \
   --build-arg COMPONENT_VERSION="$COMPONENT_VERSION" \
+  --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
   --cache-from=type=gha,scope=wheels_${COMPONENT}_amd64 \
   --cache-to=type=gha,mode=max,scope=wheels_${COMPONENT}_amd64 \
   --tag "$IMAGE:$VERSION" \

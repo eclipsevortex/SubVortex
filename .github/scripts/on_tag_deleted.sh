@@ -6,41 +6,47 @@ SERVICE="$2"
 TAG="$3"
 
 VERSION="${TAG#v}"
+REPO_OWNER="${GITHUB_REPOSITORY_OWNER:-eclipsevortex}"
 REPO_NAME="subvortex-$COMPONENT-${SERVICE//_/-}"
-IMAGE="subvortex/$REPO_NAME"
+IMAGE="ghcr.io/$REPO_OWNER/$REPO_NAME"
 
-DOCKER_USERNAME="${DOCKER_USERNAME:-subvortex}"
-DOCKER_PASSWORD="${DOCKER_PASSWORD:-}"
+GH_TOKEN="${GH_TOKEN:-}"
 
-if [[ -z "$DOCKER_USERNAME" || -z "$DOCKER_PASSWORD" ]]; then
-  echo "❌ Missing Docker credentials (DOCKER_USERNAME / DOCKER_PASSWORD)"
-  exit 1
+if [[ -z "$GH_TOKEN" ]]; then
+    echo "❌ Missing Docker credentials (GHCR_USERNAME / GHCR_TOKEN)"
+    exit 1
 fi
 
-echo "🔐 Requesting Docker Hub JWT token..."
-TOKEN=$(curl -s -X POST https://hub.docker.com/v2/users/login/ \
-  -H "Content-Type: application/json" \
-  -d "{\"username\": \"$DOCKER_USERNAME\", \"password\": \"$DOCKER_PASSWORD\"}" | jq -r .token)
+echo "🔍 Searching for Version ID corresponding to tag: $VERSION..."
 
-if [[ "$TOKEN" == "null" || -z "$TOKEN" ]]; then
-  echo "❌ Failed to authenticate with Docker Hub"
-  exit 1
+# Step 1: Find the Version ID from the tag
+VERSION_ID=$(gh api "user/packages/container/${REPO_NAME}/versions" \
+  | jq -r --arg VERSION "$VERSION" ".[] | select(.metadata.container.tags[]? == \"$VERSION\") | .id")
+
+if [[ -z "$VERSION_ID" ]]; then
+  echo "⚠️ No Version ID found for tag: $VERSION — skipping delete."
+  exit 0
 fi
 
-echo "🔍 Deleting $IMAGE:$VERSION from Docker Hub..."
+echo "🔍 Found Version ID: $VERSION_ID"
+
+# Step 2: Delete by Version ID
+echo "🗑️ Deleting $IMAGE:$VERSION (Version ID: $VERSION_ID) from GitHub Container Registry..."
+
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
-  -H "Authorization: JWT $TOKEN" \
-  "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$REPO_NAME/tags/$VERSION/")
+    -H "Authorization: Bearer $GH_TOKEN" \
+    -H "Accept: application/vnd.github.v3+json" \
+    "https://api.github.com/user/packages/container/${REPO_NAME}/versions/${VERSION_ID}")
 
 case "$RESPONSE" in
-  204)
-    echo "✅ Deleted $IMAGE:$VERSION"
+    204)
+        echo "✅ Successfully deleted $IMAGE:$VERSION"
     ;;
-  404)
-    echo "⚠️ Tag not found: $IMAGE:$VERSION"
+    404)
+        echo "⚠️ Version not found: $IMAGE:$VERSION (maybe already deleted)"
     ;;
-  *)
-    echo "❌ Failed to delete tag: HTTP $RESPONSE"
-    exit 1
+    *)
+        echo "❌ Failed to delete $IMAGE:$VERSION (HTTP $RESPONSE)"
+        exit 1
     ;;
 esac

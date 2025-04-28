@@ -7,9 +7,9 @@ RAW_VERSION_TAG="$3"
 IS_PRERELEASE="$4"
 IS_DRAFT="$5"
 
-VERSION="${RAW_VERSION_TAG#v}"
+REPO_OWNER="${GITHUB_REPOSITORY_OWNER:-eclipsevortex}"
 REPO_NAME="subvortex-$COMPONENT-${SERVICE//_/-}"
-IMAGE="subvortex/$REPO_NAME"
+IMAGE="ghcr.io/$REPO_OWNER/$REPO_NAME"
 
 if [[ "$IS_DRAFT" == "true" ]]; then
   echo "⏭️ Skipping draft release"
@@ -58,18 +58,10 @@ for FLOAT_TAG in dev stable latest; do
   fi
 
   TARGET_VERSION="${TARGET_TAG#v}"
-  echo "🔍 Checking if image $IMAGE:$TARGET_VERSION exists..."
 
-  if ! docker buildx imagetools inspect "$IMAGE:$TARGET_VERSION" > /dev/null 2>&1; then
-    echo "⚠️ Image $IMAGE:$TARGET_VERSION not found — skipping $FLOAT_TAG"
-    continue
-  fi
-
-  TARGET_VERSION="${TARGET_TAG#v}"
-
-  echo "🔍 Checking if image $IMAGE:$TARGET_VERSION exists..."
-  if ! docker buildx imagetools inspect "$IMAGE:$TARGET_VERSION" > /dev/null 2>&1; then
-    echo "⚠️ Image $IMAGE:$TARGET_VERSION not found — skipping $FLOAT_TAG"
+  # 🔥 Check if the source image exists
+  if ! docker buildx imagetools inspect "$IMAGE:$TARGET_VERSION" &>/dev/null; then
+    echo "⚠️ Source image $IMAGE:$TARGET_VERSION does not exist — skipping $FLOAT_TAG"
     continue
   fi
 

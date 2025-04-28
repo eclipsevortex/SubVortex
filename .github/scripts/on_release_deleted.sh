@@ -5,14 +5,21 @@ COMPONENT="$1"
 SERVICE="$2"
 TAG="$3"
 VERSION="${TAG#v}"
+REPO_OWNER="${GITHUB_REPOSITORY_OWNER:-eclipsevortex}"
 REPO_NAME="subvortex-$COMPONENT-${SERVICE//_/-}"
-IMAGE="subvortex/$REPO_NAME"
+IMAGE="ghcr.io/$REPO_OWNER/$REPO_NAME"
 
-DOCKER_USERNAME="${DOCKER_USERNAME:-subvortex}"
-DOCKER_PASSWORD="${DOCKER_PASSWORD:-}"
+GHCR_USERNAME="${GHCR_USERNAME:-}"
+GHCR_TOKEN="${GHCR_TOKEN:-}"
 
-if [[ -z "$DOCKER_USERNAME" || -z "$DOCKER_PASSWORD" ]]; then
-  echo "❌ Missing Docker credentials (DOCKER_USERNAME / DOCKER_PASSWORD)"
+# Always resolve the absolute path to the 'scripts' folder
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Run the install_skopeo.sh script
+bash "$SCRIPT_DIR/install_skopeo.sh"
+
+if [[ -z "$GHCR_USERNAME" || -z "$GHCR_TOKEN" ]]; then
+  echo "❌ Missing GHCR credentials (GHCR_USERNAME / GHCR_TOKEN)"
   exit 1
 fi
 
@@ -42,19 +49,26 @@ printf "    latest  → %s\n" "${LATEST_TAG:-<none>}"
 delete_docker_tag() {
   local tag="$1"
 
-  echo "🔐 Authenticating to Docker Hub..."
-  TOKEN=$(curl -s -X POST https://hub.docker.com/v2/users/login/ \
-    -H "Content-Type: application/json" \
-    -d "{\"username\": \"$DOCKER_USERNAME\", \"password\": \"$DOCKER_PASSWORD\"}" | jq -r .token)
+  echo "🗑️ Attempting to delete $IMAGE:$tag from GHCR..."
 
-  echo "🗑️ Attempting to delete $IMAGE:$tag from Docker Hub..."
+  # Find version ID
+  VERSION_ID=$(gh api "user/packages/container/${REPO_NAME}/versions" \
+    -H "Authorization: Bearer $GHCR_TOKEN" \
+    | jq -r ".[] | select(.metadata.container.tags[]? == \"$tag\") | .id")
+
+  if [[ -z "$VERSION_ID" ]]; then
+    echo "⚠️ No version ID found for tag $tag — skipping delete."
+    return
+  fi
+
   RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
-    "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$REPO_NAME/tags/$tag/" \
-    -H "Authorization: JWT $TOKEN")
+    -H "Authorization: Bearer $GHCR_TOKEN" \
+    -H "Accept: application/vnd.github.v3+json" \
+    "https://api.github.com/user/packages/container/${REPO_NAME}/versions/${VERSION_ID}")
 
   case "$RESPONSE" in
     204) echo "✅ Deleted $IMAGE:$tag" ;;
-    404) echo "⚠️ Tag $IMAGE:$tag not found on Docker Hub" ;;
+    404) echo "⚠️ Tag $IMAGE:$tag not found on GHCR" ;;
     *)   echo "❌ Failed to delete $IMAGE:$tag (HTTP $RESPONSE)" ;;
   esac
 }
@@ -73,16 +87,21 @@ for FTAG in dev stable latest; do
   fi
 
   TARGET="${TARGET#v}"
-  echo "🔍 Checking if image $IMAGE:$TARGET exists..."
 
-  if ! docker buildx imagetools inspect "$IMAGE:$TARGET" > /dev/null 2>&1; then
-    echo "⚠️ Image $IMAGE:$TARGET not found — deleting stale floating tag $FTAG"
-    delete_docker_tag "$FTAG"
-    continue
+  if [[ -n "$TARGET" ]]; then
+    echo "🔍 Checking if $IMAGE:$TARGET exists..."
+
+    if skopeo inspect --raw --creds "${GHCR_USERNAME}:${GHCR_TOKEN}" docker://$IMAGE:$TARGET &>/dev/null; then
+      echo "🏷️ Re-tagging $IMAGE:$FTAG → $IMAGE:$TARGET using skopeo"
+      skopeo copy --all --dest-creds="${GHCR_USERNAME}:${GHCR_TOKEN}" \
+        docker://$IMAGE:$TARGET \
+        docker://$IMAGE:$FTAG
+      echo "✅ Floating tag '$FTAG' now points to '$TARGET'"
+    else
+      echo "⚠️ Image $IMAGE:$TARGET does not exist — skipping $FTAG re-tag"
+      delete_docker_tag "$FTAG"
+    fi
+  else
+    echo "⚠️ No valid candidate for $FTAG — skipping"
   fi
-
-  echo "🏷️  Re-tagging $IMAGE:$FTAG → $IMAGE:$TARGET"
-  docker buildx imagetools create \
-    --tag "$IMAGE:$FTAG" \
-    "$IMAGE:$TARGET"
 done

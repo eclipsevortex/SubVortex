@@ -1,6 +1,6 @@
 services:
   miner-neuron:
-    image: subvortex/subvortex-miner-neuron:${SUBVORTEX_FLOATTING_FLAG:-latest}
+    image: ghcr.io/eclipsevortex/subvortex-miner-neuron:${SUBVORTEX_FLOATTING_FLAG:-latest}
     container_name: subvortex-miner-neuron
     restart: unless-stopped
     network_mode: host

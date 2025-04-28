@@ -1,6 +1,6 @@
 services:
   validator-neuron:
-    image: subvortex/subvortex-validator-neuron:${SUBVORTEX_FLOATTING_FLAG:-latest}
+    image: ghcr.io/eclipsevortex/subvortex-validator-neuron:${SUBVORTEX_FLOATTING_FLAG:-latest}
     container_name: subvortex-validator-neuron
     restart: unless-stopped
     network_mode: host
@@ -18,7 +18,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   validator-redis:
-    image: subvortex/subvortex-validator-redis:${SUBVORTEX_FLOATTING_FLAG:-latest}
+    image: ghcr.io/eclipsevortex/subvortex-validator-redis:${SUBVORTEX_FLOATTING_FLAG:-latest}
     container_name: subvortex-validator-redis
     restart: always
     healthcheck:

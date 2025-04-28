@@ -4,7 +4,7 @@ services:
       context: ../../
       dockerfile: ./subvortex/validator/neuron/Dockerfile
       additional_contexts:
-        wheelbuilder: docker-image://subvortex/subvortex-wheel-builder:latest
+        wheelbuilder: docker-image://ghcr.io/eclipsevortex/subvortex-wheel-builder:latest
     container_name: subvortex-validator-neuron
     restart: unless-stopped
     network_mode: host

@@ -59,6 +59,15 @@ define get_version
 	fi
 endef
 
+define load_env
+if [ -f .secrets ]; then \
+  echo "📦 Loading environment from .secrets"; \
+  set -a; \
+  source .secrets; \
+  set +a; \
+fi
+endef
+
 # ==================
 # 🔨 Version Bumping
 # ==================
@@ -248,6 +257,7 @@ TARGETS += release unrelease prerelease unprerelease
 unprerelease:
 	@VERSION=$$(cat VERSION); \
  	TAG=v$$VERSION; \
+	$(load_env); \
 	\
 	(gh release view "$$TAG" &>/dev/null && \
 	  echo "🗑️  Deleting GitHub prerelease $$TAG..." && \
@@ -285,6 +295,7 @@ prerelease:
 unrelease:
 	@VERSION=$$(cat VERSION); \
  	TAG=v$$VERSION; \
+	$(load_env); \
 	\
 	(gh release view "$$TAG" &>/dev/null && \
 	  echo "🗑️  Deleting GitHub release $$TAG..." && \

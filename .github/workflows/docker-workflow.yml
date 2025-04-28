@@ -2,12 +2,12 @@ name: Docker Build & Push All Services
 
 on:
   delete:
-      
+
   push:
     tags:
       - "v*.*.*"
       - "v*.*.*-*"
-      
+
   release:
     types: [published]
 
@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event_name == 'delete' && 'main' || github.ref }}
 
       - name: 🧠 Discover components and services
         id: set-matrix
@@ -67,6 +69,11 @@ jobs:
 
           echo "🔍 Final matrix ready."
 
+      - name: 🔍 Show discover output matrix
+        run: |
+          echo "Matrix JSON:"
+          echo '${{ toJson(steps.set-matrix.outputs.matrix) }}'
+
   build:
     if: github.event_name == 'push' || github.event_name == 'delete'
     needs: [discover]
@@ -87,7 +94,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-user-static binfmt-support
           docker run --privileged --rm tonistiigi/binfmt --install all || true
-      
+
       - name: 🛠 Install GitHub CLI
         run: |
           sudo apt-get update
@@ -181,7 +188,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-user-static binfmt-support
           docker run --privileged --rm tonistiigi/binfmt --install all || true
-      
+
       - name: 🛠 Install GitHub CLI
         run: |
           sudo apt-get update

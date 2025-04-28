@@ -30,8 +30,6 @@ jobs:
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event_name == 'delete' && 'main' || github.ref }}
 
       - name: 🧠 Discover components and services
         id: set-matrix

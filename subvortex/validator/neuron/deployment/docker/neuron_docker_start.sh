@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -49,32 +49,41 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Load environment variables
+echo "🔍 Loading environment variables from .env..."
 export $(grep -v '^#' .env | xargs)
 
-# Check which docker command is available
+# Check Docker Compose availability
+echo "🔎 Checking Docker Compose installation..."
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
     DOCKER_CMD="docker compose"
-    elif command -v docker-compose &> /dev/null; then
+    echo "✅ Found: docker compose (Docker CLI plugin)"
+elif command -v docker-compose &> /dev/null; then
     DOCKER_CMD="docker-compose"
+    echo "✅ Found: docker-compose (legacy standalone)"
 else
     echo "❌ Neither 'docker compose' nor 'docker-compose' is installed. Please install Docker Compose."
     exit 1
 fi
 
-# Choose appropriate compose file
-if [ -n "$SUBVORTEX_LOCAL" ]; then
+# Choose compose file
+if [ -n "${SUBVORTEX_LOCAL:-}" ]; then
+    echo "🛠 Local environment detected (SUBVORTEX_LOCAL is set). Using local compose file."
     COMPOSE_FILE="../docker-compose.local.yml"
 else
+    echo "🌍 Production environment detected. Using standard compose file."
     COMPOSE_FILE="../docker-compose.yml"
 fi
 
-# Clean the workspace with --remove if requested
-CMD="$DOCKER_CMD -f "$COMPOSE_FILE" up validator-neuron -d --no-deps"
+# Build the docker-compose command
+echo "🚀 Preparing to start Validator Neuron container..."
+CMD="$DOCKER_CMD -f \"$COMPOSE_FILE\" up validator-neuron -d --no-deps"
 if [[ "$RECREATE" == "true" || "$RECREATE" == "True" ]]; then
+    echo "♻️ Recreate requested — will force recreate the container."
     CMD+=" --force-recreate"
 fi
 
-# Execute the command
+# Execute
+echo "⚡ Executing: $CMD"
 eval "$CMD"
 
-echo "✅ Validator Neuron started successfully"
+echo "✅ Validator Neuron container started successfully."

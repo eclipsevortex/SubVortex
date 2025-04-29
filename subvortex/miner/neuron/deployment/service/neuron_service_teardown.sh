@@ -1,78 +1,83 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-NEURON_NAME=subvortex-miner
+NEURON_NAME="subvortex-miner"
 SERVICE_NAME="$NEURON_NAME-neuron"
-PACKAGE_NAME=subvortex
+PACKAGE_NAME="subvortex"
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+echo "📦 Starting Miner Neuron teardown..."
+
 # Stop and disable the systemd service
+echo "🔍 Checking for existing systemd service: $SERVICE_NAME..."
 if systemctl list-units --type=service --all | grep -q "${SERVICE_NAME}.service"; then
-    echo "Stopping systemd service $SERVICE_NAME..."
-    systemctl stop "${SERVICE_NAME}.service"
+    echo "🛑 Stopping systemd service: $SERVICE_NAME..."
+    sudo systemctl stop "${SERVICE_NAME}.service"
     
-    echo "Disabling systemd service $SERVICE_NAME..."
-    systemctl disable "${SERVICE_NAME}.service"
+    echo "🚫 Disabling systemd service: $SERVICE_NAME..."
+    sudo systemctl disable "${SERVICE_NAME}.service"
     
-    echo "Removing systemd service file..."
+    echo "🧹 Removing systemd service file..."
     sudo rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
     
-    echo "Reloading systemd daemon..."
+    echo "🔄 Reloading systemd daemon..."
     sudo systemctl daemon-reexec
     sudo systemctl daemon-reload
 else
-    echo "Systemd service ${SERVICE_NAME}.service not found. Skipping stop/disable."
+    echo "ℹ️ Systemd service ${SERVICE_NAME}.service not found. Skipping stop/disable."
 fi
 
 # Remove log directory
 LOG_DIR="/var/log/$NEURON_NAME"
+echo "🧹 Checking for log directory at $LOG_DIR..."
 if [[ -d "$LOG_DIR" ]]; then
-    echo "Removing log directory: $LOG_DIR"
+    echo "🧹 Removing log directory: $LOG_DIR"
     sudo rm -rf "$LOG_DIR"
 else
-    echo "Log directory $LOG_DIR does not exist. Skipping."
+    echo "ℹ️ Log directory $LOG_DIR does not exist. Skipping."
 fi
 
 # Uninstall dependencies if virtual environment exists
+echo "🔍 Checking for Python virtual environment..."
 if [[ -d "venv" ]]; then
-    echo "Activating virtual environment to uninstall dependencies..."
+    echo "🐍 Activating virtual environment..."
     source "venv/bin/activate"
     
     if pip list | grep -q "$PACKAGE_NAME"; then
-        echo "Uninstalling editable package: $PACKAGE_NAME..."
+        echo "📦 Uninstalling editable package: $PACKAGE_NAME..."
         pip uninstall -y "$PACKAGE_NAME"
     else
-        echo "Editable package $PACKAGE_NAME not found. Skipping."
+        echo "ℹ️ Editable package $PACKAGE_NAME not found. Skipping uninstall."
     fi
     
-    # Uninstall dependencies
     if [[ -f "requirements.txt" ]]; then
-        echo "Uninstalling dependencies..."
+        echo "📦 Uninstalling dependencies from requirements.txt..."
         pip uninstall -y -r "requirements.txt"
     else
-        echo "requirements.txt not found. Skipping dependency uninstallation."
+        echo "⚠️ requirements.txt not found. Skipping dependency uninstallation."
     fi
     
-    # Deactivate virtual environment
+    echo "🛑 Deactivating virtual environment..."
     deactivate
     
-    echo "Removing virtual environment..."
+    echo "🧹 Removing virtual environment directory..."
     rm -rf "venv"
 else
-    echo "Virtual environment not found. Skipping removal."
+    echo "ℹ️ Virtual environment not found. Skipping."
 fi
 
 # Ensure egg-info is removed
+echo "🧹 Checking for .egg-info directory..."
 EGG_INFO_DIR=$(find . -name "*.egg-info" -type d)
 if [[ -n "$EGG_INFO_DIR" ]]; then
-    echo "Removing egg-info directory: $EGG_INFO_DIR..."
+    echo "🧹 Removing egg-info directory: $EGG_INFO_DIR..."
     rm -rf "$EGG_INFO_DIR"
 else
-    echo "No egg-info directory found."
+    echo "ℹ️ No egg-info directory found. Skipping."
 fi
 
 echo "✅ Miner Neuron teardown completed successfully."

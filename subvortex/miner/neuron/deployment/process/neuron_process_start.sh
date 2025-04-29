@@ -1,54 +1,61 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-SERVICE_NAME="subvortex-miner-neuron"
+NEURON_NAME="subvortex-miner"
+SERVICE_NAME="$NEURON_NAME-neuron"
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-resolve_path() {
-    local path="$1"
+# echo "🔍 Resolving deployment paths..."
+
+# resolve_path() {
+#     local path="$1"
     
-    if command -v realpath >/dev/null 2>&1; then
-        realpath "$path"
-    else
-        # Fallback for macOS (readlink -f may not exist)
-        # Uses Python to resolve real path
-        python3 -c "import os; print(os.path.realpath('$path'))"
-    fi
-}
+#     if command -v realpath >/dev/null 2>&1; then
+#         realpath "$path"
+#     else
+#         # Fallback if realpath is not available
+#         python3 -c "import os; print(os.path.realpath('$path'))"
+#     fi
+# }
 
 # Activate virtual environment
+echo "🐍 Activating Python virtual environment..."
 source venv/bin/activate
 
 # Load environment variables
+echo "🔍 Loading environment variables from .env..."
 export $(grep -v '^#' .env | xargs)
 
-# Define deployment paths
-DEPLOY_SOURCE="$SCRIPT_DIR/../../../../../"
-DEPLOY_SOURCE=$(resolve_path "$DEPLOY_SOURCE")
-DEPLOY_LINK="$HOME/subvortex"
+# # Define deployment paths
+# DEPLOY_SOURCE="$SCRIPT_DIR/../../../../../"
+# DEPLOY_SOURCE=$(resolve_path "$DEPLOY_SOURCE")
+# DEPLOY_LINK="$HOME/subvortex"
 
-# Create parent directory if needed
-mkdir -p "$(dirname "$DEPLOY_LINK")"
+# echo "📁 Ensuring parent directory for symlink exists..."
+# mkdir -p "$(dirname "$DEPLOY_LINK")"
 
-# Atomically update symlink
-TEMP_LINK="${DEPLOY_LINK}.tmp"
+# # Create/update symlink atomically
+# TEMP_LINK="${DEPLOY_LINK}.tmp"
 
-# Create/update the temp symlink
-ln -sfn "$DEPLOY_SOURCE" "$TEMP_LINK"
+# echo "🔗 Creating temporary symlink..."
+# ln -sfn "$DEPLOY_SOURCE" "$TEMP_LINK"
 
-# On macOS and Linux: remove old symlink and rename temp
-if [ -L "$DEPLOY_LINK" ] || [ -e "$DEPLOY_LINK" ]; then
-    rm -rf "$DEPLOY_LINK"
-fi
-mv "$TEMP_LINK" "$DEPLOY_LINK"
+# echo "🧹 Removing old symlink if necessary..."
+# if [ -L "$DEPLOY_LINK" ] || [ -e "$DEPLOY_LINK" ]; then
+#     rm -rf "$DEPLOY_LINK"
+# fi
 
-echo "🔗 Symlink set: $DEPLOY_LINK → $DEPLOY_SOURCE"
+# echo "🔀 Moving temporary symlink to final location..."
+# mv "$TEMP_LINK" "$DEPLOY_LINK"
+
+# echo "✅ Symlink set: $DEPLOY_LINK → $DEPLOY_SOURCE"
 
 # Build CLI args from SUBVORTEX_ environment variables
+echo "🔧 Building CLI arguments from SUBVORTEX_ environment variables..."
 ARGS=()
 PREFIX="SUBVORTEX_"
 
@@ -62,7 +69,7 @@ while IFS= read -r line; do
         
         if [[ "$value_lower" == "true" ]]; then
             ARGS+=("$cli_key")
-            elif [[ $value_lower == "false" ]]; then
+        elif [[ "$value_lower" == "false" ]]; then
             continue
         else
             ARGS+=("$cli_key" "$value")
@@ -70,24 +77,26 @@ while IFS= read -r line; do
     fi
 done < <(env)
 
-# Start or reload PM2
-if pm2 list | grep -q "$SERVICE_NAME"; then
+# Start or reload PM2 process
+echo "🔍 Checking PM2 process: $SERVICE_NAME..."
+if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
     if [[ ${#ARGS[@]} -eq 0 ]]; then
-        echo "🔁  No additional CLI args, reloading service normally..."
+        echo "🔁 No additional CLI args, reloading service normally..."
         pm2 reload "$SERVICE_NAME" --update-env
     else
-        echo "🔁  Restarting $SERVICE_NAME with updated CLI args: ${ARGS[*]}"
+        echo "🔁 Restarting $SERVICE_NAME with updated CLI args: ${ARGS[*]}"
         pm2 restart "$SERVICE_NAME" --update-env -- "${ARGS[@]}"
     fi
 else
-    echo "🚀 Starting $SERVICE_NAME"
-    pm2 start "$DEPLOY_LINK/subvortex/miner/neuron/src/main.py" \
-    --name "$SERVICE_NAME" \
-    --interpreter python3 -- \
-    "${ARGS[@]}"
+    echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
+    pm2 start "$HOME/subvortex/subvortex/miner/neuron/src/main.py" \
+        --name "$SERVICE_NAME" \
+        --interpreter python3 -- \
+        "${ARGS[@]}"
 fi
 
+# Save PM2 state
 echo "💾 Saving PM2 process list for startup persistence..."
 pm2 save
 
-echo "✅ Miner Neuron is running"
+echo "✅ Miner Neuron started successfully."

@@ -1,28 +1,35 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+echo "🐍 Setting up Python virtual environment..."
+
 # Create virtual environment
+echo "🔧 Creating venv..."
 python3 -m venv venv
 
 # Activate virtual environment
+echo "🚀 Activating venv..."
 source venv/bin/activate
 
 # Install dependencies
 if [[ -f "requirements.txt" ]]; then
+    echo "📦 Installing Python dependencies from requirements.txt..."
     pip install -r requirements.txt
 else
-    echo "⚠️ requirements.txt not found. Skipping dependency installation."
+    echo "⚠️ requirements.txt not found — skipping dependency installation."
 fi
 
-# Install SubVortex in Editable Mode
+# Install SubVortex project in editable mode
+echo "📚 Installing SubVortex project in editable mode..."
 pip install -e ../../../
 
 # Deactivate virtual environment
+echo "🛑 Deactivating venv..."
 deactivate
 
-echo "✅ Miner Neuron setup successfully"
+echo "✅ Miner Neuron setup completed successfully."

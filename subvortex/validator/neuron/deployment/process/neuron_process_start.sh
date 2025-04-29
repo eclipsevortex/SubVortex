@@ -91,7 +91,7 @@ else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
     pm2 start "$HOME/subvortex/subvortex/validator/neuron/src/main.py" \
         --name "$SERVICE_NAME" \
-        --interpreter python3 -- \
+        --interpreter venv/bin/python3 -- \
         "${ARGS[@]}"
 fi
 

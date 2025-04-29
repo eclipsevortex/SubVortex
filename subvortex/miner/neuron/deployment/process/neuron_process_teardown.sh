@@ -14,7 +14,7 @@ echo "📦 Starting Miner Neuron PM2 teardown..."
 
 # Stop and delete the PM2 process
 echo "🔍 Checking for PM2 process: $SERVICE_NAME..."
-if pm2 list | grep -q "$SERVICE_NAME"; then
+if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
     echo "🛑 Stopping PM2 process: $SERVICE_NAME..."
     pm2 stop "$SERVICE_NAME"
     

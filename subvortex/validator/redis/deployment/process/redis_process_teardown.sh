@@ -20,7 +20,7 @@ export $(grep -v '^#' .env | xargs)
 
 # Stop and delete PM2 process if running
 echo "🛑 Stopping and deleting PM2 process if it exists..."
-if pm2 list | grep -q "$SERVICE_NAME"; then
+if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
     pm2 stop "$SERVICE_NAME" || true
     pm2 delete "$SERVICE_NAME" || true
     echo "✅ PM2 process $SERVICE_NAME removed."

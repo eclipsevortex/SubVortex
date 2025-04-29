@@ -1,50 +1,18 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-# Determine script directory dynamically to ensure everything runs in ./scripts/api/
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/../.."
+SERVICE_NAME="subvortex-validator-redis"
 
-# Include files
-source ../../../scripts/utils/machine.sh
+echo "🚀 Starting $SERVICE_NAME..."
 
-# Get the OS
-os=$(get_os)
+# Check if the service is already active
+if systemctl is-active --quiet "$SERVICE_NAME"; then
+    echo "🔁 $SERVICE_NAME is already running — restarting it..."
+    sudo systemctl restart "$SERVICE_NAME"
+else
+    echo "▶️ $SERVICE_NAME is not running — starting it..."
+    sudo systemctl start "$SERVICE_NAME"
+fi
 
-# Load environment variables
-export $(grep -v '^#' .env | xargs)
-
-start_linux_redis() {
-    systemctl daemon-reexec
-    systemctl daemon-reload
-    
-    if systemctl is-active --quiet $SERVICE_NAME; then
-        echo "Redis is already started on Ubuntu."
-    else
-        systemctl start redis-server
-    fi
-}
-
-start_macos_redis() {
-    if pgrep redis-server >/dev/null; then
-        brew services restart redis
-    else
-        brew services start redis
-    fi
-}
-
-case "$os" in
-    "linux")
-        start_linux_redis
-    ;;
-    "macos")
-        start_macos_redis
-    ;;
-    *)
-        echo "Unsupported operating system: $OS"
-        exit 1
-    ;;
-esac
-
-echo "✅ Validator Redis started successfully"
+echo "✅ Validator Redis started successfully."

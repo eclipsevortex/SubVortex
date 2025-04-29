@@ -25,4 +25,4 @@ else
     $DOCKER_CMD -f ../docker-compose.yml down validator-neuron --rmi all
 fi
 
-echo "✅ Validator teardown completed successfully."
+echo "✅ Validator Neuron teardown completed successfully."

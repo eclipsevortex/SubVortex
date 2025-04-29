@@ -58,4 +58,4 @@ else
     echo "No egg-info directory found."
 fi
 
-echo "✅ Miner teardown completed successfully."
+echo "✅ Miner Neuron teardown completed successfully."

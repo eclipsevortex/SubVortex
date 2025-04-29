@@ -25,4 +25,4 @@ pip install -e ../../../
 # Deactivate virtual environment
 deactivate
 
-echo "✅ Validator setup successfully"
+echo "✅ Validator Neuron setup successfully"

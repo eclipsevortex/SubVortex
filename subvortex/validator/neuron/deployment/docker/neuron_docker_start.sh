@@ -77,4 +77,4 @@ fi
 # Execute the command
 eval "$CMD"
 
-echo "✅ Validator started successfully"
+echo "✅ Validator Neuron started successfully"

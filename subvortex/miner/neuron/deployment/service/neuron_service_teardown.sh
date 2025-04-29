@@ -22,7 +22,8 @@ if systemctl list-units --type=service --all | grep -q "${SERVICE_NAME}.service"
     sudo rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
     
     echo "Reloading systemd daemon..."
-    systemctl daemon-reload
+    sudo systemctl daemon-reexec
+    sudo systemctl daemon-reload
 else
     echo "Systemd service ${SERVICE_NAME}.service not found. Skipping stop/disable."
 fi
@@ -74,4 +75,4 @@ else
     echo "No egg-info directory found."
 fi
 
-echo "✅ Miner teardown completed successfully."
+echo "✅ Miner Neuron teardown completed successfully."

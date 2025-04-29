@@ -1,0 +1,17 @@
+[Unit]
+Description=SubVortex Validator Redis
+After=network.target
+
+[Service]
+WorkingDirectory=/root/subvortex/subvortex/validator/redis
+EnvironmentFile=/root/subvortex/subvortex/validator/redis/.env
+ExecStart=/usr/bin/redis-server /etc/redis/redis.conf
+StandardOutput=append:/var/log/subvortex-validator/subvortex-validator-redis.log
+StandardError=append:/var/log/subvortex-validator/subvortex-validator-redis-error.log
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target

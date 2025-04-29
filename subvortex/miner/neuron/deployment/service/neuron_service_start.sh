@@ -100,4 +100,4 @@ else
   systemctl start $SERVICE_NAME
 fi
 
-echo "✅ Miner started successfully"
+echo "✅ Miner Neuron started successfully"

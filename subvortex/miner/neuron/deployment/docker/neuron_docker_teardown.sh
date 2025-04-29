@@ -22,4 +22,4 @@ else
     $DOCKER_CMD -f ../docker-compose.yml down miner-neuron --rmi all
 fi
 
-echo "✅ Miner teardown completed successfully."
+echo "✅ Miner Neuron teardown completed successfully."

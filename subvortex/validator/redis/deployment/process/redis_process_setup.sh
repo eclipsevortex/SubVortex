@@ -1,84 +1,54 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-# Determine script directory dynamically to ensure everything runs in ./scripts/api/
+# Determine script directory dynamically
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-# Include files
-source ../../../scripts/utils/machine.sh
-
-# Get the OS
-os=$(get_os)
+NEURON_NAME="subvortex-validator"
+SERVICE_NAME="$NEURON_NAME-redis"
+DEPLOY_TEMPLATES="./deployment/templates"
+CONFIG_DEST="/etc/redis"
+REDIS_CONF="$CONFIG_DEST/redis.conf"
 
 # Load environment variables
+echo "🔍 Loading environment variables from .env..."
 export $(grep -v '^#' .env | xargs)
 
-install_redis_ubuntu() {
-    if command -v redis-server >/dev/null 2>&1; then
-        echo "Redis is already installed on Ubuntu."
-    else
-        echo "Installing Redis on Ubuntu..."
-        sudo apt update
-        sudo apt install -y redis-server
-        sudo systemctl enable redis-server
-    fi
-    
-    if [[ -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
-        echo "Setting Redis password..."
-        REDIS_CONF="/etc/redis/redis.conf"
-        if grep -q "^requirepass" "$REDIS_CONF"; then
-            sudo sed -i "s/^requirepass .*/requirepass $SUBVORTEX_REDIS_PASSWORD/" "$REDIS_CONF"
-        else
-            sudo sed -i "/^# requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
-        fi
-        sudo systemctl restart redis-server
-    fi
-}
+echo "📂 Preparing /etc/redis directory..."
+sudo mkdir -p "$CONFIG_DEST"
 
-install_redis_macos() {
-    if command -v redis-server >/dev/null 2>&1; then
-        echo "Redis is already installed on macOS."
-    else
-        echo "Installing Redis on macOS..."
-        if ! command -v brew &>/dev/null; then
-            echo "Homebrew is not installed. Installing Homebrew first..."
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        fi
-        brew install redis
-    fi
-    
-    if [[ -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
-        echo "Setting Redis password..."
-        REDIS_CONF="/opt/homebrew/etc/redis.conf"
-        if grep -q "^requirepass" "$REDIS_CONF"; then
-            sed -i '' "s/^requirepass .*/requirepass $SUBVORTEX_REDIS_PASSWORD/" "$REDIS_CONF"
-        else
-            sed -i '' "s/^# requirepass .*/requirepass $SUBVORTEX_REDIS_PASSWORD/" "$REDIS_CONF"
-        fi
-    fi
-}
+echo "📂 Copying Redis config BEFORE installing redis-server..."
+if [ ! -f "$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf" ]; then
+  echo "❌ Missing template: $DEPLOY_TEMPLATES/${SERVICE_NAME}.conf"
+  exit 1
+fi
+sudo cp "$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf" "$REDIS_CONF"
+sudo chown root:root "$REDIS_CONF"
 
-case "$os" in
-    "linux")
-        if [ -f /etc/os-release ]; then
-            . /etc/os-release
-            if [[ "$ID" == "ubuntu" ]]; then
-                install_redis_ubuntu
-            else
-                echo "Unsupported Linux distribution. Please install Redis manually."
-                exit 1
-            fi
-        fi
-    ;;
-    "macos")
-        install_redis_macos
-    ;;
-    *)
-        echo "Unsupported operating system: $OS"
-        exit 1
-    ;;
-esac
+# 🔐 Inject Redis password if env variable is set
+if [[ -n "${SUBVORTEX_REDIS_PASSWORD:-}" ]]; then
+  echo "🔐 Injecting Redis password into redis.conf..."
+  if grep -q "^requirepass" "$REDIS_CONF"; then
+    sudo sed -i "s/^requirepass .*/requirepass $SUBVORTEX_REDIS_PASSWORD/" "$REDIS_CONF"
+  else
+    sudo sed -i "/^# requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
+  fi
+else
+  echo "⚠️ Environment variable SUBVORTEX_REDIS_PASSWORD is not set — skipping password injection."
+fi
 
-echo "✅ Validator Redis setup successfully"
+echo "📁 Preparing log directory..."
+sudo mkdir -p "/var/log/$SERVICE_NAME"
+sudo chown root:root "/var/log/$SERVICE_NAME"
+
+echo "🚀 Installing Redis server if not already installed..."
+if ! command -v redis-server >/dev/null; then
+  sudo apt update
+  sudo apt install -y -o Dpkg::Options::="--force-confold" redis-server
+else
+  echo "✅ redis-server already installed."
+fi
+
+echo "✅ Validator Redis setup completed successfully."

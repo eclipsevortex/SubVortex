@@ -25,4 +25,4 @@ pip install -e ../../../
 # Deactivate virtual environment
 deactivate
 
-echo "✅ Miner setup successfully"
+echo "✅ Miner Neuron setup successfully"

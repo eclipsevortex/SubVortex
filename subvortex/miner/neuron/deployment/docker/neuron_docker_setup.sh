@@ -22,4 +22,4 @@ else
     $DOCKER_CMD -f ../docker-compose.yml pull miner-neuron
 fi
 
-echo "✅ Miner setup successfully"
+echo "✅ Miner Neuron setup successfully"

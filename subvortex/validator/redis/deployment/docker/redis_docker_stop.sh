@@ -1,28 +1,38 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-# Load environment variables
+echo "🔍 Loading environment variables from .env..."
 export $(grep -v '^#' .env | xargs)
 
-# Check which command is available
+# Check Docker Compose availability
+echo "🔎 Checking Docker Compose installation..."
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
     DOCKER_CMD="docker compose"
+    echo "✅ Found: docker compose (Docker CLI plugin)"
 elif command -v docker-compose &> /dev/null; then
     DOCKER_CMD="docker-compose"
+    echo "✅ Found: docker-compose (legacy standalone)"
 else
-    echo "Neither 'docker compose' nor 'docker-compose' is installed. Please install Docker Compose."
+    echo "❌ Neither 'docker compose' nor 'docker-compose' is installed. Please install Docker Compose."
     exit 1
 fi
 
-if [ -n "$SUBVORTEX_LOCAL" ]; then
-    $DOCKER_CMD -f ../docker-compose.local.yml stop validator-redis
+# Choose compose file
+if [ -n "${SUBVORTEX_LOCAL:-}" ]; then
+    echo "🛠 Local environment detected (SUBVORTEX_LOCAL is set). Using local compose file."
+    COMPOSE_FILE="../docker-compose.local.yml"
 else
-    $DOCKER_CMD -f ../docker-compose.yml stop validator-redis
+    echo "🌍 Production environment detected. Using standard compose file."
+    COMPOSE_FILE="../docker-compose.yml"
 fi
 
-echo "✅ Validator Redis started successfully"
+# Stop the validator-redis container
+echo "🛑 Stopping Validator Redis container..."
+$DOCKER_CMD -f "$COMPOSE_FILE" stop validator-redis
+
+echo "✅ Validator Redis container stopped successfully."

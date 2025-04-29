@@ -1,50 +1,32 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-# Determine script directory dynamically to ensure everything runs in ./scripts/api/
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/../.."
+SERVICE_NAME="subvortex-validator-redis"
+CONFIG_FILE="/etc/redis/redis.conf"
 
-# Include files
-source ../../../scripts/utils/machine.sh
+echo "▶️ Starting $SERVICE_NAME via PM2 using config: $CONFIG_FILE"
 
-# Get the OS
-os=$(get_os)
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo "❌ Redis config not found at $CONFIG_FILE. Run setup.sh first."
+  exit 1
+fi
 
-# Load environment variables
-export $(grep -v '^#' .env | xargs)
-
-start_linux_redis() {
-    systemctl daemon-reexec
-    systemctl daemon-reload
-    
-    if systemctl is-active --quiet $SERVICE_NAME; then
-        echo "Redis is already started on Ubuntu."
+# Check if process is already managed by PM2
+if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
+    if pm2 status "$SERVICE_NAME" | grep -q "online"; then
+        echo "🔁 $SERVICE_NAME is already running — reloading..."
+        pm2 reload "$SERVICE_NAME" --update-env
     else
-        systemctl start redis-server
+        echo "♻️ $SERVICE_NAME exists but not running — restarting..."
+        pm2 restart "$SERVICE_NAME" --update-env
     fi
-}
+else
+    echo "🚀 Starting $SERVICE_NAME via PM2..."
+    pm2 start redis-server --name "$SERVICE_NAME" -- "$CONFIG_FILE"
+fi
 
-start_macos_redis() {
-    if pgrep redis-server >/dev/null; then
-        brew services restart redis
-    else
-        brew services start redis
-    fi
-}
+echo "💾 Saving PM2 process list for startup persistence..."
+pm2 save
 
-case "$os" in
-    "linux")
-        start_linux_redis
-    ;;
-    "macos")
-        start_macos_redis
-    ;;
-    *)
-        echo "Unsupported operating system: $OS"
-        exit 1
-    ;;
-esac
-
-echo "✅ Validator Redis started successfully"
+echo "✅ Validator Redis started successfully."

@@ -11,3 +11,5 @@ if pm2 list | grep -q "$SERVICE_NAME"; then
 else
   echo "ℹ️ $SERVICE_NAME is not running"
 fi
+
+echo "✅ Miner Neuron started successfully"

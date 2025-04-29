@@ -25,4 +25,4 @@ else
     $DOCKER_CMD -f ../docker-compose.yml stop validator-neuron
 fi
 
-echo "✅ Validator started successfully"
+echo "✅ Validator Neuron stopped successfully"

@@ -77,4 +77,4 @@ fi
 # Execute the command
 eval "$CMD"
 
-echo "✅ Miner started successfully"
+echo "✅ Miner Neuron started successfully"

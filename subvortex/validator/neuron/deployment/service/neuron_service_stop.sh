@@ -12,3 +12,5 @@ if systemctl is-active --quiet "$SERVICE_NAME"; then
 else
   echo "ℹ️ $SERVICE_NAME is not running"
 fi
+
+echo "✅ Validator Neuron stopped successfully"

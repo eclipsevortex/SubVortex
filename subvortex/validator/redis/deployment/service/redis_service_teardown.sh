@@ -1,55 +1,46 @@
 #!/bin/bash
+set -euo pipefail
 
-set -e
+NEURON_NAME="subvortex-validator"
+SERVICE_NAME="$NEURON_NAME-redis"
 
-# Determine script directory dynamically to ensure everything runs in ./scripts/api/
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/../.."
+echo "📦 Starting teardown for $SERVICE_NAME..."
 
-# Include files
-source ../../../scripts/utils/machine.sh
+# Stop and disable the systemd service if it exists
+if systemctl list-units --type=service --all | grep -q "${SERVICE_NAME}.service"; then
+    echo "🛑 Stopping systemd service: $SERVICE_NAME..."
+    sudo systemctl stop "${SERVICE_NAME}.service"
 
-# Get the OS
-os=$(get_os)
+    echo "🚫 Disabling systemd service: $SERVICE_NAME..."
+    sudo systemctl disable "${SERVICE_NAME}.service"
 
-# Load environment variables
-export $(grep -v '^#' .env | xargs)
+    echo "🧹 Removing systemd service file..."
+    sudo rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
 
-uninstall_redis_ubuntu() {
-    echo "Stopping and uninstalling Redis on Ubuntu..."
-    sudo systemctl stop redis-server
-    sudo systemctl disable redis-server
+    echo "🔄 Reloading systemd daemon..."
+    sudo systemctl daemon-reexec
+    sudo systemctl daemon-reload
+else
+    echo "ℹ️ Systemd service ${SERVICE_NAME}.service not found. Skipping stop/disable."
+fi
+
+# Remove log directory
+LOG_DIR="/var/log/$NEURON_NAME"
+if [[ -d "$LOG_DIR" ]]; then
+    echo "🧹 Removing log directory: $LOG_DIR"
+    sudo rm -rf "$LOG_DIR"
+else
+    echo "ℹ️ Log directory $LOG_DIR does not exist. Skipping."
+fi
+
+# Remove redis-server package if installed
+echo "🔍 Checking if redis-server is installed..."
+if dpkg -s redis-server >/dev/null 2>&1; then
+    echo "🧼 Removing redis-server package..."
     sudo apt purge -y redis-server
     sudo apt autoremove -y
-    sudo rm -rf /etc/redis /var/lib/redis /var/log/redis
-    sudo systemctl daemon-reload
-    sudo systemctl reset-failed
-
-    echo "Redis uninstallation complete on Ubuntu."
-}
-
-uninstall_redis_macos() {
-    echo "Stopping and uninstalling Redis on macOS..."
-    if command -v brew &>/dev/null; then
-        brew services stop redis
-        brew uninstall redis
-        echo "Redis uninstallation complete on macOS."
-    else
-        echo "Homebrew not found. Skipping Redis removal."
-    fi
-}
-
-case "$os" in
-    "linux")
-        uninstall_redis_ubuntu
-    ;;
-    "macos")
-        uninstall_redis_macos
-    ;;
-    *)
-        echo "Unsupported operating system: $os"
-        exit 1
-    ;;
-esac
+else
+    echo "ℹ️ redis-server not installed. Nothing to remove."
+fi
 
 echo "✅ Validator Redis teardown completed successfully."

@@ -25,4 +25,4 @@ else
     $DOCKER_CMD -f ../docker-compose.yml stop miner-neuron
 fi
 
-echo "✅ Miner started successfully"
+echo "✅ Miner Neuron started successfully"

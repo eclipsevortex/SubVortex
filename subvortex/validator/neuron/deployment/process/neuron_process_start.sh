@@ -87,4 +87,8 @@ else
     "${ARGS[@]}"
 fi
 
-echo "✅ $SERVICE_NAME is running"
+echo "💾 Saving PM2 process list for startup persistence..."
+pm2 save
+
+echo "✅ Validator Neuron started successfully"
+

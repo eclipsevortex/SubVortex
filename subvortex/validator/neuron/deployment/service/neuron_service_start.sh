@@ -100,4 +100,4 @@ else
   systemctl start $SERVICE_NAME
 fi
 
-echo "✅ Validator started successfully"
+echo "✅ Validator Neuron started successfully"

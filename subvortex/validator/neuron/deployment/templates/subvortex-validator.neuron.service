@@ -1,5 +1,5 @@
 [Unit]
-Description=SubVortex Validator
+Description=SubVortex Validator Neuron
 After=network.target
 
 [Service]

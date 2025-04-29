@@ -1,5 +1,5 @@
 [Unit]
-Description=SubVortex Miner
+Description=SubVortex Miner Neuron
 After=network.target
 
 [Service]

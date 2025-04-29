@@ -25,4 +25,4 @@ else
     $DOCKER_CMD -f ../docker-compose.yml pull validator-neuron
 fi
 
-echo "✅ Validator setup successfully"
+echo "✅ Validator Neuron setup successfully"

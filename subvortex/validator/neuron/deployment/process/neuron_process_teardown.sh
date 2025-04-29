@@ -2,7 +2,7 @@
 
 set -e
 
-SERVICE_NAME=subvortex-validator
+SERVICE_NAME=subvortex-validator-neuron
 PACKAGE_NAME=subvortex
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/

@@ -2,7 +2,7 @@
 
 set -e
 
-SERVICE_NAME=subvortex-miner
+SERVICE_NAME=subvortex-miner-neuron
 PACKAGE_NAME=subvortex
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/

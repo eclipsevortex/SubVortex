@@ -2,7 +2,8 @@
 
 set -e
 
-SERVICE_NAME=subvortex-validator
+NEURON_NAME=subvortex-validator
+SERVICE_NAME="$NEURON_NAME-neuron"
 PACKAGE_NAME=subvortex
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
@@ -27,7 +28,7 @@ else
 fi
 
 # Remove log directory
-LOG_DIR="/var/log/$SERVICE_NAME"
+LOG_DIR="/var/log/$NEURON_NAME"
 if [[ -d "$LOG_DIR" ]]; then
     echo "Removing log directory: $LOG_DIR"
     sudo rm -rf "$LOG_DIR"

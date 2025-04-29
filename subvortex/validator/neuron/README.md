@@ -72,7 +72,7 @@ To start the SubVortex Validator, you can run
 To check the SubVortex Validator is up and running, you can run
 
 ```
-systemctl status subvortex-validator
+systemctl status subvortex-validator-neuron
 ```
 
 You should see something like
@@ -104,7 +104,7 @@ To check the SubVortex Validator is up and running, you can run
 docker ps
 ```
 
-You should see a container named `subvortex-validator`.
+You should see a container named `subvortex-validator-neuron`.
 
 <br />
 
@@ -137,13 +137,13 @@ To uninstall the SubVortex Validator, you can run
 To check the SubVortex Validator has been uninstalled, you can run
 
 ```
-systemctl status subvortex-validator
+systemctl status subvortex-validator-neuron
 ```
 
 You should see something like
 
 ```
-Unit subvortex-validator.service could not be found.
+Unit subvortex-validator-neuron.service could not be found.
 ```
 
 ## As docker container <a id="uninstall-as-container"></a>
@@ -160,4 +160,4 @@ To check the SubVortex Validator has been uninstalled, you can run
 docker ps
 ```
 
-You should not see any container named `subvortex-validator`.
+You should not see any container named `subvortex-validator-neuron`.

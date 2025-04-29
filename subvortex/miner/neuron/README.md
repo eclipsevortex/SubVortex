@@ -46,7 +46,7 @@ To start the SubVortex Miner, you can run
 To check the SubVortex Miner is up and running, you can run
 
 ```
-pm2 log subvortex-miner
+pm2 log subvortex-miner-neuron
 ```
 
 You should see something like
@@ -72,7 +72,7 @@ To start the SubVortex Miner, you can run
 To check the SubVortex Miner is up and running, you can run
 
 ```
-systemctl status subvortex-miner
+systemctl status subvortex-miner-neuron
 ```
 
 You should see something like
@@ -104,7 +104,7 @@ To check the SubVortex Miner is up and running, you can run
 docker ps
 ```
 
-You should see a container named `subvortex-miner`.
+You should see a container named `subvortex-miner-neuron`.
 
 <br />
 
@@ -124,7 +124,7 @@ To check the SubVortex Miner has been uninstalled, you can run
 pm2 list
 ```
 
-You should not see any process named `subvortex-miner`.
+You should not see any process named `subvortex-miner-neuron`.
 
 ## As service <a id="uninstall-as-service"></a>
 
@@ -137,13 +137,13 @@ To uninstall the SubVortex Miner, you can run
 To check the SubVortex Miner has been uninstalled, you can run
 
 ```
-systemctl status subvortex-miner
+systemctl status subvortex-miner-neuron
 ```
 
 You should see something like
 
 ```
-Unit subvortex-miner.service could not be found.
+Unit subvortex-miner-neuron.service could not be found.
 ```
 
 ## As docker container <a id="uninstall-as-container"></a>
@@ -160,4 +160,4 @@ To check the SubVortex Miner has been uninstalled, you can run
 docker ps
 ```
 
-You should not see any container named `subvortex-miner`.
+You should not see any container named `subvortex-miner-neuron`.

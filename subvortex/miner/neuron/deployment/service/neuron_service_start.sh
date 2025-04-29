@@ -2,7 +2,7 @@
 
 set -e
 
-SERVICE_NAME="subvortex-miner"
+SERVICE_NAME="subvortex-miner-neuron"
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,7 +76,7 @@ MODULE="subvortex.miner.neuron.src.main"
 FULL_EXEC_START="$PYTHON_EXEC -m $MODULE ${ARGS[*]}"
 
 # Path setup
-SERVICE_NAME="subvortex-miner"
+SERVICE_NAME="subvortex-miner-neuron"
 TEMPLATE_PATH="./deployment/templates/${SERVICE_NAME}.service"
 TEMP_TEMPLATE="/tmp/${SERVICE_NAME}.service.template"
 

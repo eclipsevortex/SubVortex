@@ -2,7 +2,7 @@
 
 set -e
 
-SERVICE_NAME="subvortex-miner"
+SERVICE_NAME="subvortex-miner-neuron"
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

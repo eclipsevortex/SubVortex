@@ -2,7 +2,7 @@
 
 set -e
 
-SERVICE_NAME="subvortex-validator"
+SERVICE_NAME="subvortex-validator-neuron"
 
 # Check if PM2 process is running and stop it
 if pm2 list | grep -q "$SERVICE_NAME"; then

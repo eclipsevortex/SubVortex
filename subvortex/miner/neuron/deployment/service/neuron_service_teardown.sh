@@ -2,7 +2,8 @@
 
 set -e
 
-SERVICE_NAME=subvortex-miner
+NEURON_NAME=subvortex-miner
+SERVICE_NAME="$NEURON_NAME-neuron"
 PACKAGE_NAME=subvortex
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
@@ -13,13 +14,13 @@ cd "$SCRIPT_DIR/../.."
 if systemctl list-units --type=service --all | grep -q "${SERVICE_NAME}.service"; then
     echo "Stopping systemd service $SERVICE_NAME..."
     systemctl stop "${SERVICE_NAME}.service"
-
+    
     echo "Disabling systemd service $SERVICE_NAME..."
     systemctl disable "${SERVICE_NAME}.service"
-
+    
     echo "Removing systemd service file..."
     sudo rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
-
+    
     echo "Reloading systemd daemon..."
     systemctl daemon-reload
 else
@@ -27,7 +28,7 @@ else
 fi
 
 # Remove log directory
-LOG_DIR="/var/log/$SERVICE_NAME"
+LOG_DIR="/var/log/$NEURON_NAME"
 if [[ -d "$LOG_DIR" ]]; then
     echo "Removing log directory: $LOG_DIR"
     sudo rm -rf "$LOG_DIR"
@@ -39,14 +40,14 @@ fi
 if [[ -d "venv" ]]; then
     echo "Activating virtual environment to uninstall dependencies..."
     source "venv/bin/activate"
-
+    
     if pip list | grep -q "$PACKAGE_NAME"; then
         echo "Uninstalling editable package: $PACKAGE_NAME..."
         pip uninstall -y "$PACKAGE_NAME"
     else
         echo "Editable package $PACKAGE_NAME not found. Skipping."
     fi
-
+    
     # Uninstall dependencies
     if [[ -f "requirements.txt" ]]; then
         echo "Uninstalling dependencies..."
@@ -54,10 +55,10 @@ if [[ -d "venv" ]]; then
     else
         echo "requirements.txt not found. Skipping dependency uninstallation."
     fi
-
+    
     # Deactivate virtual environment
     deactivate
-
+    
     echo "Removing virtual environment..."
     rm -rf "venv"
 else

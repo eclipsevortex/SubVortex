@@ -2,7 +2,7 @@
 
 set -e
 
-SERVICE_NAME="subvortex-validator"
+SERVICE_NAME="subvortex-validator-neuron"
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

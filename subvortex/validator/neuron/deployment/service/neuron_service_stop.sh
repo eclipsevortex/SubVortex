@@ -2,7 +2,7 @@
 
 set -e
 
-SERVICE_NAME="subvortex-validator"
+SERVICE_NAME="subvortex-validator-neuron"
 
 echo "🔍 Checking $SERVICE_NAME status..."
 

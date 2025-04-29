@@ -21,19 +21,22 @@ echo "📦 Current release: $RAW_VERSION_TAG (prerelease=$IS_PRERELEASE)"
 echo "🔍 Getting manifest for $IMAGE:$VERSION"
 docker buildx imagetools inspect "$IMAGE:$VERSION"
 
-# Fetch all GitHub releases
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-ALL_RELEASES=$(gh api "/repos/$REPO/releases" --paginate | jq -rc '[.[] | select(.draft == false)] | sort_by(.created_at) | reverse')
+# Floating tags
+DEV_TAG="$RAW_VERSION_TAG"
+STABLE_TAG=""
+LATEST_TAG=""
 
-# Safe extract function
-jq_extract_or_empty() {
-  echo "$ALL_RELEASES" | jq -r "$1" | grep -v '^null$' || echo ""
-}
-
-# Determine floating tag targets
-DEV_TAG=$(jq_extract_or_empty '.[0].tag_name')
-STABLE_TAG=$(jq_extract_or_empty 'map(select(.tag_name | test("-alpha") | not)) | .[0].tag_name')
-LATEST_TAG=$(jq_extract_or_empty 'map(select(.prerelease == false)) | .[0].tag_name')
+if [[ "$RAW_VERSION_TAG" =~ -alpha\. || "$RAW_VERSION_TAG" =~ -beta\. ]]; then
+  # Alpha or beta → only dev
+  :
+elif [[ "$RAW_VERSION_TAG" =~ -rc\. ]]; then
+  # Release candidate → dev + stable
+  STABLE_TAG="$RAW_VERSION_TAG"
+else
+  # No suffix = final release → dev + stable + latest
+  STABLE_TAG="$RAW_VERSION_TAG"
+  LATEST_TAG="$RAW_VERSION_TAG"
+fi
 
 echo "🔁 Will update Docker floating tags:"
 printf "    dev     → %s\n" "${DEV_TAG:-<none>}"

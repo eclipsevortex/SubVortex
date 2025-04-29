@@ -26,7 +26,4 @@ else
     pm2 start redis-server --name "$SERVICE_NAME" -- "$CONFIG_FILE"
 fi
 
-echo "💾 Saving PM2 process list for startup persistence..."
-pm2 save
-
 echo "✅ Validator Redis started successfully."

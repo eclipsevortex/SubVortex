@@ -95,8 +95,4 @@ else
         "${ARGS[@]}"
 fi
 
-# Save PM2 state
-echo "💾 Saving PM2 process list for startup persistence..."
-pm2 save
-
 echo "✅ Miner Neuron started successfully."

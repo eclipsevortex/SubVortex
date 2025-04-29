@@ -1,0 +1,232 @@
+name: Docker Build & Push All Services
+
+on:
+  delete:
+
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-*"
+
+  release:
+    types: [published]
+
+jobs:
+  discover:
+    if: github.event_name == 'push' || github.event_name == 'release'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🧠 Discover components and services
+        id: set-matrix
+        run: |
+          # Customize these lists as needed
+          mkdir -p .build/tmp_matrix
+          echo '{ "include": [' > .build/tmp_matrix/matrix.json
+          FIRST=true
+
+          for comp in subvortex/*; do
+            [ -d "$comp" ] || continue
+            comp_name=$(basename "$comp")
+
+            for service in "$comp"/*; do
+              [ -d "$service" ] || continue
+              service_name=$(basename "$service")
+
+              # ✅ Include only if it has a pyproject or version.py
+              if [[ -f "$service/pyproject.toml" || -f "$service/version.py" ]]; then
+                if [ "$FIRST" = true ]; then
+                  FIRST=false
+                else
+                  echo "," >> .build/tmp_matrix/matrix.json
+                fi
+                echo "  { \"component\": \"$comp_name\", \"service\": \"$service_name\" }" >> .build/tmp_matrix/matrix.json
+              fi
+            done
+          done
+
+          echo "] }" >> .build/tmp_matrix/matrix.json
+
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          cat .build/tmp_matrix/matrix.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "🔍 Final matrix ready."
+
+  build:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [discover]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.discover.outputs.matrix).include }}
+
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🛠 Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          docker run --privileged --rm tonistiigi/binfmt --install all || true
+
+      - name: 🛠 Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      - name: 🧱 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: 🔐 Docker Login to GitHub Container Registry (ghcr.io)
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: 🧠 Generate build tag from hash
+        id: meta
+        run: |
+          HASH=$(sha256sum subvortex/core/Dockerfile.builder | cut -d ' ' -f1)
+          echo "tag=ghcr.io/${{ github.repository_owner }}/subvortex-wheel-builder:3.11-$HASH" >> $GITHUB_OUTPUT
+
+      - name: 🐋 Build & push wheel-builder (only if not exists)
+        if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push'
+        id: wheelbuilder
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          LATEST_TAG="ghcr.io/${{ github.repository_owner }}/subvortex-wheel-builder:latest"
+
+          if docker pull "$TAG" >/dev/null 2>&1; then
+            echo "✅ Image already exists: $TAG"
+          else
+            echo "🚀 Building wheel-builder image"
+            docker buildx build \
+              --platform linux/amd64 \
+              --tag "$TAG" \
+              --tag "$LATEST_TAG" \
+              --file subvortex/core/Dockerfile.builder \
+              --push \
+              .
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: 🧠 Determine tag and floating tags
+        id: taginfo
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "version_tag=$TAG" >> $GITHUB_OUTPUT
+
+          FLOATING_TAGS="dev"
+          if [[ "$TAG" == *-rc* ]]; then
+            FLOATING_TAGS="dev stable"
+          elif [[ "$TAG" != *-* ]]; then
+            FLOATING_TAGS="dev stable latest"
+          fi
+          echo "floating_tags=$FLOATING_TAGS" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Build and push version-tagged image (on tag push only)
+        if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push'
+        run: |
+          .github/scripts/on_tag_pushed.sh \
+            "${{ matrix.component }}" \
+            "${{ matrix.service }}" \
+            "${{ steps.meta.outputs.tag }}" \
+            "${{ steps.taginfo.outputs.version_tag }}"
+
+  delete:
+    if: github.event_name == 'delete' && github.event.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🔐 Docker Login to GitHub Container Registry (ghcr.io)
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: 🧹 Remove version-tagged images (on tag delete)
+        run: |
+          TAG="${GITHUB_EVENT_REF#refs/tags/}"
+          .github/scripts/on_tag_deleted.sh "$TAG"
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GITHUB_EVENT_REF: ${{ github.event.ref }}
+
+  release:
+    if: github.event_name == 'release' && github.event.action == 'published'
+    needs: [discover]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.discover.outputs.matrix).include }}
+
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🛠 Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          docker run --privileged --rm tonistiigi/binfmt --install all || true
+
+      - name: 🛠 Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      - name: 🧱 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: 🔐 Docker Login to GitHub Container Registry (ghcr.io)
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: 🧠 Determine tag and floating tags
+        id: taginfo
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "version_tag=$TAG" >> $GITHUB_OUTPUT
+
+          FLOATING_TAGS="dev"
+          if [[ "$TAG" == *-rc* ]]; then
+            FLOATING_TAGS="dev stable"
+          elif [[ "$TAG" != *-* ]]; then
+            FLOATING_TAGS="dev stable latest"
+          fi
+          echo "floating_tags=$FLOATING_TAGS" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Retag and push floating tags (on release or prerelease)
+        if: github.event_name == 'release' && github.event.action != 'deleted'
+        run: |
+          .github/scripts/on_release_pushed.sh \
+            "${{ matrix.component }}" \
+            "${{ matrix.service }}" \
+            "${{ steps.taginfo.outputs.version_tag }}" \
+            "${{ github.event.release.prerelease }}" \
+            "${{ github.event.release.draft }}"
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_TOKEN }}

@@ -9,6 +9,7 @@ ExecStart=/usr/bin/redis-server /etc/redis/redis.conf
 StandardOutput=append:/var/log/subvortex-validator/subvortex-validator-redis.log
 StandardError=append:/var/log/subvortex-validator/subvortex-validator-redis-error.log
 Environment=PYTHONUNBUFFERED=1
+TimeoutStopSec=10
 Restart=on-failure
 RestartSec=10
 User=root

@@ -9,18 +9,47 @@ SERVICE_NAME="$NEURON_NAME-neuron"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-# echo "🔍 Resolving deployment paths..."
+show_help() {
+    echo "Usage: $0 [--recreate]"
+    echo
+    echo "Description:"
+    echo "  This script start the validator neuron"
+    echo
+    echo "Options:"
+    echo "  --working-dir    Working directory. Default $HOME/subvortex"
+    echo "  --help        Show this help message"
+    exit 0
+}
 
-# resolve_path() {
-#     local path="$1"
-    
-#     if command -v realpath >/dev/null 2>&1; then
-#         realpath "$path"
-#     else
-#         # Fallback if realpath is not available
-#         python3 -c "import os; print(os.path.realpath('$path'))"
-#     fi
-# }
+OPTIONS="w:h"
+LONGOPTIONS="working-dir:,help"
+
+# Parse the options and their arguments
+params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+# Set defaults from env (can be overridden by arguments)
+WORKING_DIR="$HOME/subvortex/subvortex/validator/neuron"
+
+# Parse command-line arguments
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -r|--working-dir)
+            WORKING_DIR="$2"
+            shift 2
+        ;;
+        -h | --help)
+            show_help
+            exit 0
+        ;;
+        *)
+            echo "Unrecognized option '$1'"
+            exit 1
+        ;;
+    esac
+done
 
 # Activate virtual environment
 echo "🐍 Activating Python virtual environment..."
@@ -29,30 +58,6 @@ source venv/bin/activate
 # Load environment variables
 echo "🔍 Loading environment variables from .env..."
 export $(grep -v '^#' .env | xargs)
-
-# # Define deployment paths
-# DEPLOY_SOURCE="$SCRIPT_DIR/../../../../../"
-# DEPLOY_SOURCE=$(resolve_path "$DEPLOY_SOURCE")
-# DEPLOY_LINK="$HOME/subvortex"
-
-# echo "📁 Ensuring parent directory for symlink exists..."
-# mkdir -p "$(dirname "$DEPLOY_LINK")"
-
-# # Create/update symlink atomically
-# TEMP_LINK="${DEPLOY_LINK}.tmp"
-
-# echo "🔗 Creating temporary symlink..."
-# ln -sfn "$DEPLOY_SOURCE" "$TEMP_LINK"
-
-# echo "🧹 Removing old symlink if necessary..."
-# if [ -L "$DEPLOY_LINK" ] || [ -e "$DEPLOY_LINK" ]; then
-#     rm -rf "$DEPLOY_LINK"
-# fi
-
-# echo "🔀 Moving temporary symlink to final location..."
-# mv "$TEMP_LINK" "$DEPLOY_LINK"
-
-# echo "✅ Symlink set: $DEPLOY_LINK → $DEPLOY_SOURCE"
 
 # Build CLI args from SUBVORTEX_ environment variables
 echo "🔧 Building CLI arguments from SUBVORTEX_ environment variables..."
@@ -89,9 +94,10 @@ if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
     fi
 else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
-    pm2 start "$HOME/subvortex/subvortex/validator/neuron/src/main.py" \
+    pm2 start src/main.py \
         --name "$SERVICE_NAME" \
-        --interpreter venv/bin/python3 -- \
+        --cwd "$WORKING_DIR" \
+        --interpreter "$WORKING_DIR/venv/bin/python3" -- \
         "${ARGS[@]}"
 fi
 

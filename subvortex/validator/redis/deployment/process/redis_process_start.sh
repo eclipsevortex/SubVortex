@@ -8,8 +8,8 @@ CONFIG_FILE="/etc/redis/redis.conf"
 echo "▶️ Starting $SERVICE_NAME via PM2 using config: $CONFIG_FILE"
 
 if [ ! -f "$CONFIG_FILE" ]; then
-  echo "❌ Redis config not found at $CONFIG_FILE. Run setup.sh first."
-  exit 1
+    echo "❌ Redis config not found at $CONFIG_FILE. Run setup.sh first."
+    exit 1
 fi
 
 # Check if process is already managed by PM2

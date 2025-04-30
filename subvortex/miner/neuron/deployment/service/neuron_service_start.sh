@@ -9,19 +9,6 @@ SERVICE_NAME="$NEURON_NAME-neuron"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-# echo "🔍 Resolving deployment paths..."
-
-# resolve_path() {
-#   local path="$1"
-  
-#   if command -v realpath >/dev/null 2>&1; then
-#     realpath "$path"
-#   else
-#     # Fallback for macOS / systems without realpath
-#     python3 -c "import os; print(os.path.realpath('$path'))"
-#   fi
-# }
-
 # Activate virtual environment
 echo "🐍 Activating Python virtual environment..."
 source venv/bin/activate
@@ -29,30 +16,6 @@ source venv/bin/activate
 # Load environment variables
 echo "🔍 Loading environment variables from .env..."
 export $(grep -v '^#' .env | xargs)
-
-# # Define deployment paths
-# DEPLOY_SOURCE="$SCRIPT_DIR/../../../../../"
-# DEPLOY_SOURCE=$(resolve_path "$DEPLOY_SOURCE")
-# DEPLOY_LINK="$HOME/subvortex"
-
-# echo "📁 Ensuring parent directory for symlink exists..."
-# mkdir -p "$(dirname "$DEPLOY_LINK")"
-
-# # Atomically update symlink
-# TEMP_LINK="${DEPLOY_LINK}.tmp"
-
-# echo "🔗 Creating temporary symlink..."
-# ln -sfn "$DEPLOY_SOURCE" "$TEMP_LINK"
-
-# echo "🧹 Removing old symlink if any..."
-# if [ -L "$DEPLOY_LINK" ] || [ -e "$DEPLOY_LINK" ]; then
-#   rm -rf "$DEPLOY_LINK"
-# fi
-
-# echo "🔀 Moving temp symlink to final location..."
-# mv "$TEMP_LINK" "$DEPLOY_LINK"
-
-# echo "✅ Symlink set: $DEPLOY_LINK → $DEPLOY_SOURCE"
 
 # Build CLI args from SUBVORTEX_ environment variables
 echo "🔧 Building CLI arguments from SUBVORTEX_ environment variables..."

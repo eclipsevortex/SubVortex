@@ -8,8 +8,10 @@ echo "📦 Starting teardown for $SERVICE_NAME..."
 
 # Stop and disable the systemd service if it exists
 if systemctl list-units --type=service --all | grep -q "${SERVICE_NAME}.service"; then
-    echo "🛑 Stopping systemd service: $SERVICE_NAME..."
-    sudo systemctl stop "${SERVICE_NAME}.service"
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+        echo "🛑 Stopping systemd service: $SERVICE_NAME..."
+        sudo systemctl stop "${SERVICE_NAME}.service"
+    fi
 
     echo "🚫 Disabling systemd service: $SERVICE_NAME..."
     sudo systemctl disable "${SERVICE_NAME}.service"

@@ -10,6 +10,7 @@ echo "🛑 Attempting to stop $SERVICE_NAME..."
 if systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "🔻 $SERVICE_NAME is currently running — stopping it now..."
     sudo systemctl stop "$SERVICE_NAME"
+    sudo systemctl disable "$SERVICE_NAME"
 else
     echo "ℹ️ $SERVICE_NAME is not running. No action needed."
 fi

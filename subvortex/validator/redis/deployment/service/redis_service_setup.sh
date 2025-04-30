@@ -12,17 +12,27 @@ DEPLOY_TEMPLATES="./deployment/templates"
 CONFIG_DEST="/etc/redis"
 SYSTEMD_DEST="/etc/systemd/system"
 
-# Load environment variables
-export $(grep -v '^#' .env | xargs)
+# Load environment variables from .env safely
+set -a
+source .env
+set +a
 
-echo "🛑 Disabling redis-server systemd service before installing..."
+echo "🚀 Installing Redis server if not already installed..."
+if ! command -v redis-server >/dev/null; then
+  sudo DEBIAN_FRONTEND=noninteractive apt-get update
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" redis-server
+else
+  echo "✅ redis-server already installed."
+fi
+
+echo "🛑 Stopping and disabling default redis-server systemd service..."
 sudo systemctl stop redis-server || true
 sudo systemctl disable redis-server || true
 
 echo "📂 Preparing /etc/redis directory..."
 sudo mkdir -p "$CONFIG_DEST"
 
-echo "📂 Copying Redis config BEFORE installing redis-server..."
+echo "📂 Copying Redis config BEFORE masking redis-server..."
 if [ ! -f "$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf" ]; then
   echo "❌ Missing template: $DEPLOY_TEMPLATES/${SERVICE_NAME}.conf"
   exit 1
@@ -46,16 +56,8 @@ echo "📁 Preparing log directory..."
 sudo mkdir -p /var/log/$NEURON_NAME
 sudo chown root:root /var/log/$NEURON_NAME
 
-echo "🚫 Masking redis-server systemd service to prevent auto-start..."
+echo "🚫 Masking redis-server systemd service to prevent default auto-start..."
 sudo systemctl mask redis-server || true
-
-echo "🚀 Installing Redis server if not already installed..."
-if ! command -v redis-server >/dev/null; then
-  sudo apt update
-  sudo apt install -y -o Dpkg::Options::="--force-confold" redis-server
-else
-  echo "✅ redis-server already installed."
-fi
 
 echo "📂 Copying custom systemd service template for Validator Redis..."
 if [ ! -f "$DEPLOY_TEMPLATES/${SERVICE_NAME}.service" ]; then

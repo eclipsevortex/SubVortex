@@ -31,7 +31,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Set defaults from env (can be overridden by arguments)
-WORKING_DIR="$HOME/subvortex"
+WORKING_DIR="$HOME/subvortex/subvortex/miner/neuron"
 
 # Parse command-line arguments
 while [ "$#" -gt 0 ]; do
@@ -96,10 +96,10 @@ if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
     fi
 else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
-    pm2 start "$WORKING_DIR/subvortex/miner/neuron/src/main.py" \
+    pm2 start src/main.py \
         --name "$SERVICE_NAME" \
         --cwd "$WORKING_DIR" \
-        --interpreter "$WORKING_DIR/subvortex/miner/neuron/venv/bin/python3" -- \
+        --interpreter "$WORKING_DIR/venv/bin/python3" -- \
         "${ARGS[@]}"
 fi
 

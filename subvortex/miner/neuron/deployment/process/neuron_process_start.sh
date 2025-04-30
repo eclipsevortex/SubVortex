@@ -98,6 +98,7 @@ else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
     pm2 start "$WORKING_DIR/subvortex/miner/neuron/src/main.py" \
         --name "$SERVICE_NAME" \
+        --cwd "$WORKING_DIR" \
         --interpreter "$WORKING_DIR/subvortex/miner/neuron/venv/bin/python3" -- \
         "${ARGS[@]}"
 fi

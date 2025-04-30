@@ -1,9 +1,9 @@
 {
   "id": "validator-redis",
   "name": "subvortex-validator-redis",
-  "version": "3.0.0-alpha.25",
-  "validator.version": "3.0.0-alpha.25",
-  "validator.redis.version": "3.0.0-alpha.25",
+  "version": "3.0.0-alpha.26",
+  "validator.version": "3.0.0-alpha.26",
+  "validator.redis.version": "3.0.0-alpha.26",
   "migration_type": "redis",
   "migration": "./migrations/versions",
   "depends_on": []

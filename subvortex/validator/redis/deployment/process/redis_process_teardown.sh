@@ -11,6 +11,7 @@ SERVICE_NAME="$NEURON_NAME-redis"
 CONFIG_DEST="/etc/redis"
 REDIS_CONF="$CONFIG_DEST/redis.conf"
 LOG_DIR="/var/log/$SERVICE_NAME"
+CHECKSUM_DIR="/var/tmp/dumps/redis/${SERVICE_NAME}-checksums"
 
 echo "📦 Starting Validator Redis teardown for PM2 setup..."
 
@@ -44,6 +45,14 @@ if [ -d "$LOG_DIR" ]; then
     echo "✅ Redis log directory removed."
 else
     echo "ℹ️ Redis log directory not found — skipping."
+fi
+
+# Remove checksum directory
+if [[ -d "$CHECKSUM_DIR" ]]; then
+    echo "🧽 Removing checksum directory: $CHECKSUM_DIR"
+    sudo rm -rf "$CHECKSUM_DIR"
+else
+    echo "ℹ️ Checksum directory $CHECKSUM_DIR does not exist. Skipping."
 fi
 
 # Remove /etc/redis folder if empty

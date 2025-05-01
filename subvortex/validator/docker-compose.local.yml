@@ -16,8 +16,6 @@ services:
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets
       - /var/log:/app/logs
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
 
   validator-redis:
     build:
@@ -38,9 +36,8 @@ services:
     env_file:
       - ./redis/.env
     volumes:
-      - /var/tmp/subvortex/redis:/data/redis
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - ./redis/deployment/templates/subvortex-validator-redis.conf:/etc/redis/redis.conf:ro
+      - /var/tmp/dumps/redis:/var/tmp/dumps/redis
 
 networks:
   subvortex:

@@ -3,6 +3,7 @@ set -euo pipefail
 
 NEURON_NAME="subvortex-validator"
 SERVICE_NAME="$NEURON_NAME-redis"
+CHECKSUM_DIR="/var/tmp/dumps/redis/${SERVICE_NAME}-checksums"
 
 echo "📦 Starting teardown for $SERVICE_NAME..."
 
@@ -33,6 +34,14 @@ if [[ -d "$LOG_DIR" ]]; then
     sudo rm -rf "$LOG_DIR"
 else
     echo "ℹ️ Log directory $LOG_DIR does not exist. Skipping."
+fi
+
+# Remove checksum directory
+if [[ -d "$CHECKSUM_DIR" ]]; then
+    echo "🧽 Removing checksum directory: $CHECKSUM_DIR"
+    sudo rm -rf "$CHECKSUM_DIR"
+else
+    echo "ℹ️ Checksum directory $CHECKSUM_DIR does not exist. Skipping."
 fi
 
 # Remove redis-server package if installed

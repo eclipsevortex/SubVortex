@@ -11,7 +11,7 @@ SERVICE_NAME="$NEURON_NAME-redis"
 DEPLOY_TEMPLATES="./deployment/templates"
 CONFIG_DEST="/etc/redis"
 REDIS_CONF="$CONFIG_DEST/redis.conf"
-CHECKSUM_DIR="/var/lib/subvortex/${SERVICE_NAME}-checksums"
+CHECKSUM_DIR="/var/tmp/dumps/redis/${SERVICE_NAME}-checksums"
 
 # Load environment variables
 echo "🔍 Loading environment variables from .env..."
@@ -77,17 +77,27 @@ if [[ "$CONF_CHANGED" == true || "$PASS_CHANGED" == true ]]; then
   echo "📝 Changes detected — updating redis.conf..."
   sudo cp "$TEMPLATE_CONF" "$REDIS_CONF"
   sudo chown root:root "$REDIS_CONF"
-
-  if [[ -n "${SUBVORTEX_REDIS_PASSWORD:-}" ]]; then
-    echo "🔐 Injecting password into redis.conf..."
-    if grep -q "^requirepass" "$REDIS_CONF"; then
-      sudo sed -i "s/^requirepass .*/requirepass $SUBVORTEX_REDIS_PASSWORD/" "$REDIS_CONF"
-    else
-      sudo sed -i "/^# requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
-    fi
-  fi
 else
   echo "✅ No config or password changes detected — skipping redis.conf update."
+fi
+
+# 🔐 Inject Redis password only if needed
+if [[ -n "${SUBVORTEX_REDIS_PASSWORD:-}" ]]; then
+  current_pass=$(grep -E '^\s*requirepass\s+' "$REDIS_CONF" | awk '{print $2}' || true)
+  if [[ "$current_pass" != "$SUBVORTEX_REDIS_PASSWORD" ]]; then
+    echo "🔐 Injecting or updating Redis password in redis.conf..."
+    if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
+      sudo sed -i "s|^\s*requirepass\s\+.*|requirepass $SUBVORTEX_REDIS_PASSWORD|" "$REDIS_CONF"
+    elif grep -q "^# *requirepass" "$REDIS_CONF"; then
+      sudo sed -i "/^# *requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
+    else
+      echo "requirepass $SUBVORTEX_REDIS_PASSWORD" | sudo tee -a "$REDIS_CONF" > /dev/null
+    fi
+  else
+    echo "🔐 Redis password already up-to-date — no changes made."
+  fi
+else
+  echo "⚠️ Environment variable SUBVORTEX_REDIS_PASSWORD is not set — skipping password injection."
 fi
 
 # Create Redis working directory if specified in redis.conf

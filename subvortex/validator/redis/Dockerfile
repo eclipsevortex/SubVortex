@@ -16,7 +16,6 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /data
 
 # 📁 Copy source code
-COPY ./subvortex/validator/redis/deployment/templates/subvortex-validator-redis.conf /etc/redis/redis.conf
 COPY ./subvortex/validator/redis/entrypoint.sh ./entrypoint.sh
 
 ENTRYPOINT ["./entrypoint.sh"]

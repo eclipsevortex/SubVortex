@@ -16,8 +16,6 @@ services:
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets
       - /var/log:/app/logs
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
 
 networks:
   subvortex:

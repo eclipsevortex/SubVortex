@@ -8,10 +8,12 @@ This document provides a comprehensive guide on how to set up and run the miner 
 
 - [Installation](#installation)
   - [As process](#installation-as-process)
-  - [As docker container](#installation-as-container)
+  - [As service](#installation-as-service)
+  - [As container](#installation-as-container)
 - [Uninstall](#uninstall)
   - [As process](#uninstall-as-process)
-  - [As docker container](#uninstall-as-container)
+  - [As service](#uninstall-as-service)
+  - [As container](#uninstall-as-container)
 
 ---
 
@@ -39,6 +41,26 @@ To start the miner redis, you can run
 
 ```
 ./miner/redis/deployment/process/redis_process_start.sh
+```
+
+To check the miner redis is up and running, you can run
+
+```
+
+```
+
+## As service <a id="installation-as-service"></a>
+
+To setup the miner redis, you can run
+
+```
+./miner/redis/deployment/service/redis_service_setup.sh
+```
+
+To start the miner redis, you can run
+
+```
+./miner/redis/deployment/service/redis_service_start.sh
 ```
 
 To check the miner redis is up and running, you can run
@@ -82,6 +104,20 @@ To uninstall the miner redis, you can run
 
 ```
 ./miner/redis/deployment/process/redis_process_teardown.sh
+```
+
+To check the miner redis has been uninstalled, you can run
+
+```
+
+```
+
+## As service <a id="uninstall-as-service"></a>
+
+To uninstall the miner redis, you can run
+
+```
+./miner/redis/deployment/service/redis_service_teardown.sh
 ```
 
 To check the miner redis has been uninstalled, you can run

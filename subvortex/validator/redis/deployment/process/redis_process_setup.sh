@@ -11,7 +11,7 @@ SERVICE_NAME="$NEURON_NAME-redis"
 DEPLOY_TEMPLATES="./deployment/templates"
 CONFIG_DEST="/etc/redis"
 REDIS_CONF="$CONFIG_DEST/redis.conf"
-CHECKSUM_DIR="/var/lib/${SERVICE_NAME}/checksums"
+CHECKSUM_DIR="/var/lib/subvortex/${SERVICE_NAME}-checksums"
 
 # Load environment variables
 echo "🔍 Loading environment variables from .env..."
@@ -88,6 +88,16 @@ if [[ "$CONF_CHANGED" == true || "$PASS_CHANGED" == true ]]; then
   fi
 else
   echo "✅ No config or password changes detected — skipping redis.conf update."
+fi
+
+# Create Redis working directory if specified in redis.conf
+REDIS_DATA_DIR=$(grep -E '^\s*dir\s+' "$REDIS_CONF" | awk '{print $2}')
+if [[ -n "$REDIS_DATA_DIR" ]]; then
+  echo "📁 Ensuring Redis data directory exists: $REDIS_DATA_DIR"
+  sudo mkdir -p "$REDIS_DATA_DIR"
+  sudo chown root:root "$REDIS_DATA_DIR"
+else
+  echo "⚠️ Could not determine Redis data directory from redis.conf."
 fi
 
 echo "📁 Preparing log directory..."

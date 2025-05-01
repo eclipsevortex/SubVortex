@@ -13,15 +13,13 @@ CONFIG_DEST="/etc/redis"
 SYSTEMD_DEST="/etc/systemd/system"
 REDIS_CONF="$CONFIG_DEST/redis.conf"
 SYSTEMD_UNIT="$SYSTEMD_DEST/${SERVICE_NAME}.service"
-CHECKSUM_DIR="/var/lib/${SERVICE_NAME}/checksums"
-DUMP_DIR="/var/tmp/subvortex-dump"
+CHECKSUM_DIR="/var/lib/subvortex/${SERVICE_NAME}-checksums"
 
 # Load environment variables from .env safely
 set -a
 source .env
 set +a
 
-mkdir -p "$CHECKSUM_DIR"
 mkdir -p "$CHECKSUM_DIR"
 
 compute_checksum() {
@@ -112,6 +110,16 @@ if [[ "$UNIT_CHANGED" == true ]]; then
   sudo cp "$TEMPLATE_SERVICE" "$SYSTEMD_UNIT"
 else
   echo "✅ No systemd unit changes detected — skipping unit update."
+fi
+
+# Create Redis working directory if specified in redis.conf
+REDIS_DATA_DIR=$(grep -E '^\s*dir\s+' "$REDIS_CONF" | awk '{print $2}')
+if [[ -n "$REDIS_DATA_DIR" ]]; then
+  echo "📁 Ensuring Redis data directory exists: $REDIS_DATA_DIR"
+  sudo mkdir -p "$REDIS_DATA_DIR"
+  sudo chown root:root "$REDIS_DATA_DIR"
+else
+  echo "⚠️ Could not determine Redis data directory from redis.conf."
 fi
 
 echo "🔧 Reloading systemd daemon..."

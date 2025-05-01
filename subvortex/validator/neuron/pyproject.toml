@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subvortex-validator-neuron"
-version = "3.0.0-alpha.32"
+version = "3.0.0-alpha.33"
 description = "SubVortex Validator Neuron"
 authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
 readme = "README.md"

@@ -4,6 +4,7 @@ set -euo pipefail
 
 NEURON_NAME="subvortex-validator"
 SERVICE_NAME="$NEURON_NAME-neuron"
+REDIS_CLI_CMD="redis-cli -a ${SUBVORTEX_REDIS_PASSWORD:-} -p ${SUBVORTEX_REDIS_PORT:-6379} PING"
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,7 +75,7 @@ while IFS= read -r line; do
         
         if [[ "$value_lower" == "true" ]]; then
             ARGS+=("$cli_key")
-        elif [[ "$value_lower" == "false" ]]; then
+            elif [[ "$value_lower" == "false" ]]; then
             continue
         else
             ARGS+=("$cli_key" "$value")
@@ -95,10 +96,17 @@ if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
 else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
     pm2 start src/main.py \
-        --name "$SERVICE_NAME" \
-        --cwd "$WORKING_DIR" \
-        --interpreter "$WORKING_DIR/venv/bin/python3" -- \
-        "${ARGS[@]}"
+    --name "$SERVICE_NAME" \
+    --cwd "$WORKING_DIR" \
+    --interpreter "$WORKING_DIR/venv/bin/python3" -- \
+    "${ARGS[@]}"
 fi
 
-echo "✅ Validator Neuron started successfully."
+# ✅ Final check — Is Redis responding?
+sleep 2
+if $REDIS_CLI_CMD | grep -q "PONG"; then
+    echo "✅ Validator Neuron started successfully."
+else
+    echo "❌ Validator Neuron did not respond to PING. Check logs with: pm2 logs $SERVICE_NAME"
+    exit 1
+fi

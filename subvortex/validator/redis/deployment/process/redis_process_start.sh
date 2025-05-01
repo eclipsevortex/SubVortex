@@ -4,6 +4,7 @@ set -euo pipefail
 
 SERVICE_NAME="subvortex-validator-redis"
 CONFIG_FILE="/etc/redis/redis.conf"
+REDIS_CLI_CMD="redis-cli -a ${SUBVORTEX_REDIS_PASSWORD:-} -p ${SUBVORTEX_REDIS_PORT:-6379} PING"
 
 echo "▶️ Starting $SERVICE_NAME via PM2 using config: $CONFIG_FILE"
 
@@ -26,4 +27,11 @@ else
     pm2 start redis-server --name "$SERVICE_NAME" -- "$CONFIG_FILE"
 fi
 
-echo "✅ Validator Redis started successfully."
+# ✅ Final check — Is Redis responding?
+sleep 2
+if $REDIS_CLI_CMD | grep -q "PONG"; then
+    echo "✅ Validator Redis is running and responsive."
+else
+    echo "❌ Validator Redis did not respond to PING. Check logs with: pm2 logs $SERVICE_NAME"
+    exit 1
+fi

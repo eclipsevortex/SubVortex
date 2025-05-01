@@ -32,7 +32,7 @@ while IFS= read -r line; do
         
         if [[ "$value_lower" == "true" ]]; then
             ARGS+=("$cli_key")
-        elif [[ "$value_lower" == "false" ]]; then
+            elif [[ "$value_lower" == "false" ]]; then
             continue
         else
             ARGS+=("$cli_key" "$value")
@@ -68,11 +68,18 @@ sudo systemctl daemon-reload
 
 # Start or restart the service
 if systemctl is-active --quiet "$SERVICE_NAME"; then
-  echo "🔁 $SERVICE_NAME is already running — restarting..."
-  sudo systemctl restart "$SERVICE_NAME"
+    echo "🔁 $SERVICE_NAME is already running — restarting..."
+    sudo systemctl restart "$SERVICE_NAME"
 else
-  echo "🚀 Starting $SERVICE_NAME for the first time..."
-  sudo systemctl start "$SERVICE_NAME"
+    echo "🚀 Starting $SERVICE_NAME for the first time..."
+    sudo systemctl start "$SERVICE_NAME"
 fi
 
-echo "✅ Validator Neuron started successfully."
+# Final status check
+sleep 1  # short wait for startup
+if systemctl is-active --quiet "$SERVICE_NAME"; then
+    echo "✅ Validator Neuron started successfully."
+else
+    echo "❌ Failed to start $SERVICE_NAME. Run 'journalctl -u $SERVICE_NAME -xe' for details."
+    exit 1
+fi

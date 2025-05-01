@@ -14,12 +14,14 @@ SYSTEMD_DEST="/etc/systemd/system"
 REDIS_CONF="$CONFIG_DEST/redis.conf"
 SYSTEMD_UNIT="$SYSTEMD_DEST/${SERVICE_NAME}.service"
 CHECKSUM_DIR="/var/lib/${SERVICE_NAME}/checksums"
+DUMP_DIR="/var/tmp/subvortex-dump"
 
 # Load environment variables from .env safely
 set -a
 source .env
 set +a
 
+mkdir -p "$CHECKSUM_DIR"
 mkdir -p "$CHECKSUM_DIR"
 
 compute_checksum() {

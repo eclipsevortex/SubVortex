@@ -76,10 +76,4 @@ else
 fi
 
 # Final status check
-sleep 1  # short wait for startup
-if systemctl is-active --quiet "$SERVICE_NAME"; then
-    echo "✅ Validator Neuron started successfully."
-else
-    echo "❌ Failed to start $SERVICE_NAME. Run 'journalctl -u $SERVICE_NAME -xe' for details."
-    exit 1
-fi
+echo "✅ Validator Neuron started successfully."

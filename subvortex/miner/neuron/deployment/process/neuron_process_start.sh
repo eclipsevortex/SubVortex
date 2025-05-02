@@ -4,55 +4,10 @@ set -euo pipefail
 
 NEURON_NAME="subvortex-miner"
 SERVICE_NAME="$NEURON_NAME-neuron"
-REDIS_CLI_CMD="redis-cli -a ${SUBVORTEX_REDIS_PASSWORD:-} -p ${SUBVORTEX_REDIS_PORT:-6379} PING"
 
 # Determine script directory dynamically to ensure everything runs in ./scripts/api/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
-
-show_help() {
-    echo "Usage: $0 [--recreate]"
-    echo
-    echo "Description:"
-    echo "  This script start the validator neuron"
-    echo
-    echo "Options:"
-    echo "  --working-dir    Working directory. Default $HOME/subvortex"
-    echo "  --help        Show this help message"
-    exit 0
-}
-
-OPTIONS="w:h"
-LONGOPTIONS="working-dir:,help"
-
-# Parse the options and their arguments
-params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
-if [ $? -ne 0 ]; then
-    exit 1
-fi
-
-# Set defaults from env (can be overridden by arguments)
-WORKING_DIR="$HOME/subvortex/subvortex/miner/neuron"
-
-# Parse command-line arguments
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        -r|--working-dir)
-            WORKING_DIR="$2"
-            shift 2
-        ;;
-        -h | --help)
-            show_help
-            exit 0
-        ;;
-        *)
-            echo "Unrecognized option '$1'"
-            exit 1
-        ;;
-    esac
-done
-
-echo "WORKIN DIR: $WORKING_DIR"
 
 # Activate virtual environment
 echo "🐍 Activating Python virtual environment..."
@@ -99,8 +54,7 @@ else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
     pm2 start src/main.py \
     --name "$SERVICE_NAME" \
-    --cwd "$WORKING_DIR" \
-    --interpreter "$WORKING_DIR/venv/bin/python3" -- \
+    --interpreter "venv/bin/python3" -- \
     "${ARGS[@]}"
 fi
 

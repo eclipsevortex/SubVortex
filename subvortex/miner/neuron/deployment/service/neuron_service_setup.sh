@@ -24,6 +24,17 @@ else
     echo "⚠️ requirements.txt not found — skipping dependency installation."
 fi
 
+# Ensure pyproject.toml is present (local execution only)
+if [[ ! -f "../../../pyproject.toml" ]]; then
+    if [[ -f "../../../pyproject-miner.toml" ]]; then
+        echo "📄 pyproject.toml not found, copying pyproject-miner.toml..."
+        cp ../../../pyproject-miner.toml ../../../pyproject.toml
+    else
+        echo "❌ pyproject.toml and pyproject-miner.toml both not found. Cannot proceed."
+        exit 1
+    fi
+fi
+
 # Install SubVortex project in editable mode
 echo "📚 Installing SubVortex project in editable mode..."
 pip install -e ../../../

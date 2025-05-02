@@ -28,11 +28,11 @@
 - [Introduction](#introduction)
 - [Goals](#goals)
 - [Roles](#roles)
-- [Subtensor & Bittensor](#subtensor--bittensor)
+- [Subtensor & Bittensor](#subtensor-and-bittensor)
 - [Incentive Mechanism](#incentive-mechanism)
 - [Firewall](#firewall)
 - [Value Proposition](#value-proposition)
-- [Team Composition](#team-composition)
+- [Leadership & Operations](#leardership-and-operations)
 - [Credits](#credits)
 - [Conclusion](#conclusion)
 - [Machine Requirements](#machine-requirements)
@@ -52,15 +52,17 @@
   - [Troubleshooting Subtensor](#troubleshooting-subtensor)
 - [License](#license)
 
-## Abstract
+<br />
+
+## 📄 Abstract <a id="abstract"></a>
 
 SubVortex introduces an incentivized and decentralized network of subtensor nodes that are pivotal elements within the Bittensor ecosystem. This delineates the structure, objectives, and mechanisms of SubVortex, aiming to foster decentralization, stability, and efficient resource allocation within the broader Bittensor network.
 
-## Introduction
+## 👋 Introduction <a id="introduction"></a>
 
 Subtensor nodes play a vital role in the Bittensor network, governing various aspects such as incentivization, governance, and network health. SubVortex aims to enhance the decentralization and functionality of Bittensor by establishing an incentivized network of subtensors. This whitepaper describes the goals, roles, and operational phases of SubVortex, outlining its contribution and value proposition to the Bittensor ecosystem.
 
-## Goals
+## 🎯 Goals <a id="goals"></a>
 
 SubVortex aspires to set the standard for subnets, prioritizing the following objectives:
 
@@ -69,7 +71,7 @@ SubVortex aspires to set the standard for subnets, prioritizing the following ob
 - **Low Barrier to Entry**: Facilitating entry into Bittensor mining with minimal hardware requirements and offering fair incentives.
 - **Continuous Enhancement** - Committing to ongoing improvements through a comprehensive roadmap.
 
-## Roles
+## 🧑‍💻 Roles <a id="roles"></a>
 
 ### Miner
 
@@ -85,7 +87,7 @@ Validator has some operational phases:
 - **Metric Phase**: Gathers diverse metrics such as download/upload speeds, latency, and geographical data to assess miner performance.
 - **Reward System**: Scores miners based on availability, latency, reliability, and global distribution, promoting network health and efficiency.
 
-## Subtensor & Bittensor
+## 🧠 Subtensor & Bittensor <a id="subtensor-and-bittensor"></a>
 
 Subtensor serves as the foundation of the Bittensor network, facilitating decentralized consensus, incentivization, staking, and governance. Its role in orchestrating the decentralized machine learning marketplace is indispensable, ensuring integrity, trust, and quality within the ecosystem.
 
@@ -93,7 +95,7 @@ Local Subtensor Deployment:
 
 Running subtensors locally offers advantages in speed, reliability, and control over accessibility compared to the public Finney node. It enhances decentralization by empowering miners to manage their subtensor nodes efficiently.
 
-## Incentive Mechanism
+## 💰 Incentive Mechanism <a id="incentive-mechanism"></a>
 
 SubVortex's incentive mechanism will score miners based on multiple criteria of their subtensor node:
 
@@ -128,33 +130,29 @@ To assign a score to each miner, we will establish a connection with the subtens
 
 This reward incentivizes miners to effectively distribute subtensors across different geographical locations to optimize performance and reduce latency for a better subnet experience.
 
-## Firewall
+## 🛡️ Firewall <a id="firewall"></a>
 
 To know more on the firewall, refer to the [firewall guide](./docs/features/firewall.md)
 
-## Value Proposition
+## 🏆 Value Proposition <a id="value-proposition"></a>
 
 SubVortex enriches the Bittensor ecosystem by providing an alternative to the Finney network and promoting decentralization, reliability, and efficiency. It offers miners and validators a seamless experience with low barriers to entry and continuous support.
 
-## Team Composition
+## 👤 Leadership & Operations <a id="leardership-and-operations"></a>
 
-The team comprises individuals with diverse backgrounds and extensive experience in crypto, software development, engineering, business, and data management. The SubVortex team ensures robust support and continuous improvement for the network.
+SubVortex is driven by a highly focused and performance-oriented team with deep experience in crypto, software engineering, infrastructure, and data systems. With a commitment to transparency and continuous improvement, the team ensures robust support for validators, miners, and the broader Bittensor ecosystem.
 
-Team responsabilities
+We are constantly evolving and expanding, and contributors from the community are welcome as we scale.
 
-- **EclipseVortex** - Development and technology
-- **Ch3RNØbØG** - Operations and business development
-- **CryptoMinedMind** - Strategy and public relations
-- **HcL-CO** - QA Lead and support
+Core responsabilities
 
-Team timezone
+- **EclipseVortex** - Architecture, infrastructure, and development leadership
+
+Operational Timezone
 
 - **EclipseVortex** - GMT (United-Kingdom)
-- **Ch3RNØbØG** - CST (USA)
-- **tww9** - MST (Canada)
-- **HcL-CO** - EST (Canada)
 
-## Credits
+## 🙌 Credits <a id="credits"></a>
 
 Bittensor technology is still new and promising, and participants are eager to support each other. That's why the SubVortex team would like to express our gratitude to everyone who has helped us reach where we are today:
 
@@ -167,11 +165,11 @@ Bittensor technology is still new and promising, and participants are eager to s
 
 Please don't hesitate to reach out if we've inadvertently omitted anyone, and you'd like us to give them a special shout-out on our GitHub!
 
-## Conclusion
+## 🔚 Conclusion <a id="conclusion"></a>
 
 In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittensor network, incentivizing decentralization, reliability, and accessibility. Through its innovative approach and robust infrastructure, SubVortex aims to catalyze the growth and sustainability of the decentralized machine-learning ecosystem that is Bittensor.
 
-## 🖥️ Machine requirements
+## 🖥️ Machine requirements <a id="machine-requirements"></a>
 
 In terms of Operation System, you have to follow the requirements
 
@@ -192,7 +190,7 @@ For validator, you need a CPU machine (no GPU needed!).
 
 For more information, take a look on the [min requirements](./min_compute.yml)
 
-## 🦊 Registering your wallet
+## 🦊 Registering your wallet <a id="registering-your-wallet"></a>
 
 In order to run either a miner or a validator, you will need to have a wallet registered to the subnet. If you do not already have wallet set up on the server, following the steps below:
 
@@ -219,6 +217,23 @@ btcli s register --netuid <SUBNET_UID> --subtensor.network local --wallet.name Y
 Once you have successfully registered your wallet, you are now ready to start either your miner or validator.
 
 ## 🚀 Quick Setup <a id="quick-setup"></a>
+
+⚠️ **Recommended Setup Method — Use the Auto Upgrader**
+
+To safely and efficiently install and manage your SubVortex miner or validator, we strongly recommend using the [SubVortex Auto Upgrader](https://github.com/eclipsevortex/SubVortex.AutoUpgrader).
+This tool handles:
+
+- Initial installation
+- Service restarts
+- Zero-downtime upgrades
+- Version tracking and rollback
+- Safe Redis and file migrations
+
+❗ If you proceed with the manual `Quick Setup` scripts below, you do so at your own risk. You’ll be responsible for future upgrades, downtime handling, and configuration issues.
+
+➡️ For long-term reliability and simplicity, use the Auto Upgrader.
+
+<br />
 
 Before running a validator and/or a miner, you have to
 
@@ -275,6 +290,18 @@ It will stop and teardown the validator as service which is the default mode.
 Use `-h` to see the options
 
 ## ⚙️ Neuron Management <a id="neuron-management"></a>
+
+⚠️ **Manual Service Management — Use with Caution**
+
+While SubVortex provides CLI scripts to manage miners and validators manually, this approach is intended only for advanced users or for debugging purposes.
+For production environments, please use the SubVortex Auto Upgrader to:
+- Automatically handle upgrades, rollbacks, and migrations
+- Keep services up-to-date and running reliably
+- Minimize risk of misconfiguration or downtime
+
+❗ Managing neuron services manually means you are fully responsible for infrastructure stability, update coordination, and service integrity.
+
+➡️ Unless you have a strong reason, we highly recommend switching to the Auto Upgrader.
 
 This section explains the different action you can execute on a miner and/or validator.
 
@@ -356,7 +383,7 @@ You **don’t need to worry about these inner workings**. The top-level `scripts
 
 This keeps your interaction simple, while giving you full control when you need it.
 
-## 🛠️ Installation
+## 🛠️ Installation <a id="installation"></a>
 
 ### Pre-requisite
 
@@ -371,7 +398,7 @@ To install a local subtensor, refer to the [Subtensor guide](./scripts/subtensor
 
 To install wandb, refer to the [Wandb guide](./docs/wandb/wandb.md)
 
-## 🔧 Troubleshooting
+## 🔧 Troubleshooting <a id="troubleshooting"></a>
 
 ### Troubleshooting Subtensor
 
@@ -395,13 +422,13 @@ Options
 
 Once the state has been purge, you can re-execute the subtensor start script $HOME/SubVortex/scripts/subtensor/start.sh via a procedd manager or not. See the section [Install Subtensor](#install-subtensor)
 
-## 🪪 License
+## 🪪 License <a id="license"></a>
 
 This repository is licensed under the MIT License.
 
 ```text
 # The MIT License (MIT)
-# Copyright © 2025 Eclipse Vortex
+# Copyright © 2024 Eclipse Vortex
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation

@@ -49,16 +49,16 @@ if [[ -d "venv" ]]; then
     echo "🐍 Activating virtual environment..."
     source "venv/bin/activate"
     
-    if pip list | grep -q "$PACKAGE_NAME"; then
+    if ./venv/bin/python -m pip list | grep -q "$PACKAGE_NAME"; then
         echo "📦 Uninstalling editable package: $PACKAGE_NAME..."
-        pip uninstall -y "$PACKAGE_NAME"
+        ./venv/bin/python -m pip uninstall -y "$PACKAGE_NAME"|| true
     else
         echo "ℹ️ Editable package $PACKAGE_NAME not found. Skipping uninstall."
     fi
     
     if [[ -f "requirements.txt" ]]; then
         echo "📦 Uninstalling dependencies from requirements.txt..."
-        pip uninstall -y -r "requirements.txt"
+        ./venv/bin/python -m pip uninstall -y -r "requirements.txt"
     else
         echo "⚠️ requirements.txt not found. Skipping dependency uninstallation."
     fi

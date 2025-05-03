@@ -349,7 +349,7 @@ This keeps your interaction simple, while giving you full control when you need 
 
 #### 🔐 Certificate Management
 
-In order to instal the SubVortex certificate, run
+In order to install the SubVortex certificate, run
 
 ```bash
 ./subvortex/scripts/wss/install_certificate.sh
@@ -359,6 +359,28 @@ To check everything has been installed correctly, run
 
 ```bash
 ./subvortex/scripts/wss/check_certificate.sh
+```
+
+You should see something 
+```bash
+🔍 Checking NGINX service status...
+✅ NGINX is running.
+🧪 Testing NGINX configuration syntax...
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+✅ NGINX configuration syntax is OK.
+🌐 Sending JSON-RPC request to get current block from local Subtensor node...
+✅ Subtensor node responded. Current block number (hex): 0x43eb17
+🔐 Fetching SSL certificate served by local NGINX instance...
+📛 Subject (Who this cert is for): CN = secure.subvortex.info
+🏢 Issuer (Who issued the cert): C = US, O = Let's Encrypt, CN = E5
+📅 Expiration: Jun 15 14:42:14 2025 GMT
+✅ Certificate matches secure.subvortex.info
+✅ Certificate was issued by Let's Encrypt
+📂 Tailing last 10 lines of NGINX error log:
+2025/05/03 13:20:48 [notice] 2423310#2423310: using inherited sockets from "6;7;"
+2025/05/03 13:20:56 [notice] 2423944#2423944: signal process started
+✅ All checks complete on LOCAL VPS.
 ```
 
 ### Validator <a id="validator-management"></a>

@@ -11,6 +11,15 @@ if [ -z "$DOMAIN" ]; then
   exit 1
 fi
 
+# Ensure jq is installed
+echo "🔍 Checking for jq..."
+if ! command -v jq &>/dev/null; then
+  echo "📦 Installing jq..."
+  sudo apt update && sudo apt install -y jq
+else
+  echo "✅ jq is already installed."
+fi
+
 echo "🔍 Checking NGINX service status..."
 if sudo systemctl is-active --quiet nginx; then
   echo "✅ NGINX is running."
@@ -27,11 +36,27 @@ else
   exit 1
 fi
 
-echo "🌐 Curl test to LOCAL HTTPS endpoint using local IP and Host header..."
-curl -s -o /dev/null -w "HTTP %{http_code}\n" --resolve "$DOMAIN:$NGINX_DEFAULT_PORT:$IP" "https://$DOMAIN/" || {
+echo "🌐 Sending JSON-RPC request to get current block from local Subtensor node..."
+
+RESPONSE=$(curl -s --resolve "$DOMAIN:$NGINX_DEFAULT_PORT:$IP" \
+  -X POST "https://$DOMAIN" \
+  -H "Content-Type: application/json" \
+  -d '{"id":1,"jsonrpc":"2.0","method":"chain_getBlock","params":[]}' || echo "CURL_ERROR")
+
+if [[ "$RESPONSE" == "CURL_ERROR" ]]; then
   echo "❌ Failed to connect to local HTTPS endpoint."
   exit 1
-}
+fi
+
+BLOCK_HASH=$(echo "$RESPONSE" | jq -r '.result.block.header.number // empty')
+
+if [[ -n "$BLOCK_HASH" ]]; then
+  echo "✅ Subtensor node responded. Current block number (hex): $BLOCK_HASH"
+else
+  echo "⚠️ Subtensor node did not return a block. Raw response:"
+  echo "$RESPONSE"
+  exit 1
+fi
 
 echo "🔐 Fetching SSL certificate served by local NGINX instance..."
 

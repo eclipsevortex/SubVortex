@@ -58,7 +58,7 @@ include = [
     "**/metadata.json",
 ]
 "subvortex.core" = ["**/*.py"]
-"subvortex.scripts" = ["**/*.sh"]
+"subvortex.scripts" = ["**/*.sh", "wss/**/*"]
 
 [tool.setuptools.exclude-package-data]
 "subvortex" = ["**/venv/*", "**/.venv/*"]

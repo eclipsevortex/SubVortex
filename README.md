@@ -295,6 +295,7 @@ Use `-h` to see the options
 
 While SubVortex provides CLI scripts to manage miners and validators manually, this approach is intended only for advanced users or for debugging purposes.
 For production environments, please use the SubVortex Auto Upgrader to:
+
 - Automatically handle upgrades, rollbacks, and migrations
 - Keep services up-to-date and running reliably
 - Minimize risk of misconfiguration or downtime
@@ -306,6 +307,8 @@ For production environments, please use the SubVortex Auto Upgrader to:
 This section explains the different action you can execute on a miner and/or validator.
 
 ### Miner <a id="miner-management"></a>
+
+#### 🔧 Service Control
 
 A **miner** is made up of one or more services located in the `subvortex/miner` directory.
 
@@ -344,7 +347,23 @@ You **don’t need to worry about these inner workings**. The top-level `scripts
 
 This keeps your interaction simple, while giving you full control when you need it.
 
+#### 🔐 Certificate Management
+
+In order to instal the SubVortex certificate, run
+
+```bash
+./subvortex/scripts/wss/install_certificate.sh
+```
+
+To check everything has been installed correctly, run
+
+```bash
+./subvortex/scripts/wss/check_certificate.sh
+```
+
 ### Validator <a id="validator-management"></a>
+
+#### 🔧 Service Control
 
 A **validator** is made up of one or more services located in the `subvortex/validator` directory.
 

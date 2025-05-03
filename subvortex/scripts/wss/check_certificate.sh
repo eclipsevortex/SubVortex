@@ -1,10 +1,8 @@
 #!/bin/bash
 
-# Usage: ./check_ssl_nginx.sh your.domain.com
-
 set -e
 
-DOMAIN=$1
+DOMAIN=${1:-secure.subvortex.info}
 IP="127.0.0.1"
 NGINX_DEFAULT_PORT=443
 
@@ -14,7 +12,12 @@ if [ -z "$DOMAIN" ]; then
 fi
 
 echo "🔍 Checking NGINX service status..."
-sudo systemctl is-active --quiet nginx && echo "✅ NGINX is running." || { echo "❌ NGINX is not running."; exit 1; }
+if sudo systemctl is-active --quiet nginx; then
+  echo "✅ NGINX is running."
+else
+  echo "❌ NGINX is not running."
+  exit 1
+fi
 
 echo "🧪 Testing NGINX configuration syntax..."
 if sudo nginx -t; then
@@ -24,21 +27,39 @@ else
   exit 1
 fi
 
-echo "🌐 Curl test to local HTTPS endpoint..."
-curl -s -o /dev/null -w "%{http_code}\n" --resolve "$DOMAIN:$NGINX_DEFAULT_PORT:$IP" "https://$DOMAIN" | grep -q "200" \
-  && echo "✅ HTTPS endpoint is serving successfully." \
-  || echo "⚠️ HTTPS endpoint did not return HTTP 200."
+echo "🌐 Curl test to LOCAL HTTPS endpoint using local IP and Host header..."
+curl -s -o /dev/null -w "HTTP %{http_code}\n" --resolve "$DOMAIN:$NGINX_DEFAULT_PORT:$IP" "https://$DOMAIN/" || {
+  echo "❌ Failed to connect to local HTTPS endpoint."
+  exit 1
+}
 
-echo "🔐 Checking SSL certificate details..."
-echo | openssl s_client -connect "$DOMAIN:$NGINX_DEFAULT_PORT" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -text | grep -E "Subject:|Issuer:|Not Before:|Not After :"
+echo "🔐 Fetching SSL certificate served by local NGINX instance..."
 
-echo "🕵️ Checking for padlock (manual step)..."
-echo "👉 Please visit https://$DOMAIN in your browser and check for the 🔒 padlock."
+CERT_INFO=$(echo | openssl s_client -connect "$IP:$NGINX_DEFAULT_PORT" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -subject -issuer -enddate)
 
-echo "📊 Want a deeper check? Try SSL Labs at:"
-echo "🔗 https://www.ssllabs.com/ssltest/analyze.html?d=$DOMAIN"
+SUBJECT=$(echo "$CERT_INFO" | grep "subject=" | sed 's/subject=//')
+ISSUER=$(echo "$CERT_INFO" | grep "issuer=" | sed 's/issuer=//')
+END_DATE=$(echo "$CERT_INFO" | grep "notAfter=" | cut -d= -f2)
+
+echo "📛 Subject (Who this cert is for): $SUBJECT"
+echo "🏢 Issuer (Who issued the cert): $ISSUER"
+echo "📅 Expiration: $END_DATE"
+
+# Domain match check
+if echo "$SUBJECT" | grep -q "$DOMAIN"; then
+  echo "✅ Certificate matches $DOMAIN"
+else
+  echo "⚠️ WARNING: Certificate subject does NOT match $DOMAIN"
+fi
+
+# Let's Encrypt check
+if echo "$ISSUER" | grep -qi "let's encrypt"; then
+  echo "✅ Certificate was issued by Let's Encrypt"
+else
+  echo "⚠️ WARNING: Certificate was NOT issued by Let's Encrypt"
+fi
 
 echo "📂 Tailing last 10 lines of NGINX error log:"
 sudo tail -n 10 /var/log/nginx/error.log
 
-echo "✅ All checks completed."
+echo "✅ All checks complete on LOCAL VPS."

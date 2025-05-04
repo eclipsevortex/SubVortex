@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subvortex"
+dynamic = ["version"]
+description = "SubVortex Validator"
+authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "subvortex.validator.version.__version__" }
+
+[project.license]
+text = "MIT"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "scripts",
+    "subvortex",
+    "subvortex.core",
+    "subvortex.validator",
+    "subvortex.scripts",
+]
+
+[tool.setuptools.package-data]
+"scripts" = ["**/utils/*.sh"]
+"subvortex" = ["pyproject.toml"]
+"subvortex.validator" = [
+    "**/*.py",
+    "**/deployment/**/*",
+    "**/scripts/**/*",
+    "**/pyproject.toml",
+    "**/requirements.txt",
+    "**/README.md",
+    "**/env.template",
+    "**/docker-compose.yml",
+    "**/metadata.json",
+]
+"subvortex.core" = ["**/*.py"]
+"subvortex.scripts" = ["**/*.sh"]
+
+[tool.setuptools.exclude-package-data]
+"subvortex" = ["**/venv/*", "**/.venv/*"]
+"subvortex.validator" = ["**/venv/*", "**/.venv/*"]
+"subvortex.core" = ["**/venv/*", "**/.venv/*"]

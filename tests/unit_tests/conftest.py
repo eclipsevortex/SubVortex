@@ -23,8 +23,6 @@ from unittest.mock import AsyncMock
 from neurons.validator import Validator
 from neurons.miner import Miner
 
-# Use torch in metagraph
-os.environ["USE_TORCH"] = "0"
 
 @pytest.fixture(scope="session", autouse=False)
 def validator():

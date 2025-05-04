@@ -172,5 +172,9 @@ ips_blocked.json
 firewall-events.json
 .DS_Store
 DS_Store
-.secrets
+*secrets
+*.txt
+ga-*.json
 .build
+redis.conf
+pyproject.toml

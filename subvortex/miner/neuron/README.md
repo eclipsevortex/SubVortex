@@ -102,7 +102,17 @@ systemctl status subvortex-miner-neuron
 You should see something like
 
 ```bash
+● subvortex-miner-neuron.service - SubVortex Miner Neuron
+     Loaded: loaded (/etc/systemd/system/subvortex-miner-neuron.service; disabled; vendor preset: enabled)
+     Active: active (running) since Tue 2025-05-06 18:58:12 CEST; 1s ago
+   Main PID: 2545963 (python3)
+      Tasks: 8 (limit: 19116)
+     Memory: 62.9M
+        CPU: 1.854s
+     CGroup: /system.slice/subvortex-miner-neuron.service
+             └─2545963 /root/SubVortex2/subvortex/miner/neuron/venv/bin/python3 -m subvortex.miner.neuron.src.main --subtensor.network local --use.local.workdir --wallet.hotkey default --axon.ip 127.0.0.1 --axon.port 8091 --net>
 
+May 06 18:58:12 vmi1561561.contaboserver.net systemd[1]: Started SubVortex Miner Neuron.
 ```
 
 ## As docker container <a id="installation-as-container"></a>
@@ -115,6 +125,8 @@ If you are not using the Auto Upgrader, you have to prefix all these commands by
 ```bash
 export SUBVORTEX_FLOATTING_FLAG=latest
 ```
+
+For testnet, you can use `latest` (release) or `stable` (release candidate).
 
 To build the Miner, you can run
 

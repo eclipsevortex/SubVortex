@@ -115,6 +115,29 @@ May 05 17:25:56 vmi1610615.contaboserver.net systemd[1]: Starting SubVortex Vali
 May 05 17:25:57 vmi1610615.contaboserver.net systemd[1]: Started SubVortex Validator Redis.
 ```
 
+If you have these kind of logs
+
+```bash
+⚙️  Setting up for 'process' mode...
+🔧 Setting up subvortex-validator-redis...
+🚀 Installing Redis server if not already installed...
+✅ redis-server already installed.
+📂 Preparing redis directory...
+✅ No redis binary or config changes detected — skipping redis.conf update.
+🔐 Redis password already up-to-date — no changes made.
+📄 Forcing logfile to stdout/stderr (logfile "")...
+🚫 Masking default redis-server systemd service...
+📁 Ensuring Redis data directory exists: /var/lib/redis
+✅ Validator Redis setup completed successfully.
+✅ Process setup complete.
+```
+
+With a lot of `no changed detected`, you can remove the checksums in order to reinstall everything from scratch
+
+```bash
+rm -rf /var/tmp/subvortex.checksums/*
+```
+
 ## As docker container <a id="installation-as-container"></a>
 
 > **IMPORTANT** <br />
@@ -125,6 +148,8 @@ If you are not using the Auto Upgrader, you have to prefix all these commands by
 ```bash
 export SUBVORTEX_FLOATTING_FLAG=latest
 ```
+
+For testnet, you can use `latest` (release) or `stable` (release candidate).
 
 To build the Validator Redis, you can run
 

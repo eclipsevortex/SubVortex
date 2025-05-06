@@ -68,54 +68,7 @@ if [[ ! -f "$TEMPLATE_CONF" ]]; then
 fi
 checksum_changed "$TEMPLATE_CONF" "redis.conf.template" && CONF_CHANGED=true || CONF_CHANGED=false
 
-### Phase 3: Pre-Deployment Checks
-
-# Determine working Redis password
-# determine_working_password() {
-#     local env_pass conf_pass
-    
-#     env_pass="${SUBVORTEX_REDIS_PASSWORD:-}"
-#     if [[ -f "$REDIS_CONF" ]]; then
-#         conf_pass=$(grep -E '^\s*requirepass\s+' "$REDIS_CONF" | awk '{print $2}' || true)
-#     else
-#         conf_pass=""
-#     fi
-    
-#     try_passwords=()
-    
-#     [[ -n "$env_pass" ]] && try_passwords+=("$env_pass")
-#     [[ -n "$conf_pass" && "$conf_pass" != "$env_pass" ]] && try_passwords+=("$conf_pass")
-    
-#     for pass in "${try_passwords[@]}"; do
-#         if redis-cli -a "$pass" PING 2>/dev/null | grep -q PONG; then
-#             echo "$pass"
-#             return 0
-#         fi
-#     done
-    
-#     # Try unauthenticated (empty password)
-#     if redis-cli PING 2>/dev/null | grep -q PONG; then
-#         echo ""
-#         return 0
-#     fi
-    
-#     return 1  # No working password
-# }
-
-# echo "🔍 Testing available Redis passwords..."
-# if REDISCLI_AUTH="${SUBVORTEX_REDIS_PASSWORD:-}"; then
-#     export REDISCLI_AUTH
-#     if [[ -n "$REDISCLI_AUTH" ]]; then
-#         echo "✅ Found working Redis password"
-#     else
-#         echo "✅ Redis allows unauthenticated access"
-#     fi
-# else
-#     echo "❌ Failed to connect to Redis using provided or config password"
-#     exit 1
-# fi
-
-### Phase 4: Data Preservation
+### Phase 3: Data Preservation
 
 if [[ "$REDIS_CHANGED" == true || "$CONF_CHANGED" == true ]]; then
     # echo "📤 Dumping Redis data..."
@@ -126,7 +79,7 @@ if [[ "$REDIS_CHANGED" == true || "$CONF_CHANGED" == true ]]; then
     sudo systemctl disable redis-server || true
 fi
 
-### Phase 5: Configuration Deployment
+### Phase 4: Configuration Deployment
 
 # Prepare /etc/redis directory
 echo "📂 Preparing redis directory..."
@@ -171,13 +124,13 @@ else
     echo 'logfile ""' | sudo tee -a "$REDIS_CONF" > /dev/null
 fi
 
-### Phase 6: Systemd Unit Deployment
+### Phase 5: Systemd Unit Deployment
 
 # Mask default redis-server systemd service
 echo "🚫 Masking default redis-server systemd service..."
 sudo systemctl mask redis-server || true
 
-### Phase 7: Post-Deployment Verification
+### Phase 6: Post-Deployment Verification
 
 # Ensure Redis data directory exists and has correct permissions
 REDIS_DATA_DIR=$(grep -E '^\s*dir\s+' "$REDIS_CONF" | awk '{print $2}')

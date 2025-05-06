@@ -121,6 +121,8 @@ If you are not using the Auto Upgrader, you have to prefix all these commands by
 export SUBVORTEX_FLOATTING_FLAG=latest
 ```
 
+For testnet, you can use `latest` (release) or `stable` (release candidate).
+
 To build the Validator, you can run
 
 ```bash

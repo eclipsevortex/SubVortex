@@ -67,9 +67,6 @@ fi
 setup_process() {
     echo "⚙️  Setting up for 'process' mode..."
     
-    # Install pm2
-    ./scripts/install_pm2.sh
-    
     # Setup the auto upgrade as process
     ./deployment/process/redis_process_setup.sh
     

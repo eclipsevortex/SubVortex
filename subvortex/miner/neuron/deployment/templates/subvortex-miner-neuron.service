@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 WorkingDirectory=/root/subvortex/subvortex/miner/neuron
-EnvironmentFile=/root/subvortex/subvortex/miner/neuron/.env
-ExecStart=/root/subvortex/subvortex/miner/neuron/venv/bin/python3 -m subvortex.miner.neuron.src.main
+EnvironmentFile=/root/subvortex/subvortex/miner/.env
+ExecStart=/root/subvortex/subvortex/miner/venv/bin/python3 -m subvortex.miner.neuron.src.main
 StandardOutput=append:/var/log/subvortex-miner/subvortex-miner-neuron.log
 StandardError=append:/var/log/subvortex-miner/subvortex-miner-neuron-error.log
 Environment=PYTHONUNBUFFERED=1

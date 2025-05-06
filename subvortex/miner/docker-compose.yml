@@ -10,8 +10,7 @@ services:
     env_file:
       - ./neuron/.env
     volumes:
-      - ~/.bittensor/wallets:/root/.bittensor/wallets
-      - /var/log:/app/logs
+      - ~/.bittensor:/root/.bittensor
 
 networks:
   subvortex:

@@ -15,10 +15,6 @@ CHECKSUM_DIR="/var/tmp/dumps/redis/${SERVICE_NAME}-checksums"
 
 echo "📦 Starting Validator Redis teardown for PM2 setup..."
 
-# Load environment variables
-echo "🔍 Loading environment variables from .env..."
-export $(grep -v '^#' .env | xargs)
-
 # Stop and delete PM2 process if running
 echo "🛑 Stopping and deleting PM2 process if it exists..."
 if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
@@ -29,39 +25,12 @@ else
     echo "ℹ️ No PM2 process found for $SERVICE_NAME."
 fi
 
-# Remove redis.conf
-echo "🧹 Removing Redis config file at $REDIS_CONF..."
-if [ -f "$REDIS_CONF" ]; then
-    sudo rm -f "$REDIS_CONF"
-    echo "✅ Redis config file removed."
-else
-    echo "ℹ️ Redis config file not found — skipping."
-fi
-
-# Remove /var/log directory
-echo "🧹 Removing Redis log directory at $LOG_DIR..."
-if [ -d "$LOG_DIR" ]; then
-    sudo rm -rf "$LOG_DIR"
-    echo "✅ Redis log directory removed."
-else
-    echo "ℹ️ Redis log directory not found — skipping."
-fi
-
 # Remove checksum directory
 if [[ -d "$CHECKSUM_DIR" ]]; then
     echo "🧽 Removing checksum directory: $CHECKSUM_DIR"
     sudo rm -rf "$CHECKSUM_DIR"
 else
     echo "ℹ️ Checksum directory $CHECKSUM_DIR does not exist. Skipping."
-fi
-
-# Remove /etc/redis folder if empty
-if [ -d "$CONFIG_DEST" ] && [ -z "$(ls -A "$CONFIG_DEST")" ]; then
-    echo "🧹 /etc/redis is empty, removing..."
-    sudo rmdir "$CONFIG_DEST"
-    echo "✅ /etc/redis directory removed."
-else
-    echo "ℹ️ /etc/redis not empty or not found — skipping removal."
 fi
 
 # Uninstall redis-server if installed
@@ -74,5 +43,9 @@ if command -v redis-server >/dev/null 2>&1; then
 else
     echo "ℹ️ redis-server not installed — nothing to uninstall."
 fi
+
+# --- System Unit Setup ---
+echo "🚫 Unmasking default redis-server systemd service..."
+sudo systemctl unmask redis-server || true
 
 echo "✅ Validator Redis teardown completed successfully."

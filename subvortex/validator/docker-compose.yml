@@ -12,8 +12,7 @@ services:
     depends_on:
       - validator-redis
     volumes:
-      - ~/.bittensor/wallets:/root/.bittensor/wallets
-      - /var/log:/app/logs
+      - ~/.bittensor:/root/.bittensor
 
   validator-redis:
     image: ghcr.io/eclipsevortex/subvortex-validator-redis:${SUBVORTEX_FLOATTING_FLAG:-latest}
@@ -33,7 +32,6 @@ services:
       - ./redis/.env
     volumes:
       - ./redis/deployment/templates/subvortex-validator-redis.conf:/etc/redis/redis.conf:ro
-      - /var/tmp/dumps/redis:/var/tmp/dumps/redis
 
 networks:
   subvortex:

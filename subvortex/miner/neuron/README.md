@@ -21,7 +21,7 @@ This document provides a comprehensive guide on how to set up and run the SubVor
 
 > ⚠️ **Architecture Notice**  
 > The Miner currently supports only **x86_64 (amd64)** servers.  
-> `arm64` support is not yet available but is a work in progress.  
+> `arm64` support is not yet available but is a work in progress.
 
 <br />
 
@@ -29,7 +29,7 @@ This document provides a comprehensive guide on how to set up and run the SubVor
 
 Before getting started, you need to create an .env file with the correct configuration. To generate it, run
 
-```
+```bash
 cp .env.template .env
 ```
 
@@ -37,21 +37,24 @@ Then, open `.env` in a text editor and update it with your settings.
 
 ## As process <a id="installation-as-process"></a>
 
+> **IMPORTANT** <br />
+> Before starting, be sure pm2 is installed if you decide to run the Miner in a process, see [pm2 installation](../../../scripts/process/README.md)
+
 To setup the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/process/neuron_process_setup.sh
 ```
 
 To start the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/process/neuron_process_start.sh
 ```
 
 To check the SubVortex Miner is up and running, you can run
 
-```
+```bash
 pm2 log subvortex-miner-neuron
 ```
 
@@ -75,62 +78,59 @@ HotKey for the wallet 'miner' already exists.
 
 ## As service <a id="installation-as-service"></a>
 
+> ⚠️ **Manual Installation**  
+> If you are not using the **Auto Upgrader**, do not forget to add `SUBVORTEX_USE_LOCAL_WORKDIR=True` in your `.env`.
+
 To setup the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/service/neuron_service_setup.sh
 ```
 
 To start the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/service/neuron_service_start.sh
 ```
 
 To check the SubVortex Miner is up and running, you can run
 
-```
+```bash
 systemctl status subvortex-miner-neuron
 ```
 
 You should see something like
 
 ```bash
-2025-05-02 11:55:28.402 |      DEBUG       | miner version 3.0.0
-2025-05-02 11:55:28.404 |      DEBUG       | [File Monitoring] started
-ColdKey for the wallet 'miner' already exists.
-HotKey for the wallet 'miner' already exists.
-2025-05-02 11:55:28.427 |      DEBUG       | loading wallet
-2025-05-02 11:55:28.434 |      DEBUG       | wallet: Wallet (Name: 'miner', Hotkey: 'default', Path: '~/.bittensor/wallets/')
-2025-05-02 11:55:28.434 |      DEBUG       | loading subtensor
-2025-05-02 11:55:28.435 |      DEBUG       | Connecting to network: local, chain_endpoint: ws://127.0.0.1:9944> ...
-2025-05-02 11:55:30.091 |      DEBUG       | Network: local, Chain: ws://127.0.0.1:9944
-2025-05-02 11:55:30.093 |      DEBUG       | checking wallet registration
-2025-05-02 11:55:30.105 |      DEBUG       | loading metagraph
-2025-05-02 11:55:30.607 |      DEBUG       | metagraph(netuid:7, n:256, block:4444047, network:finney)
-2025-05-02 11:55:30.609 |       INFO       | Running miner on uid: 60
+
 ```
 
 ## As docker container <a id="installation-as-container"></a>
 
 > **IMPORTANT** <br />
-> Before starting, be sure docker is installed if you deciode to run the subtensor as docker container, see [docker installation](../../scripts/docker/README.md)
+> Before starting, be sure docker is installed if you decide to run the subtensor as docker container, see [docker installation](../../scripts/docker/README.md)
+
+If you are not using the Auto Upgrader, you have to prefix all these commands by
+
+```bash
+export SUBVORTEX_FLOATTING_FLAG=latest
+```
 
 To build the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/docker/neuron_docker_setup.sh
 ```
 
 To start the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/docker/neuron_docker_start.sh
 ```
 
 To check the SubVortex Miner is up and running, you can run
 
-```
+```bash
 docker ps
 ```
 
@@ -168,13 +168,13 @@ HotKey for the wallet 'miner' already exists.
 
 To uninstall the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/process/neuron_process_teardown.sh
 ```
 
 To check the SubVortex Miner has been uninstalled, you can run
 
-```
+```bash
 pm2 list
 ```
 
@@ -184,33 +184,39 @@ You should not see any process named `subvortex-miner-neuron`.
 
 To uninstall the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/service/neuron_service_teardown.sh
 ```
 
 To check the SubVortex Miner has been uninstalled, you can run
 
-```
+```bash
 systemctl status subvortex-miner-neuron
 ```
 
 You should see something like
 
-```
+```bash
 Unit subvortex-miner-neuron.service could not be found.
 ```
 
 ## As docker container <a id="uninstall-as-container"></a>
 
+If you are not using the Auto Upgrader, you have to prefix all these commands by
+
+```bash
+export SUBVORTEX_FLOATTING_FLAG=latest
+```
+
 To uninstall the Miner, you can run
 
-```
+```bash
 ./subvortex/miner/neuron/deployment/docker/neuron_docker_teardown.sh
 ```
 
 To check the SubVortex Miner has been uninstalled, you can run
 
-```
+```bash
 docker ps
 ```
 

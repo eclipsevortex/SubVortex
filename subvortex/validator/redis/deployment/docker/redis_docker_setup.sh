@@ -26,16 +26,6 @@ else
     exit 1
 fi
 
-# Create Redis working directory if specified in redis.conf
-REDIS_DATA_DIR=$(grep -E '^\s*dir\s+' "$REDIS_CONF" | awk '{print $2}')
-if [[ -n "$REDIS_DATA_DIR" ]]; then
-  echo "📁 Ensuring Redis data directory exists: $REDIS_DATA_DIR"
-  sudo mkdir -p "$REDIS_DATA_DIR"
-  sudo chown root:root "$REDIS_DATA_DIR"
-else
-  echo "⚠️ Could not determine Redis data directory from redis.conf."
-fi
-
 # Build or pull depending on environment
 if [ -n "${SUBVORTEX_LOCAL:-}" ]; then
     echo "🔨 Local development detected (SUBVORTEX_LOCAL is set). Building validator-redis image..."

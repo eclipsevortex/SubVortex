@@ -1,0 +1,38 @@
+services:
+  validator-neuron:
+    image: ghcr.io/eclipsevortex/subvortex-validator-neuron:${SUBVORTEX_FLOATTING_FLAG:-latest}
+    container_name: subvortex-validator-neuron
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    env_file:
+      - ./neuron/.env
+    depends_on:
+      - validator-redis
+    volumes:
+      - ~/.bittensor:/root/.bittensor
+
+  validator-redis:
+    image: ghcr.io/eclipsevortex/subvortex-validator-redis:${SUBVORTEX_FLOATTING_FLAG:-latest}
+    container_name: subvortex-validator-redis
+    restart: always
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${SUBVORTEX_REDIS_PASSWORD:-}", "--raw", "incr", "ping" ]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+    command:
+      - redis-server
+      - /etc/redis/redis.conf
+    ports:
+      - ${SUBVORTEX_REDIS_PORT:-6379}:6379
+    env_file:
+      - ./redis/.env
+    volumes:
+      - ./redis/deployment/templates/subvortex-validator-redis.conf:/etc/redis/redis.conf:ro
+
+networks:
+  subvortex:
+    driver: bridge

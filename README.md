@@ -2,6 +2,7 @@
 
 # **SubVortex** <!-- omit in toc -->
 
+[![Build & Push](https://github.com/eclipsevortex/SubVortex/actions/workflows/docker-workflow.yml/badge.svg)](https://github.com/eclipsevortex/SubVortex/actions/workflows/docker-workflow.yml)
 [![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -27,42 +28,41 @@
 - [Introduction](#introduction)
 - [Goals](#goals)
 - [Roles](#roles)
-- [Subtensor & Bittensor](#subtensor--bittensor)
+- [Subtensor & Bittensor](#subtensor-and-bittensor)
 - [Incentive Mechanism](#incentive-mechanism)
 - [Firewall](#firewall)
 - [Value Proposition](#value-proposition)
-- [Team Composition](#team-composition)
-- [Road Map](#road-map)
+- [Leadership & Operations](#leardership-and-operations)
 - [Credits](#credits)
 - [Conclusion](#conclusion)
 - [Machine Requirements](#machine-requirements)
   - [Validator](#validator-requirements)
   - [Miner](#miner-requirements)
-- [Fast Setup and Run](#fast-setup-and-run)
-  - [Validator](#validator-fast-setup-and-run)
-  - [Miner](#miner-fast-setup-and-run)
-- [Installation](#installation)
-  - [Install SubVortex](#install-subvortex)
-  - [Install Subtensor](#install-local-subtensor)
-  - [Install Redis](#install-redis)
-  - [Install Wandb](#install-wandb)
 - [Registering your wallet](#registering-your-wallet)
-- [Running a Miner](#running-a-miner)
-- [Running a Validator](#running-a-validator)
-- [Releases](#releases)
+- [Quick Setup](#quick-setup)
+  - [Miner](#quick-setup-miner)
+  - [Validator](#quick-setup-validator)
+- [Neuron Management](#neuron-management)
+  - [Miner](#miner-management)
+  - [Validator](#validator-management)
+- [Installation](#installation)
+  - [Install Subtensor](#install-local-subtensor)
+  - [Install Wandb](#install-wandb)
 - [Troubleshooting](#troubleshooting)
   - [Troubleshooting Subtensor](#troubleshooting-subtensor)
 - [License](#license)
 
-## Abstract
+<br />
+
+## 📄 Abstract <a id="abstract"></a>
 
 SubVortex introduces an incentivized and decentralized network of subtensor nodes that are pivotal elements within the Bittensor ecosystem. This delineates the structure, objectives, and mechanisms of SubVortex, aiming to foster decentralization, stability, and efficient resource allocation within the broader Bittensor network.
 
-## Introduction
+## 👋 Introduction <a id="introduction"></a>
 
 Subtensor nodes play a vital role in the Bittensor network, governing various aspects such as incentivization, governance, and network health. SubVortex aims to enhance the decentralization and functionality of Bittensor by establishing an incentivized network of subtensors. This whitepaper describes the goals, roles, and operational phases of SubVortex, outlining its contribution and value proposition to the Bittensor ecosystem.
 
-## Goals
+## 🎯 Goals <a id="goals"></a>
 
 SubVortex aspires to set the standard for subnets, prioritizing the following objectives:
 
@@ -71,7 +71,7 @@ SubVortex aspires to set the standard for subnets, prioritizing the following ob
 - **Low Barrier to Entry**: Facilitating entry into Bittensor mining with minimal hardware requirements and offering fair incentives.
 - **Continuous Enhancement** - Committing to ongoing improvements through a comprehensive roadmap.
 
-## Roles
+## 🧑‍💻 Roles <a id="roles"></a>
 
 ### Miner
 
@@ -87,7 +87,7 @@ Validator has some operational phases:
 - **Metric Phase**: Gathers diverse metrics such as download/upload speeds, latency, and geographical data to assess miner performance.
 - **Reward System**: Scores miners based on availability, latency, reliability, and global distribution, promoting network health and efficiency.
 
-## Subtensor & Bittensor
+## 🧠 Subtensor & Bittensor <a id="subtensor-and-bittensor"></a>
 
 Subtensor serves as the foundation of the Bittensor network, facilitating decentralized consensus, incentivization, staking, and governance. Its role in orchestrating the decentralized machine learning marketplace is indispensable, ensuring integrity, trust, and quality within the ecosystem.
 
@@ -95,7 +95,7 @@ Local Subtensor Deployment:
 
 Running subtensors locally offers advantages in speed, reliability, and control over accessibility compared to the public Finney node. It enhances decentralization by empowering miners to manage their subtensor nodes efficiently.
 
-## Incentive Mechanism
+## 💰 Incentive Mechanism <a id="incentive-mechanism"></a>
 
 SubVortex's incentive mechanism will score miners based on multiple criteria of their subtensor node:
 
@@ -130,52 +130,29 @@ To assign a score to each miner, we will establish a connection with the subtens
 
 This reward incentivizes miners to effectively distribute subtensors across different geographical locations to optimize performance and reduce latency for a better subnet experience.
 
-## Firewall
+## 🛡️ Firewall <a id="firewall"></a>
 
 To know more on the firewall, refer to the [firewall guide](./docs/features/firewall.md)
 
-## Value Proposition
+## 🏆 Value Proposition <a id="value-proposition"></a>
 
 SubVortex enriches the Bittensor ecosystem by providing an alternative to the Finney network and promoting decentralization, reliability, and efficiency. It offers miners and validators a seamless experience with low barriers to entry and continuous support.
 
-## Team Composition
+## 👤 Leadership & Operations <a id="leardership-and-operations"></a>
 
-The team comprises individuals with diverse backgrounds and extensive experience in crypto, software development, engineering, business, and data management. The SubVortex team ensures robust support and continuous improvement for the network.
+SubVortex is driven by a highly focused and performance-oriented team with deep experience in crypto, software engineering, infrastructure, and data systems. With a commitment to transparency and continuous improvement, the team ensures robust support for validators, miners, and the broader Bittensor ecosystem.
 
-Team responsabilities
+We are constantly evolving and expanding, and contributors from the community are welcome as we scale.
 
-- **EclipseVortex** - Development and technology
+Core responsabilities
 
-Team timezone
+- **EclipseVortex** - Architecture, infrastructure, and development leadership
+
+Operational Timezone
 
 - **EclipseVortex** - GMT (United-Kingdom)
 
-## Road Map
-
-### Phase 1
-
-- Create a subnet in testnet and perform internal testing of the incentive mechanism
-- Register subnet on mainnet
-- Release preliminary information publicly
-
-### Phase 2:
-
-- Internal testing on mainnet. Bug fixes, etc.
-- Public launch and allow key registrations.
-- Performance-based emission structure
-
-### Phase 3:
-
-- Public Frontend
-- Public Backend
-
-### Phase 4
-
-- Public SubVortex load balancer
-
-> Note: The Road Map will be updated if there are any changes
-
-## Credits
+## 🙌 Credits <a id="credits"></a>
 
 Bittensor technology is still new and promising, and participants are eager to support each other. That's why the SubVortex team would like to express our gratitude to everyone who has helped us reach where we are today:
 
@@ -188,11 +165,11 @@ Bittensor technology is still new and promising, and participants are eager to s
 
 Please don't hesitate to reach out if we've inadvertently omitted anyone, and you'd like us to give them a special shout-out on our GitHub!
 
-## Conclusion
+## 🔚 Conclusion <a id="conclusion"></a>
 
 In conclusion, SubVortex stands as a cornerstone in the evolution of the Bittensor network, incentivizing decentralization, reliability, and accessibility. Through its innovative approach and robust infrastructure, SubVortex aims to catalyze the growth and sustainability of the decentralized machine-learning ecosystem that is Bittensor.
 
-## Machine requirements
+## 🖥️ Machine requirements <a id="machine-requirements"></a>
 
 In terms of Operation System, you have to follow the requirements
 
@@ -213,97 +190,7 @@ For validator, you need a CPU machine (no GPU needed!).
 
 For more information, take a look on the [min requirements](./min_compute.yml)
 
-## Fast Setup and Run
-
-For a quick and seamless setup, we provide a comprehensive script that installs and runs a miner or validator, taking care of everything from installation to execution.
-
-### Setup and run a miner <a id="miner-fast-setup-and-run"></a>
-
-> **IMPORTANT** <br />
-> To use the full script, you have to follow the steps to install the subnet (**EXCEPT** executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
-
-Be sure you are in the **SubVortex** directory, if not
-
-```
-cd SubVortex
-```
-
-Then, you can run the script
-
-```
-./scripts/setup_and_run.sh -t miner
-```
-
-> IMPORTANT
->
-> - If you any prompts, just confirm them
-> - Other options are available, pleaser take a look
-
-Check the available options by running
-
-```
-./scripts/setup_and_run.sh -h
-```
-
-Once the script is successfully executed, you'll have a miner up and running—nothing else required!
-
-Of course, if you have specific settings in mind, you can use this script as a base and update anything you want to tailor your experience to your needs.
-
-Finally, if you prefer setup and run the miner in a more controlled way, you can follow the different sections below.
-
-### Setup and run a validator <a id="validator-fast-setup-and-run"></a>
-
-> **IMPORTANT** <br />
-> To use the full script, you have to follow the steps to install the subnet (**EXCEPT** executing **subnet_setup.sh**) by following the [Subnet guide](./scripts/subnet/README.md)
-
-Be sure you are in the **SubVortex** directory, if not
-
-```
-cd SubVortex
-```
-
-Then, you can run the script
-
-```
-./scripts/setup_and_run.sh -t validator
-```
-
-Check the available options by running
-
-```
-./scripts/setup_and_run.sh -h
-```
-
-Once the script is successfully executed, you'll have a validator up and running—nothing else required!
-
-Of course, if you have specific settings in mind, you can use this script as a base and update anything you want to tailor your experience to your needs.
-
-Finally, if you prefer setup and run the validator in a more controlled way, you can follow the different sections below.
-
-## Installation
-
-### Pre-requisite
-
-- Local Subtensor is mandatory for all miners, and highly recommended for validators.
-- Validators will need to install and configure Redis
-
-### Install SubVortex
-
-To install the subnet, refer to the [Subnet guide](./scripts/subnet/README.md)
-
-### Install Local Subtensor
-
-To install a local subtensor, refer to the [Subtensor guide](./scripts/subtensor/README.md)
-
-### Install Redis
-
-To install redis, refer to the [Redis guide](./scripts/redis/README.md)
-
-### Install Wandb
-
-To install wandb, refer to the [Wandb guide](./docs/wandb/wandb.md)
-
-### Registering your wallet
+## 🦊 Registering your wallet <a id="registering-your-wallet"></a>
 
 In order to run either a miner or a validator, you will need to have a wallet registered to the subnet. If you do not already have wallet set up on the server, following the steps below:
 
@@ -329,65 +216,230 @@ btcli s register --netuid <SUBNET_UID> --subtensor.network local --wallet.name Y
 
 Once you have successfully registered your wallet, you are now ready to start either your miner or validator.
 
-### Running a Miner
+## 🚀 Quick Setup <a id="quick-setup"></a>
 
-> IMPORTANT: Before running a miner, be sure you have a local subtensor up and running. Please see the [Subtensor guide](./scripts/subtensor/README.md) for more details.
+⚠️ **Recommended Setup Method — Use the Auto Upgrader**
 
-> IMPORTANT: **wandb** **IS NOT** for miners, **ONLY FOR** validators.
+To safely and efficiently install and manage your SubVortex miner or validator, we strongly recommend using the [SubVortex Auto Upgrader](https://github.com/eclipsevortex/SubVortex.AutoUpgrader).
+This tool handles:
 
-To run a miner, navigate to the SubVortex directory. It is highly recommended to run via a process manager like PM2.
+- Initial installation
+- Service restarts
+- Zero-downtime upgrades
+- Version tracking and rollback
+- Safe Redis and file migrations
 
-```
-pm2 start neurons/miner.py \
-  --name MINER_NAME \
-  --interpreter <PATH_TO_PYTHON_LIBRARY> -- \
-  --netuid <SUBNET_UID> \
-  --wallet.name YOUR_WALLET_NAME \
-  --wallet.hotkey YOUR_HOTKEY_NAME \
-  --subtensor.network local \
-  --logging.debug \
-  --auto-update
-```
+❗ If you proceed with the manual `Quick Setup` scripts below, you do so at your own risk. You’ll be responsible for future upgrades, downtime handling, and configuration issues.
 
-> IMPORTANT: Do not run more than one miner per machine. Running multiple miners will result in the loss of incentive and emissions on all miners.
+➡️ For long-term reliability and simplicity, use the Auto Upgrader.
 
-To enable the firewall, add the `--firewall.on` flag. It is highly recommended to enable the firewall to protect your miner from attacks that could impact your score. For more details about the firewall, please refer to our [firewall guide](./docs/features/firewall.md)
+<br />
 
-### Running a Validator
+Before running a validator and/or a miner, you have to
 
-> IMPORTANT: Before running a validator, be sure you have a redis up and running. Please see the [Redis guide](./scripts/redis/README.md) for more details.
+1. Create or recreate your wallets (coldkey + hotkey) - [more details](#registering-your-wallet)
+2. Register to the subnet - [more details](#registering-your-wallet)
+3. Copy the template to .env in the same directory and update the values for your specific setup.
 
-> IMPORTANT: Before running a validator, be sure you have a local subtensor up and running. Please see the [Subtensor guide](./scripts/subtensor/README.md) for more details.
+Each `.env` file maps directly to the arguments used by the service. Use the format `SUBVORTEX_<ARG>` based on the command-line flag. For example, `--database.password` becomes `SUBVORTEX_DATABASE_PASSWORD`.
 
-> IMPORTANT: By default wandb is enabled when running a validator. It is **HIGHLY RECOMMANDED** to not disable it as it enables everyone to access various statistics for better performance on the subnet but if you want to do it, just add `--wandb.off` to the followed pm2 command. If you want to keep wandb enabled, please refer to the [Wandb guide](./docs/wandb/wandb.md) for more details as there are some manually steps to go throught before running the validator.
+There’s one `env.template` per service (e.g. miner/neuron/env.template, validator/redis/env.template, etc.), so make sure to configure each role accordingly.
 
-> Please use `--database.index <INDEX>`if you have multiple subnet sharing the same redis instance and the index 1 (default value) is already taken by another subnet
+### Miner <a id="quick-setup-miner"></a>
 
-Similar to running a miner in the above section, navigate to the SubVortex directory and run the following to launch in PM2.
+To start the SubVortex miner in a quick way, you can run
 
-```
-pm2 start neurons/validator.py \
-  --name VALIDATOR_NAME \
-  --interpreter <PATH_TO_PYTHON_LIBRARY> -- \
-  --netuid <SUBNET_UID> \
-  --wallet.name YOUR_WALLET_NAME \
-  --wallet.hotkey YOUR_HOTKEY_NAME \
-  --subtensor.network local \
-  --logging.debug \
-  --auto-update
+```bash
+./subvortex/miner/scripts/quick_start.sh
 ```
 
-> NOTE: if you run a validator in testnet do not forget to add the argument `--subtensor.network test` or `--subtensor.chain_endpoint ws://<LOCAL_SUBTENSOR_IP>:9944` (the local subtensor has to target the network testnet)
+It will install and start the miner as service which is the default mode.
 
-> NOTE: to access the wandb UI to get statistics about the miners, you can click on this [link](https://wandb.ai/eclipsevortext/subvortex-team) and choose the validator run you want.
+Use `-h` to see the options
 
-> NOTE: by default the dumps created by the auto-update will be stored in /etc/redis. If you want to change the location, please use `--database.redis_dump_path`.
+To stop the SubVortex miner in a quick way, you can run
 
-## Releases
+```bash
+./subvortex/miner/scripts/quick_stop.sh
+```
 
-- [Release-2.2.0](./scripts/release/release-2.2.0/RELEASE-2.2.0.md)
+It will stop and teardown the miner as service which is the default mode.
 
-## Troubleshooting
+Use `-h` to see the options
+
+### Validator <a id="quick-setup-validator"></a>
+
+To start the SubVortex validator in a quick way, you can run
+
+```bash
+./subvortex/validator/scripts/quick_start.sh
+```
+
+It will install and start the validator as service which is the default mode.
+
+Use `-h` to see the options
+
+To stop the SubVortex validator in a quick way, you can run
+
+```bash
+./subvortex/validator/scripts/quick_stop.sh
+```
+
+It will stop and teardown the validator as service which is the default mode.
+
+Use `-h` to see the options
+
+## ⚙️ Neuron Management <a id="neuron-management"></a>
+
+⚠️ **Manual Service Management — Use with Caution**
+
+While SubVortex provides CLI scripts to manage miners and validators manually, this approach is intended only for advanced users or for debugging purposes.
+For production environments, please use the SubVortex Auto Upgrader to:
+
+- Automatically handle upgrades, rollbacks, and migrations
+- Keep services up-to-date and running reliably
+- Minimize risk of misconfiguration or downtime
+
+❗ Managing neuron services manually means you are fully responsible for infrastructure stability, update coordination, and service integrity.
+
+➡️ Unless you have a strong reason, we highly recommend switching to the Auto Upgrader.
+
+This section explains the different action you can execute on a miner and/or validator.
+
+### Miner <a id="miner-management"></a>
+
+#### 🔧 Service Control
+
+A **miner** is made up of one or more services located in the `subvortex/miner` directory.
+
+Each service includes a `scripts/` folder, which provides a simple interface to control the service with the following actions:
+
+- `setup` – Prepare the service environment
+- `start` – Launch the service
+- `stop` – Stop the service
+- `teardown` – Clean up everything related to the service
+
+To stop the miner neuron service, run:
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_stop.sh
+```
+
+Need help? You can pass `-h` to any of these scripts to view the available options:
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_stop.sh -h
+```
+
+These scripts are wrappers around lower-level implementations found in the `deployment/` directory. This directory is organized by **execution type**:
+
+- `service`
+- `process`
+- `docker` (soon to be renamed to `container`)
+
+Each of these directories contains specialized logic for running the services in different environments or configurations.
+
+You **don’t need to worry about these inner workings**. The top-level `scripts/` handle it for you. When needed, just pass the `--execution` flag to specify which mode to use, like so:
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_start.sh --execution process
+```
+
+This keeps your interaction simple, while giving you full control when you need it.
+
+#### 🔐 Certificate Management
+
+In order to install the SubVortex certificate, run
+
+```bash
+./subvortex/scripts/wss/install_certificate.sh
+```
+
+To check everything has been installed correctly, run
+
+```bash
+./subvortex/scripts/wss/check_certificate.sh
+```
+
+You should see something 
+```bash
+🔍 Checking NGINX service status...
+✅ NGINX is running.
+🧪 Testing NGINX configuration syntax...
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+✅ NGINX configuration syntax is OK.
+🌐 Sending JSON-RPC request to get current block from local Subtensor node...
+✅ Subtensor node responded. Current block number (hex): 0x43eb17
+🔐 Fetching SSL certificate served by local NGINX instance...
+📛 Subject (Who this cert is for): CN = secure.subvortex.info
+🏢 Issuer (Who issued the cert): C = US, O = Let's Encrypt, CN = E5
+📅 Expiration: Jun 15 14:42:14 2025 GMT
+✅ Certificate matches secure.subvortex.info
+✅ Certificate was issued by Let's Encrypt
+📂 Tailing last 10 lines of NGINX error log:
+2025/05/03 13:20:48 [notice] 2423310#2423310: using inherited sockets from "6;7;"
+2025/05/03 13:20:56 [notice] 2423944#2423944: signal process started
+✅ All checks complete on LOCAL VPS.
+```
+
+### Validator <a id="validator-management"></a>
+
+#### 🔧 Service Control
+
+A **validator** is made up of one or more services located in the `subvortex/validator` directory.
+
+Each service includes a `scripts/` folder, which provides a simple interface to control the service with the following actions:
+
+- `setup` – Prepare the service environment
+- `start` – Launch the service
+- `stop` – Stop the service
+- `teardown` – Clean up everything related to the service
+
+To stop the miner neuron service, run:
+
+```bash
+./subvortex/validator/neuron/scripts/neuron_stop.sh
+```
+
+Need help? You can pass `-h` to any of these scripts to view the available options:
+
+```bash
+./subvortex/validator/neuron/scripts/neuron_stop.sh -h
+```
+
+These scripts are wrappers around lower-level implementations found in the `deployment/` directory. This directory is organized by **execution type**:
+
+- `service`
+- `process`
+- `docker` (soon to be renamed to `container`)
+
+Each of these directories contains specialized logic for running the services in different environments or configurations.
+
+You **don’t need to worry about these inner workings**. The top-level `scripts/` handle it for you. When needed, just pass the `--execution` flag to specify which mode to use, like so:
+
+```bash
+./subvortex/validator/neuron/scripts/neuron_start.sh --execution process
+```
+
+This keeps your interaction simple, while giving you full control when you need it.
+
+## 🛠️ Installation <a id="installation"></a>
+
+### Pre-requisite
+
+- Local Subtensor is mandatory for all miners, and highly recommended for validators.
+- Validators will need to install and configure Redis
+
+### Install Local Subtensor
+
+To install a local subtensor, refer to the [Subtensor guide](./scripts/subtensor/README.md)
+
+### Install Wandb
+
+To install wandb, refer to the [Wandb guide](./docs/wandb/wandb.md)
+
+## 🔧 Troubleshooting <a id="troubleshooting"></a>
 
 ### Troubleshooting Subtensor
 
@@ -411,7 +463,7 @@ Options
 
 Once the state has been purge, you can re-execute the subtensor start script $HOME/SubVortex/scripts/subtensor/start.sh via a procedd manager or not. See the section [Install Subtensor](#install-subtensor)
 
-## License
+## 🪪 License <a id="license"></a>
 
 This repository is licensed under the MIT License.
 

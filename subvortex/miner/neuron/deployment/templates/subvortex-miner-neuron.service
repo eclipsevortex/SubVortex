@@ -1,0 +1,17 @@
+[Unit]
+Description=SubVortex Miner Neuron
+After=network.target
+
+[Service]
+WorkingDirectory=/root/subvortex/subvortex/miner/neuron
+EnvironmentFile=/root/subvortex/subvortex/miner/.env
+ExecStart=/root/subvortex/subvortex/miner/venv/bin/python3 -m subvortex.miner.neuron.src.main
+StandardOutput=append:/var/log/subvortex-miner/subvortex-miner-neuron.log
+StandardError=append:/var/log/subvortex-miner/subvortex-miner-neuron-error.log
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target

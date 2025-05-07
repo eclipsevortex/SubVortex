@@ -1,0 +1,17 @@
+services:
+  miner-neuron:
+    image: ghcr.io/eclipsevortex/subvortex-miner-neuron:${SUBVORTEX_FLOATTING_FLAG:-latest}
+    container_name: subvortex-miner-neuron
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    env_file:
+      - ./neuron/.env
+    volumes:
+      - ~/.bittensor:/root/.bittensor
+
+networks:
+  subvortex:
+    driver: bridge

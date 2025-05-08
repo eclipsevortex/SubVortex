@@ -44,3 +44,32 @@ check_required_args() {
     fi
 }
 
+convert_env_var_to_args() {
+    PREFIX="SUBVORTEX_"
+    local args=()
+
+    while IFS= read -r line; do
+        key="${line%%=*}"
+        value="${line#*=}"
+
+        # Skip if key doesn't start with PREFIX or value is empty (even if it's just "")
+        if [[ $key != ${PREFIX}* || -z "${value//\"/}" ]]; then
+            continue
+        fi
+
+        key_suffix="${key#$PREFIX}"
+        cli_key="--$(echo "$key_suffix" | tr '[:upper:]' '[:lower:]' | tr '_' '.')"
+        value_lower="$(echo "$value" | tr '[:upper:]' '[:lower:]')"
+
+        if [[ "$value_lower" == "true" ]]; then
+            args+=("$cli_key")
+        elif [[ "$value_lower" == "false" ]]; then
+            continue
+        else
+            args+=("$cli_key" "$value")
+        fi
+    done < <(env)
+
+    # Output escaped values so caller can eval safely
+    printf '%q ' "${args[@]}"
+}

@@ -95,14 +95,14 @@ else
     echo "✅ No redis binary or config changes detected — skipping redis.conf update."
 fi
 
-# Update Redis password in redis.conf if necessary
-if [[ -n "${SUBVORTEX_REDIS_PASSWORD:-}" ]]; then
+# Update or remove Redis password in redis.conf based on SUBVORTEX_REDIS_PASSWORD
+if [[ -v SUBVORTEX_REDIS_PASSWORD && -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
     current_pass=$(grep -E '^\s*requirepass\s+' "$REDIS_CONF" | awk '{print $2}' || true)
     if [[ "$current_pass" != "$SUBVORTEX_REDIS_PASSWORD" ]]; then
         echo "🔐 Injecting or updating Redis password in redis.conf..."
         if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
             sudo sed -i "s|^\s*requirepass\s\+.*|requirepass $SUBVORTEX_REDIS_PASSWORD|" "$REDIS_CONF"
-            elif grep -q "^# *requirepass" "$REDIS_CONF"; then
+        elif grep -q "^# *requirepass" "$REDIS_CONF"; then
             sudo sed -i "/^# *requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
         else
             echo "requirepass $SUBVORTEX_REDIS_PASSWORD" | sudo tee -a "$REDIS_CONF" > /dev/null
@@ -111,7 +111,12 @@ if [[ -n "${SUBVORTEX_REDIS_PASSWORD:-}" ]]; then
         echo "🔐 Redis password already up-to-date — no changes made."
     fi
 else
-    echo "⚠️ Environment variable SUBVORTEX_REDIS_PASSWORD is not set — skipping password injection."
+    if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
+        echo "❌ Removing Redis password from redis.conf (SUBVORTEX_REDIS_PASSWORD is unset or empty)..."
+        sudo sed -i '/^\s*requirepass\s\+/d' "$REDIS_CONF"
+    else
+        echo "⚠️ SUBVORTEX_REDIS_PASSWORD is unset or empty — no password configured in redis.conf."
+    fi
 fi
 
 # Ensure Redis logs to stdout/stderr for PM2

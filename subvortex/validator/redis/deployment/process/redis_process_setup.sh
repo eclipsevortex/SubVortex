@@ -8,6 +8,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+source ../../scripts/tools.sh
+
 # Define constants and paths
 NEURON_NAME=subvortex-validator
 SERVICE_NAME="${NEURON_NAME}-redis"
@@ -30,13 +32,7 @@ echo "🔧 Setting up $SERVICE_NAME..."
 mkdir -p "$CHECKSUM_DIR"
 
 # Install Redis server if not already installed
-echo "🚀 Installing Redis server if not already installed..."
-if ! command -v redis-server >/dev/null; then
-    sudo DEBIAN_FRONTEND=noninteractive apt-get update
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" redis-server
-else
-    echo "✅ redis-server already installed."
-fi
+install_redis_if_needed
 
 ### Phase 2: Checksum Verification
 

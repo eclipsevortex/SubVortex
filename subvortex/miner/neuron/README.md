@@ -103,7 +103,7 @@ You should see something like
 
 ```bash
 ● subvortex-miner-neuron.service - SubVortex Miner Neuron
-     Loaded: loaded (/etc/systemd/system/subvortex-miner-neuron.service; disabled; vendor preset: enabled)
+     Loaded: loaded (/etc/systemd/user/subvortex-miner-neuron.service; disabled; vendor preset: enabled)
      Active: active (running) since Tue 2025-05-06 18:58:12 CEST; 1s ago
    Main PID: 2545963 (python3)
       Tasks: 8 (limit: 19116)

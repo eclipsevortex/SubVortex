@@ -10,6 +10,8 @@ REDIS_CLI_CMD="redis-cli -a ${SUBVORTEX_REDIS_PASSWORD:-} -p ${SUBVORTEX_REDIS_P
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+source ../../../scripts/utils/utils.sh
+
 # Activate virtual environment
 echo "🐍 Activating Python virtual environment..."
 source venv/bin/activate

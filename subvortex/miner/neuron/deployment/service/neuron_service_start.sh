@@ -9,6 +9,8 @@ SERVICE_NAME="$NEURON_NAME-neuron"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
+source ../../../scripts/utils/utils.sh
+
 # Activate virtual environment
 echo "🐍 Activating Python virtual environment..."
 source venv/bin/activate
@@ -64,7 +66,7 @@ sed -e "s|^ExecStart=.*|ExecStart=$WORKING_DIR/$FULL_EXEC_START|" \
     "$TEMPLATE_PATH" > "$TEMP_TEMPLATE"
 
 # Inject any remaining env vars
-envsubst < "$TEMP_TEMPLATE" | sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" > /dev/null
+envsubst < "$TEMP_TEMPLATE" | sudo tee "/etc/systemd/user/${SERVICE_NAME}.service" > /dev/null
 
 # Prepare log folder
 echo "📁 Preparing log directory for $NEURON_NAME..."

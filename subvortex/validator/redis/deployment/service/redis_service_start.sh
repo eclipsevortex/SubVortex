@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SERVICE_NAME="subvortex-validator-redis"
-SYSTEMD_DEST="/etc/systemd/system"
+SYSTEMD_DEST="/etc/systemd/user"
 SYSTEMD_UNIT="$SYSTEMD_DEST/${SERVICE_NAME}.service"
 
 echo "🚀 Starting $SERVICE_NAME..."

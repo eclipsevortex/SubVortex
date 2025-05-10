@@ -98,7 +98,7 @@ You should see something like
 
 ```bash
  subvortex-validator-neuron.service - SubVortex Validator Neuron
-     Loaded: loaded (/etc/systemd/system/subvortex-validator-neuron.service; disabled; vendor preset: enabled)
+     Loaded: loaded (/etc/systemd/user/subvortex-validator-neuron.service; disabled; vendor preset: enabled)
      Active: active (running) since Mon 2025-05-05 17:42:06 BST; 8s ago
    Main PID: 775722 (python3)
       Tasks: 18 (limit: 28765)

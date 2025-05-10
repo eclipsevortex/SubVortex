@@ -14,7 +14,7 @@ source ../../scripts/tools.sh
 NEURON_NAME=subvortex-validator
 SERVICE_NAME="${NEURON_NAME}-redis"
 DEPLOY_TEMPLATES="./deployment/templates"
-SYSTEMD_DEST="/etc/systemd/system"
+SYSTEMD_DEST="/etc/systemd/user"
 SYSTEMD_UNIT="${SYSTEMD_DEST}/${SERVICE_NAME}.service"
 CHECKSUM_DIR="/var/tmp/subvortex.checksums/${SERVICE_NAME}-checksums"
 REDIS_USER="redis"

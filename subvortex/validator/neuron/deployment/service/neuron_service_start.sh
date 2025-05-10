@@ -66,7 +66,7 @@ sed -e "s|^ExecStart=.*|ExecStart=$WORKING_DIR/$FULL_EXEC_START|" \
     "$TEMPLATE_PATH" > "$TEMP_TEMPLATE"
 
 # Inject any remaining env vars
-envsubst < "$TEMP_TEMPLATE" | sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" > /dev/null
+envsubst < "$TEMP_TEMPLATE" | sudo tee "/etc/systemd/user/${SERVICE_NAME}.service" > /dev/null
 
 # Prepare log folder
 echo "📁 Preparing log directory for $NEURON_NAME..."

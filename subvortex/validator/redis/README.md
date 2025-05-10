@@ -99,7 +99,7 @@ You should see something like
 
 ```bash
 ● subvortex-validator-redis.service - SubVortex Validator Redis
-     Loaded: loaded (/etc/systemd/system/subvortex-validator-redis.service; disabled; vendor preset: enabled)
+     Loaded: loaded (/etc/systemd/user/subvortex-validator-redis.service; disabled; vendor preset: enabled)
      Active: active (running) since Mon 2025-05-05 17:25:57 BST; 4s ago
        Docs: http://redis.io/documentation,
              man:redis-server(1)

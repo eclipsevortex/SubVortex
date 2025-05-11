@@ -27,7 +27,7 @@ function install_redis_if_needed() {
     REQUIRED_VERSION="8.0.0"
 
     get_redis_version() {
-        command -v redis-server >/dev/null && redis-server --version | awk '{print $3}' | cut -d'=' -f2'
+        command -v redis-server >/dev/null && redis-server --version | awk '{print $3}' | cut -d'=' -f2
     }
 
     echo "📦 Checking Redis installation..."
@@ -39,7 +39,7 @@ function install_redis_if_needed() {
 
     echo "🔍 Redis is not installed or not at version $REQUIRED_VERSION. Proceeding with upgrade..."
 
-    # Stop existing service safely
+    # Stop existing Redis service safely
     echo "🛑 Stopping existing Redis service (if running)..."
     sudo systemctl stop redis-server || true
 
@@ -55,7 +55,7 @@ function install_redis_if_needed() {
         echo "⚠️ Could not determine or access Redis data directory — skipping backup."
     fi
 
-    # Remove Redis if installed via APT
+    # Remove existing Redis (if installed via APT)
     if dpkg -l | grep -q redis-server; then
         echo "🧹 Removing existing Redis installation from APT..."
         sudo apt-get remove -y redis-server

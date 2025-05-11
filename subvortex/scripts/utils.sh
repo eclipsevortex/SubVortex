@@ -45,20 +45,24 @@ check_required_args() {
 }
 
 convert_env_var_to_args() {
-    PREFIX="SUBVORTEX_"
+    local PREFIX="SUBVORTEX_"
     local args=()
 
     while IFS= read -r line; do
-        key="${line%%=*}"
-        value="${line#*=}"
+        local key="${line%%=*}"
+        local value="${line#*=}"
 
-        # Skip if key doesn't start with PREFIX or value is empty (even if it's just "")
+        # Skip if the key doesn't start with PREFIX or the value is completely empty (even if it's just "")
         if [[ $key != ${PREFIX}* || -z "${value//\"/}" ]]; then
             continue
         fi
 
-        key_suffix="${key#$PREFIX}"
-        cli_key="--$(echo "$key_suffix" | tr '[:upper:]' '[:lower:]' | tr '_' '.')"
+        # Convert SUBVORTEX_EXECUTION_ROLE -> --execution.role
+        local key_suffix="${key#$PREFIX}"
+        local cli_key="--$(echo "$key_suffix" | tr '[:upper:]' '[:lower:]' | tr '_' '.')"
+
+        # Normalize booleans to lowercase
+        local value_lower
         value_lower="$(echo "$value" | tr '[:upper:]' '[:lower:]')"
 
         if [[ "$value_lower" == "true" ]]; then
@@ -70,6 +74,6 @@ convert_env_var_to_args() {
         fi
     done < <(env)
 
-    # Output escaped values so caller can eval safely
+    # Output escaped CLI args so they can be safely eval'ed into an array
     printf '%q ' "${args[@]}"
 }

@@ -10,7 +10,7 @@ REDIS_CLI_CMD="redis-cli -a ${SUBVORTEX_REDIS_PASSWORD:-} -p ${SUBVORTEX_REDIS_P
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-source ../../../scripts/utils/utils.sh
+source ../../scripts/utils.sh
 
 # Activate virtual environment
 echo "🐍 Activating Python virtual environment..."
@@ -21,27 +21,7 @@ echo "🔍 Loading environment variables from .env..."
 export $(grep -v '^#' .env | xargs)
 
 # Build CLI args from SUBVORTEX_ environment variables
-echo "🔧 Building CLI arguments from SUBVORTEX_ environment variables..."
-ARGS=()
-PREFIX="SUBVORTEX_"
-
-while IFS= read -r line; do
-    key="${line%%=*}"
-    value="${line#*=}"
-    if [[ $key == ${PREFIX}* ]]; then
-        key_suffix="${key#$PREFIX}"
-        cli_key="--$(echo "$key_suffix" | tr '[:upper:]' '[:lower:]' | tr '_' '.')"
-        value_lower="$(echo "$value" | tr '[:upper:]' '[:lower:]')"
-        
-        if [[ "$value_lower" == "true" ]]; then
-            ARGS+=("$cli_key")
-            elif [[ "$value_lower" == "false" ]]; then
-            continue
-        else
-            ARGS+=("$cli_key" "$value")
-        fi
-    fi
-done < <(env)
+eval "ARGS=( $(convert_env_var_to_args) )"
 
 # Start or reload PM2 process
 echo "🔍 Checking PM2 process: $SERVICE_NAME..."

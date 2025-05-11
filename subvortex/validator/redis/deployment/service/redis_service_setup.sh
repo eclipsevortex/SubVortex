@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# Ensure script run as root
+if [[ "$EUID" -ne 0 ]]; then
+  echo "🛑 This script must be run as root. Re-running with sudo..."
+  exec sudo "$0" "$@"
+fi
+
 ### Phase 1: Initialization & Environment Setup
 
 # Determine script directory dynamically
@@ -54,21 +60,21 @@ checksum_changed() {
 
 ### Phase 3: Data Preservation
 echo "🛑 Stopping and disabling default redis-server systemd service..."
-sudo systemctl stop redis-server || true
-sudo systemctl disable redis-server || true
+systemctl stop redis-server || true
+systemctl disable redis-server || true
 
 ### Phase 4: Configuration Deployment
 
 # Prepare /etc/redis directory
 echo "📂 Preparing redis directory..."
-sudo mkdir -p "$(dirname "$REDIS_CONF")"
-sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
+mkdir -p "$(dirname "$REDIS_CONF")"
+chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
 
 # Install updated redis.conf if changes are detected
 echo "📄 Installing updated redis.conf..."
 TEMPLATE_CONF="$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf"
-sudo cp "$TEMPLATE_CONF" "$REDIS_CONF"
-sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
+cp "$TEMPLATE_CONF" "$REDIS_CONF"
+chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
 
 # Update or remove Redis password in redis.conf based on SUBVORTEX_REDIS_PASSWORD
 if [[ -v SUBVORTEX_REDIS_PASSWORD && -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
@@ -76,11 +82,11 @@ if [[ -v SUBVORTEX_REDIS_PASSWORD && -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
     if [[ "$current_pass" != "$SUBVORTEX_REDIS_PASSWORD" ]]; then
         echo "🔐 Injecting or updating Redis password in redis.conf..."
         if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
-            sudo sed -i "s|^\s*requirepass\s\+.*|requirepass $SUBVORTEX_REDIS_PASSWORD|" "$REDIS_CONF"
+            sed -i "s|^\s*requirepass\s\+.*|requirepass $SUBVORTEX_REDIS_PASSWORD|" "$REDIS_CONF"
         elif grep -q "^# *requirepass" "$REDIS_CONF"; then
-            sudo sed -i "/^# *requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
+            sed -i "/^# *requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
         else
-            echo "requirepass $SUBVORTEX_REDIS_PASSWORD" | sudo tee -a "$REDIS_CONF" > /dev/null
+            echo "requirepass $SUBVORTEX_REDIS_PASSWORD" | tee -a "$REDIS_CONF" > /dev/null
         fi
     else
         echo "🔐 Redis password already up-to-date — no changes made."
@@ -88,7 +94,7 @@ if [[ -v SUBVORTEX_REDIS_PASSWORD && -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
 else
     if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
         echo "❌ Removing Redis password from redis.conf (SUBVORTEX_REDIS_PASSWORD is unset or empty)..."
-        sudo sed -i '/^\s*requirepass\s\+/d' "$REDIS_CONF"
+        sed -i '/^\s*requirepass\s\+/d' "$REDIS_CONF"
     else
         echo "⚠️ SUBVORTEX_REDIS_PASSWORD is unset or empty — no password configured in redis.conf."
     fi
@@ -104,8 +110,8 @@ if [[ -z "$log_path" || "$log_path" == '""' ]]; then
 else
     log_dir=$(dirname "$log_path")
     echo "📁 Preparing log directory: $log_dir"
-    sudo mkdir -p "$log_dir"
-    sudo chown "$REDIS_USER:$REDIS_GROUP" "$log_dir"
+    mkdir -p "$log_dir"
+    chown "$REDIS_USER:$REDIS_GROUP" "$log_dir"
     echo "✅ Log directory ready and owned by $REDIS_USER:$REDIS_GROUP"
 fi
 
@@ -113,16 +119,16 @@ fi
 
 # Mask default redis-server systemd service
 echo "🚫 Masking default redis-server systemd service..."
-sudo systemctl mask redis-server || true
+systemctl mask redis-server || true
 
 # Install updated systemd unit file if changes are detected
 echo "📄 Installing updated systemd unit file..."
 TEMPLATE_SERVICE="$DEPLOY_TEMPLATES/${SERVICE_NAME}.service"
-sudo cp "$TEMPLATE_SERVICE" "$SYSTEMD_UNIT"
+cp "$TEMPLATE_SERVICE" "$SYSTEMD_UNIT"
 
 # Reload systemd daemon to apply changes
 echo "🔧 Reloading systemd daemon..."
-sudo systemctl daemon-reload
+systemctl daemon-reload
 
 ### Phase 6: Post-Deployment Verification
 
@@ -130,8 +136,8 @@ sudo systemctl daemon-reload
 REDIS_DATA_DIR=$(grep -E '^\s*dir\s+' "$REDIS_CONF" | awk '{print $2}')
 if [[ -n "$REDIS_DATA_DIR" ]]; then
     echo "📁 Ensuring Redis data directory exists: $REDIS_DATA_DIR"
-    sudo mkdir -p "$REDIS_DATA_DIR"
-    sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_DATA_DIR"
+    mkdir -p "$REDIS_DATA_DIR"
+    chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_DATA_DIR"
 else
     echo "⚠️ Could not determine Redis data directory from redis.conf."
 fi

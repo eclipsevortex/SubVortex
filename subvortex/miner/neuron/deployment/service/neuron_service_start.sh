@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# Ensure script run as root
+if [[ "$EUID" -ne 0 ]]; then
+    echo "🛑 This script must be run as root. Re-running with sudo..."
+    exec sudo "$0" "$@"
+fi
+
 NEURON_NAME="subvortex-miner"
 SERVICE_NAME="$NEURON_NAME-neuron"
 
@@ -61,30 +67,30 @@ TEMP_TEMPLATE="/tmp/${SERVICE_NAME}.service.template"
 
 # Replace ExecStart in template before envsubst
 sed -e "s|^ExecStart=.*|ExecStart=$WORKING_DIR/$FULL_EXEC_START|" \
-    -e "s|^EnvironmentFile=.*|EnvironmentFile=$WORKING_DIR/.env|" \
-    -e "s|^WorkingDirectory=.*|WorkingDirectory=$WORKING_DIR|" \
-    "$TEMPLATE_PATH" > "$TEMP_TEMPLATE"
+-e "s|^EnvironmentFile=.*|EnvironmentFile=$WORKING_DIR/.env|" \
+-e "s|^WorkingDirectory=.*|WorkingDirectory=$WORKING_DIR|" \
+"$TEMPLATE_PATH" > "$TEMP_TEMPLATE"
 
 # Inject any remaining env vars
-envsubst < "$TEMP_TEMPLATE" | sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" > /dev/null
+envsubst < "$TEMP_TEMPLATE" | tee "/etc/systemd/system/${SERVICE_NAME}.service" > /dev/null
 
 # Prepare log folder
 echo "📁 Preparing log directory for $NEURON_NAME..."
-sudo mkdir -p /var/log/$NEURON_NAME
-sudo chown root:root /var/log/$NEURON_NAME
+mkdir -p /var/log/$NEURON_NAME
+chown root:root /var/log/$NEURON_NAME
 
 # Reload systemd
 echo "🔄 Reloading systemd daemon..."
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
+systemctl daemon-reexec
+systemctl daemon-reload
 
 # Start or restart the service
 if systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "🔁 $SERVICE_NAME is already running — restarting..."
-    sudo systemctl restart "$SERVICE_NAME"
+    systemctl restart "$SERVICE_NAME"
 else
     echo "🚀 Starting $SERVICE_NAME for the first time..."
-    sudo systemctl start "$SERVICE_NAME"
+    systemctl start "$SERVICE_NAME"
 fi
 
 # Final status check

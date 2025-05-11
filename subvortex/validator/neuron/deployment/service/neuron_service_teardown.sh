@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# Ensure script run as root
+if [[ "$EUID" -ne 0 ]]; then
+    echo "🛑 This script must be run as root. Re-running with sudo..."
+    exec sudo "$0" "$@"
+fi
+
 NEURON_NAME="subvortex-validator"
 SERVICE_NAME="$NEURON_NAME-neuron"
 PACKAGE_NAME="subvortex"
@@ -17,18 +23,18 @@ echo "🔍 Checking for existing systemd service: $SERVICE_NAME..."
 if systemctl list-units --type=service --all | grep -q "${SERVICE_NAME}.service"; then
     if systemctl is-active --quiet "$SERVICE_NAME"; then
         echo "🛑 Stopping systemd service: $SERVICE_NAME..."
-        sudo systemctl stop "${SERVICE_NAME}.service"
+        systemctl stop "${SERVICE_NAME}.service"
     fi
     
     echo "🚫 Disabling systemd service: $SERVICE_NAME..."
-    sudo systemctl disable "${SERVICE_NAME}.service"
+    systemctl disable "${SERVICE_NAME}.service"
     
     echo "🧹 Removing systemd service file..."
-    sudo rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
+    rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
     
     echo "🔄 Reloading systemd daemon..."
-    sudo systemctl daemon-reexec
-    sudo systemctl daemon-reload
+    systemctl daemon-reexec
+    systemctl daemon-reload
 else
     echo "ℹ️ Systemd service ${SERVICE_NAME}.service not found. Skipping stop/disable."
 fi
@@ -38,7 +44,7 @@ LOG_DIR="/var/log/$NEURON_NAME"
 echo "🧹 Checking for log directory at $LOG_DIR..."
 if [[ -d "$LOG_DIR" ]]; then
     echo "🧹 Removing log directory: $LOG_DIR"
-    sudo rm -rf "$LOG_DIR"
+    rm -rf "$LOG_DIR"
 else
     echo "ℹ️ Log directory $LOG_DIR does not exist. Skipping."
 fi

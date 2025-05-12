@@ -26,10 +26,10 @@ if [[ -n "${SUBVORTEX_WORKING_DIR:-}" ]]; then
     TARGET_DIR="$SUBVORTEX_WORKING_DIR/$REL_PATH"
     [[ -d "$TARGET_DIR" ]] || { echo "❌ Target directory does not exist: $TARGET_DIR"; exit 1; }
     echo "📁 Using SUBVORTEX_WORKING_DIR: $TARGET_DIR"
-    cd "$TARGET_DIR"
+    cd "$TARGET_DIR/../.."
 else
     echo "📁 Using fallback PROJECT_ROOT: $SCRIPT_DIR"
-    cd "$SCRIPT_DIR"
+    cd "$SCRIPT_DIR/../.."
 fi
 
 echo "📍 Working directory: $(pwd)"

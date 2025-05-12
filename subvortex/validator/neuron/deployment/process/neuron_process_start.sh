@@ -26,10 +26,10 @@ if [[ -n "${SUBVORTEX_WORKING_DIR:-}" ]]; then
     TARGET_DIR="$SUBVORTEX_WORKING_DIR/$REL_PATH"
     [[ -d "$TARGET_DIR" ]] || { echo "❌ Target directory does not exist: $TARGET_DIR"; exit 1; }
     echo "📁 Using SUBVORTEX_WORKING_DIR: $TARGET_DIR"
-    cd "$TARGET_DIR"
+    cd "$TARGET_DIR/../.."
 else
     echo "📁 Using fallback PROJECT_ROOT: $SCRIPT_DIR"
-    cd "$SCRIPT_DIR"
+    cd "$SCRIPT_DIR/../.."
 fi
 
 echo "📍 Working directory: $(pwd)"
@@ -51,6 +51,16 @@ export $(grep -v '^#' .env | xargs)
 # Build CLI args from SUBVORTEX_ environment variables
 eval "ARGS=( $(convert_env_var_to_args) )"
 
+# Check for existing PM2 process and remove if config differs
+if pm2 jlist | jq -e ".[] | select(.name==\"$SERVICE_NAME\")" > /dev/null; then
+    EXISTING_CWD="$(pm2 jlist | jq -r ".[] | select(.name==\"$SERVICE_NAME\") | .pm2_env.pm_cwd")"
+    CURRENT_CWD="$(pwd)"
+
+    if [[ "$EXISTING_CWD" != "$CURRENT_CWD" ]]; then
+        pm2 delete "$SERVICE_NAME"
+    fi
+fi
+
 # Start or reload PM2 process
 echo "🔍 Checking PM2 process: $SERVICE_NAME..."
 if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
@@ -63,9 +73,10 @@ if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
     fi
 else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
-    pm2 start src/main.py \
+    pm2 start "$(pwd)/src/main.py" \
     --name "$SERVICE_NAME" \
-    --interpreter "venv/bin/python3" -- \
+    --cwd "$(pwd)" \
+    --interpreter "$(pwd)/venv/bin/python3" -- \
     "${ARGS[@]}"
 fi
 

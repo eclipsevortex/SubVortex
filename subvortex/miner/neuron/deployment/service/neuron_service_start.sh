@@ -59,7 +59,8 @@ eval "ARGS=( $(convert_env_var_to_args) )"
 # Build the full ExecStart command
 PYTHON_EXEC="venv/bin/python3"
 MODULE="subvortex.miner.neuron.src.main"
-FULL_EXEC_START="$PYTHON_EXEC -m $MODULE ${ARGS[*]}"
+ESCAPED_ARGS=$(printf '%q ' "${ARGS[@]}")
+FULL_EXEC_START="$PYTHON_EXEC -m $MODULE $ESCAPED_ARGS"
 USE_LOCAL_WORKDIR="${SUBVORTEX_USE_LOCAL_WORKDIR:-}"
 
 # Determine WorkingDirectory based on --local
@@ -80,7 +81,7 @@ sed -e "s|^ExecStart=.*|ExecStart=$WORKING_DIR/$FULL_EXEC_START|" \
 "$TEMPLATE_PATH" > "$TEMP_TEMPLATE"
 
 # Inject any remaining env vars
-envsubst < "$TEMP_TEMPLATE" | tee "/etc/systemd/system/${SERVICE_NAME}.service" > /dev/null
+cp "$TEMP_TEMPLATE" "/etc/systemd/system/${SERVICE_NAME}.service"
 
 # Prepare log folder
 echo "📁 Preparing log directory for $NEURON_NAME..."

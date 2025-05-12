@@ -147,25 +147,27 @@ def _get_redis_setting(file_path, setting):
 
 def _get_redis_password(redis_conf_path):
     try:
+        # Check environment variable first
         redis_password = os.getenv("SUBVORTEX_DATABASE_PASSWORD")
         if redis_password:
             return redis_password
 
-        if not redis_conf_path:
+        if not redis_conf_path or not os.path.exists(redis_conf_path):
             return None
 
-        if not os.path.exists(redis_conf_path):
-            return None
-
-        cmd = f"sudo grep -Po '^requirepass \K.*' {redis_conf_path}"
+        # Try to extract requirepass from the config
+        cmd = f"sudo grep -Po '^requirepass \\K.*' {redis_conf_path}"
         result = subprocess.run(
-            cmd, shell=True, text=True, capture_output=True, check=True
+            cmd, shell=True, text=True, capture_output=True
         )
+
+        # If grep didn't find anything, return None
+        if result.returncode != 0 or not result.stdout.strip():
+            return None
+
         return result.stdout.strip()
 
-    except subprocess.CalledProcessError as e:
-        assert False, f"Command failed: {e}"
     except Exception as e:
-        assert False, f"An error occurred: {e}"
+        assert False, f"An unexpected error occurred: {e}"
 
     return None

@@ -256,6 +256,10 @@ untag:
 TARGETS += release unrelease prerelease unprerelease
 unprerelease:
 	@VERSION=$$(cat VERSION); \
+	if ! echo "$$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-(alpha|rc)\.[0-9]+$$'; then \
+		echo "❌ VERSION must be in format x.x.x-alpha.x or x.x.x-rc.x (got: $$VERSION)"; \
+		exit 1; \
+	fi; \
  	TAG=v$$VERSION; \
 	$(load_env); \
 	\
@@ -282,6 +286,10 @@ unprerelease:
 
 prerelease:
 	@VERSION=$$(cat VERSION); \
+	if ! echo "$$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-(alpha|rc)\.[0-9]+$$'; then \
+		echo "❌ VERSION must be in format x.x.x-alpha.x or x.x.x-rc.x (got: $$VERSION)"; \
+		exit 1; \
+	fi; \
  	TAG=v$$VERSION; \
  	echo "🚀 Creating GitHub prerelease..."; \
  	gh release create $$TAG \
@@ -294,6 +302,10 @@ prerelease:
 
 unrelease:
 	@VERSION=$$(cat VERSION); \
+	if ! echo "$$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "❌ VERSION must be in format x.x.x (got: $$VERSION)"; \
+		exit 1; \
+	fi; \
  	TAG=v$$VERSION; \
 	$(load_env); \
 	\
@@ -319,6 +331,10 @@ unrelease:
 	done
 release:
 	@VERSION=$$(cat VERSION); \
+	if ! echo "$$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "❌ VERSION must be in format x.x.x (got: $$VERSION)"; \
+		exit 1; \
+	fi; \
  	TAG=v$$VERSION; \
  	echo "🚀 Creating GitHub release..."; \
  	gh release create $$TAG \

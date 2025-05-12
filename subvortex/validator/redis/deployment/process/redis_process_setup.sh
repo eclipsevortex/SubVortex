@@ -2,11 +2,39 @@
 
 set -euo pipefail
 
-### Phase 1: Initialization & Environment Setup
+# Determine working directory: prefer SUBVORTEX_WORKING_DIR, fallback to script location
+SCRIPT_DIR="$(cd "$(dirname "$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$0")")" && pwd)"
 
-# Determine script directory dynamically
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/../.."
+# Find project root by walking up until LICENSE is found
+find_project_root() {
+    local dir="$1"
+    while [[ "$dir" != "/" ]]; do
+        [[ -f "$dir/LICENSE" ]] && { echo "$dir"; return; }
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+PROJECT_ROOT="$(find_project_root "$SCRIPT_DIR")" || {
+    echo "❌ Could not detect project root (LICENSE not found)"
+    exit 1
+}
+
+# Resolve final working directory
+if [[ -n "${SUBVORTEX_WORKING_DIR:-}" ]]; then
+    REL_PATH="${SCRIPT_DIR#$PROJECT_ROOT/}"
+    TARGET_DIR="$SUBVORTEX_WORKING_DIR/$REL_PATH"
+    [[ -d "$TARGET_DIR" ]] || { echo "❌ Target directory does not exist: $TARGET_DIR"; exit 1; }
+    echo "📁 Using SUBVORTEX_WORKING_DIR: $TARGET_DIR"
+    cd "$TARGET_DIR/../.."
+else
+    echo "📁 Using fallback PROJECT_ROOT: $SCRIPT_DIR"
+    cd "$SCRIPT_DIR/../.."
+fi
+
+echo "📍 Working directory: $(pwd)"
+
+source ../../scripts/tools.sh
 
 # Define constants and paths
 NEURON_NAME=subvortex-validator
@@ -30,56 +58,12 @@ echo "🔧 Setting up $SERVICE_NAME..."
 mkdir -p "$CHECKSUM_DIR"
 
 # Install Redis server if not already installed
-echo "🚀 Installing Redis server if not already installed..."
-if ! command -v redis-server >/dev/null; then
-    sudo DEBIAN_FRONTEND=noninteractive apt-get update
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" redis-server
-else
-    echo "✅ redis-server already installed."
-fi
+install_specific_redis
 
-### Phase 2: Checksum Verification
-
-compute_checksum() {
-    sha256sum "$1" | awk '{print $1}'
-}
-
-checksum_changed() {
-    local file="$1"
-    local name="$2"
-    local new_hash
-    new_hash=$(compute_checksum "$file")
-    if [[ ! -f "$CHECKSUM_DIR/$name" ]] || [[ "$new_hash" != "$(cat "$CHECKSUM_DIR/$name")" ]]; then
-        echo "$new_hash" > "$CHECKSUM_DIR/$name"
-        return 0
-    fi
-    return 1
-}
-
-# Checksum redis binary
-REDIS_BINARY="$(command -v redis-server)"
-checksum_changed "$REDIS_BINARY" "redis-server.binary" && REDIS_CHANGED=true || REDIS_CHANGED=false
-
-# Checksum redis config template
-TEMPLATE_CONF="$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf"
-if [[ ! -f "$TEMPLATE_CONF" ]]; then
-    echo "❌ Missing template: $TEMPLATE_CONF"
-    exit 1
-fi
-checksum_changed "$TEMPLATE_CONF" "redis.conf.template" && CONF_CHANGED=true || CONF_CHANGED=false
-
-### Phase 3: Data Preservation
-
-if [[ "$REDIS_CHANGED" == true || "$CONF_CHANGED" == true ]]; then
-    # echo "📤 Dumping Redis data..."
-    # redis-cli SAVE || echo "⚠️ Could not save Redis data."
-    
-    echo "🛑 Stopping and disabling default redis-server systemd service..."
-    sudo systemctl stop redis-server || true
-    sudo systemctl disable redis-server || true
-fi
-
-### Phase 4: Configuration Deployment
+## Stop default redis-server
+echo "🛑 Stopping and disabling default redis-server systemd service..."
+sudo systemctl stop redis-server || true
+sudo systemctl disable redis-server || true
 
 # Prepare /etc/redis directory
 echo "📂 Preparing redis directory..."
@@ -87,22 +71,19 @@ sudo mkdir -p "$(dirname "$REDIS_CONF")"
 sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
 
 # Install updated redis.conf if changes are detected
-if [[ "$REDIS_CHANGED" == true || "$CONF_CHANGED" == true ]]; then
-    echo "📄 Installing updated redis.conf..."
-    sudo cp "$TEMPLATE_CONF" "$REDIS_CONF"
-    sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
-else
-    echo "✅ No redis binary or config changes detected — skipping redis.conf update."
-fi
+echo "📄 Installing updated redis.conf..."
+TEMPLATE_CONF="$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf"
+sudo cp "$TEMPLATE_CONF" "$REDIS_CONF"
+sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
 
-# Update Redis password in redis.conf if necessary
-if [[ -n "${SUBVORTEX_REDIS_PASSWORD:-}" ]]; then
+# Update or remove Redis password in redis.conf based on SUBVORTEX_REDIS_PASSWORD
+if [[ -v SUBVORTEX_REDIS_PASSWORD && -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
     current_pass=$(grep -E '^\s*requirepass\s+' "$REDIS_CONF" | awk '{print $2}' || true)
     if [[ "$current_pass" != "$SUBVORTEX_REDIS_PASSWORD" ]]; then
         echo "🔐 Injecting or updating Redis password in redis.conf..."
         if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
             sudo sed -i "s|^\s*requirepass\s\+.*|requirepass $SUBVORTEX_REDIS_PASSWORD|" "$REDIS_CONF"
-            elif grep -q "^# *requirepass" "$REDIS_CONF"; then
+        elif grep -q "^# *requirepass" "$REDIS_CONF"; then
             sudo sed -i "/^# *requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
         else
             echo "requirepass $SUBVORTEX_REDIS_PASSWORD" | sudo tee -a "$REDIS_CONF" > /dev/null
@@ -111,7 +92,12 @@ if [[ -n "${SUBVORTEX_REDIS_PASSWORD:-}" ]]; then
         echo "🔐 Redis password already up-to-date — no changes made."
     fi
 else
-    echo "⚠️ Environment variable SUBVORTEX_REDIS_PASSWORD is not set — skipping password injection."
+    if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
+        echo "❌ Removing Redis password from redis.conf (SUBVORTEX_REDIS_PASSWORD is unset or empty)..."
+        sudo sed -i '/^\s*requirepass\s\+/d' "$REDIS_CONF"
+    else
+        echo "⚠️ SUBVORTEX_REDIS_PASSWORD is unset or empty — no password configured in redis.conf."
+    fi
 fi
 
 # Ensure Redis logs to stdout/stderr for PM2
@@ -124,13 +110,9 @@ else
     echo 'logfile ""' | sudo tee -a "$REDIS_CONF" > /dev/null
 fi
 
-### Phase 5: Systemd Unit Deployment
-
 # Mask default redis-server systemd service
 echo "🚫 Masking default redis-server systemd service..."
 sudo systemctl mask redis-server || true
-
-### Phase 6: Post-Deployment Verification
 
 # Ensure Redis data directory exists and has correct permissions
 REDIS_DATA_DIR=$(grep -E '^\s*dir\s+' "$REDIS_CONF" | awk '{print $2}')

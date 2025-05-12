@@ -2,13 +2,43 @@
 
 set -euo pipefail
 
+# Determine working directory: prefer SUBVORTEX_WORKING_DIR, fallback to script location
+SCRIPT_DIR="$(cd "$(dirname "$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$0")")" && pwd)"
+
+# Find project root by walking up until LICENSE is found
+find_project_root() {
+    local dir="$1"
+    while [[ "$dir" != "/" ]]; do
+        [[ -f "$dir/LICENSE" ]] && { echo "$dir"; return; }
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+PROJECT_ROOT="$(find_project_root "$SCRIPT_DIR")" || {
+    echo "❌ Could not detect project root (LICENSE not found)"
+    exit 1
+}
+
+# Resolve final working directory
+if [[ -n "${SUBVORTEX_WORKING_DIR:-}" ]]; then
+    REL_PATH="${SCRIPT_DIR#$PROJECT_ROOT/}"
+    TARGET_DIR="$SUBVORTEX_WORKING_DIR/$REL_PATH"
+    [[ -d "$TARGET_DIR" ]] || { echo "❌ Target directory does not exist: $TARGET_DIR"; exit 1; }
+    echo "📁 Using SUBVORTEX_WORKING_DIR: $TARGET_DIR"
+    cd "$TARGET_DIR/../.."
+else
+    echo "📁 Using fallback PROJECT_ROOT: $SCRIPT_DIR"
+    cd "$SCRIPT_DIR/../.."
+fi
+
+echo "📍 Working directory: $(pwd)"
+
 NEURON_NAME="subvortex-validator"
 SERVICE_NAME="$NEURON_NAME-neuron"
 REDIS_CLI_CMD="redis-cli -a ${SUBVORTEX_REDIS_PASSWORD:-} -p ${SUBVORTEX_REDIS_PORT:-6379} PING"
 
-# Determine script directory dynamically to ensure everything runs in ./scripts/api/
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/../.."
+source ../../scripts/utils.sh
 
 # Activate virtual environment
 echo "🐍 Activating Python virtual environment..."
@@ -19,27 +49,17 @@ echo "🔍 Loading environment variables from .env..."
 export $(grep -v '^#' .env | xargs)
 
 # Build CLI args from SUBVORTEX_ environment variables
-echo "🔧 Building CLI arguments from SUBVORTEX_ environment variables..."
-ARGS=()
-PREFIX="SUBVORTEX_"
+eval "ARGS=( $(convert_env_var_to_args) )"
 
-while IFS= read -r line; do
-    key="${line%%=*}"
-    value="${line#*=}"
-    if [[ $key == ${PREFIX}* ]]; then
-        key_suffix="${key#$PREFIX}"
-        cli_key="--$(echo "$key_suffix" | tr '[:upper:]' '[:lower:]' | tr '_' '.')"
-        value_lower="$(echo "$value" | tr '[:upper:]' '[:lower:]')"
-        
-        if [[ "$value_lower" == "true" ]]; then
-            ARGS+=("$cli_key")
-            elif [[ "$value_lower" == "false" ]]; then
-            continue
-        else
-            ARGS+=("$cli_key" "$value")
-        fi
+# Check for existing PM2 process and remove if config differs
+if pm2 jlist | jq -e ".[] | select(.name==\"$SERVICE_NAME\")" > /dev/null; then
+    EXISTING_CWD="$(pm2 jlist | jq -r ".[] | select(.name==\"$SERVICE_NAME\") | .pm2_env.pm_cwd")"
+    CURRENT_CWD="$(pwd)"
+
+    if [[ "$EXISTING_CWD" != "$CURRENT_CWD" ]]; then
+        pm2 delete "$SERVICE_NAME"
     fi
-done < <(env)
+fi
 
 # Start or reload PM2 process
 echo "🔍 Checking PM2 process: $SERVICE_NAME..."
@@ -53,9 +73,10 @@ if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
     fi
 else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
-    pm2 start src/main.py \
+    pm2 start "$(pwd)/src/main.py" \
     --name "$SERVICE_NAME" \
-    --interpreter "venv/bin/python3" -- \
+    --cwd "$(pwd)" \
+    --interpreter "$(pwd)/venv/bin/python3" -- \
     "${ARGS[@]}"
 fi
 

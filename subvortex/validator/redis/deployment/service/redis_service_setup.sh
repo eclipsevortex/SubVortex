@@ -66,7 +66,7 @@ set +a
 mkdir -p "$CHECKSUM_DIR"
 
 # Install Redis server if not already installed
-install_redis_if_needed
+install_specific_redis
 
 ### Phase 2: Checksum Verification
 

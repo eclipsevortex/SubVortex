@@ -51,10 +51,10 @@ done
 # Check maandatory args
 check_required_args EXECUTION
 
-# Stop and teardown redis 
-./redis/scripts/redis_stop.sh --execution $EXECUTION
-./redis/scripts/redis_teardown.sh --execution $EXECUTION
-
 # Stop and teardown neuron
 ./neuron/scripts/neuron_stop.sh --execution $EXECUTION
 ./neuron/scripts/neuron_teardown.sh --execution $EXECUTION
+
+# Stop and teardown redis 
+./redis/scripts/redis_stop.sh --execution $EXECUTION
+./redis/scripts/redis_teardown.sh --execution $EXECUTION

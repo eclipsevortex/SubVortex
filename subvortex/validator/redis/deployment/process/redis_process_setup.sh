@@ -34,8 +34,6 @@ fi
 
 echo "📍 Working directory: $(pwd)"
 
-### Phase 1: Initialization & Environment Setup
-
 source ../../scripts/tools.sh
 
 # Define constants and paths
@@ -62,48 +60,10 @@ mkdir -p "$CHECKSUM_DIR"
 # Install Redis server if not already installed
 install_specific_redis
 
-### Phase 2: Checksum Verification
-
-compute_checksum() {
-    sha256sum "$1" | awk '{print $1}'
-}
-
-checksum_changed() {
-    local file="$1"
-    local name="$2"
-    local new_hash
-    new_hash=$(compute_checksum "$file")
-    if [[ ! -f "$CHECKSUM_DIR/$name" ]] || [[ "$new_hash" != "$(cat "$CHECKSUM_DIR/$name")" ]]; then
-        echo "$new_hash" > "$CHECKSUM_DIR/$name"
-        return 0
-    fi
-    return 1
-}
-
-# Checksum redis binary
-REDIS_BINARY="$(command -v redis-server)"
-checksum_changed "$REDIS_BINARY" "redis-server.binary" && REDIS_CHANGED=true || REDIS_CHANGED=false
-
-# Checksum redis config template
-TEMPLATE_CONF="$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf"
-if [[ ! -f "$TEMPLATE_CONF" ]]; then
-    echo "❌ Missing template: $TEMPLATE_CONF"
-    exit 1
-fi
-checksum_changed "$TEMPLATE_CONF" "redis.conf.template" && CONF_CHANGED=true || CONF_CHANGED=false
-
-### Phase 3: Data Preservation
-
-if [[ "$REDIS_CHANGED" == true || "$CONF_CHANGED" == true ]]; then
-    # echo "📤 Dumping Redis data..."
-    # redis-cli SAVE || echo "⚠️ Could not save Redis data."
-    
-    echo "🛑 Stopping and disabling default redis-server systemd service..."
-    sudo systemctl stop redis-server || true
-    sudo systemctl disable redis-server || true
-fi
-
-### Phase 4: Configuration Deployment
+## Stop default redis-server
+echo "🛑 Stopping and disabling default redis-server systemd service..."
+sudo systemctl stop redis-server || true
+sudo systemctl disable redis-server || true
 
 # Prepare /etc/redis directory
 echo "📂 Preparing redis directory..."
@@ -111,13 +71,10 @@ sudo mkdir -p "$(dirname "$REDIS_CONF")"
 sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
 
 # Install updated redis.conf if changes are detected
-if [[ "$REDIS_CHANGED" == true || "$CONF_CHANGED" == true ]]; then
-    echo "📄 Installing updated redis.conf..."
-    sudo cp "$TEMPLATE_CONF" "$REDIS_CONF"
-    sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
-else
-    echo "✅ No redis binary or config changes detected — skipping redis.conf update."
-fi
+echo "📄 Installing updated redis.conf..."
+TEMPLATE_CONF="$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf"
+sudo cp "$TEMPLATE_CONF" "$REDIS_CONF"
+sudo chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
 
 # Update or remove Redis password in redis.conf based on SUBVORTEX_REDIS_PASSWORD
 if [[ -v SUBVORTEX_REDIS_PASSWORD && -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
@@ -153,13 +110,9 @@ else
     echo 'logfile ""' | sudo tee -a "$REDIS_CONF" > /dev/null
 fi
 
-### Phase 5: Systemd Unit Deployment
-
 # Mask default redis-server systemd service
 echo "🚫 Masking default redis-server systemd service..."
 sudo systemctl mask redis-server || true
-
-### Phase 6: Post-Deployment Verification
 
 # Ensure Redis data directory exists and has correct permissions
 REDIS_DATA_DIR=$(grep -E '^\s*dir\s+' "$REDIS_CONF" | awk '{print $2}')

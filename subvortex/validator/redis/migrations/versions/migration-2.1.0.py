@@ -1,0 +1,22 @@
+from redis import asyncio as aioredis
+
+revision = "2.1.0"
+down_revision = "2.0.0"
+
+
+async def _rename_keys(database: aioredis.Redis, old_prefix: str, new_prefix: str):
+    async for old_key in database.scan_iter(f"{old_prefix}:*"):
+        old_key_str = old_key.decode()
+        suffix = old_key_str[len(old_prefix) + 1 :]
+        new_key = f"{new_prefix}:{suffix}"
+        await database.rename(old_key_str, new_key)
+
+
+async def rollout(database: aioredis.Redis):
+    await _rename_keys(database, "stats", "sv:stats")
+    await _rename_keys(database, "selection", "sv:selection")
+
+
+async def rollback(database: aioredis.Redis):
+    await _rename_keys(database, "sv:stats", "stats")
+    await _rename_keys(database, "sv:selection", "selection")

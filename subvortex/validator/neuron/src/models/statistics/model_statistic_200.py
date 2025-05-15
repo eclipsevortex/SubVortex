@@ -12,13 +12,9 @@ class StatisticModel:
 
     version = "2.0.0"
 
-    def __init__(self):
-        # Redis key prefix (version is tracked in the value, not the key)
-        self.key_prefix = "stats:"
-
     def redis_key(self, ss58_address: str) -> str:
         """Generate the Redis key for a given hotkey."""
-        return f"{self.key_prefix}{ss58_address}"
+        return f"stats:{ss58_address}"
 
     async def read(self, redis: Redis, ss58_address: str) -> Optional[Dict[str, Any]]:
         """

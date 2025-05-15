@@ -14,34 +14,31 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import math
-import bittensor.utils.btlogging as btul
-
-from subvortex.core.constants import *
-from subvortex.validator.core.models import Miner
+import pytest
+from hashlib import sha256
+from typing import Optional
 
 
-def wilson_score_interval(successes, total):
-    if total == 0:
-        return 0.5  # chance
+def get_block_hash(block: Optional[int] = None) -> str:
+    return "0x" + sha256(str(block).encode()).hexdigest()[:64]
 
-    z = 0.6744897501960817
 
-    p = successes / total
-    denominator = 1 + z**2 / total
-    centre_adjusted_probability = p + z**2 / (2 * total)
-    adjusted_standard_deviation = math.sqrt((p * (1 - p) + z**2 / (4 * total)) / total)
+# def make_async(method):
+#     """Wraps a mock's return value in an async function."""
 
-    lower_bound = (
-        centre_adjusted_probability - z * adjusted_standard_deviation
-    ) / denominator
-    upper_bound = (
-        centre_adjusted_probability + z * adjusted_standard_deviation
-    ) / denominator
+#     async def async_wrapper(*args, **kwargs):
+#         return method(*args, **kwargs)
 
-    wilson_score = (max(0, lower_bound) + min(upper_bound, 1)) / 2
+#     return async_wrapper
 
-    btul.logging.trace(
-        f"Wilson score interval with {successes} / {total}: {wilson_score}"
-    )
-    return wilson_score
+
+# @pytest.fixture(scope="session", autouse=False)
+# def subtensor():
+#     wallet = cbw.get_mock_wallet()
+#     subtensor = cbm.MockSubtensor(netuid=1, wallet=wallet)
+
+#     # Make some sync method async
+#     subtensor.get_block_hash = make_async(subtensor.get_block_hash)
+#     subtensor.substrate.get_block_hash = make_async(get_block_hash)
+
+#     yield subtensor

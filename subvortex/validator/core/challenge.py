@@ -33,7 +33,7 @@ from subvortex.validator.core.utils import (
     get_next_uids,
     deregister_suspicious_uid,
 )
-from subvortex.validator.core.bonding import update_statistics
+
 from subvortex.validator.core.state import log_event
 from subvortex.validator.core.score import (
     compute_availability_score,
@@ -283,6 +283,8 @@ async def handle_challenge(self, uid: int, challenge):
 
 
 async def challenge_data(self):
+    val_hotkey = self.metagraph.hotkeys[self.uid]
+
     start_time = time.time()
     btul.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
@@ -296,7 +298,6 @@ async def challenge_data(self):
     )
 
     # Select the miners
-    val_hotkey = self.metagraph.hotkeys[self.uid]
     uids = await get_next_uids(self, val_hotkey)
     btul.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
@@ -382,7 +383,7 @@ async def challenge_data(self):
         miner.version = await send_scope(self, miner)
 
         # Save miner snapshot in database
-        await update_statistics(self, miner)
+        await self.database.update_hotkey_statistics(val_hotkey, miner.snapshot)
 
     btul.logging.trace(f"[{CHALLENGE_NAME}] Rewards: {rewards}")
 

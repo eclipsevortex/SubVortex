@@ -23,7 +23,7 @@ from Crypto.Random import random
 from subvortex.core.constants import DEFAULT_CHUNK_SIZE
 from subvortex.core.core_bittensor.synapse import Synapse
 from subvortex.validator.core.models import Miner
-from subvortex.validator.core.database import get_selected_miners, set_selection
+# from subvortex.validator.core.database import set_selection
 
 
 def current_block_hash(self):
@@ -162,7 +162,8 @@ async def ping_uid(self, uid):
 
 async def get_next_uids(self, ss58_address: str, k: int = DEFAULT_CHUNK_SIZE):
     # Get the list of uids already selected
-    uids_already_selected = await get_selected_miners(ss58_address, self.database)
+    # uids_already_selected = await get_selected_miners(ss58_address, self.database)
+    uids_already_selected = await self.database.get_selected_miners(ss58_address)
     btul.logging.debug(
         f"get_next_uids() uids already selected: {uids_already_selected}"
     )
@@ -186,8 +187,10 @@ async def get_next_uids(self, ss58_address: str, k: int = DEFAULT_CHUNK_SIZE):
     btul.logging.debug(f"get_next_uids() uids selected: {uids_selected}")
 
     # Store the new selection in the database
-    selection = ",".join(str(uid) for uid in uids_already_selected + uids_selected)
-    await set_selection(ss58_address, selection, self.database)
+    # selection = ",".join(str(uid) for uid in uids_already_selected + uids_selected)
+    selection = uids_already_selected + uids_selected
+    await self.database.set_selection_miners(ss58_address, selection)
+    # await set_selection(ss58_address, selection, self.database)
     btul.logging.debug(f"get_next_uids() new uids selection stored: {selection}")
 
     return uids_selected

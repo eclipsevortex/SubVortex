@@ -61,6 +61,7 @@ from subvortex.validator.core.weights import (
     set_weights_for_validator,
 )
 from subvortex.validator.neuron.src.settings import Settings
+from subvortex.validator.neuron.src.database import Database
 
 
 class Validator:
@@ -150,15 +151,9 @@ class Validator:
         self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
         btul.logging.debug(str(self.metagraph))
 
-        # Setup database
+        # Initialize the database
         btul.logging.info("loading database")
-        self.database = aioredis.StrictRedis(
-            host=self.settings.redis_host,
-            port=self.settings.redis_port,
-            db=self.settings.redis_index,
-            password=self.settings.redis_password,
-        )
-        self.db_semaphore = asyncio.Semaphore()
+        self.database = Database(settings=self.settings)
 
         # Init Weights.
         btul.logging.debug("loading moving_averaged_scores")

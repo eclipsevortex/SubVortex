@@ -25,12 +25,6 @@ from subvortex.validator.core.score import (
     compute_final_score,
 )
 from subvortex.validator.core.utils import get_available_uids, check_uid_availability
-from subvortex.validator.core.database import (
-    get_hotkey_statistics,
-    remove_hotkey_stastitics,
-    get_field_value,
-    update_hotkey_statistics,
-)
 
 
 def get_miner_ip_occurences(ip: str, ips: List[str]):
@@ -60,7 +54,7 @@ async def get_all_miners(self) -> List[Miner]:
         # Check there are not more than 1 miner associated with the ip
         ip_occurences = get_miner_ip_occurences(axon.ip, ips)
 
-        statistics = await get_hotkey_statistics(axon.hotkey, self.database)
+        statistics = await self.database.get_hotkey_statistics(axon.hotkey)
         if statistics is None:
             miner = Miner(
                 uid=uid,
@@ -70,50 +64,79 @@ async def get_all_miners(self) -> List[Miner]:
                 ip_occurences=ip_occurences,
             )
         else:
-            # In hash set everything is stored as a string to the verified need to be manage differently
-            country = self.country_service.get_country(axon.ip)
-            if country == None:
-                country = get_field_value(statistics.get(b"country"))
-
-            version = get_field_value(statistics.get(b"version"), "0.0.0")
-            verified = get_field_value(statistics.get(b"verified"), "0")
-            score = get_field_value(statistics.get(b"score"), 0)
-            availability_score = get_field_value(
-                statistics.get(b"availability_score"), 0
-            )
-            latency_score = get_field_value(statistics.get(b"latency_score"), 0)
-            reliability_score = get_field_value(statistics.get(b"reliability_score"), 0)
-            distribution_score = get_field_value(
-                statistics.get(b"distribution_score"), 0
-            )
-            challenge_successes = get_field_value(
-                statistics.get(b"challenge_successes"), 0
-            )
-            challenge_attempts = get_field_value(
-                statistics.get(b"challenge_attempts"), 0
-            )
-            process_time = get_field_value(statistics.get(b"process_time"), 0)
-
             miner = Miner(
                 uid=uid,
                 ip=axon.ip,
                 ip_occurences=ip_occurences,
                 hotkey=axon.hotkey,
-                version=version,
-                country=country,
-                verified=verified == "1",
-                score=score,
-                availability_score=availability_score,
-                latency_score=latency_score,
-                reliability_score=reliability_score,
-                distribution_score=distribution_score,
-                challenge_successes=challenge_successes,
-                challenge_attempts=challenge_attempts,
-                process_time=process_time,
+                version=statistics["version"],
+                country=statistics["country"],
+                verified=statistics["verified"],
+                score=statistics["score"],
+                availability_score=statistics["availability_score"],
+                latency_score=statistics["latency_score"],
+                reliability_score=statistics["reliability_score"],
+                distribution_score=statistics["distribution_score"],
+                challenge_successes=statistics["challenge_successes"],
+                challenge_attempts=statistics["challenge_attempts"],
+                process_time=statistics["process_time"],
             )
 
+        # statistics = await get_hotkey_statistics(axon.hotkey, self.database)
+        # if statistics is None:
+        #     miner = Miner(
+        #         uid=uid,
+        #         ip=axon.ip,
+        #         hotkey=axon.hotkey,
+        #         country=self.country_service.get_country(axon.ip),
+        #         ip_occurences=ip_occurences,
+        #     )
+        # else:
+        #     # In hash set everything is stored as a string to the verified need to be manage differently
+        #     country = self.country_service.get_country(axon.ip)
+        #     if country == None:
+        #         country = get_field_value(statistics.get(b"country"))
+
+        #     version = get_field_value(statistics.get(b"version"), "0.0.0")
+        #     verified = get_field_value(statistics.get(b"verified"), "0")
+        #     score = get_field_value(statistics.get(b"score"), 0)
+        #     availability_score = get_field_value(
+        #         statistics.get(b"availability_score"), 0
+        #     )
+        #     latency_score = get_field_value(statistics.get(b"latency_score"), 0)
+        #     reliability_score = get_field_value(statistics.get(b"reliability_score"), 0)
+        #     distribution_score = get_field_value(
+        #         statistics.get(b"distribution_score"), 0
+        #     )
+        #     challenge_successes = get_field_value(
+        #         statistics.get(b"challenge_successes"), 0
+        #     )
+        #     challenge_attempts = get_field_value(
+        #         statistics.get(b"challenge_attempts"), 0
+        #     )
+        #     process_time = get_field_value(statistics.get(b"process_time"), 0)
+
+        #     miner = Miner(
+        #         uid=uid,
+        #         ip=axon.ip,
+        #         ip_occurences=ip_occurences,
+        #         hotkey=axon.hotkey,
+        #         version=version,
+        #         country=country,
+        #         verified=verified == "1",
+        #         score=score,
+        #         availability_score=availability_score,
+        #         latency_score=latency_score,
+        #         reliability_score=reliability_score,
+        #         distribution_score=distribution_score,
+        #         challenge_successes=challenge_successes,
+        #         challenge_attempts=challenge_attempts,
+        #         process_time=process_time,
+        #     )
+
         # Update the database just to be sure we have the right country
-        await update_hotkey_statistics(axon.hotkey, miner.snapshot, self.database)
+        # await update_hotkey_statistics(axon.hotkey, miner.snapshot, self.database)
+        self.database.update_hotkey_statistics(axon.hotkey, miner.snapshot)
 
         miners.append(miner)
 
@@ -139,7 +162,7 @@ async def replace_old_miner(self, ip: str, hotkey: str, miner: Miner):
     old_hotkey = miner.hotkey
 
     # Remove the old hotkey statistics
-    await remove_hotkey_stastitics(miner.hotkey, self.database)
+    await self.database.remove_hotkey_stastitics(miner.hotkey)
 
     # Reset the new miner
     miner.reset(ip, hotkey, self.country_service.get_country(ip))
@@ -168,7 +191,7 @@ async def remove_miner(self, uid: int, hotkey: str):
         return False
 
     # Remove the statistics
-    await remove_hotkey_stastitics(hotkey, self.database)
+    await self.database.remove_hotkey_stastitics(hotkey)
 
     # Remove the miner
     self.miners = miners
@@ -252,7 +275,7 @@ async def resync_miners(self):
         miner.score = compute_final_score(miner)
 
         # Update the miner in the database
-        await update_hotkey_statistics(miner.hotkey, miner.snapshot, self.database)
+        await self.database.update_hotkey_statistics(miner.hotkey, miner.snapshot)
 
 
 async def reset_reliability_score(self, miners: List[Miner]):
@@ -262,4 +285,4 @@ async def reset_reliability_score(self, miners: List[Miner]):
         miner.challenge_attempts = 0
         miner.challenge_successes = 0
 
-        await update_hotkey_statistics(miner.hotkey, miner.snapshot, self.database)
+        await self.database.update_hotkey_statistics(miner.hotkey, miner.snapshot)

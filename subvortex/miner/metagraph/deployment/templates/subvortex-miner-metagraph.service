@@ -1,0 +1,29 @@
+[Unit]
+Description=SubVortex Miner Metagraph
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=<WORKING_DIR>/subvortex/miner/metagraph/.env
+ExecStart=<WORKING_DIR>/subvortex/miner/metagraph/venv/bin/python3 -m subvortex.miner.metagraph.src.main
+Restart=on-failure
+RestartSec=10s
+User=subvortex
+Group=subvortex
+WorkingDirectory=<WORKING_DIR>/subvortex/miner/metagraph
+StandardOutput=append:/var/log/subvortex-miner/subvortex-miner-metagraph.log
+StandardError=append:/var/log/subvortex-miner/subvortex-miner-metagraph-error.log
+
+UMask=007
+PrivateTmp=yes
+ProtectHome=yes
+NoNewPrivileges=true
+LimitNOFILE=65535
+
+ReadWriteDirectories=-/var/log/subvortex-miner
+RuntimeDirectory=subvortex-miner
+RuntimeDirectoryMode=2755
+
+[Install]
+WantedBy=multi-user.target
+Alias=subvortex-miner-metagraph.service

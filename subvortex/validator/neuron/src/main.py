@@ -31,7 +31,7 @@ from traceback import print_exception
 
 
 from subvortex.core.monitor.monitor import Monitor
-from subvortex.core.country.country import CountryService
+from subvortex.core.country.country_service import CountryService
 from subvortex.core.file.file_monitor import FileMonitor
 
 from subvortex.core.shared.subtensor import get_current_block

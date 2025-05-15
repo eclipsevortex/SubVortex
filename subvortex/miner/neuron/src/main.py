@@ -30,12 +30,12 @@ import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
 
 from subvortex.core.protocol import Score
-
 from subvortex.core.shared.checks import check_registration
 from subvortex.core.shared.subtensor import get_hyperparameter_value
 from subvortex.core.shared.substrate import get_weights_min_stake
 from subvortex.core.shared.mock import MockMetagraph, MockSubtensor, MockAxon
 
+from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.metagraph import SubVortexMetagraph
 from subvortex.core.core_bittensor.axon import SubVortexAxon
 from subvortex.core.core_bittensor.synapse import Synapse
@@ -56,6 +56,7 @@ from subvortex.miner.core.config import (
     add_args,
 )
 from subvortex.miner.core.utils import load_request_log
+from subvortex.miner.metagraph.src.settings import Settings
 
 
 class Miner:
@@ -101,10 +102,13 @@ class Miner:
     metagraph: SubVortexMetagraph
 
     def __init__(self, config=None):
-        base_config = copy.deepcopy(config or Miner.config())
         self.config = Miner.config()
-        self.config.merge(base_config)
         self.check_config(self.config)
+
+        # Create settings
+        settings = Settings.create()
+        update_config(settings, config)
+
         btul.logging(
             config=self.config,
             logging_dir=self.config.miner.full_path,

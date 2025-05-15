@@ -1,0 +1,127 @@
+#!/bin/bash
+
+set -euo pipefail
+
+SERVICE_NAME={{ name }}
+PROJECT_WORKING_DIR="${SUBVORTEX_WORKING_DIR:-}"
+
+if [[ "$EUID" -ne 0 ]]; then
+  echo "🛑 Must be run as root. Re-running with sudo..."
+  exec sudo "$0" "$@"
+fi
+
+echo "🔧 Starting $SERVICE_NAME setup..."
+
+# Fallback to script location if PROJECT_WORKING_DIR is not set
+if [[ -z "$PROJECT_WORKING_DIR" ]]; then
+  SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PROJECT_WORKING_DIR="$(realpath "$SCRIPT_PATH/../../../../../")"
+  echo "📁 PROJECT_WORKING_DIR not set — using fallback: $PROJECT_WORKING_DIR"
+else
+  echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
+fi
+
+SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/{{ neuron }}/{{ component }}"
+
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
+SERVICE_TEMPLATE="$SERVICE_WORKING_DIR/deployment/templates/$SERVICE_NAME.service"
+SERVICE_LOG_DIR="/var/log/subvortex-{{ neuron }}"
+TEMP_SERVICE_FILE="/tmp/$SERVICE_NAME.service"
+
+# --- Install binaries or create venv ---
+{% if type == 'python' %}
+# --- Python project setup ---
+# Set the venv dir
+VENV_DIR="$SERVICE_WORKING_DIR/venv"
+
+if [[ ! -d "$VENV_DIR" ]]; then
+  echo "🐍 Creating Python virtual environment..."
+  python3 -m venv "$VENV_DIR"
+fi
+
+echo "🐍 Activating virtual environment..."
+source "$VENV_DIR/bin/activate"
+
+echo "📦 Installing Python dependencies..."
+pip install -r $SERVICE_WORKING_DIR/requirements.txt
+
+echo "📚 Installing Python project in editable mode..."
+pip install -e "$PROJECT_WORKING_DIR"
+
+echo "🧘 Deactivating virtual environment..."
+deactivate
+
+{% elif type == 'package' %}
+# --- Package-based service setup ---
+echo "📦 Installing package dependencies..."
+if command -v apt-get &> /dev/null; then
+  sudo apt-get update
+  sudo apt-get install -y {{ package_name }}
+elif command -v dnf &> /dev/null; then
+  sudo dnf install -y {{ package_name }}
+elif command -v pacman &> /dev/null; then
+  sudo pacman -Sy --noconfirm {{ package_name }}
+else
+  echo "⚠️ Unsupported package manager. Install {{ package_name }} manually."
+fi
+
+# --- If a systemd unit for the package is running, stop and mask it ---
+if systemctl list-units --type=service --all | grep -q "{{ package_name }}.service"; then
+  if systemctl is-active --quiet "{{ package_name }}.service"; then
+    echo "🛑 Stopping running systemd service: {{ package_name }}.service"
+    sudo systemctl stop "{{ package_name }}.service"
+  fi
+  echo "🚫 Masking systemd service to prevent autostart: {{ package_name }}.service"
+  sudo systemctl mask "{{ package_name }}.service"
+else
+  echo "ℹ️ No active systemd service found for {{ package_name }}.service"
+fi
+
+# --- Look for config and copy if exists ---
+CONFIG_DIR="$SERVICE_WORKING_DIR/deployment/templates"
+DEST_CONFIG="/etc/redis/redis.conf"
+for EXT in conf ini cfg; do
+  CONFIG_FILE="$CONFIG_DIR/subvortex-{{ neuron }}-{{ component }}.$EXT"
+  if [[ -f "$CONFIG_FILE" ]]; then
+    echo "📄 Found config file: $CONFIG_FILE → copying to $DEST_CONFIG"
+    cp "$CONFIG_FILE" "$DEST_CONFIG"
+    break
+  fi
+done
+
+{% elif type == 'binary' %}
+# --- Binary service setup ---
+echo "📂 Checking binary directory..."
+BIN_DIR="$SERVICE_WORKING_DIR/bin"
+if [[ -f "$BIN_DIR/{{ binary_name }}" ]]; then
+  echo "🔗 Installing {{ binary_name }} to /usr/local/bin"
+  sudo cp "$BIN_DIR/{{ binary_name }}" /usr/local/bin/
+  sudo chmod +x /usr/local/bin/{{ binary_name }}
+else
+  echo "⚠️ Binary {{ binary_name }} not found. Please build it first."
+fi
+
+{% elif type == 'system' %}
+# --- No setup needed, maybe system-managed ---
+echo "⚙️ System-managed service. No setup required."
+{% else %}
+echo "❌ Unknown service type: '{{ type }}'"
+exit 1
+{% endif %}
+
+echo "📁 Preparing log directory..."
+mkdir -p "$SERVICE_LOG_DIR"
+chown {{ user }}:{{ group }} "$SERVICE_LOG_DIR"
+
+echo "📝 Preparing systemd service file from template..."
+# Replace placeholder <WORKING_DIR> with actual path
+sed "s|<WORKING_DIR>|$PROJECT_WORKING_DIR|g" "$SERVICE_TEMPLATE" > "$TEMP_SERVICE_FILE"
+
+echo "📝 Installing systemd service file to $SERVICE_FILE..."
+mv "$TEMP_SERVICE_FILE" "$SERVICE_FILE"
+
+# --- Permissions and Reload ---
+chmod 644 "$SERVICE_FILE"
+systemctl daemon-reload
+
+echo "✅ $SERVICE_NAME installed successfully."

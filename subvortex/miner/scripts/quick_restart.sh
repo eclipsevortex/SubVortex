@@ -1,32 +1,41 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-# Determine script directory dynamically to ensure everything runs in ./scripts/api/
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/.."
+SERVICE_NAME=
+PROJECT_WORKING_DIR="${SUBVORTEX_WORKING_DIR:-}"
 
-source ../scripts/utils.sh
+# Fallback to script location if PROJECT_WORKING_DIR is not set
+if [[ -z "$PROJECT_WORKING_DIR" ]]; then
+  SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PROJECT_WORKING_DIR="$(realpath "$SCRIPT_PATH/../../../")"
+  echo "📁 PROJECT_WORKING_DIR not set — using fallback: $PROJECT_WORKING_DIR"
+else
+  echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
+fi
+
+NEURON_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner"
+
+# Load some utils
+source "$NEURON_WORKING_DIR/../scripts/utils.sh"
 
 # Help function
 show_help() {
     echo "Usage: $0 [--execution=process|container|service]"
     echo
     echo "Description:"
-    echo "  This script restart the miner's components"
+    echo "  This script start the validator's components"
     echo
     echo "Options:"
     echo "  --execution   Specify the execution method (default: service)"
-    echo "  --recreate    True if you want to recreate the container when starting it, false otherwise."
     echo "  --help        Show this help message"
     exit 0
 }
 
-OPTIONS="e:rh"
-LONGOPTIONS="execution:,recreate,help"
+OPTIONS="e:h"
+LONGOPTIONS="execution:,help:"
 
 EXECUTION=service
-RECREATE=false
 
 # Parse arguments
 while [ "$#" -gt 0 ]; do
@@ -35,10 +44,6 @@ while [ "$#" -gt 0 ]; do
             EXECUTION="$2"
             shift 2
         ;;
-        -r|--recreate)
-            RECREATE=true
-            shift
-        ;;
         -h | --help)
             show_help
             exit 0
@@ -46,7 +51,7 @@ while [ "$#" -gt 0 ]; do
         --)
             shift
             break
-            ;;
+        ;;
         *)
             echo "Unrecognized option '$1'"
             exit 1
@@ -58,7 +63,7 @@ done
 check_required_args EXECUTION
 
 # Build the command and arguments
-CMD="./neuron/scripts/neuron_start.sh --execution $EXECUTION"
+CMD="$NEURON_WORKING_DIR//scripts/_start.sh --execution $EXECUTION"
 if [[ "$RECREATE" == "true" || "$RECREATE" == "True" ]]; then
     CMD+=" --recreate"
 fi

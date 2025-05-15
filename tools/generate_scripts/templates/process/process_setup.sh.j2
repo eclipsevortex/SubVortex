@@ -1,0 +1,104 @@
+#!/bin/bash
+
+set -euo pipefail
+
+SERVICE_NAME={{ name }}
+PROJECT_WORKING_DIR="${SUBVORTEX_WORKING_DIR:-}"
+
+echo "🔧 Starting $SERVICE_NAME setup..."
+
+# Fallback to script location if PROJECT_WORKING_DIR is not set
+if [[ -z "$PROJECT_WORKING_DIR" ]]; then
+  SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PROJECT_WORKING_DIR="$(realpath "$SCRIPT_PATH/../../../../../")"
+  echo "📁 PROJECT_WORKING_DIR not set — using fallback: $PROJECT_WORKING_DIR"
+else
+  echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
+fi
+
+SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/{{ neuron }}/{{ component }}"
+
+{% if type == 'python' %}
+# --- Python project setup ---
+# Set the venv dir
+VENV_DIR="$SERVICE_WORKING_DIR/venv"
+
+if [[ ! -d "$VENV_DIR" ]]; then
+  echo "🐍 Creating Python virtual environment..."
+  python3 -m venv "$VENV_DIR"
+fi
+
+echo "🐍 Activating virtual environment..."
+source "$VENV_DIR/bin/activate"
+
+echo "📦 Installing Python dependencies..."
+pip install -r $SERVICE_WORKING_DIR/requirements.txt
+
+echo "📚 Installing Python project in editable mode..."
+pip install -e "$PROJECT_WORKING_DIR"
+
+echo "🧘 Deactivating virtual environment..."
+deactivate
+
+{% elif type == 'package' %}
+# --- Package-based service setup  ---
+echo "📦 Installing package dependencies..."
+# Replace with specific install commands if needed
+# Example: apt-get install -y redis-server
+if command -v apt-get &> /dev/null; then
+  sudo apt-get update
+  sudo apt-get install -y {{ package_name }}
+elif command -v dnf &> /dev/null; then
+  sudo dnf install -y {{ package_name }}
+elif command -v pacman &> /dev/null; then
+  sudo pacman -Sy --noconfirm {{ package_name }}
+else
+  echo "⚠️ Unsupported package manager. Install {{ package_name }} manually."
+fi
+
+# --- If a systemd unit for the package is running, stop and mask it ---
+if systemctl list-units --type=service --all | grep -q "{{ package_name }}.service"; then
+  if systemctl is-active --quiet "{{ package_name }}.service"; then
+    echo "🛑 Stopping running systemd service: {{ package_name }}.service"
+    sudo systemctl stop "{{ package_name }}.service"
+  fi
+  echo "🚫 Masking systemd service to prevent autostart: {{ package_name }}.service"
+  sudo systemctl mask "{{ package_name }}.service"
+else
+  echo "ℹ️ No active systemd service found for {{ package_name }}.service"
+fi
+
+# Ensure logs to stdout/stderr
+SERVICE_CONF_FILE="/etc/redis/redis.conf"
+echo "📄 Forcing logfile to stdout/stderr (logfile \"\")..."
+if grep -qE '^\s*logfile\s+' "$SERVICE_CONF_FILE"; then
+    sudo sed -i 's|^\s*logfile\s\+.*|logfile ""|' "$SERVICE_CONF_FILE"
+elif grep -q "^# *logfile" "$SERVICE_CONF_FILE"; then
+    sudo sed -i '/^# *logfile/a logfile ""' "$SERVICE_CONF_FILE"
+else
+    echo 'logfile ""' | sudo tee -a "$SERVICE_CONF_FILE" > /dev/null
+fi
+
+{% elif type == 'binary' %}
+# --- Binary service setup ---
+echo "📂 Checking binary directory..."
+BIN_DIR="$SERVICE_WORKING_DIR/bin"
+if [[ -f "$BIN_DIR/{{ binary_name }}" ]]; then
+  echo "🔗 Installing {{ binary_name }} to /usr/local/bin"
+  sudo cp "$BIN_DIR/{{ binary_name }}" /usr/local/bin/
+  sudo chmod +x /usr/local/bin/{{ binary_name }}
+else
+  echo "⚠️ Binary {{ binary_name }} not found. Please build it first."
+fi
+
+{% elif type == 'system' %}
+# --- No setup needed, maybe system-managed ---
+echo "⚙️ System-managed service. No setup required."
+# Optional: validate configuration or emit message
+{% else %}
+echo "❌ Unknown service type: '{{ type }}'"
+exit 1
+{% endif %}
+
+
+echo "✅ $SERVICE_NAME installed successfully."

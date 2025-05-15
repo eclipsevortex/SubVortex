@@ -1,0 +1,29 @@
+[Unit]
+Description={{ description }}
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=<WORKING_DIR>/subvortex/{{ neuron }}/{{ component }}/.env
+ExecStart=<WORKING_DIR>/subvortex/{{ neuron }}/{{ component }}/venv/bin/python3 -m subvortex.{{ neuron }}.{{ component }}.src.main
+Restart={{ restart | default("on-failure") }}
+RestartSec={{ restart_sec | default("5s") }}
+User=subvortex
+Group=subvortex
+WorkingDirectory=<WORKING_DIR>/subvortex/{{ neuron }}/{{ component }}
+StandardOutput=append:/var/log/subvortex-{{ neuron }}/subvortex-{{ neuron }}-{{ component }}.log
+StandardError=append:/var/log/subvortex-{{ neuron }}/subvortex-{{ neuron }}-{{ component }}-error.log
+
+UMask=007
+PrivateTmp=yes
+ProtectHome=yes
+NoNewPrivileges=true
+LimitNOFILE=65535
+
+ReadWriteDirectories=-/var/log/subvortex-{{ neuron }}
+RuntimeDirectory=subvortex-{{ neuron }}
+RuntimeDirectoryMode=2755
+
+[Install]
+WantedBy=multi-user.target
+Alias=subvortex-{{ neuron }}-{{ component }}.service

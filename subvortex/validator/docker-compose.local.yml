@@ -15,7 +15,6 @@ services:
       - ./neuron/.env
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets
-      - /var/log:/app/logs
 
   validator-redis:
     build:
@@ -37,7 +36,6 @@ services:
       - ./redis/.env
     volumes:
       - ./redis/deployment/templates/subvortex-validator-redis.conf:/etc/redis/redis.conf:ro
-      - /var/tmp/dumps/redis:/var/tmp/dumps/redis
 
 networks:
   subvortex:

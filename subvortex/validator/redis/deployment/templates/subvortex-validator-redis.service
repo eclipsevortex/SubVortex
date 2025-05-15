@@ -1,29 +1,33 @@
 [Unit]
 Description=SubVortex Validator Redis
 After=network.target
-Documentation=http://redis.io/documentation, man:redis-server(1)
+Documentation=https://redis.io/docs, man:redis-server(1)
 
 [Service]
 Type=notify
+User=redis
+Group=redis
 ExecStart=/usr/bin/redis-server /etc/redis/redis.conf
 ExecStop=/bin/kill -s TERM $MAINPID
 PIDFile=/run/redis/redis-server.pid
-TimeoutStopSec=0
+
 Restart=always
-User=redis
-Group=redis
+TimeoutStopSec=0
+
+UMask=007
 RuntimeDirectory=redis
 RuntimeDirectoryMode=2755
 
-UMask=007
+# Security
 PrivateTmp=yes
-LimitNOFILE=65535
 PrivateDevices=yes
 ProtectHome=yes
+ProtectSystem=full
 ReadOnlyDirectories=/
 ReadWriteDirectories=-/var/lib/redis
 ReadWriteDirectories=-/var/log/subvortex-validator
 ReadWriteDirectories=-/run/redis
+ReadWriteDirectories=-/etc/redis
 
 NoNewPrivileges=true
 CapabilityBoundingSet=CAP_SETGID CAP_SETUID CAP_SYS_RESOURCE
@@ -34,12 +38,6 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictRealtime=true
 RestrictNamespaces=true
-
-# redis-server can write to its own config file when in cluster mode so we
-# permit writing there by default. If you are not using this feature, it is
-# recommended that you replace the following lines with "ProtectSystem=full".
-ProtectSystem=true
-ReadWriteDirectories=-/etc/redis
 
 [Install]
 WantedBy=multi-user.target

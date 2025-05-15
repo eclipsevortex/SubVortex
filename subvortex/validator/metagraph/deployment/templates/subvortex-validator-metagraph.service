@@ -1,0 +1,29 @@
+[Unit]
+Description=SubVortex Validator Metagraph
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=<WORKING_DIR>/subvortex/validator/metagraph/.env
+ExecStart=<WORKING_DIR>/subvortex/validator/metagraph/venv/bin/python3 -m subvortex.validator.metagraph.src.main
+Restart=on-failure
+RestartSec=10s
+User=subvortex
+Group=subvortex
+WorkingDirectory=<WORKING_DIR>/subvortex/validator/metagraph
+StandardOutput=append:/var/log/subvortex-validator/subvortex-validator-metagraph.log
+StandardError=append:/var/log/subvortex-validator/subvortex-validator-metagraph-error.log
+
+UMask=007
+PrivateTmp=yes
+ProtectHome=yes
+NoNewPrivileges=true
+LimitNOFILE=65535
+
+ReadWriteDirectories=-/var/log/subvortex-validator
+RuntimeDirectory=subvortex-validator
+RuntimeDirectoryMode=2755
+
+[Install]
+WantedBy=multi-user.target
+Alias=subvortex-validator-metagraph.service

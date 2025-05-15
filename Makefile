@@ -344,6 +344,13 @@ release:
  		$(DIST_DIR)/*.tar.gz \
  		$(DIST_DIR)/*.whl || true
 
+
+# ==========
+# 📜 Scripts 
+# ==========
+generate:
+	python3 tools/generate_scripts/src/main.py
+
 # =====================
 # Add the last target
 # =====================

@@ -1,0 +1,20 @@
+{
+    "name": "subvortex-validator-redis",
+    "description": "SubVortex Validator Redis",
+    "type": "package",
+    "neuron": "validator",
+    "component": "redis",
+    "common": {
+        "user": "redis",
+        "group": "redis",
+        "package_name": "redis-server"
+    },
+    "service": {
+        "environment": {
+            "PYTHONUNBUFFERED": 1
+        },
+        "restart": "on-failure",
+        "restart_sec": "10s"
+    },
+    "depends_on": []
+}

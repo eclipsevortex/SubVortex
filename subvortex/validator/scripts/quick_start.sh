@@ -63,5 +63,11 @@ done
 check_required_args EXECUTION
 
 echo "🔧 Running setup for validator components..."
+"$NEURON_WORKING_DIR/redis/scripts/redis_setup.sh" --execution $EXECUTION
+"$NEURON_WORKING_DIR/metagraph/scripts/metagraph_setup.sh" --execution $EXECUTION
+"$NEURON_WORKING_DIR/neuron/scripts/neuron_setup.sh" --execution $EXECUTION
 
 echo "🚀 Starting validator components..."
+"$NEURON_WORKING_DIR/redis/scripts/redis_start.sh" --execution $EXECUTION
+"$NEURON_WORKING_DIR/metagraph/scripts/metagraph_start.sh" --execution $EXECUTION
+"$NEURON_WORKING_DIR/neuron/scripts/neuron_start.sh" --execution $EXECUTION

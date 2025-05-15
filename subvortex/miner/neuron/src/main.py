@@ -17,7 +17,6 @@
 import os
 import sys
 import time
-import copy
 import typing
 import asyncio
 import threading
@@ -50,13 +49,13 @@ from subvortex.core.firewall.firewall_factory import (
 from subvortex.miner.version import __version__ as THIS_VERSION
 from subvortex.miner.core.run import run
 from subvortex.miner.core.firewall import Firewall
-from subvortex.miner.core.config import (
+from subvortex.miner.neuron.src.config import (
     config,
     check_config,
     add_args,
 )
 from subvortex.miner.core.utils import load_request_log
-from subvortex.miner.metagraph.src.settings import Settings
+from subvortex.miner.neuron.src.settings import Settings
 
 
 class Miner:
@@ -101,13 +100,13 @@ class Miner:
     wallet: "btw.Wallet"
     metagraph: SubVortexMetagraph
 
-    def __init__(self, config=None):
-        self.config = Miner.config()
+    def __init__(self):
+        self.config, parser = Miner.config()
         self.check_config(self.config)
 
         # Create settings
-        settings = Settings.create()
-        update_config(settings, config)
+        self.settings = Settings.create()
+        update_config(self.settings, self.config, parser)
 
         btul.logging(
             config=self.config,
@@ -116,7 +115,10 @@ class Miner:
         )
         btul.logging.set_trace(self.config.logging.trace)
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
-        btul.logging.info(f"{self.config}")
+        btul.logging.info(str(self.config))
+        
+        # Display the settings
+        btul.logging.info(f"miner settings: {self.settings}")
 
         # Show the pid
         pid = os.getpid()

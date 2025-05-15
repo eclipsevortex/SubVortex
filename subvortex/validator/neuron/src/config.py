@@ -186,37 +186,6 @@ def add_args(cls, parser):
         default="debug_logs.txt",
     )
 
-    # Redis arguments
-    parser.add_argument(
-        "--database.host", default="localhost", help="The host of the redis database."
-    )
-    parser.add_argument(
-        "--database.port", default=6379, help="The port of the redis database."
-    )
-    parser.add_argument(
-        "--database.index",
-        default=1,
-        help="The database number of the redis database.",
-    )
-    parser.add_argument(
-        "--database.password",
-        type=str,
-        default=None,
-        help="The redis password.",
-    )
-    parser.add_argument(
-        "--database.redis_conf_path",
-        type=str,
-        help="Redis configuration path.",
-        default="/etc/redis/redis.conf",
-    )
-    parser.add_argument(
-        "--database.redis_dump_path",
-        type=str,
-        help="Redis directory where to store dumps.",
-        default="/etc/redis/",
-    )
-
     # Auto update
     parser.add_argument(
         "--auto-update",
@@ -267,4 +236,4 @@ def config(cls):
     btul.logging.add_args(parser)
     btca.Axon.add_args(parser)
     cls.add_args(parser)
-    return btcc.Config(parser)
+    return btcc.Config(parser), parser

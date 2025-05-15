@@ -1,0 +1,19 @@
+{
+    "name": "subvortex-validator-neuron",
+    "description": "SubVortex Validator Neuron",
+    "type": "python",
+    "neuron": "validator",
+    "component": "neuron",
+    "common": {
+        "user": "root",
+        "group": "root"
+    },
+    "service": {
+        "environment": {
+            "PYTHONUNBUFFERED": 1
+        },
+        "restart": "on-failure",
+        "restart_sec": "10s"
+    },
+    "depends_on": ["redis", "metagraph"]
+}

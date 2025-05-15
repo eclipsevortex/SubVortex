@@ -15,7 +15,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import time
-import copy
 import asyncio
 import threading
 import numpy as np
@@ -37,6 +36,7 @@ from subvortex.core.file.file_monitor import FileMonitor
 from subvortex.core.shared.subtensor import get_current_block
 from subvortex.core.shared.weights import should_set_weights
 from subvortex.core.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
+from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
 from subvortex.core.version import to_spec_version
 
@@ -45,7 +45,7 @@ from subvortex.validator.core.checks import (
     check_registration,
     check_redis_connection,
 )
-from subvortex.validator.core.config import config, check_config, add_args
+from subvortex.validator.neuron.src.config import config, check_config, add_args
 from subvortex.validator.core.forward import forward
 from subvortex.validator.core.models import Miner
 from subvortex.validator.core.miner import get_all_miners
@@ -60,6 +60,7 @@ from subvortex.validator.core.state import (
 from subvortex.validator.core.weights import (
     set_weights_for_validator,
 )
+from subvortex.validator.neuron.src.settings import Settings
 
 
 class Validator:
@@ -92,11 +93,14 @@ class Validator:
     wallet: "btw.Wallet"
     metagraph: "btcm.Metagraph"
 
-    def __init__(self, config=None):
-        base_config = copy.deepcopy(config or Validator.config())
-        self.config = Validator.config()
-        self.config.merge(base_config)
+    def __init__(self):
+        self.config, parser = Validator.config()
         self.check_config(self.config)
+
+        # Create settings
+        self.settings = Settings.create()
+        update_config(self.settings, self.config, parser)
+
         btul.logging(
             config=self.config,
             logging_dir=self.config.neuron.full_path,
@@ -104,7 +108,9 @@ class Validator:
         )
         btul.logging.set_trace(self.config.logging.trace)
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
-        btul.logging.info(f"{self.config}")
+
+        # Display the settings
+        btul.logging.info(f"validator settings: {self.settings}")
 
         # Show miner version
         btul.logging.debug(f"validator version {THIS_VERSION}")
@@ -147,10 +153,10 @@ class Validator:
         # Setup database
         btul.logging.info("loading database")
         self.database = aioredis.StrictRedis(
-            host=self.config.database.host,
-            port=self.config.database.port,
-            db=self.config.database.index,
-            password=self.config.database.password,
+            host=self.settings.redis_host,
+            port=self.settings.redis_port,
+            db=self.settings.redis_index,
+            password=self.settings.redis_password,
         )
         self.db_semaphore = asyncio.Semaphore()
 
@@ -191,7 +197,7 @@ class Validator:
         btul.logging.info("run()")
 
         # Check if the connection to the database is successful
-        await check_redis_connection(port=self.config.database.port)
+        await check_redis_connection(port=self.settings.redis_port)
 
         # File monitor
         self.file_monitor = FileMonitor()

@@ -216,4 +216,4 @@ def config(cls):
     btw.Wallet.add_args(parser)
     btca.Axon.add_args(parser)
     cls.add_args(parser)
-    return btcc.Config(parser)
+    return btcc.Config(parser), parser

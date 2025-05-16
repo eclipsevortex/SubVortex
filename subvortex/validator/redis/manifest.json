@@ -10,11 +10,22 @@
         "package_name": "redis-server"
     },
     "service": {
+        "generate_unit": false,
         "environment": {
             "PYTHONUNBUFFERED": 1
         },
         "restart": "on-failure",
-        "restart_sec": "10s"
+        "restart_sec": "10s",
+        "log_prefix": "subvortex-validator-redis",
+        "configs": {
+            "redis.conf": {
+                "ext": "conf",
+                "destination": "/etc/redis/redis.conf",
+                "overrides": {
+                    "logfile": "/var/log/subvortex-validator/subvortex-validator-redis.log"
+                }
+            }
+        }
     },
     "depends_on": []
 }

@@ -5,8 +5,8 @@ Documentation=https://redis.io/docs, man:redis-server(1)
 
 [Service]
 Type=notify
-User=redis
-Group=redis
+User={{ user }}
+Group={{ group }}
 ExecStart=/usr/bin/redis-server /etc/redis/redis.conf
 ExecStop=/bin/kill -s TERM $MAINPID
 PIDFile=/run/redis/redis-server.pid

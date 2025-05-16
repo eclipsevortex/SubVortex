@@ -21,16 +21,13 @@ else
   echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
 fi
 
-SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner/neuron"
-
 SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
+SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner/neuron"
 SERVICE_TEMPLATE="$SERVICE_WORKING_DIR/deployment/templates/$SERVICE_NAME.service"
 SERVICE_LOG_DIR="/var/log/subvortex-miner"
 TEMP_SERVICE_FILE="/tmp/$SERVICE_NAME.service"
 
-# --- Install binaries or create venv ---
 # --- Python project setup ---
-# Set the venv dir
 VENV_DIR="$SERVICE_WORKING_DIR/venv"
 
 if [[ ! -d "$VENV_DIR" ]]; then
@@ -42,7 +39,7 @@ echo "🐍 Activating virtual environment..."
 source "$VENV_DIR/bin/activate"
 
 echo "📦 Installing Python dependencies..."
-pip install -r $SERVICE_WORKING_DIR/requirements.txt
+pip install -r "$SERVICE_WORKING_DIR/requirements.txt"
 
 echo "📚 Installing Python project in editable mode..."
 pip install -e "$PROJECT_WORKING_DIR"
@@ -55,15 +52,29 @@ echo "📁 Preparing log directory..."
 mkdir -p "$SERVICE_LOG_DIR"
 chown root:root "$SERVICE_LOG_DIR"
 
+# --- Create log files and adjust permissions ---
+LOG_PREFIX="$SERVICE_LOG_DIR/subvortex-miner-neuron"
+echo "🔒 Adjusting permissions for logs with prefix: $LOG_PREFIX"
+
+# Ensure the log directory exists
+mkdir -p "$(dirname "$LOG_PREFIX")"
+
+# Create the log files if they don't exist
+touch "${LOG_PREFIX}.log" "${LOG_PREFIX}-error.log"
+
+# Set correct ownership
+chown root:root "${LOG_PREFIX}.log" "${LOG_PREFIX}-error.log"
+
 echo "📝 Preparing systemd service file from template..."
-# Replace placeholder <WORKING_DIR> with actual path
 sed "s|<WORKING_DIR>|$PROJECT_WORKING_DIR|g" "$SERVICE_TEMPLATE" > "$TEMP_SERVICE_FILE"
 
 echo "📝 Installing systemd service file to $SERVICE_FILE..."
 mv "$TEMP_SERVICE_FILE" "$SERVICE_FILE"
 
-# --- Permissions and Reload ---
 chmod 644 "$SERVICE_FILE"
+
+echo "🔄 Reloading systemd and completing setup..."
+systemctl daemon-reexec
 systemctl daemon-reload
 
 echo "✅ $SERVICE_NAME installed successfully."

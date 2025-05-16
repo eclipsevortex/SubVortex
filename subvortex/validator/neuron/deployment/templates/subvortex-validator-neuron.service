@@ -8,21 +8,32 @@ EnvironmentFile=<WORKING_DIR>/subvortex/validator/neuron/.env
 ExecStart=<WORKING_DIR>/subvortex/validator/neuron/venv/bin/python3 -m subvortex.validator.neuron.src.main
 Restart=on-failure
 RestartSec=10s
-User=subvortex
-Group=subvortex
+User=root
+Group=root
 WorkingDirectory=<WORKING_DIR>/subvortex/validator/neuron
 StandardOutput=append:/var/log/subvortex-validator/subvortex-validator-neuron.log
 StandardError=append:/var/log/subvortex-validator/subvortex-validator-neuron-error.log
 
 UMask=007
-PrivateTmp=yes
-ProtectHome=yes
-NoNewPrivileges=true
-LimitNOFILE=65535
-
-ReadWriteDirectories=-/var/log/subvortex-validator
 RuntimeDirectory=subvortex-validator
 RuntimeDirectoryMode=2755
+
+# Security
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full
+ReadWriteDirectories=-/var/log/subvortex-validator
+ReadWriteDirectories=-/run/subvortex-validator
+
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID CAP_SYS_RESOURCE
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryDenyWriteExecute=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
 
 [Install]
 WantedBy=multi-user.target

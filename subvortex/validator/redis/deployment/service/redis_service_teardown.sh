@@ -22,6 +22,7 @@ else
   echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
 fi
 
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/validator/redis"
 SERVICE_LOG_DIR="/var/log/subvortex-validator"
 SERVICE_LOG_PREFIX="subvortex-validator-redis"
@@ -81,6 +82,13 @@ elif command -v pacman &> /dev/null; then
     sudo pacman -Rns --noconfirm redis-server
 else
     echo "⚠️ Unsupported package manager. Please uninstall redis-server manually."
+fi
+
+# Clean up leftover binary if still present
+REDIS_BIN=$(command -v redis-server 2>/dev/null || true)
+if [[ -n "$REDIS_BIN" ]]; then
+    echo "🧹 Removing leftover binary at $REDIS_BIN"
+    sudo rm -f "$REDIS_BIN" || true
 fi
 
 

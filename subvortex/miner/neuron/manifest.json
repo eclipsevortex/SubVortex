@@ -13,7 +13,8 @@
             "PYTHONUNBUFFERED": 1
         },
         "restart": "on-failure",
-        "restart_sec": "10s"
+        "restart_sec": "10s",
+        "log_prefix": "subvortex-miner-neuron"
     },
     "depends_on": ["redis", "metagraph"]
 }

@@ -1,9 +1,16 @@
 import bittensor.utils.btlogging as btul
+from packaging.version import parse as parse_version
 
 from subvortex.core.database.database import Database as BaseDatabase
 from subvortex.validator.core.database import get_field_value
-from subvortex.validator.neuron.src.models.statistics import StatisticModel200
-from subvortex.validator.neuron.src.models.selection import SelectionModel200
+from subvortex.validator.neuron.src.models.statistics import (
+    StatisticModel200,
+    StatisticModel210,
+)
+from subvortex.validator.neuron.src.models.selection import (
+    SelectionModel200,
+    SelectionModel210,
+)
 
 
 class Database(BaseDatabase):
@@ -11,8 +18,12 @@ class Database(BaseDatabase):
         super().__init__(settings=settings)
 
         self.models = {
-            "statistic": {x.version: x for x in [StatisticModel200()]},
-            "selection": {x.version: x for x in [SelectionModel200()]},
+            "statistic": {
+                x.version: x for x in [StatisticModel200(), StatisticModel210()]
+            },
+            "selection": {
+                x.version: x for x in [SelectionModel200(), SelectionModel210()]
+            },
         }
 
     async def get_hotkey_statistics(self, ss58_address: str):
@@ -143,15 +154,17 @@ class Database(BaseDatabase):
         """
         Returns:
             - latest_version: the 'new' version
-            - active_versions: versions marked 'dual' or 'new'
+            - active_versions: versions marked 'dual' or 'new',
+            or fallback to latest if none are active.
         """
-        # Ensure the connection is ip and running
         await self.ensure_connection()
 
         latest = None
         active = []
 
-        for version in sorted(self.models[model_name].keys()):
+        all_versions = sorted(self.models[model_name].keys(), key=parse_version)
+
+        for version in all_versions:
             mode = await self.database.get(f"migration_mode:{version}")
             mode = get_field_value(mode)
 
@@ -161,9 +174,9 @@ class Database(BaseDatabase):
             if mode in ("dual", "new"):
                 active.append(version)
 
-        if len(active) == 0:
-            btul.logging.warning(
-                f"No models {model_name}", prefix=self.settings.logging_name
-            )
+        if not active:
+            latest = all_versions[-1] if all_versions else None
+            if latest is not None:
+                active = [latest]
 
         return latest, active

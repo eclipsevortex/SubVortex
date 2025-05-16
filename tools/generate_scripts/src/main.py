@@ -26,6 +26,8 @@ def load_and_merge_manifest(manifest_path: Path, deployment: str, subvortex_dir:
     rendered = env.from_string(raw).render(SUBVORTEX_WORKING_DIR=subvortex_dir)
     manifest = json.loads(rendered)
 
+    print(manifest.get(deployment, {}))
+
     merged = {
         **manifest.get("common", {}),
         **manifest.get(manifest.get("type", ""), {}),
@@ -90,6 +92,7 @@ def generate_for_component(
         merged_context = load_and_merge_manifest(
             manifest_path, deployment, subvortex_dir
         )
+
         output_deployment_name = deployment_output_map.get(deployment, deployment)
         deployment_output_dir = base_output / output_deployment_name
         if not dry_run:

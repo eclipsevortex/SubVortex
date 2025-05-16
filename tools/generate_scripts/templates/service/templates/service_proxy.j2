@@ -7,8 +7,8 @@ Type=notify
 ExecStart=/usr/sbin/haproxy -Ws -f /etc/haproxy/haproxy.cfg
 ExecReload=/bin/kill -USR2 $MAINPID
 PIDFile=/run/haproxy.pid
-User=haproxy
-Group=haproxy
+User={{ user }}
+Group={{ group }}
 
 RuntimeDirectory=haproxy
 RuntimeDirectoryMode=0755

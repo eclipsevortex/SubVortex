@@ -117,7 +117,7 @@ class Storage(scmms.MetagraphStorage):
             state = await self.client.get(self._key("state:metagraph"))
 
             # Notify the state
-            await self.client.xadd("metagraph", {"state": state})
+            await self.client.xadd(self._key("state:metagraph:stream"), {"state": state})
         except Exception as ex:
             btul.logging.error(
                 f"Failed to get neurons: {ex}", prefix=self.settings.logging_name

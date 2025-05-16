@@ -101,3 +101,38 @@ async def test_get_migration_status_returns_active_versions(db):
     assert latest == "200"
     assert active == ["200"]
     db.database.get.assert_called_once_with("migration_mode:200")
+
+
+@pytest.mark.asyncio
+async def test_get_migration_status_fallback_no_migration_mode(db):
+    # Simulate two versions with no migration_mode set
+    db.models["statistic"] = {
+        "2.0.0": StatisticModel200(),
+        "2.1.0": StatisticModel200(),
+    }
+
+    # No value returned from redis for either version
+    db.database.get = AsyncMock(return_value=None)
+
+    latest, active = await db._get_migration_status("statistic")
+
+    assert latest == "2.1.0"
+    assert active == ["2.1.0"]
+
+
+@pytest.mark.asyncio
+async def test_get_migration_status_fallback_when_none_marked_new(db):
+    db.models["selection"] = {
+        "2.0.0": SelectionModel200(),
+        "2.1.0": SelectionModel200(),
+    }
+
+    async def fake_get(key):
+        return b"old" if "2.0.0" in key or "2.1.0" in key else None
+
+    db.database.get = AsyncMock(side_effect=fake_get)
+
+    latest, active = await db._get_migration_status("selection")
+
+    assert latest == "2.1.0"
+    assert active == ["2.1.0"]

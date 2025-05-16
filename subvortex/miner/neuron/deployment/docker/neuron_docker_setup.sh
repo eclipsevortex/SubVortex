@@ -17,6 +17,8 @@ else
   echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
 fi
 
+NEURON_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner"
+
 # Detect Docker Compose command
 echo "🔎 Detecting Docker Compose command..."
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
@@ -33,10 +35,10 @@ fi
 # Choose compose file depending on environment
 if [ -n "${SUBVORTEX_LOCAL:-}" ]; then
     echo "🛠️ Local mode detected — building miner-neuron service from source..."
-    $DOCKER_CMD -f ../docker-compose.local.yml build "$SERVICE_KEY"
+    $DOCKER_CMD -f "$NEURON_WORKING_DIR/docker-compose.local.yml" build "$SERVICE_KEY"
 else
     echo "🌐 Pulling miner-neuron image from remote registry..."
-    $DOCKER_CMD -f ../docker-compose.yml pull "$SERVICE_KEY"
+    $DOCKER_CMD -f "$NEURON_WORKING_DIR/docker-compose.yml pull" "$SERVICE_KEY"
 fi
 
 echo "✅ $SERVICE_NAME installed successfully."

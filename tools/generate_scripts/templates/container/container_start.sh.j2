@@ -17,6 +17,8 @@ else
   echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
 fi
 
+NEURON_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/{{ neuron }}"
+
 # Detect Docker Compose command
 echo "🔎 Detecting Docker Compose command..."
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then
@@ -34,10 +36,10 @@ fi
 echo "🔎 Detecting Docker Compose file..."
 if [ -n "${SUBVORTEX_LOCAL:-}" ]; then
     echo "🛠 Local environment detected (SUBVORTEX_LOCAL is set). Using local compose file."
-    COMPOSE_FILE="../docker-compose.local.yml"
+    COMPOSE_FILE="$NEURON_WORKING_DIR/docker-compose.local.yml"
 else
     echo "🌍 Production environment detected. Using standard compose file."
-    COMPOSE_FILE="../docker-compose.yml"
+    COMPOSE_FILE="$NEURON_WORKING_DIR/docker-compose.yml"
 fi
 
 # Build the docker-compose command

@@ -16,11 +16,6 @@ fi
 
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/validator/metagraph"
 
-if [[ "$EUID" -ne 0 ]]; then
-  echo "🛑 Must be run as root. Re-running with sudo..."
-  exec sudo "$0" "$@"
-fi
-
 # Load the tools
 source $PROJECT_WORKING_DIR/subvortex/scripts/utils.sh
 

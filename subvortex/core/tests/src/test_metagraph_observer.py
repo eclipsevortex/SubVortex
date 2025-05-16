@@ -1,6 +1,5 @@
 import pytest
 import asyncio
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import subvortex.core.metagraph.models as scmm
@@ -82,12 +81,15 @@ async def test_notify_if_not_needed(observer):
 @pytest.mark.asyncio
 async def test_has_new_neuron_registered_same_count(observer):
     observer.subtensor = AsyncMock()
-    with patch(
-        "subvortex.core.core_bittensor.subtensor.get_number_of_registration",
-        return_value=5,
-    ), patch(
-        "subvortex.core.core_bittensor.subtensor.get_next_adjustment_block",
-        return_value=100,
+    with (
+        patch(
+            "subvortex.core.core_bittensor.subtensor.get_number_of_registration",
+            return_value=5,
+        ),
+        patch(
+            "subvortex.core.core_bittensor.subtensor.get_next_adjustment_block",
+            return_value=100,
+        ),
     ):
 
         # Action
@@ -101,12 +103,15 @@ async def test_has_new_neuron_registered_same_count(observer):
 @pytest.mark.asyncio
 async def test_has_new_neuron_registered_reset(observer):
     observer.subtensor = AsyncMock()
-    with patch(
-        "subvortex.core.core_bittensor.subtensor.get_number_of_registration",
-        return_value=5,
-    ), patch(
-        "subvortex.core.core_bittensor.subtensor.get_next_adjustment_block",
-        return_value=100,
+    with (
+        patch(
+            "subvortex.core.core_bittensor.subtensor.get_number_of_registration",
+            return_value=5,
+        ),
+        patch(
+            "subvortex.core.core_bittensor.subtensor.get_next_adjustment_block",
+            return_value=100,
+        ),
     ):
 
         # Action
@@ -193,33 +198,37 @@ async def test_resync_updates_neurons(observer):
 
 @pytest.mark.asyncio
 async def test_start_and_stop(observer):
-    # Prevent actual sync calls
-    observer._initialize = AsyncMock()
+    # Mock all internal behavior
     observer._resync = AsyncMock(return_value={"hk": "1.1.1.1"})
     observer._notify_if_needed = AsyncMock(return_value=True)
     observer._has_new_neuron_registered = AsyncMock(return_value=(True, 1))
     observer._has_neuron_ip_changed = AsyncMock(return_value=(False, {}))
-
-    async def wait_for_block_mock():
-        await asyncio.sleep(0.1)
-        return True
-
-    observer.subtensor = AsyncMock()
-    observer.subtensor.wait_for_block = AsyncMock(side_effect=wait_for_block_mock)
     observer.subtensor.get_current_block = AsyncMock(return_value=123)
 
-    task = asyncio.create_task(observer.start())
-    await asyncio.sleep(0.1)
-    await observer.stop()
+    # Force exit after one loop using `should_exit.set()` inside the loop
+    # Patch wait_for_block so it returns immediately
+    with patch(
+        "subvortex.core.core_bittensor.subtensor.wait_for_block", new_callable=AsyncMock
+    ) as mock_wait:
 
-    # Await the start task to finish gracefully
-    await asyncio.wait_for(task, timeout=1.0)
+        async def wait_for_block_mock(*args, **kwargs):
+            await asyncio.sleep(0.1)
+            return True
 
+        mock_wait.side_effect = wait_for_block_mock
+
+        task = asyncio.create_task(observer.start())
+        await asyncio.sleep(0.1)
+        await observer.stop()
+
+        # Await the start task to finish gracefully
+        await asyncio.wait_for(task, timeout=1.0)
+
+    # Assertions
     assert observer.finished.is_set()
     observer._resync.assert_called_once()
     observer._notify_if_needed.assert_called_once()
     observer._has_new_neuron_registered.assert_called_once()
-    # observer._has_neuron_ip_changed.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -322,7 +331,10 @@ async def test_resync_country_not_updated_if_ip_is_same(observer):
     observer.storage.get_neurons = AsyncMock(return_value=[stored_neuron])
     observer.storage.set_neurons = AsyncMock()
 
-    axons = await observer._resync()
+    with patch(
+        "subvortex.core.metagraph.models.Neuron.from_proto", return_value=stored_neuron
+    ):
+        axons = await observer._resync()
 
     observer.storage.set_neurons.assert_not_called()
     assert axons["hotkey99"] == "2.2.2.2"
@@ -336,7 +348,6 @@ async def test_resync_removes_old_hotkey(observer):
     fake_proto.hotkey = "new_hotkey"
 
     stored = scmm.Neuron(uid=1, ip="3.3.3.3", hotkey="old_hotkey", country="US")
-    stored.update = MagicMock(return_value=stored)
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
@@ -344,7 +355,17 @@ async def test_resync_removes_old_hotkey(observer):
     observer.storage.set_neurons = AsyncMock()
     observer.storage.delete_neurons = AsyncMock()
 
-    with patch("subvortex.core.country.country.get_country", return_value="US"):
+    with (
+        patch(
+            "subvortex.core.metagraph.models.Neuron.from_proto",
+            return_value=scmm.Neuron(
+                uid=1, ip="3.3.3.3", hotkey="new_hotkey", country=None
+            ),
+        ),
+        patch("subvortex.core.country.country.get_country", return_value="US"),
+    ):
         axons = await observer._resync()
-        observer.storage.set_neurons.assert_called_once()
-        observer.storage.delete_neurons.assert_called_once_with(["old_hotkey"])
+
+    observer.storage.set_neurons.assert_called_once()
+    observer.storage.delete_neurons.assert_called_once_with(["old_hotkey"])
+    assert axons["new_hotkey"] == "3.3.3.3"

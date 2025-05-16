@@ -23,6 +23,11 @@ class Settings:
     UID of the subnet
     """
 
+    sync_interval: int = 100
+    """
+    Force resync every X blocks to keep neuron data fresh
+    """
+
     @classmethod
     def create(cls) -> "Settings":
         return scsu.create_settings_instance(cls)

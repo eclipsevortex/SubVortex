@@ -41,6 +41,8 @@ class MetagraphObserver:
         registration_count = 0
         axons = {}
         ready = False
+        last_synced_block = 0
+        sync_interval = self.settings.sync_interval
 
         btul.logging.info("Service starting...", prefix=self.settings.logging_name)
 
@@ -69,16 +71,29 @@ class MetagraphObserver:
                     )
 
                     # Determine whether a resync is needed
-                    must_resync = not ready or has_new_registration or has_axons_changed
-                    if must_resync:
-                        # Sync from chain and update Redis
-                        axons = await self._resync()
+                    time_to_resync = block - last_synced_block >= sync_interval
+                    must_resync = (
+                        not ready
+                        or has_new_registration
+                        or has_axons_changed
+                        or time_to_resync
+                    )
 
-                        # Notify listeners if this is the first successful sync
-                        ready = await self._notify_if_needed(ready)
+                    # Nothing changed, so we do nothing
+                    if not must_resync:
+                        continue
 
-                        # Update known axons to track future IP changes
-                        axons = new_axons
+                    # Sync from chain and update Redis
+                    axons = await self._resync()
+
+                    # Update the last synced block
+                    last_synced_block = block
+
+                    # Notify listeners if this is the first successful sync
+                    ready = await self._notify_if_needed(ready)
+
+                    # Update known axons to track future IP changes
+                    axons = new_axons
 
                 except Exception as e:
                     # Catch and log any unexpected runtime errors
@@ -120,15 +135,16 @@ class MetagraphObserver:
         for mneuron in self.metagraph.neurons:
             new_axons[mneuron.hotkey] = mneuron.axon_info.ip
 
-            # Find matching stored neuron by UID
-            stored = next((n for n in stored_neurons if n.uid == mneuron.uid), None)
+            # Create the new neuron
+            new_neuron = scmm.Neuron.from_proto(mneuron)
 
-            # Skip if nothing has changed
-            if (
-                stored
-                and stored.ip == mneuron.axon_info.ip
-                and stored.hotkey == mneuron.hotkey
-            ):
+            # Find matching stored neuron by UID
+            current_neuron = next(
+                (n for n in stored_neurons if n.uid == new_neuron.uid), None
+            )
+
+            # Check if the neuron has changed
+            if new_neuron == current_neuron:
                 btul.logging.debug(
                     f"Unchanged neuron {mneuron.hotkey} (uid={mneuron.uid}), skipping",
                     prefix=self.settings.logging_name,
@@ -136,24 +152,24 @@ class MetagraphObserver:
                 continue
 
             # If hotkey changed (same UID but different owner), remove old record
-            if stored and stored.hotkey != mneuron.hotkey:
+            if current_neuron and current_neuron.hotkey != mneuron.hotkey:
                 btul.logging.debug(
-                    f"Neuron uid={mneuron.uid} changed hotkey from {stored.hotkey} to {mneuron.hotkey}",
+                    f"Neuron uid={mneuron.uid} changed hotkey from {current_neuron.hotkey} to {mneuron.hotkey}",
                     prefix=self.settings.logging_name,
                 )
-                neurons_to_delete.append(stored.hotkey)
+                neurons_to_delete.append(current_neuron.hotkey)
 
             # Log if IP changed and we're about to fetch a new country
-            if stored and stored.ip != mneuron.axon_info.ip:
+            if current_neuron and current_neuron.ip != mneuron.axon_info.ip:
                 btul.logging.debug(
-                    f"Neuron {mneuron.hotkey} IP changed from {stored.ip} to {mneuron.axon_info.ip}, refetching country",
+                    f"Neuron {mneuron.hotkey} IP changed from {current_neuron.ip} to {mneuron.axon_info.ip}, refetching country",
                     prefix=self.settings.logging_name,
                 )
 
             # Update country only if IP changed
             country = (
-                stored.country
-                if stored and stored.ip == mneuron.axon_info.ip
+                current_neuron.country
+                if current_neuron and current_neuron.ip == mneuron.axon_info.ip
                 else (
                     sccc.get_country(mneuron.axon_info.ip)
                     if mneuron.axon_info.ip != "0.0.0.0"
@@ -161,10 +177,11 @@ class MetagraphObserver:
                 )
             )
 
-            # Either update or create a new neuron instance
-            updated = scmm.Neuron.from_proto(mneuron)
-            updated.country = country
-            updated_neurons.append(updated)
+            # Update the country of the new neuron
+            new_neuron.country = country
+
+            # Add the new neuron to the list of neuron to update
+            updated_neurons.append(new_neuron)
 
         # Delete old records if needed
         if neurons_to_delete:

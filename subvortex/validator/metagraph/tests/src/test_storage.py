@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from subvortex.miner.metagraph.src.storage import Storage
+from subvortex.validator.metagraph.src.storage import Storage
 import subvortex.core.metagraph.models as scmm
-import subvortex.miner.metagraph.src.settings as scms
+import subvortex.validator.metagraph.src.settings as scms
 
 
 class DummySettings(scms.Settings):
@@ -102,4 +102,4 @@ async def test_mark_as_unready(storage):
 async def test_notify_state(storage):
     storage.client.get.return_value = "ready"
     await storage.notify_state()
-    storage.client.xadd.assert_awaited_once_with("metagraph", {"state": "ready"})
+    storage.client.xadd.assert_awaited_once_with("sv:state:metagraph:stream", {"state": "ready"})

@@ -26,10 +26,11 @@ class NeuronReadOnlyDatabase(BaseDatabase):
     """
 
     def setup_neuron_models(self):
+        # Register neuron models keyed by their version
         self.models["neuron"] = {x.version: x for x in [NeuronModel210()]}
 
     async def get_neuron(self, hotkey: str) -> typing.List[scmm.Neuron]:
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
 
         # Get the active versions
@@ -41,20 +42,24 @@ class NeuronReadOnlyDatabase(BaseDatabase):
                 continue
 
             try:
+                # Attempt to read the neuron using the model
                 neuron = await model.read(self.database, hotkey)
                 return neuron
 
             except Exception as ex:
                 btul.logging.warning(
-                    f"[{version}] Read neuron failed for hotkey {hotkey}: {ex}",
+                    f"[get_neuron] Failed to read neuron for hotkey='{hotkey}' using version={version}: {ex}",
                     prefix=self.settings.logging_name,
                 )
-                btul.logging.debug(traceback.format_exc())
+                btul.logging.debug(
+                    f"[get_neuron] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return None
 
     async def get_neurons(self) -> typing.List[scmm.Neuron]:
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
 
         # Get the active versions
@@ -66,15 +71,19 @@ class NeuronReadOnlyDatabase(BaseDatabase):
                 continue
 
             try:
+                # Attempt to read all neurons using the model
                 neurons = await model.read_all(self.database)
                 return neurons
 
             except Exception as ex:
                 btul.logging.warning(
-                    f"[{version}] Read neurons failed: {ex}",
+                    f"[get_neurons] Failed to read all neurons using version={version}: {ex}",
                     prefix=self.settings.logging_name,
                 )
-                btul.logging.debug(traceback.format_exc())
+                btul.logging.debug(
+                    f"[get_neurons] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return []
 
@@ -97,7 +106,7 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         self.setup_neuron_models()
 
     async def update_neurons(self, neurons: typing.List[scmm.Neuron]):
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
 
         # Get the active versions
@@ -109,28 +118,37 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
                 continue
 
             try:
+                # Attempt to write all neurons to the database
                 await model.write_all(self.database, neurons)
 
             except Exception as ex:
                 btul.logging.warning(
-                    f"[{version}] Update neurons failed: {ex}",
+                    f"[update_neurons] Failed to update neurons using version={version}: {ex}",
                     prefix=self.settings.logging_name,
                 )
-                btul.logging.debug(traceback.format_exc())
+                btul.logging.debug(
+                    f"[update_neurons] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return None
 
     async def remove_neurons(self, neurons: list[Neuron]):
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
 
         for version, model in self.models["neuron"].items():
             try:
+                # Attempt to delete all given neurons
                 await model.delete_all(self.database, neurons)
 
             except Exception as ex:
                 btul.logging.error(
-                    f"[{version}] Remove neurons failed: {ex}",
+                    f"[remove_neurons] Failed to remove neurons using version={version}: {ex}",
+                    prefix=self.settings.logging_name,
+                )
+                btul.logging.debug(
+                    f"[remove_neurons] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
                     prefix=self.settings.logging_name,
                 )
 
@@ -140,7 +158,7 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         """
         Get the block of the last time the metagraph has been updated
         """
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
 
         try:
@@ -149,7 +167,11 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
 
         except Exception as ex:
             btul.logging.error(
-                f"Read failed for last updated: {ex}",
+                f"[get_last_updated] Failed to read last updated block: {ex}",
+                prefix=self.settings.logging_name,
+            )
+            btul.logging.debug(
+                f"[get_last_updated] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
                 prefix=self.settings.logging_name,
             )
 
@@ -159,7 +181,7 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         """
         Set the block of the last time the metagraph has been updated
         """
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
 
         try:
@@ -167,49 +189,63 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
 
         except Exception as ex:
             btul.logging.error(
-                f"Write failed for last updated at block #{block}: {ex}",
+                f"[set_last_updated] Failed to write last updated block {block}: {ex}",
+                prefix=self.settings.logging_name,
+            )
+            btul.logging.debug(
+                f"[set_last_updated] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
                 prefix=self.settings.logging_name,
             )
 
     async def mark_as_ready(self):
+        # Mark metagraph state as "ready"
         await self._set_state(state="ready")
 
     async def mark_as_unready(self):
+        # Mark metagraph state as "unready"
         await self._set_state(state="unready")
 
     async def notify_state(self):
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
 
         try:
-            # Get the state
+            # Get the current state of the metagraph
             state = await self.database.get(self._key("state:metagraph"))
 
-            # Notify the state
+            # Notify downstream via Redis stream
             await self.database.xadd(
                 self._key("state:metagraph:stream"), {"state": state}
             )
+
         except Exception as ex:
             btul.logging.error(
-                f"Failed to get neurons: {ex}", prefix=self.settings.logging_name
+                f"[notify_state] Failed to notify metagraph state: {ex}",
+                prefix=self.settings.logging_name,
             )
             btul.logging.debug(
-                traceback.format_exc(), prefix=self.settings.logging_name
+                f"[notify_state] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                prefix=self.settings.logging_name,
             )
 
     def _key(self, key: str):
+        # Prefixes keys to namespace them under this service
         return f"{self.settings.key_prefix}:{key}"
 
     async def _set_state(self, state: str):
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
 
         try:
+            # Set the current metagraph state
             await self.database.set(self._key("state:metagraph"), state)
+
         except Exception as ex:
             btul.logging.error(
-                f"Failed to get neurons: {ex}", prefix=self.settings.logging_name
+                f"[_set_state] Failed to set metagraph state='{state}': {ex}",
+                prefix=self.settings.logging_name,
             )
             btul.logging.debug(
-                traceback.format_exc(), prefix=self.settings.logging_name
+                f"[_set_state] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                prefix=self.settings.logging_name,
             )

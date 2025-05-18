@@ -1,5 +1,5 @@
-import traceback
 from typing import List
+import traceback
 
 import bittensor.utils.btlogging as btul
 
@@ -43,10 +43,7 @@ class Database(NeuronReadOnlyDatabase):
         """
         Return selected uids for a hotkey using versioned selection models.
         """
-        # Ensure the connection is ip and running
         await self.ensure_connection()
-
-        # Get the active versions
         _, active = await self._get_migration_status("selection")
 
         for version in reversed(active):  # Prefer latest version
@@ -63,6 +60,10 @@ class Database(NeuronReadOnlyDatabase):
                     f"[{version}] Failed to read selected miners for {ss58_address}: {err}",
                     prefix=self.settings.logging_name,
                 )
+                btul.logging.debug(
+                    f"[get_selected_miners] Exception type: {type(err).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return []
 
@@ -70,10 +71,7 @@ class Database(NeuronReadOnlyDatabase):
         """
         Store selected miner UIDs in all active selection model versions.
         """
-        # Ensure the connection is ip and running
         await self.ensure_connection()
-
-        # Get the active versions
         _, active = await self._get_migration_status("selection")
 
         for version in active:
@@ -89,13 +87,15 @@ class Database(NeuronReadOnlyDatabase):
                     f"[{version}] Failed to write selection for {ss58_address}: {err}",
                     prefix=self.settings.logging_name,
                 )
+                btul.logging.debug(
+                    f"[set_selection_miners] Exception type: {type(err).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
         return None
 
     async def get_miner(self, hotkey: str) -> Miner:
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
-
-        # Get the active versions
         _, active = await self._get_migration_status("miner")
 
         for version in reversed(active):
@@ -112,15 +112,16 @@ class Database(NeuronReadOnlyDatabase):
                     f"[{version}] Read miner failed for hotkey {hotkey}: {ex}",
                     prefix=self.settings.logging_name,
                 )
-                btul.logging.debug(traceback.format_exc())
+                btul.logging.debug(
+                    f"[get_miner] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return None
 
     async def get_miners(self) -> dict[str, Miner]:
-        # Ensure the connection is ip and running
+        # Ensure the connection is up and running
         await self.ensure_connection()
-
-        # Get the active versions
         _, active = await self._get_migration_status("miner")
 
         for version in reversed(active):
@@ -137,18 +138,18 @@ class Database(NeuronReadOnlyDatabase):
                     f"[{version}] Read miners failed: {ex}",
                     prefix=self.settings.logging_name,
                 )
-                btul.logging.debug(traceback.format_exc())
+                btul.logging.debug(
+                    f"[get_miners] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return None
 
     async def add_miner(self, miner: Miner):
         """
-        Return the stastistics metadata for the hotkey from the database
+        Add a new miner record to all active versions of the miner schema.
         """
-        # Ensure the connection is ip and running
         await self.ensure_connection()
-
-        # Get the active versions
         _, active = await self._get_migration_status("miner")
 
         for version in active:
@@ -164,14 +165,18 @@ class Database(NeuronReadOnlyDatabase):
                     f"[{version}] Add miner failed for {miner.hotkey}: {ex}",
                     prefix=self.settings.logging_name,
                 )
+                btul.logging.debug(
+                    f"[add_miner] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return None
 
     async def update_miner(self, miner: Miner):
-        # Ensure the connection is ip and running
+        """
+        Update an existing miner record.
+        """
         await self.ensure_connection()
-
-        # Get the active versions
         _, active = await self._get_migration_status("miner")
 
         for version in reversed(active):
@@ -187,15 +192,18 @@ class Database(NeuronReadOnlyDatabase):
                     f"[{version}] Update miner failed: {ex}",
                     prefix=self.settings.logging_name,
                 )
-                btul.logging.debug(traceback.format_exc())
+                btul.logging.debug(
+                    f"[update_miner] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return None
 
     async def update_miners(self, miners: List[Miner]):
-        # Ensure the connection is ip and running
+        """
+        Bulk update for a list of miners using active model versions.
+        """
         await self.ensure_connection()
-
-        # Get the active versions
         _, active = await self._get_migration_status("miner")
 
         for version in reversed(active):
@@ -211,15 +219,17 @@ class Database(NeuronReadOnlyDatabase):
                     f"[{version}] Update miners failed: {ex}",
                     prefix=self.settings.logging_name,
                 )
-                btul.logging.debug(traceback.format_exc())
+                btul.logging.debug(
+                    f"[update_miners] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return None
 
     async def remove_miner(self, miner: Miner):
         """
-        Return the stastistics metadata for the hotkey from the database
+        Remove a single miner entry from all available versions.
         """
-        # Ensure the connection is ip and running
         await self.ensure_connection()
 
         for version, model in self.models["miner"].items():
@@ -231,14 +241,17 @@ class Database(NeuronReadOnlyDatabase):
                     f"[{version}] Remove miner failed for {miner.hotkey}: {ex}",
                     prefix=self.settings.logging_name,
                 )
+                btul.logging.debug(
+                    f"[remove_miner] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
 
         return None
 
     async def get_neuron_last_update(self):
         """
-        Get the block of the last time the metagraph has been updated
+        Get the block of the last time the metagraph has been updated.
         """
-        # Ensure the connection is ip and running
         await self.ensure_connection()
 
         try:
@@ -247,6 +260,12 @@ class Database(NeuronReadOnlyDatabase):
 
         except Exception as ex:
             btul.logging.error(
-                f"Read failed for last updated: {ex}",
+                f"[get_neuron_last_update] Read failed for last updated: {ex}",
                 prefix=self.settings.logging_name,
             )
+            btul.logging.debug(
+                f"[get_neuron_last_update] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                prefix=self.settings.logging_name,
+            )
+
+        return 0

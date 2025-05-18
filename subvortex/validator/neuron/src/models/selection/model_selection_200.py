@@ -1,7 +1,7 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from redis import asyncio as Redis
 
-from subvortex.validator.core.database import get_field_value
+from subvortex.core.database.database_utils import decode_value
 
 
 class SelectionModel:
@@ -12,20 +12,19 @@ class SelectionModel:
 
     version = "2.0.0"
 
-    def redis_key(self, ss58_address: str) -> str:
+    def redis_key(self, ss58_address: str) -> List[int]:
         return f"selection:{ss58_address}"
 
     async def read(self, redis: Redis, ss58_address: str) -> Optional[Dict[str, Any]]:
-        value = await redis.get(self.redis_key(ss58_address))
-        if value is None:
-            return []
+        key = self.redis_key(ss58_address)
+        raw = await redis.get(key)
+        data = decode_value(raw) if raw else ""
+        return [int(uid) for uid in data.split(",") if uid.strip().isdigit()]
 
-        uids_str = get_field_value(value)
-        return [int(uid) for uid in uids_str.split(",") if uid.strip().isdigit()]
-
-    async def write(self, redis: Redis, ss58_address: str, selection: list[int]):
+    async def write(self, redis: Redis, ss58_address: str, uids: List[int]):
         """
         Store the list of selected miner UIDs in Redis as a comma-separated string.
         """
-        selection_str = ",".join(str(uid) for uid in selection)
-        await redis.set(self.redis_key(ss58_address), selection_str)
+        key = self.redis_key(ss58_address)
+        data = ",".join(str(uid) for uid in uids)
+        await redis.set(key, data)

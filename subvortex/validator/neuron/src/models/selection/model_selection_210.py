@@ -1,4 +1,3 @@
-from subvortex.validator.core.database import get_field_value
 from subvortex.validator.neuron.src.models.selection import SelectionModel200
 
 

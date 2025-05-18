@@ -9,13 +9,13 @@ import bittensor.core.metagraph as btcm
 
 import subvortex.core.core_bittensor.config.config_utils as scccu
 import subvortex.core.metagraph.metagraph_observer as scmm
+import subvortex.core.metagraph.metagraph_storage as scmms
 
-import subvortex.miner.metagraph.src.storage as smms
 import subvortex.miner.metagraph.src.settings as smme
 
 
 async def wait_for_storage_connection(
-    settings: smme.Settings, storage: smms.Storage
+    settings: smme.Settings, storage: scmms.Storage
 ) -> None:
     btul.logging.warning(
         "⏳ Waiting for Redis to become available...",
@@ -51,7 +51,7 @@ async def main():
     subtensor = None
     try:
         # Create the storage
-        storage = smms.Storage(settings=settings)
+        storage = scmms.Storage(settings=settings)
         await wait_for_storage_connection(settings=settings, storage=storage)
 
         # Initialize the subtensor
@@ -60,8 +60,9 @@ async def main():
         btul.logging.info(str(subtensor))
 
         # Initialize the metagraph
+        # TODO: Tell OTF if i provide the subtensor the network wil be finney even if the subtensor is in test!
         metagraph = btcm.AsyncMetagraph(
-            netuid=settings.netuid, subtensor=subtensor, sync=False
+            netuid=settings.netuid, network=subtensor.network, sync=False
         )
         btul.logging.info(str(metagraph))
 

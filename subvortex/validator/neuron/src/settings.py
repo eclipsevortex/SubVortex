@@ -1,14 +1,16 @@
-from dotenv import load_dotenv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import subvortex.core.settings_utils as scsu
 from subvortex.core.metagraph.settings import Settings as MetagraphSettings
 
-load_dotenv()
-
 
 @dataclass
 class Settings(MetagraphSettings):
+    logging_name: str = field(default="Neuron", metadata={"readonly": True})
+    """
+    Prefix to use when logging
+    """
+
     redis_host: str = "localhost"
     """
     Host of the redis instance

@@ -40,7 +40,6 @@ where = ["."]
 include = [
     "scripts",
     "subvortex",
-    "subvortex.core",
     "subvortex.validator",
     "subvortex.scripts",
 ]
@@ -59,7 +58,6 @@ include = [
     "**/docker-compose.yml",
     "**/metadata.json",
 ]
-"subvortex.core" = ["**/*.py"]
 "subvortex.scripts" = ["**/*.sh"]
 
 [tool.setuptools.exclude-package-data]

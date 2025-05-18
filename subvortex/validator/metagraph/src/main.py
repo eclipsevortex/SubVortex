@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import traceback
+from dotenv import load_dotenv
 
 import bittensor.utils.btlogging as btul
 import bittensor.core.config as btcc
@@ -9,21 +10,28 @@ import bittensor.core.metagraph as btcm
 
 import subvortex.core.core_bittensor.config.config_utils as scccu
 import subvortex.core.metagraph.metagraph_observer as scmm
+import subvortex.core.metagraph.metagraph_storage as scmms
 
-import subvortex.miner.metagraph.src.storage as smms
-import subvortex.miner.metagraph.src.settings as smme
+import subvortex.validator.metagraph.src.settings as svme
+
+
+# Load the environment variables for the whole process
+load_dotenv(override=True)
 
 
 async def wait_for_storage_connection(
-    settings: smme.Settings, storage: smms.Storage
+    settings: svme.Settings, storage: scmms.Storage
 ) -> None:
     btul.logging.warning(
         "⏳ Waiting for Redis to become available...",
         prefix=settings.logging_name,
     )
 
+    # Ensure the connection
+    await storage.ensure_connection()
+
     while True:
-        if await storage.is_redis_available():
+        if await storage.is_connection_alive():
             btul.logging.info("✅ Connected to Redis.", prefix=settings.logging_name)
             return
 
@@ -39,19 +47,23 @@ async def main():
     config = btcc.Config(parser)
 
     # Create settings
-    settings = smme.Settings.create()
+    settings = svme.Settings.create()
     scccu.update_config(settings, config, parser)
 
     # Initialise logging
     btul.logging(config=config, debug=True)
     btul.logging.set_trace(config.logging.trace)
     btul.logging._stream_formatter.set_trace(config.logging.trace)
+    btul.logging.debug(str(config))
+
+    # Display the settings
+    btul.logging.info(f"metagraph settings: {settings}")
 
     metagraph_observer = None
     subtensor = None
     try:
         # Create the storage
-        storage = smms.Storage(settings=settings)
+        storage = scmms.Storage(settings=settings)
         await wait_for_storage_connection(settings=settings, storage=storage)
 
         # Initialize the subtensor
@@ -60,8 +72,9 @@ async def main():
         btul.logging.info(str(subtensor))
 
         # Initialize the metagraph
+        # TODO: Tell OTF if i provide the subtensor the network wil be finney even if the subtensor is in test!
         metagraph = btcm.AsyncMetagraph(
-            netuid=settings.netuid, subtensor=subtensor, sync=False
+            netuid=settings.netuid, network=subtensor.network, sync=False
         )
         btul.logging.info(str(metagraph))
 

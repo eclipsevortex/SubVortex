@@ -14,25 +14,24 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-from typing import List
-
-from subvortex.validator.core.models import Miner
+from typing import Optional
 
 
-def is_miner_suspicious(miner: Miner, suspicious_uids: List[int]):
-    """
-    True if the miner is in in the suspicious list, false otherwise
-    the penalise factor will be returned too if there is one
-    """
-    return next(
-        (
-            (
-                suspicious is not None,
-                (suspicious.get("penalty_factor") if suspicious else None) or 0,
-            )
-            for suspicious in suspicious_uids
-            if suspicious.get("uid") == miner.uid
-            and suspicious.get("hotkey") == miner.hotkey
-        ),
-        (False, 0),
-    )
+def decode_value(val: bytes | None) -> Optional[str]:
+    return val.decode() if val is not None else None
+
+
+def decode_hash(raw: dict[bytes, bytes]) -> dict[str, str]:
+    return {k.decode(): v.decode() for k, v in raw.items()}
+
+
+def decode_list(raw: list[bytes]) -> list[str]:
+    return [item.decode() for item in raw]
+
+
+def decode_stream(raw) -> list[dict[str, str]]:
+    decoded = []
+    for _, messages in raw:
+        for _, fields in messages:
+            decoded.append({k.decode(): v.decode() for k, v in fields.items()})
+    return decoded

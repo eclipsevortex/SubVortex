@@ -23,26 +23,27 @@ import bittensor.core.chain_data as btccd
 import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
 import bittensor.utils.btlogging as btul
+from collections import Counter
 
 from subvortex.core.constants import DEFAULT_PROCESS_TIME
 from subvortex.core.protocol import Synapse
-from subvortex.validator.core.models import Miner
-from subvortex.validator.core.synapse import send_scope
-from subvortex.validator.core.security import is_miner_suspicious
-from subvortex.validator.core.utils import (
-    get_next_uids,
+from subvortex.validator.neuron.src.miner import Miner
+from subvortex.validator.neuron.src.synapse import send_scope
+from subvortex.validator.neuron.src.security import (
+    is_miner_suspicious,
     deregister_suspicious_uid,
 )
-
-from subvortex.validator.core.state import log_event
-from subvortex.validator.core.score import (
+from subvortex.validator.neuron.src.selection import get_next_uids
+from subvortex.validator.neuron.src.state import log_event
+from subvortex.validator.neuron.src.score import (
     compute_availability_score,
     compute_reliability_score,
     compute_latency_score,
     compute_distribution_score,
     compute_final_score,
 )
-from subvortex.validator.core.constants import CHALLENGE_NAME
+
+CHALLENGE_NAME = "Challenge"
 
 DEFAULT_CHALLENGE_PROCESS_TIME = 60
 
@@ -283,7 +284,8 @@ async def handle_challenge(self, uid: int, challenge):
 
 
 async def challenge_data(self):
-    val_hotkey = self.metagraph.hotkeys[self.uid]
+    # Get the hotkey of the validator
+    val_hotkey = self.neuron.hotkey
 
     start_time = time.time()
     btul.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
@@ -308,6 +310,9 @@ async def challenge_data(self):
     # Get the locations
     locations = self.country_service.get_locations()
 
+    # Define the ip occurences
+    ip_occurrences = Counter(miner.ip for miner in self.miners)
+
     # Execute the challenges
     tasks = []
     reasons = []
@@ -325,6 +330,7 @@ async def challenge_data(self):
     for idx, (uid) in enumerate(uids):
         # Get the miner
         miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
+        miner_ip_occurences = ip_occurrences.get(miner.ip, 0)
 
         btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
         btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Country {miner.country}")
@@ -343,33 +349,34 @@ async def challenge_data(self):
             )
 
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
-        if miner.has_ip_conflicts:
+        has_ip_conflicts = miner_ip_occurences > 1
+        if has_ip_conflicts:
             btul.logging.warning(
-                f"[{CHALLENGE_NAME}][{miner.uid}] {miner.ip_occurences} miner(s) associated with the ip"
+                f"[{CHALLENGE_NAME}][{miner.uid}] {miner_ip_occurences} miner(s) associated with the ip"
             )
 
         # Compute score for availability
-        miner.availability_score = compute_availability_score(miner)
+        miner.availability_score = compute_availability_score(miner, has_ip_conflicts)
         btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Availability score {miner.availability_score}"
         )
 
         # Compute score for latency
         miner.latency_score = compute_latency_score(
-            self.country_code, miner, self.miners, locations
+            self.neuron.country, miner, self.miners, locations, has_ip_conflicts
         )
         btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Latency score {miner.latency_score}"
         )
 
         # Compute score for reliability
-        miner.reliability_score = await compute_reliability_score(miner)
+        miner.reliability_score = await compute_reliability_score(miner, has_ip_conflicts)
         btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Reliability score {miner.reliability_score}"
         )
 
         # Compute score for distribution
-        miner.distribution_score = compute_distribution_score(miner, self.miners)
+        miner.distribution_score = compute_distribution_score(miner, self.miners, ip_occurrences)
         btul.logging.debug(
             f"[{CHALLENGE_NAME}][{miner.uid}] Distribution score {miner.distribution_score}"
         )
@@ -380,10 +387,10 @@ async def challenge_data(self):
         btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Final score {miner.score}")
 
         # Send the score details to the miner
-        miner.version = await send_scope(self, miner)
+        miner.version = await send_scope(self, miner, miner_ip_occurences)
 
         # Save miner snapshot in database
-        await self.database.update_hotkey_statistics(val_hotkey, miner.snapshot)
+        await self.database.update_miner(miner=miner)
 
     btul.logging.trace(f"[{CHALLENGE_NAME}] Rewards: {rewards}")
 

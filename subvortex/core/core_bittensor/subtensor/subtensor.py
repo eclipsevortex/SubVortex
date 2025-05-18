@@ -1,5 +1,8 @@
 import typing
+import random
 import netaddr
+
+import bittensor.core.subtensor as btcs
 
 import bittensor.core.async_subtensor as btcas
 
@@ -86,3 +89,20 @@ async def wait_for_block(
         subscription_handler=handler,
     )
     return True
+
+
+def current_block_hash(subtensor: btcs.Subtensor):
+    # Get the current block
+    block = subtensor.get_current_block()
+
+    # Get the block hash
+    block_hash: str = subtensor.get_block_hash(block)
+    if block_hash is not None:
+        return block_hash
+
+    return int(str(random.randint(2 << 32, 2 << 64)))
+
+
+def get_block_seed(subtensor: btcs.Subtensor):
+    block_hash = current_block_hash(subtensor=subtensor)
+    return int(block_hash, 16)

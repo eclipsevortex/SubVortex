@@ -19,10 +19,10 @@ from typing import List
 
 from subvortex.core import protocol
 from subvortex.core.constants import DEFAULT_PROCESS_TIME
-from subvortex.validator.core.models import Miner
+from subvortex.validator.neuron.src.models.miner import Miner
 
 
-async def send_scope(self, miner: Miner):
+async def send_scope(self, miner: Miner, ip_occurences: int):
     """
     Send the scope synapse to the miner and return the version
     """
@@ -32,7 +32,7 @@ async def send_scope(self, miner: Miner):
             axons=[self.metagraph.axons[miner.uid]],
             synapse=protocol.Score(
                 validator_uid=self.uid,
-                count=miner.ip_occurences,
+                count=ip_occurences,
                 availability=miner.availability_score,
                 latency=miner.latency_score,
                 reliability=miner.reliability_score,

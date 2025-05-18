@@ -1,10 +1,7 @@
-from dotenv import load_dotenv
 from dataclasses import dataclass
 
 import subvortex.core.settings_utils as scsu
 from subvortex.core.metagraph.settings import Settings as MetagraphSettings
-
-load_dotenv()
 
 
 @dataclass

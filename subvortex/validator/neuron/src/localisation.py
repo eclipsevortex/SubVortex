@@ -14,19 +14,30 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import bittensor.utils.btlogging as btul
+from math import radians, sin, cos, sqrt, atan2
 
 
-def get_field_value(value, default=None, cast_type=None):
+def compute_localisation_distance(lat1, lon1, lat2, lon2):
     """
-    Returned the decoded value of the field
+    Compute the distance between two localisations using Haversine formula
     """
-    if value is None:
-        return default
+    distance = 0
 
     try:
-        value = value.decode("utf-8") if isinstance(value, bytes) else value
-        if cast_type:
-            return cast_type(value)
-        return value
-    except Exception:
-        return default
+        # Convert latitude and longitude from degrees to radians
+        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+
+        # Haversine formula
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        distance = 6371 * c  # Radius of the Earth in kilometers
+        return distance
+    except Exception as err:
+        btul.logging.error(
+            f"Could not compute the distance from {lat1}/{lon1} to {lat2}/{lon2}: {err}"
+        )
+
+    return distance

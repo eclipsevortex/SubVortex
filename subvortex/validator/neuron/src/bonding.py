@@ -18,7 +18,6 @@ import math
 import bittensor.utils.btlogging as btul
 
 from subvortex.core.constants import *
-from subvortex.validator.core.models import Miner
 
 
 def wilson_score_interval(successes, total):

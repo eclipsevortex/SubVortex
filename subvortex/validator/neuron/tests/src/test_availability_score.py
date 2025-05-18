@@ -14,29 +14,50 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import time
-import bittensor.utils.btlogging as btul
+from subvortex.validator.neuron.src.score import compute_availability_score
 
-from subvortex.core.constants import RELIABILLITY_RESET
-from subvortex.core.shared.subtensor import get_current_block
-from subvortex.validator.core.challenge import challenge_data
-from subvortex.validator.core.miner import reset_reliability_score
+import subvortex.validator.neuron.tests.mock.mock_miners as mocks
 
 
-async def forward(self):
-    btul.logging.info(f"forward step: {self.step}")
+def test_a_not_verified_miner_should_return_a_score_of_zero():
+    # Arrange
+    miner = mocks.miner_not_verified_1
 
-    # Record forward time
-    start = time.time()
+    # Act
+    result = compute_availability_score(miner, False)
 
-    # Send synapse to get challenge
-    btul.logging.info("initiating challenge")
-    await challenge_data(self)
+    # Assert
+    assert 0.0 == result
 
-    # Reset reliability statistics every 3 epochs
-    if get_current_block(self.subtensor) % RELIABILLITY_RESET == 0 and self.step > 0:
-        await reset_reliability_score(self, self.miners)
 
-    # Display step time
-    forward_time = time.time() - start
-    btul.logging.info(f"forward step time: {forward_time:.2f}s")
+def test_an_ip_conflicts_miner_should_return_a_score_of_zero():
+    # Arrange
+    miner = mocks.miner_with_ip_conflicts_1
+
+    # Act
+    result = compute_availability_score(miner, True)
+
+    # Assert
+    assert 0.0 == result
+
+
+def test_a_not_verified_and_ip_conflicts_miner_should_return_a_score_of_zero():
+    # Arrange
+    miner = mocks.miner_not_verified_and_ip_conflicts_1
+
+    # Act
+    result = compute_availability_score(miner, True)
+
+    # Assert
+    assert 0.0 == result
+
+
+def test_a_verified_miner_should_return_a_score_of_one():
+    # Arrange
+    miner = mocks.miner_verified
+
+    # Act
+    result = compute_availability_score(miner, False)
+
+    # Assert
+    assert 1.0 == result

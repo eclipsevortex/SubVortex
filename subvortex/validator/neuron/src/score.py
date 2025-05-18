@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 import bittensor.utils.btlogging as btul
 from typing import List
+from collections import Counter
 
 from subvortex.core.constants import (
     AVAILABILITY_FAILURE_REWARD,
@@ -27,10 +28,9 @@ from subvortex.core.constants import (
     RELIABILLITY_WEIGHT,
     DISTRIBUTION_WEIGHT,
 )
-from subvortex.validator.core.models import Miner
-from subvortex.validator.core.bonding import wilson_score_interval
-from subvortex.validator.core.localisation import compute_localisation_distance
-from subvortex.validator.core.constants import CHALLENGE_NAME
+from subvortex.validator.neuron.src.bonding import wilson_score_interval
+from subvortex.validator.neuron.src.localisation import compute_localisation_distance
+from subvortex.validator.neuron.src.models.miner import Miner
 
 
 # Longest distance between any two places on Earth is 20,010 kilometers
@@ -50,41 +50,43 @@ def check_multiple_miners_on_same_ip(miner: Miner, miners: List[Miner]):
     return count
 
 
-def can_compute_availability_score(miner: Miner):
+def can_compute_availability_score(miner: Miner, has_ip_conflicts: bool):
     """
     True if we can compute the availaiblity score, false to get the penalty
     """
-    return miner.verified and not miner.has_ip_conflicts
+    return miner.verified and not has_ip_conflicts
 
 
-def compute_availability_score(miner: Miner):
+def compute_availability_score(miner: Miner, has_ip_conflicts: bool):
     """
     Compute the availability score of the uid
     """
 
     score = (
-        1.0 if can_compute_availability_score(miner) else AVAILABILITY_FAILURE_REWARD
+        1.0
+        if can_compute_availability_score(miner, has_ip_conflicts)
+        else AVAILABILITY_FAILURE_REWARD
     )
 
     return score
 
 
-def can_compute_reliability_score(miner: Miner):
+def can_compute_reliability_score(miner: Miner, has_ip_conflicts: bool):
     """
     True if we can compute the reliability score, false to get the penalty
     """
     return True
 
 
-async def compute_reliability_score(miner: Miner):
+async def compute_reliability_score(miner: Miner, has_ip_conflicts: bool):
     """
     Compute the reliaiblity score of the uid based on the the ratio challenge_successes/challenge_attempts
     """
-    if not can_compute_reliability_score(miner):
+    if not can_compute_reliability_score(miner, has_ip_conflicts):
         return RELIABILLITY_FAILURE_REWARD
 
     # Step 1: Retrieve statistics
-    is_successful = miner.verified and not miner.has_ip_conflicts
+    is_successful = miner.verified and not has_ip_conflicts
     miner.challenge_successes = miner.challenge_successes + int(is_successful)
     miner.challenge_attempts = miner.challenge_attempts + 1
     btul.logging.trace(
@@ -100,20 +102,24 @@ async def compute_reliability_score(miner: Miner):
     return score
 
 
-def can_compute_latency_score(miner: Miner):
+def can_compute_latency_score(miner: Miner, has_ip_conflicts: bool):
     """
     True if we can compute the latency score, false to get the penalty
     """
-    return miner.verified and not miner.has_ip_conflicts
+    return miner.verified and not has_ip_conflicts
 
 
 def compute_latency_score(
-    validator_country: str, miner: Miner, miners: List[Miner], locations
+    validator_country: str,
+    miner: Miner,
+    miners: List[Miner],
+    locations,
+    has_ip_conflicts: bool,
 ):
     """
     Compute the latency score of the uid based on the process time of all uids
     """
-    if not can_compute_latency_score(miner):
+    if not can_compute_latency_score(miner, has_ip_conflicts):
         return LATENCY_FAILURE_REWARD
 
     btul.logging.trace(
@@ -127,7 +133,7 @@ def compute_latency_score(
     miner_index = -1
     process_times = []
     for item in miners:
-        if not item.verified or item.has_ip_conflicts:
+        if not item.verified or has_ip_conflicts:
             # Exclude miners not verifed to not alterate the computation
             continue
 
@@ -164,7 +170,7 @@ def compute_latency_score(
     )
 
     # Step 3: Baseline Latency Calculation
-    baseline_latency = sum(process_times) / len(process_times) 
+    baseline_latency = sum(process_times) / len(process_times)
     btul.logging.trace(f"[{miner.uid}][Score][Latency] Base latency {baseline_latency}")
 
     # Step 4: Relative Latency Score Calculation
@@ -197,18 +203,20 @@ def compute_latency_score(
     return score
 
 
-def can_compute_distribution_score(miner: Miner):
+def can_compute_distribution_score(miner: Miner, has_ip_conflicts: bool):
     """
     True if we can compute the distribution score, false to get the penalty
     """
-    return miner.verified and not miner.has_ip_conflicts
+    return miner.verified and not has_ip_conflicts
 
 
-def compute_distribution_score(miner: Miner, miners: List[Miner]):
+def compute_distribution_score(
+    miner: Miner, miners: List[Miner], ip_occurrences: Counter
+):
     """
     Compute the distribution score of the uid based on the country of all uids
     """
-    if not can_compute_distribution_score(miner):
+    if not can_compute_distribution_score(miner, ip_occurrences.get(miner.ip, 0) > 1):
         return DISTRIBUTION_FAILURE_REWARD
 
     # Step 1: Country of the requested response
@@ -216,7 +224,9 @@ def compute_distribution_score(miner: Miner, miners: List[Miner]):
 
     # Step 2; Exclude miners not verified or with ip conflicts
     conform_miners = [
-        miner for miner in miners if miner.verified and not miner.has_ip_conflicts
+        miner
+        for miner in miners
+        if miner.verified and ip_occurrences.get(miner.ip) == 1
     ]
 
     # Step 3: Country the number of miners in the country
@@ -257,7 +267,7 @@ def compute_final_score(miner: Miner):
     if miner.suspicious:
         penalty_factor = miner.penalty_factor or 0
         btul.logging.debug(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Applying penalty factor of {penalty_factor}"
+            f"[Challenge][{miner.uid}] Applying penalty factor of {penalty_factor}"
         )
         score = penalty_factor * score
 

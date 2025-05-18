@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import subvortex.core.metagraph.models as scmm
+import subvortex.core.model.neuron.neuron as scmm
 import subvortex.core.metagraph.settings as scms
 
 
@@ -174,7 +174,7 @@ async def test_has_neuron_ip_unchanged(observer):
 
 @pytest.mark.asyncio
 async def test_resync_updates_neurons(observer):
-    from subvortex.core.metagraph.models import Neuron
+    from subvortex.core.model.neuron.neuron import Neuron
 
     fake_proto = MagicMock()
     fake_proto.uid = 1
@@ -187,13 +187,13 @@ async def test_resync_updates_neurons(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value=[])
-    observer.storage.set_neurons = AsyncMock()
+    observer.storage.get_neurons = AsyncMock(return_value={})
+    observer.storage.update_neurons = AsyncMock()
 
     with patch("subvortex.core.country.country.get_country", return_value="US"):
         axons = await observer._resync()
         assert "hotkey123" in axons
-        observer.storage.set_neurons.assert_awaited_once()
+        observer.storage.update_neurons.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -242,12 +242,12 @@ async def test_resync_no_neuron_change(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value=[stored_neuron])
-    observer.storage.set_neurons = AsyncMock()
+    observer.storage.get_neurons = AsyncMock(return_value={stored_neuron.hotkey: stored_neuron})
+    observer.storage.update_neurons = AsyncMock()
 
     axons = await observer._resync()
 
-    observer.storage.set_neurons.assert_not_called()
+    observer.storage.update_neurons.assert_not_called()
     assert axons["hotkey123"] == "1.2.3.4"
 
 
@@ -263,12 +263,12 @@ async def test_resync_neuron_ip_changed(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value=[stored_neuron])
-    observer.storage.set_neurons = AsyncMock()
+    observer.storage.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
+    observer.storage.update_neurons = AsyncMock()
 
     with patch("subvortex.core.country.country.get_country", return_value="US"):
         axons = await observer._resync()
-        observer.storage.set_neurons.assert_called_once()
+        observer.storage.update_neurons.assert_called_once()
         assert axons["hotkey123"] == "9.9.9.9"
 
 
@@ -284,12 +284,12 @@ async def test_resync_hotkey_changed(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value=[stored_neuron])
-    observer.storage.set_neurons = AsyncMock()
+    observer.storage.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
+    observer.storage.update_neurons = AsyncMock()
 
     with patch("subvortex.core.country.country.get_country", return_value="US"):
         axons = await observer._resync()
-        observer.storage.set_neurons.assert_called_once()
+        observer.storage.update_neurons.assert_called_once()
         assert axons["new_hotkey"] == "1.1.1.1"
 
 
@@ -308,12 +308,12 @@ async def test_resync_neuron_not_in_storage(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value=[])
-    observer.storage.set_neurons = AsyncMock()
+    observer.storage.get_neurons = AsyncMock(return_value={})
+    observer.storage.update_neurons = AsyncMock()
 
     with patch("subvortex.core.country.country.get_country", return_value="FR"):
         axons = await observer._resync()
-        observer.storage.set_neurons.assert_called_once()
+        observer.storage.update_neurons.assert_called_once()
         assert axons["new_hotkey"] == "5.5.5.5"
 
 
@@ -328,15 +328,15 @@ async def test_resync_country_not_updated_if_ip_is_same(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value=[stored_neuron])
-    observer.storage.set_neurons = AsyncMock()
+    observer.storage.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
+    observer.storage.update_neurons = AsyncMock()
 
     with patch(
-        "subvortex.core.metagraph.models.Neuron.from_proto", return_value=stored_neuron
+        "subvortex.core.model.neuron.neuron.Neuron.from_proto", return_value=stored_neuron
     ):
         axons = await observer._resync()
 
-    observer.storage.set_neurons.assert_not_called()
+    observer.storage.update_neurons.assert_not_called()
     assert axons["hotkey99"] == "2.2.2.2"
 
 
@@ -351,13 +351,13 @@ async def test_resync_removes_old_hotkey(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value=[stored])
-    observer.storage.set_neurons = AsyncMock()
-    observer.storage.delete_neurons = AsyncMock()
+    observer.storage.get_neurons = AsyncMock(return_value={ stored.hotkey: stored })
+    observer.storage.update_neurons = AsyncMock()
+    observer.storage.remove_neurons = AsyncMock()
 
     with (
         patch(
-            "subvortex.core.metagraph.models.Neuron.from_proto",
+            "subvortex.core.model.neuron.neuron.Neuron.from_proto",
             return_value=scmm.Neuron(
                 uid=1, ip="3.3.3.3", hotkey="new_hotkey", country=None
             ),
@@ -366,6 +366,6 @@ async def test_resync_removes_old_hotkey(observer):
     ):
         axons = await observer._resync()
 
-    observer.storage.set_neurons.assert_called_once()
-    observer.storage.delete_neurons.assert_called_once_with(["old_hotkey"])
+    observer.storage.update_neurons.assert_called_once()
+    observer.storage.remove_neurons.assert_called_once_with([stored])
     assert axons["new_hotkey"] == "3.3.3.3"

@@ -1,9 +1,6 @@
-from dotenv import load_dotenv
 from dataclasses import dataclass, field
 
 import subvortex.core.settings_utils as scsu
-
-load_dotenv()
 
 
 @dataclass

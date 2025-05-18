@@ -7,7 +7,7 @@ import bittensor.core.async_subtensor as btcas
 
 import subvortex.core.country.country as sccc
 import subvortex.core.core_bittensor.subtensor as scbs
-import subvortex.core.metagraph.models as scmm
+import subvortex.core.model.neuron.neuron as scmm
 import subvortex.core.metagraph.metagraph_storage as scms
 import subvortex.miner.metagraph.src.settings as smms
 
@@ -21,7 +21,7 @@ class MetagraphObserver:
     def __init__(
         self,
         settings: smms.Settings,
-        storage: scms.MetagraphStorage,
+        storage: scms.Storage,
         subtensor: btcas.AsyncSubtensor,
         metagraph: btcm.AsyncMetagraph,
     ):
@@ -83,6 +83,8 @@ class MetagraphObserver:
                     if not must_resync:
                         continue
 
+                    btul.logging.info("Syncing neurons")
+
                     # Sync from chain and update Redis
                     axons = await self._resync()
 
@@ -123,7 +125,7 @@ class MetagraphObserver:
         - Deletes outdated neurons (e.g., when hotkey has changed)
         - Returns a map of {hotkey: ip} to track IPs for change detection
         """
-        await self.metagraph.sync(lite=False)
+        await self.metagraph.sync(subtensor=self.subtensor, lite=False)
         btul.logging.debug("Metagraph synced", prefix=self.settings.logging_name)
 
         new_axons: dict[str, str] = {}
@@ -131,6 +133,7 @@ class MetagraphObserver:
         neurons_to_delete: list[str] = []
 
         stored_neurons = await self.storage.get_neurons()
+        btul.logging.debug(f"Neurons loaded: {len(stored_neurons)}")
 
         for mneuron in self.metagraph.neurons:
             new_axons[mneuron.hotkey] = mneuron.axon_info.ip
@@ -140,7 +143,7 @@ class MetagraphObserver:
 
             # Find matching stored neuron by UID
             current_neuron = next(
-                (n for n in stored_neurons if n.uid == new_neuron.uid), None
+                (n for n in stored_neurons.values() if n.uid == new_neuron.uid), None
             )
 
             # Check if the neuron has changed
@@ -157,7 +160,7 @@ class MetagraphObserver:
                     f"Neuron uid={mneuron.uid} changed hotkey from {current_neuron.hotkey} to {mneuron.hotkey}",
                     prefix=self.settings.logging_name,
                 )
-                neurons_to_delete.append(current_neuron.hotkey)
+                neurons_to_delete.append(current_neuron)
 
             # Log if IP changed and we're about to fetch a new country
             if current_neuron and current_neuron.ip != mneuron.axon_info.ip:
@@ -189,7 +192,7 @@ class MetagraphObserver:
                 f"Deleting old neuron hotkeys: {neurons_to_delete}",
                 prefix=self.settings.logging_name,
             )
-            await self.storage.delete_neurons(neurons_to_delete)
+            await self.storage.remove_neurons(neurons_to_delete)
 
         # Persist updated neurons
         if updated_neurons:
@@ -197,7 +200,16 @@ class MetagraphObserver:
                 f"# of changed neurons: {len(updated_neurons)}",
                 prefix=self.settings.logging_name,
             )
-            await self.storage.set_neurons(updated_neurons)
+            await self.storage.update_neurons(updated_neurons)
+
+        # Only update Redis if something changed
+        if updated_neurons or neurons_to_delete:
+            block = await self.subtensor.get_current_block()
+            await self.storage.set_last_updated(block)
+            btul.logging.debug(
+                f"Last updated block set to #{block}",
+                prefix=self.settings.logging_name,
+            )
 
         return new_axons
 
@@ -228,21 +240,27 @@ class MetagraphObserver:
         )
 
         if new_count == registration_count:
+            if registration_count == 0:
+                return False, registration_count
+
             next_block = await scbs.get_next_adjustment_block(
                 subtensor=self.subtensor, netuid=self.settings.netuid
             )
+
             if block == next_block:
                 btul.logging.debug(
                     f"At adjustment block #{block}; resetting registration count to 0",
                     prefix=self.settings.logging_name,
                 )
                 return False, 0
+            
             return False, registration_count
 
         btul.logging.debug(
             f"New neuron registered: count changed from {registration_count} to {new_count}",
             prefix=self.settings.logging_name,
         )
+
         return True, new_count
 
     async def _has_neuron_ip_changed(
@@ -266,6 +284,7 @@ class MetagraphObserver:
                     f"Axon IP changed for {hotkey}: {axons[hotkey]} -> {ip}",
                     prefix=self.settings.logging_name,
                 )
+
                 return True, latest_axons
 
         return False, latest_axons

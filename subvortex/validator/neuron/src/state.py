@@ -27,78 +27,11 @@ from datetime import datetime
 
 from subvortex.core.constants import TESTNET_SUBNET_UID, MAIN_SUBNET_UID
 
-import subvortex.validator.core as validator
 from subvortex.core.version import to_spec_version
 from subvortex.validator.version import __version__ as THIS_VERSION
-from subvortex.validator.core.models import Miner
-from subvortex.validator.core.miner import resync_miners
+from subvortex.validator.neuron.src.models.miner import Miner
 
 THIS_SPEC_VERSION = to_spec_version(THIS_VERSION)
-
-
-def should_checkpoint(current_block, prev_step_block, checkpoint_block_length):
-    # Check if enough epoch blocks have elapsed since the last checkpoint.
-    return current_block - prev_step_block >= checkpoint_block_length
-
-
-async def resync_metagraph_and_miners(self, force_refresh=False):
-    """Checkpoints the training process."""
-    btul.logging.info("checkpoint()")
-    resynched = resync_metagraph(self)
-
-    if resynched or force_refresh:
-        # Resync miners list
-        await resync_miners(self)
-
-        # Send refresh data to wandb for global graphs
-        log_event(self, [miner.uid for miner in self.miners])
-
-        # Save state
-        save_state(self)
-
-
-def resync_metagraph(self: "validator.neuron.neuron"):
-    """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph."""
-    btul.logging.info("resync_metagraph()")
-
-    # Copies state of metagraph before syncing.
-    previous_metagraph = copy.deepcopy(self.metagraph)
-
-    # Sync the metagraph.
-    self.metagraph.sync(subtensor=self.subtensor)
-
-    # Check if the metagraph axon info has changed.
-    metagraph_axon_info_updated = previous_metagraph.axons != self.metagraph.axons
-    btul.logging.debug(f"metagraph_axon_info_updated: {metagraph_axon_info_updated}")
-
-    if not metagraph_axon_info_updated:
-        return False
-
-    btul.logging.info(
-        "resync_metagraph() Metagraph updated, re-syncing moving averages"
-    )
-
-    # Zero out all hotkeys that have been replaced.
-    for uid, hotkey in enumerate(previous_metagraph.hotkeys):
-        if hotkey != self.metagraph.hotkeys[uid]:
-            btul.logging.debug(
-                f"resync_metagraph() old hotkey {hotkey} | uid {uid} has been replaced by {self.metagraph.hotkeys[uid]}"
-            )
-            self.moving_averaged_scores[uid] = 0  # hotkey has been replaced
-
-    # Check to see if the metagraph has changed size.
-    # If so, we need to add new hotkeys and moving averages.
-    if len(self.moving_averaged_scores) < len(self.metagraph.hotkeys):
-        btul.logging.info(
-            "resync_metagraph() Metagraph has grown, adding new hotkeys and moving averages"
-        )
-        # Update the size of the moving average scores.
-        new_moving_average = np.zeros((self.metagraph.n))
-        min_len = min(len(self.metagraph.hotkeys), len(self.moving_averaged_scores))
-        new_moving_average[:min_len] = self.moving_averaged_scores[:min_len]
-        self.moving_averaged_scores = new_moving_average
-
-    return True
 
 
 def save_state(self):
@@ -127,7 +60,7 @@ def load_state(self):
 
         state_dict = np.load(state_file)
         neuron_weights = state_dict["neuron_weights"]
- 
+
         # Check to ensure that the size of the neruon weights matches the metagraph size.
         if neuron_weights.shape != (self.metagraph.n,):
             btul.logging.warning(
@@ -330,7 +263,7 @@ def init_wandb(self):
             THIS_VERSION,
             str(THIS_SPEC_VERSION),
             f"netuid_{self.metagraph.netuid}",
-            self.country_code,
+            self.neuron.country,
         ]
 
         if self.config.mock:

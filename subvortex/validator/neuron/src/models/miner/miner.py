@@ -1,0 +1,106 @@
+import copy
+from typing import Dict, Any
+from dataclasses import dataclass, asdict
+
+@dataclass
+class Miner:
+    uid: int = -1
+    hotkey: str = None
+    ip: str = "0.0.0.0"
+    version: str = "0.0.0"
+    country: str = None
+    score: float = 0
+    availability_score: float = 0
+    reliability_score: float = 0
+    latency_score: float = 0
+    distribution_score: float = 0
+    challenge_successes: int = 0
+    challenge_attempts: int = 0
+    process_time: float = 0
+    verified: bool = False
+    # True if the miner subtensor is sync which mean the block is equal or more recent than the validator one
+    sync: bool = False
+    # True if the miner is suspicious (its weight will be 0), false otherwise
+    suspicious: bool = False
+    penalty_factor: int = None
+
+    @staticmethod
+    def create_new_miner(
+        uid: int, ip: str, hotkey: str, country: str
+    ):
+        return Miner(
+            uid=uid,
+            ip=ip,
+            hotkey=hotkey,
+            country=country,
+        )
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Miner":
+        return cls(
+            uid=int(data.get("uid", -1)),
+            country=data.get("country", None),
+            version=data.get("version", "0.0.0"),
+            verified=bool(int(data.get("verified", 0))),
+            score=float(data.get("score", 0)),
+            availability_score=float(data.get("availability_score", 0)),
+            latency_score=float(data.get("latency_score", 0)),
+            reliability_score=float(data.get("reliability_score", 0)),
+            distribution_score=float(data.get("distribution_score", 0)),
+            challenge_successes=int(data.get("challenge_successes", 0)),
+            challenge_attempts=int(data.get("challenge_attempts", 0)),
+            process_time=float(data.get("process_time", 0)),
+        )
+
+    def to_redis_mapping(self) -> Dict[str, str]:
+        return {
+            "uid": self.uid,
+            # "ip": self.ip,
+            "country": self.country or "",
+            "version": self.version,
+            "verified": int(self.verified),
+            "score": self.score,
+            "availability_score": self.availability_score,
+            "latency_score": self.latency_score,
+            "reliability_score": self.reliability_score,
+            "distribution_score": self.distribution_score,
+            "challenge_successes": self.challenge_successes,
+            "challenge_attempts": self.challenge_attempts,
+            "process_time": self.process_time,
+        }
+
+    @classmethod
+    def from_redis_mapping(cls, data: Dict[str, str]) -> "Miner":
+        return cls(
+            uid=int(data.get("uid", -1)),
+            # ip=data.get("ip", "0.0.0.0"),
+            country=data.get("country", None),
+            version=data.get("version", "0.0.0"),
+            verified=bool(int(data.get("verified", 0))),
+            score=float(data.get("score", 0)),
+            availability_score=float(data.get("availability_score", 0)),
+            latency_score=float(data.get("latency_score", 0)),
+            reliability_score=float(data.get("reliability_score", 0)),
+            distribution_score=float(data.get("distribution_score", 0)),
+            challenge_successes=int(data.get("challenge_successes", 0)),
+            challenge_attempts=int(data.get("challenge_attempts", 0)),
+            process_time=float(data.get("process_time", 0)),
+        )
+
+    def reset(self):
+        self.version = "0.0.0"
+        self.verified = False
+        self.sync = False
+        self.suspicious = False
+        self.penalty_factor = None
+        self.score = 0
+        self.availability_score = 0
+        self.reliability_score = 0
+        self.latency_score = 0
+        self.distribution_score = 0
+        self.challenge_successes = 0
+        self.challenge_attempts = 0
+        self.process_time = 0
+
+    def clone(self) -> "Miner":
+        return copy.deepcopy(self)

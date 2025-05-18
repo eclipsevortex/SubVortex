@@ -24,15 +24,14 @@ import bittensor.core.metagraph as btcm
 import bittensor.utils.btlogging as btul
 import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
-from redis import asyncio as aioredis
 from typing import List
+from dotenv import load_dotenv
 from traceback import print_exception
-
 
 from subvortex.core.monitor.monitor import Monitor
 from subvortex.core.country.country_service import CountryService
 from subvortex.core.file.file_monitor import FileMonitor
-
+from subvortex.core.shared.checks import check_registration
 from subvortex.core.shared.subtensor import get_current_block
 from subvortex.core.shared.weights import should_set_weights
 from subvortex.core.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
@@ -41,27 +40,28 @@ from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
 from subvortex.core.version import to_spec_version
 
 from subvortex.validator.version import __version__ as THIS_VERSION
-from subvortex.validator.core.checks import (
-    check_registration,
-    check_redis_connection,
-)
+
 from subvortex.validator.neuron.src.config import config, check_config, add_args
-from subvortex.validator.core.forward import forward
-from subvortex.validator.core.models import Miner
-from subvortex.validator.core.miner import get_all_miners
-from subvortex.validator.core.state import (
-    resync_metagraph_and_miners,
+from subvortex.validator.neuron.src.checks import check_redis_connection
+from subvortex.validator.neuron.src.forward import forward
+from subvortex.validator.neuron.src.models.miner import Miner
+from subvortex.validator.neuron.src.state import (
     load_state,
     save_state,
     init_wandb,
     finish_wandb,
     should_reinit_wandb,
 )
-from subvortex.validator.core.weights import (
+from subvortex.validator.neuron.src.weights import (
     set_weights_for_validator,
 )
 from subvortex.validator.neuron.src.settings import Settings
 from subvortex.validator.neuron.src.database import Database
+from subvortex.validator.neuron.src.miner import get_miners, sync_miners
+
+
+# Load the environment variables for the whole process
+load_dotenv(override=True)
 
 
 class Validator:
@@ -109,6 +109,7 @@ class Validator:
         )
         btul.logging.set_trace(self.config.logging.trace)
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
+        btul.logging.debug(str(self.config))
 
         # Display the settings
         btul.logging.info(f"validator settings: {self.settings}")
@@ -135,6 +136,7 @@ class Validator:
         btul.logging.debug(str(self.subtensor))
 
         # Check registration
+        btul.logging.debug("checking registration")
         check_registration(self.subtensor, self.wallet, self.config.netuid)
 
         btul.logging.debug(f"wallet: {str(self.wallet)}")
@@ -194,6 +196,9 @@ class Validator:
         # Check if the connection to the database is successful
         await check_redis_connection(port=self.settings.redis_port)
 
+        # Wait until the metagraph is ready
+        await self.database.wait_until_ready("metagraph")
+
         # File monitor
         self.file_monitor = FileMonitor()
         self.file_monitor.start()
@@ -208,9 +213,9 @@ class Validator:
         self.file_monitor.add_file_provider(self.country_service.provider)
         self.country_service.wait()
 
-        # Get the validator country
-        self.country_code = self.country_service.get_country(self.dendrite.external_ip)
-        btul.logging.debug(f"Validator based in {self.country_code}")
+        # Get the neuron
+        self.neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
+        btul.logging.debug(f"Validator based in {self.neuron.country}")
 
         # Init wandb.
         if not self.config.wandb.off:
@@ -218,23 +223,51 @@ class Validator:
             init_wandb(self)
 
         # Init miners
-        self.miners = await get_all_miners(self)
+        self.miners = await get_miners(database=self.database)
         btul.logging.debug(f"Miners loaded {len(self.miners)}")
 
         # Load the state
         load_state(self)
 
+        previous_last_update = None
         try:
             while 1:
                 start_epoch = time.time()
 
-                # Check if the coutry changed
-                last_upgrade_country = self.country_service.get_last_modified()
-                has_country_changed = self.last_upgrade_country != last_upgrade_country
-                self.last_upgrade_country = last_upgrade_country
+                # Get the last time neurons have been updated
+                last_update = await self.database.get_neuron_last_update()
+                btul.logging.debug(f"Neurons last updated #{last_update}")
 
-                await resync_metagraph_and_miners(self, has_country_changed)
-                prev_set_weights_block = self.metagraph.last_update[self.uid].item()
+                # Avoir to triggers the following on start
+                previous_last_update = previous_last_update or last_update
+
+                # Check if the neurons have changed
+                if previous_last_update != last_update:
+                    # At least one neuron has changed
+                    btul.logging.debug(f"Neurons changed, rsync miners")
+
+                    # Get the neurons
+                    neurons = await self.database.get_neurons()
+                    btul.logging.debug(f"Neurons loaded {len(neurons)}")
+
+                    # Refresh the validator neuron
+                    self.neuron = neurons.get(self.neuron.hotkey)
+
+                    # Get the locations
+                    locations = self.country_service.get_locations()
+                    btul.logging.debug(f"Locations loaded {len(locations)}")
+
+                    # Sync the miners
+                    await sync_miners(
+                        database=self.database,
+                        neurons=neurons,
+                        miners=self.miners,
+                        validator=self.neuron,
+                        locations=locations,
+                    )
+
+                    # Save in database
+                    await self.database.update_miners(miners=self.miners)
 
                 # --- Wait until next step epoch.
                 current_block = self.subtensor.get_current_block()
@@ -262,7 +295,7 @@ class Validator:
                 validator_should_set_weights = should_set_weights(
                     self,
                     get_current_block(self.subtensor),
-                    prev_set_weights_block,
+                    self.neuron.last_update,
                     self.config.neuron.epoch_length,
                     self.config.neuron.disable_set_weights,
                 )
@@ -279,7 +312,6 @@ class Validator:
                         netuid=self.config.netuid,
                         moving_averaged_scores=self.moving_averaged_scores,
                     )
-                    prev_set_weights_block = get_current_block(self.subtensor)
                     save_state(self)
 
                 # Rollover wandb to a new run.

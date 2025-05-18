@@ -1,31 +1,34 @@
 {
-    "name": "subvortex-validator-redis",
-    "description": "SubVortex Validator Redis",
-    "type": "package",
-    "neuron": "validator",
-    "component": "redis",
-    "common": {
-        "user": "redis",
-        "group": "redis",
-        "package_name": "redis-server"
+  "name": "subvortex-validator-redis",
+  "description": "SubVortex Validator Redis",
+  "version": "3.0.1",
+  "validator.version": "3.0.1",
+  "validator.redis.version": "3.0.1",
+  "type": "package",
+  "neuron": "validator",
+  "component": "redis",
+  "common": {
+    "user": "redis",
+    "group": "redis",
+    "package_name": "redis-server"
+  },
+  "service": {
+    "generate_unit": false,
+    "environment": {
+      "PYTHONUNBUFFERED": 1
     },
-    "service": {
-        "generate_unit": false,
-        "environment": {
-            "PYTHONUNBUFFERED": 1
-        },
-        "restart": "on-failure",
-        "restart_sec": "10s",
-        "log_prefix": "subvortex-validator-redis",
-        "configs": {
-            "redis.conf": {
-                "ext": "conf",
-                "destination": "/etc/redis/redis.conf",
-                "overrides": {
-                    "logfile": "/var/log/subvortex-validator/subvortex-validator-redis.log"
-                }
-            }
+    "restart": "on-failure",
+    "restart_sec": "10s",
+    "log_prefix": "subvortex-validator-redis",
+    "configs": {
+      "redis.conf": {
+        "ext": "conf",
+        "destination": "/etc/redis/redis.conf",
+        "overrides": {
+          "logfile": "/var/log/subvortex-validator/subvortex-validator-redis.log"
         }
-    },
-    "depends_on": []
+      }
+    }
+  },
+  "depends_on": []
 }

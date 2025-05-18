@@ -28,18 +28,18 @@ from subvortex.validator.version import __version__ as THIS_VERSION
 from subvortex.validator.neuron.src.settings import Settings
 
 
-async def should_set_weights(
+def should_set_weights(
     settings: Settings, subtensor: btcs.Subtensor, uid: int, block: int
 ):
     # Get the weight rate limit
-    weights_rate_limit = await subtensor.weights_rate_limit(settings.netuid)
+    weights_rate_limit = subtensor.weights_rate_limit(settings.netuid)
     btul.logging.debug(
         f"Weights rate limit: {weights_rate_limit}",
-        prefix=settings.settings.logging_namer,
+        prefix=settings.logging_name,
     )
 
     # Get the last update
-    last_update = await subtensor.get_hyperparameter(
+    last_update = subtensor.get_hyperparameter(
         param_name="LastUpdate", netuid=settings.netuid
     )
 
@@ -47,14 +47,14 @@ async def should_set_weights(
     validator_last_update = last_update[uid]
     btul.logging.debug(
         f"Last set weight at block #{validator_last_update}",
-        prefix=settings.settings.logging_namer,
+        prefix=settings.logging_name,
     )
 
     # Compute the next block to set weight
     # Have to add 1 block more otherwise you always have a failed attempt
     next_block = validator_last_update + (weights_rate_limit) + 1
 
-    return next_block > block
+    return next_block <= block
 
 
 def set_weights(
@@ -92,14 +92,14 @@ def set_weights(
             weights=weights_proceed.tolist(),
             wait_for_inclusion=True,
             wait_for_finalization=False,
-            version_key=THIS_VERSION,
+            version_key=to_spec_version(THIS_VERSION),
             max_retries=2,
         )
 
         if success:
             btul.logging.success(
                 f"[green]Set weights on chain successfully![/green] ",
-                prefix=settings.logging_namer,
+                prefix=settings.logging_name,
             )
             break
 
@@ -113,13 +113,13 @@ def set_weights(
             success = True
             btul.logging.success(
                 f"[green]Set weights on chain successfully![/green]",
-                prefix=settings.logging_namer,
+                prefix=settings.logging_name,
             )
             break
 
         btul.logging.warning(
             f"[orange]Set weights on chain failed[/orange]: Could not set weight on attempt {(settings.weights_setting_attempts - attempts) + 1}/{settings.weights_setting_attempts} - {message}",
-            prefix=settings.logging_namer,
+            prefix=settings.logging_name,
         )
 
         # Check if there are still some retry or  not
@@ -128,7 +128,7 @@ def set_weights(
             # No more attempts available
             btul.logging.error(
                 f":cross_mark: [red]Set weights on chain failed[/red]: Could not set weight after {settings.weights_setting_attempts} attempts",
-                prefix=settings.logging_namer,
+                prefix=settings.logging_name,
             )
             break
 

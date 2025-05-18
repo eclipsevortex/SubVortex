@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 import time
 import asyncio
+import traceback
 import threading
 import numpy as np
 import bittensor.core.config as btcc
@@ -26,7 +27,6 @@ import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
 from typing import List
 from dotenv import load_dotenv
-from traceback import print_exception
 
 from subvortex.core.monitor.monitor import Monitor
 from subvortex.core.country.country_service import CountryService
@@ -293,12 +293,11 @@ class Validator:
 
                 # Set the weights on chain.
                 btul.logging.info("Checking if should set weights")
-                must_set_weight = await should_set_weights(
+                must_set_weight = should_set_weights(
                     settings=self.settings,
                     subtensor=self.subtensor,
                     uid=self.neuron.uid,
                     block=current_block,
-
                 )
                 btul.logging.debug(
                     f"Should validator check weights? -> {must_set_weight}"
@@ -328,8 +327,8 @@ class Validator:
                 self.step += 1
 
         except Exception as err:
-            btul.logging.error("Error in training loop", str(err))
-            btul.logging.debug(print_exception(type(err), err, err.__traceback__))
+            btul.logging.error("Unhandled exception", str(err))
+            btul.logging.debug(traceback.format_exc())
             finish_wandb()
 
         # After all we have to ensure subtensor connection is closed properly

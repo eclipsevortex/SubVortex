@@ -1,10 +1,16 @@
 import typing
 import random
 import netaddr
+import numpy as np
+from numpy.typing import NDArray
 
 import bittensor.core.subtensor as btcs
+import bittensor.utils.btlogging as btul
+import bittensor.utils.weight_utils as btuwu
 
 import bittensor.core.async_subtensor as btcas
+
+U16_MAX = 65535
 
 
 async def get_number_of_registration(subtensor: btcas.AsyncSubtensor, netuid: int):
@@ -106,3 +112,83 @@ def current_block_hash(subtensor: btcs.Subtensor):
 def get_block_seed(subtensor: btcs.Subtensor):
     block_hash = current_block_hash(subtensor=subtensor)
     return int(block_hash, 16)
+
+
+def process_weights_for_netuid(
+    uids,
+    weights: np.ndarray,
+    netuid: int,
+    subtensor: "btcs.Subtensor",
+    exclude_quantile: int = 0,
+) -> tuple[NDArray[np.int64], NDArray[np.float32]]:
+    btul.logging.debug("process_weights_for_netuid()")
+    btul.logging.debug(f"weights: {weights}")
+    btul.logging.debug(f"netuid: {netuid}")
+
+    # Get latest metagraph from chain if metagraph is None.
+    metagraph = subtensor.metagraph(netuid)
+
+    # Cast weights to floats.
+    if not isinstance(weights, np.float32):
+        weights = weights.astype(np.float32)
+
+    # Network configuration parameters from an subtensor.
+    # These parameters determine the range of acceptable weights for each neuron.
+    quantile = exclude_quantile / U16_MAX
+    min_allowed_weights = subtensor.min_allowed_weights(netuid=netuid)
+    max_weight_limit = subtensor.max_weight_limit(netuid=netuid)
+    btul.logging.debug(f"quantile: {quantile}")
+    btul.logging.debug(f"min_allowed_weights: {min_allowed_weights}")
+    btul.logging.debug(f"max_weight_limit: {max_weight_limit}")
+
+    # Find all non zero weights.
+    non_zero_weight_idx = np.argwhere(weights > 0).squeeze(axis=1)
+    non_zero_weight_uids = uids[non_zero_weight_idx]
+    non_zero_weights = weights[non_zero_weight_idx]
+    nzw_size = non_zero_weights.size
+    if nzw_size == 0 or metagraph.n < min_allowed_weights:
+        btul.logging.warning("No non-zero weights returning all ones.")
+        final_weights = np.ones((metagraph.n), dtype=np.int64) / metagraph.n
+        btul.logging.debug(f"final_weights: {final_weights}")
+        final_weights_count = np.arange(len(final_weights))
+        return final_weights_count, final_weights
+
+    elif nzw_size < min_allowed_weights:
+        btul.logging.warning(
+            "No non-zero weights less then min allowed weight, returning all ones."
+        )
+        # ( const ): Should this be np.zeros( ( metagraph.n ) ) to reset everyone to build up weight?
+        weights = np.ones((metagraph.n), dtype=np.int64) * 1e-5
+        weights[non_zero_weight_idx] += non_zero_weights
+        btul.logging.debug(f"final_weights: {weights}")
+        normalized_weights = btuwu.normalize_max_weight(
+            x=weights, limit=max_weight_limit
+        )
+        nw_arange = np.arange(len(normalized_weights))
+        return nw_arange, normalized_weights
+
+    btul.logging.debug(f"non_zero_weights: {non_zero_weights}")
+
+    # Compute the exclude quantile and find the weights in the lowest quantile
+    max_exclude = max(0, len(non_zero_weights) - min_allowed_weights) / len(
+        non_zero_weights
+    )
+    exclude_quantile = min([quantile, max_exclude])
+    lowest_quantile = np.quantile(non_zero_weights, exclude_quantile)
+    btul.logging.debug(f"max_exclude: {max_exclude}")
+    btul.logging.debug(f"exclude_quantile: {exclude_quantile}")
+    btul.logging.debug(f"lowest_quantile: {lowest_quantile}")
+
+    # Exclude all weights below the allowed quantile.
+    non_zero_weight_uids = non_zero_weight_uids[lowest_quantile <= non_zero_weights]
+    non_zero_weights = non_zero_weights[lowest_quantile <= non_zero_weights]
+    btul.logging.debug(f"non_zero_weight_uids: {non_zero_weight_uids}")
+    btul.logging.debug(f"non_zero_weights: {non_zero_weights}")
+
+    # Normalize weights and return.
+    normalized_weights = btuwu.normalize_max_weight(
+        x=non_zero_weights, limit=max_weight_limit
+    )
+    btul.logging.debug(f"final_weights: {normalized_weights}")
+
+    return non_zero_weight_uids, normalized_weights

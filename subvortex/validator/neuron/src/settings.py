@@ -31,6 +31,11 @@ class Settings(MetagraphSettings):
     Password of the redis instance
     """
 
+    weights_setting_attempts = 5
+    """
+    Number of attempts to set weights on the chain
+    """
+
     @classmethod
     def create(cls) -> "Settings":
         return scsu.create_settings_instance(cls)

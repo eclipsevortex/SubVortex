@@ -21,12 +21,122 @@ import bittensor.utils.weight_utils as btuw
 import bittensor.utils.btlogging as btul
 import bittensor_wallet.wallet as btw
 
+import subvortex.core.core_bittensor.subtensor as scbs
 from subvortex.core.version import to_spec_version
 from subvortex.core.shared.weights import set_weights
 from subvortex.validator.version import __version__ as THIS_VERSION
+from subvortex.validator.neuron.src.settings import Settings
 
 
-def set_weights_for_validator(
+async def should_set_weights(
+    settings: Settings, subtensor: btcs.Subtensor, uid: int, block: int
+):
+    # Get the weight rate limit
+    weights_rate_limit = await subtensor.weights_rate_limit(settings.netuid)
+    btul.logging.debug(
+        f"Weights rate limit: {weights_rate_limit}",
+        prefix=settings.settings.logging_namer,
+    )
+
+    # Get the last update
+    last_update = await subtensor.get_hyperparameter(
+        param_name="LastUpdate", netuid=settings.netuid
+    )
+
+    # Get the last time the validator set weights
+    validator_last_update = last_update[uid]
+    btul.logging.debug(
+        f"Last set weight at block #{validator_last_update}",
+        prefix=settings.settings.logging_namer,
+    )
+
+    # Compute the next block to set weight
+    # Have to add 1 block more otherwise you always have a failed attempt
+    next_block = validator_last_update + (weights_rate_limit) + 1
+
+    return next_block > block
+
+
+def set_weights(
+    settings: Settings,
+    subtensor: "btcs.Subtensor",
+    wallet: "btw.Wallet",
+    uid: int,
+    moving_scores: "np.NDArray",
+):
+    # Get the uids form teh moving scores array
+    uids = np.arange(moving_scores.shape[0])
+
+    # Process weights for the subnet
+    uids_proceed, weights_proceed = scbs.process_weights_for_netuid(
+        uids=uids,
+        weights=moving_scores,
+        netuid=settings.netuid,
+        subtensor=subtensor,
+    )
+
+    success = False
+    new_last_update = None
+    attempts = settings.weights_setting_attempts
+    while not success:
+        # Get the last update for the validator
+        last_update = subtensor.blocks_since_last_update(
+            netuid=settings.netuid, uid=uid
+        )
+
+        # Set weights on the chain
+        success, message = subtensor.set_weights(
+            wallet=wallet,
+            netuid=settings.netuid,
+            uids=uids_proceed.tolist(),
+            weights=weights_proceed.tolist(),
+            wait_for_inclusion=True,
+            wait_for_finalization=False,
+            version_key=THIS_VERSION,
+            max_retries=2,
+        )
+
+        if success:
+            btul.logging.success(
+                f"[green]Set weights on chain successfully![/green] ",
+                prefix=settings.logging_namer,
+            )
+            break
+
+        # Get the last update for the validator
+        new_last_update = subtensor.blocks_since_last_update(
+            netuid=settings.netuid, uid=uid
+        )
+
+        # Check if the last update has changed. If yes it means the weights have been set
+        if new_last_update < last_update:
+            success = True
+            btul.logging.success(
+                f"[green]Set weights on chain successfully![/green]",
+                prefix=settings.logging_namer,
+            )
+            break
+
+        btul.logging.warning(
+            f"[orange]Set weights on chain failed[/orange]: Could not set weight on attempt {(settings.weights_setting_attempts - attempts) + 1}/{settings.weights_setting_attempts} - {message}",
+            prefix=settings.logging_namer,
+        )
+
+        # Check if there are still some retry or  not
+        attempts = attempts - 1
+        if attempts < 0:
+            # No more attempts available
+            btul.logging.error(
+                f":cross_mark: [red]Set weights on chain failed[/red]: Could not set weight after {settings.weights_setting_attempts} attempts",
+                prefix=settings.logging_namer,
+            )
+            break
+
+        # Wait for the next block
+        subtensor.wait_for_block()
+
+
+def set_weights2(
     uid: int,
     subtensor: "btcs.Subtensor",
     wallet: "btw.Wallet",
@@ -116,7 +226,7 @@ def set_weights_for_validator(
     ) = btuw.process_weights_for_netuid(
         uids=metagraph.uids,
         weights=raw_weights,
-        netuid=netuid,
+        netuid=settings.netuid,
         subtensor=subtensor,
         metagraph=metagraph,
     )
@@ -135,7 +245,7 @@ def set_weights_for_validator(
         uid=uid,
         subtensor=subtensor,
         wallet=wallet,
-        netuid=netuid,
+        netuid=settings.netuid,
         uids=uint_uids,
         weights=uint_weights,
         version_key=to_spec_version(THIS_VERSION),

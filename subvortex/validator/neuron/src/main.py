@@ -33,7 +33,6 @@ from subvortex.core.country.country_service import CountryService
 from subvortex.core.file.file_monitor import FileMonitor
 from subvortex.core.shared.checks import check_registration
 from subvortex.core.shared.subtensor import get_current_block
-from subvortex.core.shared.weights import should_set_weights
 from subvortex.core.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
 from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
@@ -53,11 +52,12 @@ from subvortex.validator.neuron.src.state import (
     should_reinit_wandb,
 )
 from subvortex.validator.neuron.src.weights import (
-    set_weights_for_validator,
+    set_weights,
 )
 from subvortex.validator.neuron.src.settings import Settings
 from subvortex.validator.neuron.src.database import Database
 from subvortex.validator.neuron.src.miner import get_miners, sync_miners
+from subvortex.validator.neuron.src.weights import should_set_weights
 
 
 # Load the environment variables for the whole process
@@ -277,10 +277,11 @@ class Validator:
                     current_block = self.subtensor.get_current_block()
 
                 time.sleep(5)
-                if self.wallet.hotkey.ss58_address not in self.metagraph.hotkeys:
-                    raise Exception(
-                        f"Validator is not registered - hotkey {self.wallet.hotkey.ss58_address} not in metagraph"
-                    )
+
+                # --- Check validator is registered
+                neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
+                if neuron is None:
+                    raise Exception(f"Validator is not registered")
 
                 btul.logging.info(
                     f"step({self.step}) block({get_current_block(self.subtensor)})"
@@ -292,25 +293,24 @@ class Validator:
 
                 # Set the weights on chain.
                 btul.logging.info("Checking if should set weights")
-                validator_should_set_weights = should_set_weights(
-                    self,
-                    get_current_block(self.subtensor),
-                    self.neuron.last_update,
-                    self.config.neuron.epoch_length,
-                    self.config.neuron.disable_set_weights,
+                must_set_weight = await should_set_weights(
+                    settings=self.settings,
+                    subtensor=self.subtensor,
+                    uid=self.neuron.uid,
+                    block=current_block,
+
                 )
                 btul.logging.debug(
-                    f"Should validator check weights? -> {validator_should_set_weights}"
+                    f"Should validator check weights? -> {must_set_weight}"
                 )
-                if validator_should_set_weights:
+                if must_set_weight:
                     btul.logging.debug(f"Setting weights {self.moving_averaged_scores}")
-                    set_weights_for_validator(
-                        uid=self.uid,
+                    set_weights(
+                        settings=self.settings,
                         subtensor=self.subtensor,
                         wallet=self.wallet,
-                        metagraph=self.metagraph,
-                        netuid=self.config.netuid,
-                        moving_averaged_scores=self.moving_averaged_scores,
+                        uid=self.neuron.uid,
+                        moving_scores=self.moving_averaged_scores,
                     )
                     save_state(self)
 

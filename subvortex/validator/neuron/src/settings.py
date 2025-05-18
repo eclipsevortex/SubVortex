@@ -31,7 +31,7 @@ class Settings(MetagraphSettings):
     Password of the redis instance
     """
 
-    weights_setting_attempts = 5
+    weights_setting_attempts: int = field(default=5, metadata={"readonly": True})
     """
     Number of attempts to set weights on the chain
     """

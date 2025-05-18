@@ -2,11 +2,16 @@ import copy
 from typing import Dict, Any
 from dataclasses import dataclass, asdict
 
+from bittensor.core.axon import AxonInfo
+
+
 @dataclass
 class Miner:
     uid: int = -1
+    coldkey: str = None
     hotkey: str = None
     ip: str = "0.0.0.0"
+    port: int = 0
     version: str = "0.0.0"
     country: str = None
     score: float = 0
@@ -24,15 +29,21 @@ class Miner:
     suspicious: bool = False
     penalty_factor: int = None
 
+    @property
+    def axon(self):
+        AxonInfo.from_dict(
+            {
+                "coldkey": self.coldkey,
+                "hotkey": self.hotkey,
+                "ip": self.ip,
+                "port": self.port,
+            }
+        )
+
     @staticmethod
-    def create_new_miner(
-        uid: int, ip: str, hotkey: str, country: str
-    ):
+    def create_new_miner(uid: int):
         return Miner(
             uid=uid,
-            ip=ip,
-            hotkey=hotkey,
-            country=country,
         )
 
     @classmethod
@@ -55,7 +66,6 @@ class Miner:
     def to_redis_mapping(self) -> Dict[str, str]:
         return {
             "uid": self.uid,
-            # "ip": self.ip,
             "country": self.country or "",
             "version": self.version,
             "verified": int(self.verified),
@@ -73,7 +83,6 @@ class Miner:
     def from_redis_mapping(cls, data: Dict[str, str]) -> "Miner":
         return cls(
             uid=int(data.get("uid", -1)),
-            # ip=data.get("ip", "0.0.0.0"),
             country=data.get("country", None),
             version=data.get("version", "0.0.0"),
             verified=bool(int(data.get("verified", 0))),

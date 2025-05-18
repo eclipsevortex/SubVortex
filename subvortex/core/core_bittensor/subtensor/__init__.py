@@ -4,7 +4,8 @@ from .subtensor import (
     get_number_of_registration,
     wait_for_block,
     get_block_seed,
-    process_weights_for_netuid
+    process_weights_for_netuid,
+    get_number_of_neurons
 )
 
 from .subtensor_settings import Settings
@@ -16,5 +17,6 @@ __all__ = [
     "get_number_of_registration",
     "wait_for_block",
     "get_block_seed",
-    "process_weights_for_netuid"
+    "process_weights_for_netuid",
+    "get_number_of_neurons"
 ]

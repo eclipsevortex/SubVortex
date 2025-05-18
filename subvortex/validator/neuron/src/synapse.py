@@ -29,9 +29,9 @@ async def send_scope(self, miner: Miner, ip_occurences: int):
     try:
         # Send the score details to the miner
         response: List[protocol.Score] = await self.dendrite(
-            axons=[self.metagraph.axons[miner.uid]],
+            axons=[miner.axon],
             synapse=protocol.Score(
-                validator_uid=self.uid,
+                validator_uid=self.neuron.uid,
                 count=ip_occurences,
                 availability=miner.availability_score,
                 latency=miner.latency_score,

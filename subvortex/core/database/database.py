@@ -8,6 +8,7 @@ from subvortex.core.database.database_utils import decode_value
 
 class Database:
     def __init__(self, settings):
+        self.models = {}
         self.settings = settings
         self.database = None
 

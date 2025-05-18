@@ -139,7 +139,7 @@ async def challenge_miner(self, miner: Miner):
 
     try:
         response = await self.dendrite(
-            self.metagraph.axons[miner.uid],
+            miner.axon,
             Synapse(),
             deserialize=False,
             timeout=5,

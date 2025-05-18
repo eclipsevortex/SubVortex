@@ -32,9 +32,6 @@ async def get_miners(database: Database) -> List[Miner]:
             # Create an instance of miner
             miner = Miner.create_new_miner(
                 uid=neuron.uid,
-                ip=neuron.ip,
-                hotkey=neuron.hotkey,
-                country=neuron.country,
             )
 
             # Add the new miner
@@ -42,6 +39,8 @@ async def get_miners(database: Database) -> List[Miner]:
 
         # Set the property that comes from neuron
         miner.ip = neuron.ip
+        miner.port = neuron.port
+        miner.coldkey = neuron.coldkey
         miner.hotkey = neuron.hotkey
         miner.country = neuron.country
 
@@ -68,9 +67,6 @@ async def sync_miners(
             # Create the new miner
             miner = Miner.create_new_miner(
                 uid=neuron.uid,
-                ip=neuron.ip,
-                hotkey=hotkey,
-                country=neuron.country,
             )
 
             # Add the new miner
@@ -84,6 +80,8 @@ async def sync_miners(
         # Create an updated miner
         miner = current_miner.clone()
         miner.ip = neuron.ip
+        miner.port = neuron.port
+        miner.coldkey = neuron.coldkey
         miner.hotkey = neuron.hotkey
         miner.country = neuron.country
 

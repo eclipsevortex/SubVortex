@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 import subvortex.core.model.neuron.neuron as scmm
 import subvortex.core.metagraph.settings as scms
 
-from subvortex.core.metagraph.metagraph_storage import Storage
+from subvortex.core.metagraph.database import NeuronDatabase
 
 
 class DummySettings(scms.Settings):
@@ -15,9 +15,9 @@ class DummySettings(scms.Settings):
 
 
 @pytest.fixture
-def storage():
+def database():
     settings = DummySettings()
-    s = Storage(settings)
+    s = NeuronDatabase(settings)
 
     # Mock Redis client
     mock_redis = MagicMock()
@@ -73,83 +73,83 @@ class AsyncContextManager:
 
 
 @pytest.mark.asyncio
-async def test_update_neurons(storage):
+async def test_update_neurons(database):
     neurons = [scmm.Neuron(hotkey="hk1"), scmm.Neuron(hotkey="hk2")]
-    await storage.update_neurons(neurons)
+    await database.update_neurons(neurons)
 
-    storage._mock_model.write_all.assert_awaited_once_with(storage.database, neurons)
+    database._mock_model.write_all.assert_awaited_once_with(database.database, neurons)
 
 
 @pytest.mark.asyncio
-async def test_get_neuron_found(storage):
-    neuron = await storage.get_neuron("hk1")
+async def test_get_neuron_found(database):
+    neuron = await database.get_neuron("hk1")
     assert neuron is not None
     assert neuron.hotkey == "hk1"
-    storage._mock_model.read.assert_awaited_once_with(storage.database, "hk1")
+    database._mock_model.read.assert_awaited_once_with(database.database, "hk1")
 
 
 @pytest.mark.asyncio
-async def test_get_neurons(storage):
-    neurons = await storage.get_neurons()
+async def test_get_neurons(database):
+    neurons = await database.get_neurons()
     assert len(neurons) == 2
     assert neurons[0].hotkey == "hk1"
     assert neurons[1].hotkey == "hk2"
-    storage._mock_model.read_all.assert_awaited_once_with(storage.database)
+    database._mock_model.read_all.assert_awaited_once_with(database.database)
 
 
 @pytest.mark.asyncio
-async def test_remove_neurons(storage):
+async def test_remove_neurons(database):
     neurons = [scmm.Neuron(hotkey="hk1")]
-    await storage.remove_neurons(neurons)
-    storage._mock_model.delete_all.assert_awaited_once_with(storage.database, neurons)
+    await database.remove_neurons(neurons)
+    database._mock_model.delete_all.assert_awaited_once_with(database.database, neurons)
 
 
 @pytest.mark.asyncio
-async def test_get_last_updated_success(storage):
-    storage.database.get.return_value = b"123456"
+async def test_get_last_updated_success(database):
+    database.database.get.return_value = b"123456"
 
     with patch(
-        "subvortex.core.metagraph.metagraph_storage.decode_hash", return_value="123456"
+        "subvortex.core.metagraph.database.decode_hash", return_value="123456"
     ):
-        block = await storage.get_last_updated()
+        block = await database.get_last_updated()
 
     assert block == 123456
-    storage.database.get.assert_awaited_once_with("sv:state:neuron:last_updated")
+    database.database.get.assert_awaited_once_with("sv:state:neuron:last_updated")
 
 
 @pytest.mark.asyncio
-async def test_get_last_updated_failure(storage):
-    storage.database.get.side_effect = Exception("Redis error")
+async def test_get_last_updated_failure(database):
+    database.database.get.side_effect = Exception("Redis error")
 
     with patch(
-        "subvortex.core.metagraph.metagraph_storage.decode_hash", return_value="0"
+        "subvortex.core.metagraph.database.decode_hash", return_value="0"
     ):
-        block = await storage.get_last_updated()
+        block = await database.get_last_updated()
 
     assert block == 0
 
 
 @pytest.mark.asyncio
-async def test_set_last_updated_failure(storage):
-    storage.database.set.side_effect = Exception("fail")
-    await storage.set_last_updated(9001)
+async def test_set_last_updated_failure(database):
+    database.database.set.side_effect = Exception("fail")
+    await database.set_last_updated(9001)
     # The error is logged, not raised
-    storage.database.set.assert_awaited_once_with(
+    database.database.set.assert_awaited_once_with(
         "sv:state:neuron:last_updated", "9001"
     )
 
 
-def test__key(storage):
-    assert storage._key("neuron:hk1") == "sv:neuron:hk1"
+def test__key(database):
+    assert database._key("neuron:hk1") == "sv:neuron:hk1"
 
 
 @pytest.mark.asyncio
-async def test__set_state_success(storage):
-    await storage._set_state("testing")
-    storage.database.set.assert_awaited_with("sv:state:metagraph", "testing")
+async def test__set_state_success(database):
+    await database._set_state("testing")
+    database.database.set.assert_awaited_with("sv:state:metagraph", "testing")
 
 
 @pytest.mark.asyncio
-async def test__set_state_failure(storage):
-    storage.database.set.side_effect = Exception("set failed")
-    await storage._set_state("failcase")
+async def test__set_state_failure(database):
+    database.database.set.side_effect = Exception("set failed")
+    await database._set_state("failcase")

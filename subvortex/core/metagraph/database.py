@@ -5,44 +5,28 @@ import bittensor.utils.btlogging as btul
 
 import subvortex.core.model.neuron.neuron as scmm
 from subvortex.core.database.database_utils import decode_hash
-from subvortex.core.database.database import Database
+from subvortex.core.database.database import Database as BaseDatabase
 from subvortex.core.model.neuron import (
     Neuron,
     NeuronModel210,
 )
 
 
-class Storage(Database):
-    def __init__(self, settings):
-        super().__init__(settings=settings)
+class NeuronReadOnlyDatabase(BaseDatabase):
+    """
+    A read-only database interface for neuron data.
 
-        self.models = {
-            "neuron": {x.version: x for x in [NeuronModel210()]},
-        }
+    This class provides methods to query the neuron database for individual
+    neurons or the full list of neurons, based on the current active model
+    version(s). It ensures database connectivity before performing any read operations
+    and gracefully handles failures by logging detailed error information.
 
-    async def update_neurons(self, neurons: typing.List[scmm.Neuron]):
-        # Ensure the connection is ip and running
-        await self.ensure_connection()
+    Use this class when you need safe access to neuron data without the risk
+    of modifying it.
+    """
 
-        # Get the active versions
-        _, active = await self._get_migration_status("neuron")
-
-        for version in reversed(active):
-            model = self.models["neuron"][version]
-            if not model:
-                continue
-
-            try:
-                await model.write_all(self.database, neurons)
-
-            except Exception as ex:
-                btul.logging.warning(
-                    f"[{version}] Update neurons failed: {ex}",
-                    prefix=self.settings.logging_name,
-                )
-                btul.logging.debug(traceback.format_exc())
-
-        return None
+    def setup_neuron_models(self):
+        self.models["neuron"] = {x.version: x for x in [NeuronModel210()]}
 
     async def get_neuron(self, hotkey: str) -> typing.List[scmm.Neuron]:
         # Ensure the connection is ip and running
@@ -93,6 +77,48 @@ class Storage(Database):
                 btul.logging.debug(traceback.format_exc())
 
         return []
+
+
+class NeuronDatabase(NeuronReadOnlyDatabase):
+    """
+    A full read-write database interface for neuron data, extending NeuronReadOnlyDatabase.
+
+    This class provides methods to:
+    - Update or remove neuron records in the database.
+    - Track and persist the last block when the metagraph was updated.
+    - Mark the current metagraph state as ready/unready.
+    - Notify downstream listeners of metagraph state changes via Redis streams.
+
+    Use this class in components responsible for managing or syncing neuron state.
+    """
+
+    def __init__(self, settings):
+        super().__init__(settings=settings)
+        self.setup_neuron_models()
+
+    async def update_neurons(self, neurons: typing.List[scmm.Neuron]):
+        # Ensure the connection is ip and running
+        await self.ensure_connection()
+
+        # Get the active versions
+        _, active = await self._get_migration_status("neuron")
+
+        for version in reversed(active):
+            model = self.models["neuron"][version]
+            if not model:
+                continue
+
+            try:
+                await model.write_all(self.database, neurons)
+
+            except Exception as ex:
+                btul.logging.warning(
+                    f"[{version}] Update neurons failed: {ex}",
+                    prefix=self.settings.logging_name,
+                )
+                btul.logging.debug(traceback.format_exc())
+
+        return None
 
     async def remove_neurons(self, neurons: list[Neuron]):
         # Ensure the connection is ip and running

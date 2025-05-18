@@ -49,7 +49,7 @@ def save_state(self):
         btul.logging.warning(f"Failed to save model with error: {e}")
 
 
-def load_state(self):
+def load_state(self, number_of_neurons: int):
     r"""Load hotkeys and moving average scores from filesystem."""
     btul.logging.info("load_state()")
     try:
@@ -62,9 +62,9 @@ def load_state(self):
         neuron_weights = state_dict["neuron_weights"]
 
         # Check to ensure that the size of the neruon weights matches the metagraph size.
-        if neuron_weights.shape != (self.metagraph.n,):
+        if neuron_weights.shape != (number_of_neurons,):
             btul.logging.warning(
-                f"Neuron weights shape {neuron_weights.shape} does not match metagraph n {self.metagraph.n}."
+                f"Neuron weights shape {neuron_weights.shape} does not match metagraph n {number_of_neurons}."
                 " Populating new moving_averaged_scores IDs with zeros."
             )
             self.moving_averaged_scores[: len(neuron_weights)] = neuron_weights
@@ -182,12 +182,9 @@ def log_moving_averaged_score(
     """
     Create a graph showing the moving score for each miner over time
     """
-    metagraph_uids = self.metagraph.uids.tolist()
-
     # Build the data for the metric
     data = {}
-    for idx, (score) in enumerate(moving_averaged_scores):
-        uid = metagraph_uids[idx]
+    for uid, (score) in enumerate(moving_averaged_scores):
         if uid not in uids:
             continue
 
@@ -262,7 +259,7 @@ def init_wandb(self):
             self.wallet.hotkey.ss58_address,
             THIS_VERSION,
             str(THIS_SPEC_VERSION),
-            f"netuid_{self.metagraph.netuid}",
+            f"netuid_{self.settings.netuid}",
             self.neuron.country,
         ]
 
@@ -297,15 +294,15 @@ def init_wandb(self):
         runs = api.runs(
             f"{self.config.wandb.entity}/{project_name}",
             order="-created_at",
-            filters={"display_name": {"$regex": f"^validator-{self.uid}"}},
+            filters={"display_name": {"$regex": f"^validator-{self.neuron.uid}"}},
         )
 
-        name = f"validator-{self.uid}-1"
+        name = f"validator-{self.neuron.uid}-1"
         if len(runs) > 0:
             # Take the first run as it will be the most recent one
             last_number = runs[0].name.split("-")[-1]
             next_number = (int(last_number) % 10000) + 1
-            name = f"validator-{self.uid}-{next_number}"
+            name = f"validator-{self.neuron.uid}-{next_number}"
 
         # Create a new run
         wandb.init(

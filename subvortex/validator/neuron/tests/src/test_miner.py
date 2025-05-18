@@ -11,7 +11,11 @@ def fake_neuron(uid: int, hotkey: str = "hk", ip: str = "1.2.3.4", country: str 
 
 
 def fake_miner(uid: int, hotkey: str = "hk", ip: str = "1.2.3.4", country: str = "US") -> Miner:
-    return Miner.create_new_miner(uid=uid, hotkey=hotkey, ip=ip, country=country)
+    miner = Miner.create_new_miner(uid=uid)
+    miner.hotkey = hotkey
+    miner.ip = ip
+    miner.country = country
+    return miner
 
 
 @pytest.mark.asyncio
@@ -22,9 +26,6 @@ async def test_get_miners_creates_new_miners():
     db.get_miner.return_value = None
 
     miners = await get_miners(db)
-
-    print(neuron)
-    print(miners[0])
 
     assert len(miners) == 1
     assert miners[0].uid == neuron.uid

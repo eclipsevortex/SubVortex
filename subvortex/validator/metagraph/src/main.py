@@ -9,8 +9,8 @@ import bittensor.core.async_subtensor as btcas
 import bittensor.core.metagraph as btcm
 
 import subvortex.core.core_bittensor.config.config_utils as scccu
-import subvortex.core.metagraph.metagraph_observer as scmm
-import subvortex.core.metagraph.metagraph_storage as scmms
+import subvortex.core.metagraph.metagraph as scmm
+import subvortex.core.metagraph.database as scmms
 
 import subvortex.validator.metagraph.src.settings as svme
 
@@ -19,8 +19,8 @@ import subvortex.validator.metagraph.src.settings as svme
 load_dotenv(override=True)
 
 
-async def wait_for_storage_connection(
-    settings: svme.Settings, storage: scmms.Storage
+async def wait_for_database_connection(
+    settings: svme.Settings, database: scmms.NeuronDatabase
 ) -> None:
     btul.logging.warning(
         "⏳ Waiting for Redis to become available...",
@@ -28,10 +28,10 @@ async def wait_for_storage_connection(
     )
 
     # Ensure the connection
-    await storage.ensure_connection()
+    await database.ensure_connection()
 
     while True:
-        if await storage.is_connection_alive():
+        if await database.is_connection_alive():
             btul.logging.info("✅ Connected to Redis.", prefix=settings.logging_name)
             return
 
@@ -59,12 +59,13 @@ async def main():
     # Display the settings
     btul.logging.info(f"metagraph settings: {settings}")
 
+    database = None
     metagraph_observer = None
     subtensor = None
     try:
         # Create the storage
-        storage = scmms.Storage(settings=settings)
-        await wait_for_storage_connection(settings=settings, storage=storage)
+        database = scmms.NeuronDatabase(settings=settings)
+        await wait_for_database_connection(settings=settings, database=database)
 
         # Initialize the subtensor
         subtensor = btcas.AsyncSubtensor(config=config)
@@ -80,7 +81,10 @@ async def main():
 
         # Create and run the metagraph observer
         metagraph_observer = scmm.MetagraphObserver(
-            settings=settings, subtensor=subtensor, metagraph=metagraph, storage=storage
+            settings=settings,
+            subtensor=subtensor,
+            metagraph=metagraph,
+            database=database,
         )
         await metagraph_observer.start()
 
@@ -92,6 +96,9 @@ async def main():
         btul.logging.info("Keyboard interrupt detected, exiting.")
 
     finally:
+        if database:
+            await database.mark_as_unready()
+
         if metagraph_observer:
             await metagraph_observer.stop()
 

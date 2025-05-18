@@ -3,8 +3,7 @@ from typing import List
 
 import bittensor.utils.btlogging as btul
 
-from subvortex.core.database.database import Database as BaseDatabase
-from subvortex.core.model.neuron.neuron import Neuron
+from subvortex.core.metagraph.database import NeuronReadOnlyDatabase
 from subvortex.core.database.database_utils import decode_value
 from subvortex.validator.neuron.src.models.selection import (
     SelectionModel200,
@@ -14,23 +13,31 @@ from subvortex.validator.neuron.src.models.miner import (
     Miner,
     MinerModel210,
 )
-from subvortex.core.model.neuron import (
-    Neuron,
-    NeuronModel210,
-)
 
 
-class Database(BaseDatabase):
+class Database(NeuronReadOnlyDatabase):
+    """
+    Extended database class for validator logic that handles both read and write access
+    to neuron and miner data, as well as selected miner UIDs.
+
+    This class supports:
+    - Reading and writing selected miners (validator selection state)
+    - Reading and updating miner metadata
+    - Fallback support for multiple schema/model versions
+    - Tracking the last update block for neurons
+
+    It builds upon NeuronReadOnlyDatabase and adds write access and multi-model support
+    for 'selection' and 'miner' domains.
+    """
+
     def __init__(self, settings):
         super().__init__(settings=settings)
 
-        self.models = {
-            "selection": {
-                x.version: x for x in [SelectionModel200(), SelectionModel210()]
-            },
-            "neuron": {x.version: x for x in [NeuronModel210()]},
-            "miner": {x.version: x for x in [MinerModel210()]},
+        self.setup_neuron_models()
+        self.models["selection"] = {
+            x.version: x for x in [SelectionModel200(), SelectionModel210()]
         }
+        self.models["miner"] = {x.version: x for x in [MinerModel210()]}
 
     async def get_selected_miners(self, ss58_address: str):
         """
@@ -82,56 +89,6 @@ class Database(BaseDatabase):
                     f"[{version}] Failed to write selection for {ss58_address}: {err}",
                     prefix=self.settings.logging_name,
                 )
-        return None
-
-    async def get_neuron(self, hotkey: str) -> Neuron:
-        # Ensure the connection is ip and running
-        await self.ensure_connection()
-
-        # Get the active versions
-        _, active = await self._get_migration_status("neuron")
-
-        for version in reversed(active):
-            model = self.models["neuron"][version]
-            if not model:
-                continue
-
-            try:
-                neuron = await model.read(self.database, hotkey)
-                return neuron
-
-            except Exception as ex:
-                btul.logging.warning(
-                    f"[{version}] Read neuron failed for hotkey {hotkey}: {ex}",
-                    prefix=self.settings.logging_name,
-                )
-                btul.logging.debug(traceback.format_exc())
-
-        return None
-
-    async def get_neurons(self) -> dict[str, Neuron]:
-        # Ensure the connection is ip and running
-        await self.ensure_connection()
-
-        # Get the active versions
-        _, active = await self._get_migration_status("neuron")
-
-        for version in reversed(active):
-            model = self.models["neuron"][version]
-            if not model:
-                continue
-
-            try:
-                neurons = await model.read_all(self.database)
-                return neurons
-
-            except Exception as ex:
-                btul.logging.warning(
-                    f"[{version}] Read neurons failed: {ex}",
-                    prefix=self.settings.logging_name,
-                )
-                btul.logging.debug(traceback.format_exc())
-
         return None
 
     async def get_miner(self, hotkey: str) -> Miner:

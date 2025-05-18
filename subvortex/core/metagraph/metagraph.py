@@ -8,7 +8,7 @@ import bittensor.core.async_subtensor as btcas
 import subvortex.core.country.country as sccc
 import subvortex.core.core_bittensor.subtensor as scbs
 import subvortex.core.model.neuron.neuron as scmm
-import subvortex.core.metagraph.metagraph_storage as scms
+import subvortex.core.metagraph.database as scms
 import subvortex.miner.metagraph.src.settings as smms
 
 
@@ -21,12 +21,12 @@ class MetagraphObserver:
     def __init__(
         self,
         settings: smms.Settings,
-        storage: scms.Storage,
+        database: scms.NeuronDatabase,
         subtensor: btcas.AsyncSubtensor,
         metagraph: btcm.AsyncMetagraph,
     ):
         self.settings = settings
-        self.storage = storage
+        self.database = database
         self.subtensor = subtensor
         self.metagraph = metagraph
 
@@ -132,7 +132,7 @@ class MetagraphObserver:
         updated_neurons: list[scmm.Neuron] = []
         neurons_to_delete: list[str] = []
 
-        stored_neurons = await self.storage.get_neurons()
+        stored_neurons = await self.database.get_neurons()
         btul.logging.debug(f"Neurons loaded: {len(stored_neurons)}")
 
         for mneuron in self.metagraph.neurons:
@@ -192,7 +192,7 @@ class MetagraphObserver:
                 f"Deleting old neuron hotkeys: {neurons_to_delete}",
                 prefix=self.settings.logging_name,
             )
-            await self.storage.remove_neurons(neurons_to_delete)
+            await self.database.remove_neurons(neurons_to_delete)
 
         # Persist updated neurons
         if updated_neurons:
@@ -200,12 +200,12 @@ class MetagraphObserver:
                 f"# of changed neurons: {len(updated_neurons)}",
                 prefix=self.settings.logging_name,
             )
-            await self.storage.update_neurons(updated_neurons)
+            await self.database.update_neurons(updated_neurons)
 
         # Only update Redis if something changed
         if updated_neurons or neurons_to_delete:
             block = await self.subtensor.get_current_block()
-            await self.storage.set_last_updated(block)
+            await self.database.set_last_updated(block)
             btul.logging.debug(
                 f"Last updated block set to #{block}",
                 prefix=self.settings.logging_name,
@@ -221,10 +221,10 @@ class MetagraphObserver:
             return ready
 
         btul.logging.debug("Mark metagraph as ready", prefix=self.settings.logging_name)
-        await self.storage.mark_as_ready()
+        await self.database.mark_as_ready()
 
         btul.logging.debug("Notify metagraph state", prefix=self.settings.logging_name)
-        await self.storage.notify_state()
+        await self.database.notify_state()
 
         return True
 

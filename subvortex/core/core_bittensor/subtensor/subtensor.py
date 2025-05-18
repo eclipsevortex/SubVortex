@@ -13,6 +13,20 @@ import bittensor.core.async_subtensor as btcas
 U16_MAX = 65535
 
 
+def get_number_of_neurons(subtensor: btcs.Subtensor, netuid: int):
+    """
+    Return the number of registration done in the current interval
+    """
+    # Get the number of registration during the current adjustment
+    number_of_neurons = subtensor.substrate.query(
+        module="SubtensorModule",
+        storage_function="SubnetworkN",
+        params=[netuid],
+    )
+
+    return int(number_of_neurons.value or 0)
+
+
 async def get_number_of_registration(subtensor: btcas.AsyncSubtensor, netuid: int):
     """
     Return the number of registration done in the current interval

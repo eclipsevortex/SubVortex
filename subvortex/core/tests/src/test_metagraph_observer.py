@@ -7,10 +7,10 @@ import subvortex.core.metagraph.settings as scms
 
 
 @pytest.fixture
-def mock_storage():
-    storage = AsyncMock()
-    storage.get_neurons.return_value = []
-    return storage
+def mock_database():
+    database = AsyncMock()
+    database.get_neurons.return_value = []
+    return database
 
 
 @pytest.fixture
@@ -26,23 +26,23 @@ def mock_metagraph():
 
 
 @pytest.fixture
-def storage_with_mocked_redis():
-    from subvortex.core.metagraph.metagraph_storage import Storage
+def database_with_mocked_redis():
+    from subvortex.core.metagraph.database import NeuronDatabase
     from subvortex.miner.metagraph.src.settings import Settings
 
-    storage = Storage(Settings.create())
+    database = NeuronDatabase(Settings.create())
 
-    with patch.object(storage, "client", new_callable=AsyncMock):
-        yield storage
+    with patch.object(database, "client", new_callable=AsyncMock):
+        yield database
 
 
 @pytest.fixture
-def observer(mock_storage, mock_subtensor, mock_metagraph):
-    from subvortex.core.metagraph.metagraph_observer import MetagraphObserver
+def observer(mock_database, mock_subtensor, mock_metagraph):
+    from subvortex.core.metagraph.metagraph import MetagraphObserver
 
     return MetagraphObserver(
         settings=scms.Settings.create(),
-        storage=mock_storage,
+        database=mock_database,
         subtensor=mock_subtensor,
         metagraph=mock_metagraph,
     )
@@ -51,31 +51,31 @@ def observer(mock_storage, mock_subtensor, mock_metagraph):
 @pytest.mark.asyncio
 async def test_notify_if_needed(observer):
     # Arrange
-    observer.storage.mark_as_ready = AsyncMock()
-    observer.storage.notify_state = AsyncMock()
+    observer.database.mark_as_ready = AsyncMock()
+    observer.database.notify_state = AsyncMock()
     result = await observer._notify_if_needed(False)
 
     # Action
     assert result is True
 
     # Assert
-    observer.storage.mark_as_ready.assert_called_once()
-    observer.storage.notify_state.assert_called_once()
+    observer.database.mark_as_ready.assert_called_once()
+    observer.database.notify_state.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_notify_if_not_needed(observer):
     # Arrange
-    observer.storage.mark_as_ready = AsyncMock()
-    observer.storage.notify_state = AsyncMock()
+    observer.database.mark_as_ready = AsyncMock()
+    observer.database.notify_state = AsyncMock()
     result = await observer._notify_if_needed(True)
 
     # Action
     assert result is True
 
     # Assert
-    observer.storage.mark_as_ready.assert_not_called()
-    observer.storage.notify_state.assert_not_called()
+    observer.database.mark_as_ready.assert_not_called()
+    observer.database.notify_state.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -187,13 +187,13 @@ async def test_resync_updates_neurons(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value={})
-    observer.storage.update_neurons = AsyncMock()
+    observer.database.get_neurons = AsyncMock(return_value={})
+    observer.database.update_neurons = AsyncMock()
 
     with patch("subvortex.core.country.country.get_country", return_value="US"):
         axons = await observer._resync()
         assert "hotkey123" in axons
-        observer.storage.update_neurons.assert_awaited_once()
+        observer.database.update_neurons.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -242,12 +242,12 @@ async def test_resync_no_neuron_change(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value={stored_neuron.hotkey: stored_neuron})
-    observer.storage.update_neurons = AsyncMock()
+    observer.database.get_neurons = AsyncMock(return_value={stored_neuron.hotkey: stored_neuron})
+    observer.database.update_neurons = AsyncMock()
 
     axons = await observer._resync()
 
-    observer.storage.update_neurons.assert_not_called()
+    observer.database.update_neurons.assert_not_called()
     assert axons["hotkey123"] == "1.2.3.4"
 
 
@@ -263,12 +263,12 @@ async def test_resync_neuron_ip_changed(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
-    observer.storage.update_neurons = AsyncMock()
+    observer.database.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
+    observer.database.update_neurons = AsyncMock()
 
     with patch("subvortex.core.country.country.get_country", return_value="US"):
         axons = await observer._resync()
-        observer.storage.update_neurons.assert_called_once()
+        observer.database.update_neurons.assert_called_once()
         assert axons["hotkey123"] == "9.9.9.9"
 
 
@@ -284,17 +284,17 @@ async def test_resync_hotkey_changed(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
-    observer.storage.update_neurons = AsyncMock()
+    observer.database.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
+    observer.database.update_neurons = AsyncMock()
 
     with patch("subvortex.core.country.country.get_country", return_value="US"):
         axons = await observer._resync()
-        observer.storage.update_neurons.assert_called_once()
+        observer.database.update_neurons.assert_called_once()
         assert axons["new_hotkey"] == "1.1.1.1"
 
 
 @pytest.mark.asyncio
-async def test_resync_neuron_not_in_storage(observer):
+async def test_resync_neuron_not_in_database(observer):
     fake_proto = MagicMock()
     fake_proto.uid = 42
     fake_proto.axon_info.ip = "5.5.5.5"
@@ -308,12 +308,12 @@ async def test_resync_neuron_not_in_storage(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value={})
-    observer.storage.update_neurons = AsyncMock()
+    observer.database.get_neurons = AsyncMock(return_value={})
+    observer.database.update_neurons = AsyncMock()
 
     with patch("subvortex.core.country.country.get_country", return_value="FR"):
         axons = await observer._resync()
-        observer.storage.update_neurons.assert_called_once()
+        observer.database.update_neurons.assert_called_once()
         assert axons["new_hotkey"] == "5.5.5.5"
 
 
@@ -328,15 +328,15 @@ async def test_resync_country_not_updated_if_ip_is_same(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
-    observer.storage.update_neurons = AsyncMock()
+    observer.database.get_neurons = AsyncMock(return_value={ stored_neuron.hotkey: stored_neuron })
+    observer.database.update_neurons = AsyncMock()
 
     with patch(
         "subvortex.core.model.neuron.neuron.Neuron.from_proto", return_value=stored_neuron
     ):
         axons = await observer._resync()
 
-    observer.storage.update_neurons.assert_not_called()
+    observer.database.update_neurons.assert_not_called()
     assert axons["hotkey99"] == "2.2.2.2"
 
 
@@ -351,9 +351,9 @@ async def test_resync_removes_old_hotkey(observer):
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
-    observer.storage.get_neurons = AsyncMock(return_value={ stored.hotkey: stored })
-    observer.storage.update_neurons = AsyncMock()
-    observer.storage.remove_neurons = AsyncMock()
+    observer.database.get_neurons = AsyncMock(return_value={ stored.hotkey: stored })
+    observer.database.update_neurons = AsyncMock()
+    observer.database.remove_neurons = AsyncMock()
 
     with (
         patch(
@@ -366,6 +366,6 @@ async def test_resync_removes_old_hotkey(observer):
     ):
         axons = await observer._resync()
 
-    observer.storage.update_neurons.assert_called_once()
-    observer.storage.remove_neurons.assert_called_once_with([stored])
+    observer.database.update_neurons.assert_called_once()
+    observer.database.remove_neurons.assert_called_once_with([stored])
     assert axons["new_hotkey"] == "3.3.3.3"

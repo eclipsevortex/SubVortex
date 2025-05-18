@@ -32,10 +32,10 @@ from subvortex.core.monitor.monitor import Monitor
 from subvortex.core.country.country_service import CountryService
 from subvortex.core.file.file_monitor import FileMonitor
 from subvortex.core.shared.checks import check_registration
-from subvortex.core.shared.subtensor import get_current_block
-from subvortex.core.shared.mock import MockMetagraph, MockDendrite, MockSubtensor
+from subvortex.core.shared.mock import MockDendrite, MockSubtensor
 from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
+from subvortex.core.core_bittensor.subtensor import get_number_of_neurons, wait_for_block
 from subvortex.core.version import to_spec_version
 
 from subvortex.validator.version import __version__ as THIS_VERSION
@@ -111,11 +111,25 @@ class Validator:
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
         btul.logging.debug(str(self.config))
 
+        # Init the event loop.
+        self.loop = asyncio.get_event_loop()
+
+        # Instantiate runners
+        self.step = 0
+        self.should_exit: bool = False
+        self.subscription_is_running: bool = False
+        self.subscription_thread: threading.Thread = None
+        self.last_registered_block = 0
+        self.rebalance_queue = []
+        self.miners: List[Miner] = []
+        self.last_upgrade_country = None
+
+    async def run(self):
         # Display the settings
-        btul.logging.info(f"validator settings: {self.settings}")
+        btul.logging.info(f"Settings: {self.settings}")
 
         # Show miner version
-        btul.logging.debug(f"validator version {THIS_VERSION}")
+        btul.logging.debug(f"Version: {THIS_VERSION}")
 
         # Init validator wallet.
         btul.logging.debug(f"loading wallet")
@@ -141,29 +155,20 @@ class Validator:
 
         btul.logging.debug(f"wallet: {str(self.wallet)}")
 
-        # Init metagraph.
-        btul.logging.debug("loading metagraph")
-        self.metagraph = (
-            MockMetagraph(self.config.netuid, subtensor=self.subtensor)
-            if self.config.mock
-            else btcm.Metagraph(
-                netuid=self.config.netuid, network=self.subtensor.network, sync=False
-            )
-        )
-        self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
-        btul.logging.debug(str(self.metagraph))
-
         # Initialize the database
         btul.logging.info("loading database")
         self.database = Database(settings=self.settings)
 
+        # Get the numbers of neuron
+        self.number_of_neurons = get_number_of_neurons(
+            subtensor=self.subtensor, netuid=self.settings.netuid
+        )
+        btul.logging.debug(f"# of neurons: {self.number_of_neurons}")
+
         # Init Weights.
         btul.logging.debug("loading moving_averaged_scores")
-        self.moving_averaged_scores = np.zeros((self.metagraph.n))
+        self.moving_averaged_scores = np.zeros(self.number_of_neurons)
         btul.logging.debug(str(self.moving_averaged_scores))
-
-        self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
-        btul.logging.info(f"Running validator on uid: {self.uid}")
 
         # Dendrite pool for querying the network.
         btul.logging.debug("loading dendrite_pool")
@@ -174,24 +179,6 @@ class Validator:
                 version=to_spec_version(THIS_VERSION), wallet=self.wallet
             )
         btul.logging.debug(str(self.dendrite))
-
-        # Init the event loop.
-        self.loop = asyncio.get_event_loop()
-
-        self.prev_step_block = get_current_block(self.subtensor)
-        self.step = 0
-
-        # Instantiate runners
-        self.should_exit: bool = False
-        self.subscription_is_running: bool = False
-        self.subscription_thread: threading.Thread = None
-        self.last_registered_block = 0
-        self.rebalance_queue = []
-        self.miners: List[Miner] = []
-        self.last_upgrade_country = None
-
-    async def run(self):
-        btul.logging.info("run()")
 
         # Check if the connection to the database is successful
         await check_redis_connection(port=self.settings.redis_port)
@@ -227,13 +214,12 @@ class Validator:
         btul.logging.debug(f"Miners loaded {len(self.miners)}")
 
         # Load the state
-        load_state(self)
+        load_state(self, number_of_neurons=self.number_of_neurons)
 
         previous_last_update = None
+        prev_step_block = 0
         try:
-            while 1:
-                start_epoch = time.time()
-
+            while True:
                 # Get the last time neurons have been updated
                 last_update = await self.database.get_neuron_last_update()
                 btul.logging.debug(f"Neurons last updated #{last_update}")
@@ -269,29 +255,26 @@ class Validator:
                     # Save in database
                     await self.database.update_miners(miners=self.miners)
 
-                # --- Wait until next step epoch.
-                current_block = self.subtensor.get_current_block()
-                while current_block - self.prev_step_block < 3:
-                    # --- Wait for next block.
-                    time.sleep(1)
-                    current_block = self.subtensor.get_current_block()
-
-                time.sleep(5)
-
-                # --- Check validator is registered
+                # Check validator is registered
                 neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
                 if neuron is None:
                     raise Exception(f"Validator is not registered")
 
-                btul.logging.info(
-                    f"step({self.step}) block({get_current_block(self.subtensor)})"
-                )
+                # --- Wait until next step epoch.
+                current_block = self.subtensor.get_current_block()
+                while current_block - prev_step_block < 1:
+                    # --- Wait for next block.
+                    time.sleep(1)
+                    current_block = self.subtensor.get_current_block()
+
+                prev_step_block = current_block
+                btul.logging.debug(f"Step block #{prev_step_block}")
 
                 # Run multiple forwards.
                 coroutines = [forward(self)]
                 await asyncio.gather(*coroutines)
 
-                # Set the weights on chain.
+                # Set weights if time for it
                 btul.logging.info("Checking if should set weights")
                 must_set_weight = should_set_weights(
                     settings=self.settings,
@@ -319,15 +302,10 @@ class Validator:
                     finish_wandb()
                     init_wandb(self)
 
-                self.prev_step_block = get_current_block(self.subtensor)
-                if self.config.neuron.verbose:
-                    btul.logging.debug(f"block at end of step: {self.prev_step_block}")
-                    btul.logging.debug(f"Step took {time.time() - start_epoch} seconds")
-
                 self.step += 1
 
-        except Exception as err:
-            btul.logging.error("Unhandled exception", str(err))
+        except Exception as ex:
+            btul.logging.error(f"Unhandled exception: {ex}")
             btul.logging.debug(traceback.format_exc())
             finish_wandb()
 

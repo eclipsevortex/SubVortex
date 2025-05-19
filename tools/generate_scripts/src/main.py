@@ -255,22 +255,36 @@ def generate_quick_scripts():
             components.append(name)
             dependency_graph[name].extend(manifest.get("depends_on", []))
 
-        visited = set()
         ordered = []
+        visited = {}
 
         def visit(node):
-            if node in visited:
+            if visited.get(node) == "black":
                 return
-            for dep in dependency_graph[node]:
-                visit(dep)
-            visited.add(node)
-            ordered.append(node)
+            if visited.get(node) == "gray":
+                raise ValueError(f"Cycle detected in dependency graph at: {node}")
+            
+            visited[node] = "gray"
 
-        for c in components:
-            visit(c)
+            for dep in dependency_graph.get(node, []):
+                visit(dep)
+
+            visited[node] = "black"
+            ordered.append(node.replace(f"{neuron}-", ""))
+
+        for component in components:
+            visit(component)
+
+        # Remove duplicates while preserving order
+        final_order = []
+        seen = set()
+        for item in ordered:
+            if item not in seen:
+                final_order.append(item)
+                seen.add(item)
 
         context = {
-            "ordered_components": ordered,
+            "ordered_components": final_order,
             "neuron": neuron,
         }
 

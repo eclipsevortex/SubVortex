@@ -31,7 +31,7 @@ export $(grep -v '^#' $SERVICE_WORKING_DIR/.env | xargs)
 echo "🔍 Checking $SERVICE_NAME..."
 if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
     echo "🔁 Restarting $SERVICE_NAME with updated CLI args: ${ARGS[*]}"
-    pm2 restart "$SERVICE_NAME" --update-env -- "${ARGS[@]}"
+    pm2 restart "$SERVICE_NAME" --update-env
 else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
     pm2 start "$SERVICE_WORKING_DIR/src/main.py" \

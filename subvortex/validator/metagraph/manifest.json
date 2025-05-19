@@ -1,4 +1,5 @@
 {
+  "id": "validator-metagraph",
   "name": "subvortex-validator-metagraph",
   "description": "SubVortex Validator Metagraph",
   "version": "3.0.1",

@@ -1,4 +1,5 @@
 {
+  "id": "miner-neuron",
   "name": "subvortex-miner-neuron",
   "description": "SubVortex Miner Neuron",
   "version": "3.0.1",

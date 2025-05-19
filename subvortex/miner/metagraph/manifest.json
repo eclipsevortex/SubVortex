@@ -1,4 +1,5 @@
 {
+  "id": "miner-metagraph",
   "name": "subvortex-miner-metagraph",
   "description": "SubVortex Miner Metagraph",
   "version": "3.0.1",

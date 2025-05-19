@@ -1,4 +1,5 @@
 {
+  "id": "miner-redis",
   "name": "subvortex-miner-redis",
   "description": "SubVortex Miner Redis",
   "version": "3.0.1",

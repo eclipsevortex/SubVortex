@@ -12,7 +12,7 @@ ACTIONS_miner := bump-major bump-minor bump-patch bump-alpha bump-rc
 ACTIONS_validator := bump-major bump-minor bump-patch bump-alpha bump-rc
 
 # Services per component
-SERVICES_miner := neuron metagraph
+SERVICES_miner := neuron metagraph redis
 SERVICES_validator := neuron metagraph redis
 
 # All components

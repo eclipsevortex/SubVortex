@@ -7,8 +7,8 @@ echo "🔄 Updating metadata.json and manifest.json with correct versions"
 # Define components and their services
 COMPONENTS=("miner" "validator")
 declare -A SERVICES
-SERVICES["miner"]="neuron"
-SERVICES["validator"]="neuron redis"
+SERVICES["miner"]="neuron metagraph redis"
+SERVICES["validator"]="neuron metagraph redis"
 
 # Function to extract version from a directory
 get_version() {

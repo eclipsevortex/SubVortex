@@ -1,31 +1,34 @@
 {
-    "name": "subvortex-miner-redis",
-    "description": "SubVortex Miner Redis",
-    "type": "package",
-    "neuron": "miner",
-    "component": "redis",
-    "common": {
-        "user": "redis",
-        "group": "redis",
-        "package_name": "redis-server"
+  "name": "subvortex-miner-redis",
+  "description": "SubVortex Miner Redis",
+  "version": "3.0.1",
+  "miner.version": "3.0.1",
+  "miner.redis.version": "3.0.1",
+  "type": "package",
+  "neuron": "miner",
+  "component": "redis",
+  "common": {
+    "user": "redis",
+    "group": "redis",
+    "package_name": "redis-server"
+  },
+  "service": {
+    "generate_unit": false,
+    "environment": {
+      "PYTHONUNBUFFERED": 1
     },
-    "service": {
-        "generate_unit": false,
-        "environment": {
-            "PYTHONUNBUFFERED": 1
-        },
-        "restart": "on-failure",
-        "restart_sec": "10s",
-        "log_prefix": "subvortex-miner-redis",
-        "configs": {
-            "redis.conf": {
-                "ext": "conf",
-                "destination": "/etc/redis/redis.conf",
-                "overrides": {
-                    "logfile": "/var/log/subvortex-miner/subvortex-miner-redis.log"
-                }
-            }
+    "restart": "on-failure",
+    "restart_sec": "10s",
+    "log_prefix": "subvortex-miner-redis",
+    "configs": {
+      "redis.conf": {
+        "ext": "conf",
+        "destination": "/etc/redis/redis.conf",
+        "overrides": {
+          "logfile": "/var/log/subvortex-miner/subvortex-miner-redis.log"
         }
-    },
-    "depends_on": []
+      }
+    }
+  },
+  "depends_on": []
 }

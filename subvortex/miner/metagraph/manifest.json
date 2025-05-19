@@ -21,6 +21,6 @@
     "log_prefix": "subvortex-miner-metagraph"
   },
   "depends_on": [
-    "redis"
+    "miner-redis"
   ]
 }

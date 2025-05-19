@@ -4,5 +4,7 @@
   "version": "3.0.1",
   "validator.version": "3.0.1",
   "validator.metagraph.version": "3.0.1-alpha.1",
-  "depends_on": []
+  "depends_on": [
+    "validator-redis"
+  ]
 }

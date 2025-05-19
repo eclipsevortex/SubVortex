@@ -21,6 +21,6 @@
     "log_prefix": "subvortex-validator-metagraph"
   },
   "depends_on": [
-    "redis"
+    "validator-redis"
   ]
 }

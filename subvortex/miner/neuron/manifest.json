@@ -21,7 +21,7 @@
     "log_prefix": "subvortex-miner-neuron"
   },
   "depends_on": [
-    "redis",
-    "metagraph"
+    "miner-redis",
+    "miner-metagraph"
   ]
 }

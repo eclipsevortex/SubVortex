@@ -5,6 +5,7 @@
   "validator.version": "3.0.1",
   "validator.neuron.version": "3.0.1",
   "depends_on": [
-    "validator-redis"
+    "validator-redis",
+    "validator-metagraph"
   ]
 }

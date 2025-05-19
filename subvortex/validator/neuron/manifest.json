@@ -21,7 +21,7 @@
     "log_prefix": "subvortex-validator-neuron"
   },
   "depends_on": [
-    "redis",
-    "metagraph"
+    "validator-redis",
+    "validator-metagraph"
   ]
 }

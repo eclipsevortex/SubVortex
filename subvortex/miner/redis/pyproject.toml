@@ -3,9 +3,9 @@ requires = ["setuptools>=70"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "subvortex-validator-redis"
-version = "3.0.0"
-description = "SubVortex Validator Redis"
+name = "subvortex-miner-redis"
+version = "3.0.1"
+description = "SubVortex Miner Redis"
 authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.10"

@@ -177,4 +177,4 @@ DS_Store
 ga-*.json
 .build
 redis.conf
-pyproject.toml
+/pyproject.toml

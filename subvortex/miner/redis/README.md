@@ -1,6 +1,6 @@
-# Validator Redis Guide
+# Miner Redis Guide
 
-This document provides a comprehensive guide on how to set up and run the Validator Redis. Redis is used by the validator to store miners' scores over time.
+This document provides a comprehensive guide on how to set up and run the Miner Redis. Redis is used by the miner to store miners' scores over time.
 
 <br />
 
@@ -20,7 +20,7 @@ This document provides a comprehensive guide on how to set up and run the Valida
 <br />
 
 > ⚠️ **Architecture Notice**  
-> The Validator Redis currently supports only **x86_64 (amd64)** servers.  
+> The Miner Redis currently supports only **x86_64 (amd64)** servers.  
 > `arm64` support is not yet available but is a work in progress.
 
 <br />
@@ -38,24 +38,24 @@ Then, open `.env` in a text editor and update it with your settings.
 ## As process <a id="installation-as-process"></a>
 
 > **IMPORTANT** <br />
-> Before starting, be sure pm2 is installed if you decide to run the Validator Redis in a process, see [pm2 installation](../../../scripts/process/README.md)
+> Before starting, be sure pm2 is installed if you decide to run the Miner Redis in a process, see [pm2 installation](../../../scripts/process/README.md)
 
-To setup the Validator Redis, you can run
+To setup the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/process/redis_process_setup.sh
+./subvortex/miner/redis/deployment/process/redis_process_setup.sh
 ```
 
-To start the Validator Redis, you can run
+To start the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/process/redis_process_start.sh
+./subvortex/miner/redis/deployment/process/redis_process_start.sh
 ```
 
-To check the Validator Redis is up and running, you can run
+To check the Miner Redis is up and running, you can run
 
 ```bash
-pm2 log subvortex-validator-redis
+pm2 log subvortex-miner-redis
 ```
 
 You should see something like
@@ -77,29 +77,29 @@ You should see something like
 
 ## As service <a id="installation-as-service"></a>
 
-To setup the Validator Redis, you can run
+To setup the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/service/redis_service_setup.sh
+./subvortex/miner/redis/deployment/service/redis_service_setup.sh
 ```
 
-To start the Validator Redis, you can run
+To start the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/service/redis_service_start.sh
+./subvortex/miner/redis/deployment/service/redis_service_start.sh
 ```
 
-To check the Validator Redis is up and running, you can run
+To check the Miner Redis is up and running, you can run
 
 ```bash
-systemctl status subvortex-validator-redis
+systemctl status subvortex-miner-redis
 ```
 
 You should see something like
 
 ```bash
-● subvortex-validator-redis.service - SubVortex Validator Redis
-     Loaded: loaded (/etc/systemd/system/subvortex-validator-redis.service; disabled; vendor preset: enabled)
+● subvortex-miner-redis.service - SubVortex Miner Redis
+     Loaded: loaded (/etc/systemd/system/subvortex-miner-redis.service; disabled; vendor preset: enabled)
      Active: active (running) since Mon 2025-05-05 17:25:57 BST; 4s ago
        Docs: http://redis.io/documentation,
              man:redis-server(1)
@@ -108,18 +108,18 @@ You should see something like
       Tasks: 6 (limit: 28765)
      Memory: 3.3M
         CPU: 106ms
-     CGroup: /system.slice/subvortex-validator-redis.service
+     CGroup: /system.slice/subvortex-miner-redis.service
              └─774498 "/usr/bin/redis-server 127.0.0.1:6379" "" "" "" "" "" "" ""
 
-May 05 17:25:56 vmi1610615.contaboserver.net systemd[1]: Starting SubVortex Validator Redis...
-May 05 17:25:57 vmi1610615.contaboserver.net systemd[1]: Started SubVortex Validator Redis.
+May 05 17:25:56 vmi1610615.contaboserver.net systemd[1]: Starting SubVortex Miner Redis...
+May 05 17:25:57 vmi1610615.contaboserver.net systemd[1]: Started SubVortex Miner Redis.
 ```
 
 If you have these kind of logs
 
 ```bash
 ⚙️  Setting up for 'process' mode...
-🔧 Setting up subvortex-validator-redis...
+🔧 Setting up subvortex-miner-redis...
 🚀 Installing Redis server if not already installed...
 ✅ redis-server already installed.
 📂 Preparing redis directory...
@@ -128,7 +128,7 @@ If you have these kind of logs
 📄 Forcing logfile to stdout/stderr (logfile "")...
 🚫 Masking default redis-server systemd service...
 📁 Ensuring Redis data directory exists: /var/lib/redis
-✅ Validator Redis setup completed successfully.
+✅ Miner Redis setup completed successfully.
 ✅ Process setup complete.
 ```
 
@@ -141,7 +141,7 @@ rm -rf /var/tmp/subvortex.checksums/*
 ## As docker container <a id="installation-as-container"></a>
 
 > **IMPORTANT** <br />
-> Before starting, be sure docker is installed if you decide to run the Validator Redis as docker container, see [docker installation](../../scripts/docker/README.md)
+> Before starting, be sure docker is installed if you decide to run the Miner Redis as docker container, see [docker installation](../../scripts/docker/README.md)
 
 If you are not using the Auto Upgrader, you have to prefix all these commands by
 
@@ -151,25 +151,25 @@ export SUBVORTEX_FLOATTING_FLAG=latest
 
 For testnet, you can use `latest` (release) or `stable` (release candidate).
 
-To build the Validator Redis, you can run
+To build the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/docker/redis_docker_setup.sh
+./subvortex/miner/redis/deployment/docker/redis_docker_setup.sh
 ```
 
-To start the Validator Redis, you can run
+To start the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/docker/redis_docker_start.sh
+./subvortex/miner/redis/deployment/docker/redis_docker_start.sh
 ```
 
-To check the Validator Redis is up and running, you can run
+To check the Miner Redis is up and running, you can run
 
 ```bash
 docker ps
 ```
 
-You should see a container named `subvortex-validator-redis`.
+You should see a container named `subvortex-miner-redis`.
 
 <br />
 
@@ -177,38 +177,38 @@ You should see a container named `subvortex-validator-redis`.
 
 ## As process <a id="uninstall-as-process"></a>
 
-To uninstall the Validator Redis, you can run
+To uninstall the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/process/redis_process_teardown.sh
+./subvortex/miner/redis/deployment/process/redis_process_teardown.sh
 ```
 
-To check the Validator Redis has been uninstalled, you can run
+To check the Miner Redis has been uninstalled, you can run
 
 ```bash
 pm2 list
 ```
 
-You should not see any process named `subvortex-validator-redis`.
+You should not see any process named `subvortex-miner-redis`.
 
 ## As service <a id="uninstall-as-service"></a>
 
-To uninstall the Validator Redis, you can run
+To uninstall the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/service/redis_service_teardown.sh
+./subvortex/miner/redis/deployment/service/redis_service_teardown.sh
 ```
 
-To check the Validator Redis has been uninstalled, you can run
+To check the Miner Redis has been uninstalled, you can run
 
 ```bash
-systemctl status subvortex-validator-redis
+systemctl status subvortex-miner-redis
 ```
 
 You should see something like
 
 ```bash
-Unit subvortex-validator-redis.service could not be found.
+Unit subvortex-miner-redis.service could not be found.
 ```
 
 ## As docker container <a id="uninstall-as-container"></a>
@@ -219,16 +219,16 @@ If you are not using the Auto Upgrader, you have to prefix all these commands by
 export SUBVORTEX_FLOATTING_FLAG=latest
 ```
 
-To uninstall the Validator Redis, you can run
+To uninstall the Miner Redis, you can run
 
 ```bash
-./subvortex/validator/redis/deployment/docker/redis_docker_teardown.sh
+./subvortex/miner/redis/deployment/docker/redis_docker_teardown.sh
 ```
 
-To check the Validator Redis has been uninstalled, you can run
+To check the Miner Redis has been uninstalled, you can run
 
 ```bash
 docker ps
 ```
 
-You should not see any container named `subvortex-validator-redis`.
+You should not see any container named `subvortex-miner-redis`.

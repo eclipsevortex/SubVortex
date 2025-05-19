@@ -1,25 +1,40 @@
 [Unit]
-Description=SubVortex {{ neuron | title }} HAProxy
+Description={{ description }}
 After=network.target
 
 [Service]
-Type=notify
+Type=simple
+EnvironmentFile=<WORKING_DIR>/subvortex/{{ neuron }}/{{ component }}/.env
 ExecStart=/usr/sbin/haproxy -Ws -f /etc/haproxy/haproxy.cfg
 ExecReload=/bin/kill -USR2 $MAINPID
-PIDFile=/run/haproxy.pid
+PIDFile=/run/haproxy/haproxy.pid
 User={{ user }}
 Group={{ group }}
+WorkingDirectory=<WORKING_DIR>/subvortex/{{ neuron }}/{{ component }}
+StandardOutput=append:/var/log/subvortex-{{ neuron }}/subvortex-{{ neuron }}-{{ component }}.log
+StandardError=append:/var/log/subvortex-{{ neuron }}/subvortex-{{ neuron }}-{{ component }}-error.log
 
-RuntimeDirectory=haproxy
-RuntimeDirectoryMode=0755
-LimitNOFILE=65536
-Restart=always
+UMask=007
+RuntimeDirectory=subvortex-{{ neuron }}
+RuntimeDirectoryMode=2755
+
+# Security
 PrivateTmp=yes
-NoNewPrivileges=true
+PrivateDevices=yes
 ProtectSystem=full
 ReadWriteDirectories=-/var/log/subvortex-{{ neuron }}
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ReadWriteDirectories=-/run/subvortex-{{ neuron }}
+
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID CAP_SYS_RESOURCE
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryDenyWriteExecute=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
 
 [Install]
 WantedBy=multi-user.target
-Alias=subvortex-{{ neuron }}-haproxy.service
+Alias=subvortex-{{ neuron }}-proxy.service

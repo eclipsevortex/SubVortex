@@ -27,6 +27,7 @@ import bittensor.utils.btlogging as btul
 import bittensor.utils.networking as btun
 import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
+from dotenv import load_dotenv
 
 from subvortex.core.protocol import Score
 from subvortex.core.shared.checks import check_registration
@@ -56,6 +57,9 @@ from subvortex.miner.neuron.src.config import (
 )
 from subvortex.miner.core.utils import load_request_log
 from subvortex.miner.neuron.src.settings import Settings
+
+# Load the environment variables for the whole process
+load_dotenv(override=True)
 
 
 class Miner:
@@ -116,7 +120,7 @@ class Miner:
         btul.logging.set_trace(self.config.logging.trace)
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
         btul.logging.info(str(self.config))
-        
+
         # Display the settings
         btul.logging.info(f"miner settings: {self.settings}")
 

@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import traceback
+from dotenv import load_dotenv
 
 import bittensor.utils.btlogging as btul
 import bittensor.core.config as btcc
@@ -12,6 +13,9 @@ import subvortex.core.metagraph.metagraph as scmm
 import subvortex.core.metagraph.database as scmms
 
 import subvortex.miner.metagraph.src.settings as smme
+
+# Load the environment variables for the whole process
+load_dotenv(override=True)
 
 
 async def wait_for_database_connection(

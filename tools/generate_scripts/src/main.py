@@ -18,15 +18,13 @@ OUTPUT_BASE_DIR = "subvortex"
 HERE = Path().resolve()
 
 
-def load_and_merge_manifest(manifest_path: Path, deployment: str, subvortex_dir: str):
+def load_and_merge_manifest(manifest_path: Path, deployment: str):
     env = Environment(
         loader=FileSystemLoader("."), trim_blocks=True, lstrip_blocks=True
     )
     raw = manifest_path.read_text()
-    rendered = env.from_string(raw).render(SUBVORTEX_WORKING_DIR=subvortex_dir)
+    rendered = env.from_string(raw).render()
     manifest = json.loads(rendered)
-
-    print(manifest.get(deployment, {}))
 
     merged = {
         **manifest.get("common", {}),
@@ -67,7 +65,6 @@ def generate_for_component(
     neuron: str,
     component: str,
     manifest_path: Path,
-    subvortex_dir: str,
     dry_run: bool = False,
 ):
     base_output = HERE / OUTPUT_BASE_DIR / neuron / component / "deployment"
@@ -89,9 +86,7 @@ def generate_for_component(
             trim_blocks=True,
             lstrip_blocks=True,
         )
-        merged_context = load_and_merge_manifest(
-            manifest_path, deployment, subvortex_dir
-        )
+        merged_context = load_and_merge_manifest(manifest_path, deployment)
 
         output_deployment_name = deployment_output_map.get(deployment, deployment)
         deployment_output_dir = base_output / output_deployment_name
@@ -208,9 +203,7 @@ def generate_for_component(
             lstrip_blocks=True,
         )
         if "merged_context" not in locals():
-            merged_context = load_and_merge_manifest(
-                manifest_path, "process", subvortex_dir
-            )
+            merged_context = load_and_merge_manifest(manifest_path, "process")
 
         for tmpl_file in global_templates_dir.glob("*.j2"):
             output_name = tmpl_file.name.replace(
@@ -297,11 +290,6 @@ def generate_quick_scripts():
 
 
 def generate_all():
-    subvortex_dir = os.environ.get("SUBVORTEX_WORKING_DIR")
-    if not subvortex_dir:
-        print("❌ SUBVORTEX_WORKING_DIR is not set in the environment.")
-        return
-
     for neuron in NEURONS:
         neuron_dir = HERE / "subvortex" / neuron
         if not neuron_dir.is_dir():
@@ -315,9 +303,7 @@ def generate_all():
             if not manifest_path.exists():
                 continue
 
-            generate_for_component(
-                neuron, component_dir.name, manifest_path, subvortex_dir, False
-            )
+            generate_for_component(neuron, component_dir.name, manifest_path, False)
 
     generate_quick_scripts()
 

@@ -41,4 +41,5 @@ where = ["."]
     "pyproject.toml",
     "env.template",
     "docker-compose.yml",
+    "manifest.json"
 ]

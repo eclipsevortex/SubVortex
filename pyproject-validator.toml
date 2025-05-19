@@ -57,6 +57,7 @@ include = [
     "**/env.template",
     "**/docker-compose.yml",
     "**/metadata.json",
+    "**/manifest.json",
 ]
 "subvortex.scripts" = ["**/*.sh"]
 

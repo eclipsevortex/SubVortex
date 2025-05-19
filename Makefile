@@ -272,8 +272,8 @@ unprerelease:
 		[ -d "$$comp" ] || continue; \
 		comp_name=$$(basename "$$comp"); \
 		case $$comp_name in \
-			miner) services="neuron" ;; \
-			validator) services="neuron redis" ;; \
+			miner) services="$(SERVICES_miner)" ;; \
+			validator) services="$(SERVICES_validator)" ;; \
 			*) services="$$comp_name" ;; \
 		esac; \
 		for service in $$services; do \
@@ -318,8 +318,8 @@ unrelease:
 		[ -d "$$comp" ] || continue; \
 		comp_name=$$(basename "$$comp"); \
 		case $$comp_name in \
-			miner) services="neuron" ;; \
-			validator) services="neuron redis" ;; \
+			miner) services="$(SERVICES_miner)" ;; \
+			validator) services="$(SERVICES_validator)" ;; \
 			*) services="$$comp_name" ;; \
 		esac; \
 		for service in $$services; do \

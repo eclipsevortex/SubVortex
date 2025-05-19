@@ -42,5 +42,5 @@ where = ["."]
     "pyproject.toml",
     "env.template",
     "metadata.json",
-    "**/*.py",
+    "manifest.json"
 ]

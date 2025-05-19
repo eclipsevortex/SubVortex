@@ -8,6 +8,8 @@
   "type": "package",
   "neuron": "validator",
   "component": "redis",
+  "migration_type": "redis",
+  "migration": "./migrations/versions",
   "common": {
     "user": "redis",
     "group": "redis",

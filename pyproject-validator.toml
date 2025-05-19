@@ -40,6 +40,7 @@ where = ["."]
 include = [
     "scripts",
     "subvortex",
+    "subvortex.core",
     "subvortex.validator",
     "subvortex.scripts",
 ]
@@ -59,6 +60,7 @@ include = [
     "**/metadata.json",
     "**/manifest.json",
 ]
+"subvortex.core" = ["**/*.py"]
 "subvortex.scripts" = ["**/*.sh"]
 
 [tool.setuptools.exclude-package-data]

@@ -26,6 +26,7 @@ def load_and_merge_manifest(manifest_path: Path, deployment: str):
     rendered = env.from_string(raw).render()
     manifest = json.loads(rendered)
 
+    # Start with shallow merge
     merged = {
         **manifest.get("common", {}),
         **manifest.get(manifest.get("type", ""), {}),
@@ -37,6 +38,31 @@ def load_and_merge_manifest(manifest_path: Path, deployment: str):
         "neuron": manifest["neuron"],
         "component": manifest["component"],
     }
+
+    # === Deep merge of configs ===
+    common_configs = manifest.get("common", {}).get("configs", {})
+    deployment_configs = manifest.get(deployment, {}).get("configs", {})
+
+    merged_configs = {}
+
+    all_config_names = set(common_configs) | set(deployment_configs)
+    for config_name in all_config_names:
+        common_conf = common_configs.get(config_name, {})
+        deploy_conf = deployment_configs.get(config_name, {})
+
+        merged_config = {
+            **common_conf,
+            **deploy_conf,
+            "overrides": {
+                **common_conf.get("overrides", {}),
+                **deploy_conf.get("overrides", {}),
+            },
+        }
+
+        merged_configs[config_name] = merged_config
+
+    # Add merged configs to context
+    merged["configs"] = merged_configs
 
     return merged
 
@@ -80,13 +106,26 @@ def generate_for_component(
         deployment_template_dir = HERE / TEMPLATE_ROOT / deployment
         if not deployment_template_dir.exists():
             continue
+        
+        merged_context = load_and_merge_manifest(manifest_path, deployment)
+
+        # Load provision hooks for setup.sh template
+        provision_dir = HERE / TEMPLATE_ROOT / "provision"
+        output_provision_dir = base_output / "provision"
+        package_name = merged_context.get("package_name")
+        provision_hooks = build_install_remove_hooks(
+            provision_dir=provision_dir,
+            output_provision_dir=output_provision_dir,
+            package_name=package_name,
+            context=merged_context,
+        )
+        merged_context["provision_hooks"] = provision_hooks
 
         env = Environment(
             loader=FileSystemLoader(deployment_template_dir),
             trim_blocks=True,
             lstrip_blocks=True,
         )
-        merged_context = load_and_merge_manifest(manifest_path, deployment)
 
         output_deployment_name = deployment_output_map.get(deployment, deployment)
         deployment_output_dir = base_output / output_deployment_name
@@ -228,6 +267,75 @@ def generate_for_component(
         )
 
 
+def build_install_remove_hooks(
+    provision_dir: Path,
+    output_provision_dir: Path,
+    package_name: str,
+    context: dict,
+) -> str:
+    """
+    Generate and write install/uninstall provision scripts if they exist and return
+    the shell block to inject in *_setup.sh.j2.
+
+    Args:
+        provision_dir (Path): Root dir for Jinja templates (e.g., templates/provision/)
+        output_provision_dir (Path): Final output path for rendered scripts
+        package_name (str): e.g. "redis-server"
+        context (dict): Full render context (e.g., merged_context)
+
+    Returns:
+        str: Shell script block to be injected into the setup.sh
+    """
+    if not package_name:
+        return ""
+    
+    env = Environment(
+        loader=FileSystemLoader(HERE / TEMPLATE_ROOT / "provision"),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    provision_name = package_name.lower()
+    provision_script_prefix = provision_name.replace("-", "_")
+
+    install_template = provision_dir / provision_name / "install.sh.j2"
+    remove_template = provision_dir / provision_name / "uninstall.sh.j2"
+
+    install_rendered = remove_rendered = None
+
+    # Create output dir if needed
+    output_provision_dir.mkdir(parents=True, exist_ok=True)
+
+    if install_template.exists():
+        install_rendered = env.get_template(
+            f"{provision_name}/install.sh.j2"
+        ).render(**context)
+        (output_provision_dir / f"{provision_script_prefix}_install.sh").write_text(install_rendered)
+        (output_provision_dir / f"{provision_script_prefix}_install.sh").chmod(0o755)
+
+    if remove_template.exists():
+        remove_rendered = env.get_template(
+            f"{provision_name}/uninstall.sh.j2"
+        ).render(**context)
+        (output_provision_dir / f"{provision_script_prefix}_uninstall.sh").write_text(remove_rendered)
+        (output_provision_dir / f"{provision_script_prefix}_uninstall.sh").chmod(0o755)
+
+    if not install_rendered and not remove_rendered:
+        return ""
+
+    # Build shell block to include in setup.sh.j2
+    lines = []
+    lines.append("# --- Handle provisioned install/uninstall scripts (if defined) ---")
+    lines.append('if [[ "$CURRENT_VERSION" != "$DESIRED_VERSION" ]]; then')
+    if remove_rendered:
+        lines.append(f"  bash \"$SERVICE_WORKING_DIR/provision/{provision_script_prefix}_uninstall.sh\"")
+    lines.append("fi")
+    if install_rendered:
+        lines.append(f"bash \"$SERVICE_WORKING_DIR/provision/{provision_script_prefix}_install.sh\"")
+
+    return "\n".join(lines)
+
+
 def generate_quick_scripts():
     neuron_template_dir = HERE / TEMPLATE_ROOT / "neuron"
     env = Environment(
@@ -263,7 +371,7 @@ def generate_quick_scripts():
                 return
             if visited.get(node) == "gray":
                 raise ValueError(f"Cycle detected in dependency graph at: {node}")
-            
+
             visited[node] = "gray"
 
             for dep in dependency_graph.get(node, []):

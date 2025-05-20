@@ -27,38 +27,24 @@ SERVICE_TEMPLATE="$SERVICE_WORKING_DIR/deployment/templates/$SERVICE_NAME.servic
 SERVICE_LOG_DIR="/var/log/subvortex-validator"
 TEMP_SERVICE_FILE="/tmp/$SERVICE_NAME.service"
 
-# --- Package-based service setup ---
-echo "📦 Installing package dependencies..."
-if command -v apt-get &> /dev/null; then
-  echo "🧹 Removing Redis Labs repository (if present)..."
-  sudo rm -f /etc/apt/sources.list.d/redis.list
-  sudo rm -f /etc/apt/trusted.gpg.d/redis-archive-keyring.gpg
+# --- Load environment variables from .env file ---
+ENV_FILE="$SERVICE_WORKING_DIR/.env"
 
-  echo "🧹 Cleaning APT cache and redis-server .deb files..."
-  sudo apt-get clean
-  sudo rm -f /var/cache/apt/archives/redis-server_*.deb || true
-  sudo apt-get update
-
-  echo "📌 Installing redis-server from Ubuntu repo..."
-  sudo apt-get install --allow-downgrades -y redis-server
-
-elif command -v dnf &> /dev/null; then
-  echo "🧹 Removing Redis Labs repo from DNF (if present)..."
-  sudo rm -f /etc/yum.repos.d/redis.repo || true
-
-  echo "🧹 Cleaning DNF metadata and cache..."
-  sudo dnf clean all
-  sudo dnf makecache
-  sudo dnf install -y redis-server
-
-elif command -v pacman &> /dev/null; then
-  echo "🧹 Cleaning Pacman cache for redis-server..."
-  sudo pacman -Scc --noconfirm || true
-  sudo pacman -Sy --noconfirm redis-server
-
+if [[ -f "$ENV_FILE" ]]; then
+  echo "🌱 Loading environment variables from $ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
 else
-  echo "⚠️ Unsupported package manager. Please install redis-server manually."
+  echo "⚠️ No .env file found at $ENV_FILE"
 fi
+
+# --- Handle provisioned install/uninstall scripts (if defined) ---
+if [[ "$CURRENT_VERSION" != "$DESIRED_VERSION" ]]; then
+  bash "$SERVICE_WORKING_DIR/provision/redis_server_uninstall.sh"
+fi
+bash "$SERVICE_WORKING_DIR/provision/redis_server_install.sh"
 
 # --- Stop and mask default service to avoid conflict ---
 if systemctl list-unit-files --quiet "redis-server.service"; then
@@ -141,6 +127,11 @@ if [[ -f "$DEST_FILE" ]]; then
     sed -i "s|^logfile[[:space:]]*.*|logfile /var/log/subvortex-validator/subvortex-validator-redis.log|" "$DEST_FILE"
   else
     echo "logfile /var/log/subvortex-validator/subvortex-validator-redis.log" >> "$DEST_FILE"
+  fi
+  if grep -q "^requirepass\s*" "$DEST_FILE"; then
+    sed -i "s|^requirepass[[:space:]]*.*|requirepass ${SUBVORTEX_REDIS_PASSWORD:-\"\"}|" "$DEST_FILE"
+  else
+    echo "requirepass ${SUBVORTEX_REDIS_PASSWORD:-\"\"}" >> "$DEST_FILE"
   fi
 else
   echo "🛑 Destination file $DEST_FILE does not exist — cannot apply overrides"

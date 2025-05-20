@@ -18,6 +18,19 @@ fi
 
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/{{ neuron }}/{{ component }}"
 
+# --- Load environment variables from .env file ---
+ENV_FILE="$SERVICE_WORKING_DIR/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  echo "🌱 Loading environment variables from $ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  echo "⚠️ No .env file found at $ENV_FILE"
+fi
+
 {% if type == 'python' %}
 # --- Python project setup ---
 # Set the venv dir
@@ -41,20 +54,9 @@ echo "🧘 Deactivating virtual environment..."
 deactivate
 
 {% elif type == 'package' %}
-# --- Package-based service setup  ---
-echo "📦 Installing package dependencies..."
-# Replace with specific install commands if needed
-# Example: apt-get install -y redis-server
-if command -v apt-get &> /dev/null; then
-  sudo apt-get update
-  sudo apt-get install -y {{ package_name }}
-elif command -v dnf &> /dev/null; then
-  sudo dnf install -y {{ package_name }}
-elif command -v pacman &> /dev/null; then
-  sudo pacman -Sy --noconfirm {{ package_name }}
-else
-  echo "⚠️ Unsupported package manager. Install {{ package_name }} manually."
-fi
+{% if provision_hooks %}
+{{ provision_hooks }}
+{% endif %}
 
 # --- If a systemd unit for the package is running, stop and mask it ---
 if systemctl list-units --type=service --all | grep -q "{{ package_name }}.service"; then
@@ -68,16 +70,41 @@ else
   echo "ℹ️ No active systemd service found for {{ package_name }}.service"
 fi
 
-# Ensure logs to stdout/stderr
-SERVICE_CONF_FILE="/etc/redis/redis.conf"
-echo "📄 Forcing logfile to stdout/stderr (logfile \"\")..."
-if grep -qE '^\s*logfile\s+' "$SERVICE_CONF_FILE"; then
-    sudo sed -i 's|^\s*logfile\s\+.*|logfile ""|' "$SERVICE_CONF_FILE"
-elif grep -q "^# *logfile" "$SERVICE_CONF_FILE"; then
-    sudo sed -i '/^# *logfile/a logfile ""' "$SERVICE_CONF_FILE"
+# --- Handle optional configuration templates ---
+{% if configs %}
+CONFIG_DIR="$SERVICE_WORKING_DIR/deployment/templates"
+
+{% for key, cfg in configs.items() %}
+{% set ext = cfg.ext %}
+{% set template_file = cfg.get('template') or ("subvortex-" ~ neuron ~ "-" ~ component ~ "." ~ ext) %}
+TEMPLATE_FILE="$CONFIG_DIR/{{ template_file }}"
+DEST_FILE="{{ cfg.destination }}"
+
+if [[ -f "$TEMPLATE_FILE" ]]; then
+  echo "📄 Found template: $TEMPLATE_FILE → copying to $DEST_FILE"
+  cp "$TEMPLATE_FILE" "$DEST_FILE"
 else
-    echo 'logfile ""' | sudo tee -a "$SERVICE_CONF_FILE" > /dev/null
+  echo "⚠️ Template not found: $TEMPLATE_FILE — will attempt to patch $DEST_FILE if it exists"
 fi
+
+if [[ -f "$DEST_FILE" ]]; then
+  {% if cfg.overrides %}
+  echo "🔧 Applying overrides to $DEST_FILE"
+  {% for k, v in cfg.overrides.items() %}
+  if grep -q "^{{ k | replace(' ', '\\s*') }}\s*" "$DEST_FILE"; then
+    sed -i "s|^{{ k | replace(' ', '[[:space:]]*') }}[[:space:]]*.*|{{ k }} {{ v }}|" "$DEST_FILE"
+  else
+    echo "{{ k }} {{ v }}" >> "$DEST_FILE"
+  fi
+  {% endfor %}
+  {% endif %}
+else
+  echo "🛑 Destination file $DEST_FILE does not exist — cannot apply overrides"
+fi
+{% endfor %}
+{% else %}
+echo "ℹ️ No custom config files to apply."
+{% endif %}
 
 {% elif type == 'binary' %}
 # --- Binary service setup ---

@@ -18,20 +18,24 @@ fi
 
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner/redis"
 
-# --- Package-based service setup  ---
-echo "📦 Installing package dependencies..."
-# Replace with specific install commands if needed
-# Example: apt-get install -y redis-server
-if command -v apt-get &> /dev/null; then
-  sudo apt-get update
-  sudo apt-get install -y redis-server
-elif command -v dnf &> /dev/null; then
-  sudo dnf install -y redis-server
-elif command -v pacman &> /dev/null; then
-  sudo pacman -Sy --noconfirm redis-server
+# --- Load environment variables from .env file ---
+ENV_FILE="$SERVICE_WORKING_DIR/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  echo "🌱 Loading environment variables from $ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
 else
-  echo "⚠️ Unsupported package manager. Install redis-server manually."
+  echo "⚠️ No .env file found at $ENV_FILE"
 fi
+
+# --- Handle provisioned install/uninstall scripts (if defined) ---
+if [[ "$CURRENT_VERSION" != "$DESIRED_VERSION" ]]; then
+  bash "$SERVICE_WORKING_DIR/provision/redis_server_uninstall.sh"
+fi
+bash "$SERVICE_WORKING_DIR/provision/redis_server_install.sh"
 
 # --- If a systemd unit for the package is running, stop and mask it ---
 if systemctl list-units --type=service --all | grep -q "redis-server.service"; then
@@ -45,15 +49,33 @@ else
   echo "ℹ️ No active systemd service found for redis-server.service"
 fi
 
-# Ensure logs to stdout/stderr
-SERVICE_CONF_FILE="/etc/redis/redis.conf"
-echo "📄 Forcing logfile to stdout/stderr (logfile \"\")..."
-if grep -qE '^\s*logfile\s+' "$SERVICE_CONF_FILE"; then
-    sudo sed -i 's|^\s*logfile\s\+.*|logfile ""|' "$SERVICE_CONF_FILE"
-elif grep -q "^# *logfile" "$SERVICE_CONF_FILE"; then
-    sudo sed -i '/^# *logfile/a logfile ""' "$SERVICE_CONF_FILE"
+# --- Handle optional configuration templates ---
+CONFIG_DIR="$SERVICE_WORKING_DIR/deployment/templates"
+
+TEMPLATE_FILE="$CONFIG_DIR/subvortex-miner-redis.conf"
+DEST_FILE="/etc/redis/redis.conf"
+
+if [[ -f "$TEMPLATE_FILE" ]]; then
+  echo "📄 Found template: $TEMPLATE_FILE → copying to $DEST_FILE"
+  cp "$TEMPLATE_FILE" "$DEST_FILE"
 else
-    echo 'logfile ""' | sudo tee -a "$SERVICE_CONF_FILE" > /dev/null
+  echo "⚠️ Template not found: $TEMPLATE_FILE — will attempt to patch $DEST_FILE if it exists"
+fi
+
+if [[ -f "$DEST_FILE" ]]; then
+  echo "🔧 Applying overrides to $DEST_FILE"
+  if grep -q "^logfile\s*" "$DEST_FILE"; then
+    sed -i "s|^logfile[[:space:]]*.*|logfile \"\"|" "$DEST_FILE"
+  else
+    echo "logfile \"\"" >> "$DEST_FILE"
+  fi
+  if grep -q "^requirepass\s*" "$DEST_FILE"; then
+    sed -i "s|^requirepass[[:space:]]*.*|requirepass ${SUBVORTEX_REDIS_PASSWORD:-\"\"}|" "$DEST_FILE"
+  else
+    echo "requirepass ${SUBVORTEX_REDIS_PASSWORD:-\"\"}" >> "$DEST_FILE"
+  fi
+else
+  echo "🛑 Destination file $DEST_FILE does not exist — cannot apply overrides"
 fi
 
 

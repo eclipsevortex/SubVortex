@@ -27,6 +27,19 @@ SERVICE_TEMPLATE="$SERVICE_WORKING_DIR/deployment/templates/$SERVICE_NAME.servic
 SERVICE_LOG_DIR="/var/log/subvortex-validator"
 TEMP_SERVICE_FILE="/tmp/$SERVICE_NAME.service"
 
+# --- Load environment variables from .env file ---
+ENV_FILE="$SERVICE_WORKING_DIR/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  echo "🌱 Loading environment variables from $ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  echo "⚠️ No .env file found at $ENV_FILE"
+fi
+
 # --- Python project setup ---
 VENV_DIR="$SERVICE_WORKING_DIR/venv"
 

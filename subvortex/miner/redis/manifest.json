@@ -13,7 +13,18 @@
   "common": {
     "user": "redis",
     "group": "redis",
-    "package_name": "redis-server"
+    "package_name": "redis-server",
+    "package_version": "6:8.0.0-1rl1~jammy1",
+    "configs": {
+      "redis.conf": {
+        "ext": "conf",
+        "destination": "/etc/redis/redis.conf",
+        "overrides": {
+          "logfile": "/var/log/subvortex-miner/subvortex-miner-redis.log",
+          "requirepass": "${SUBVORTEX_REDIS_PASSWORD:-\\\"\\\"}"
+        }
+      }
+    }
   },
   "service": {
     "generate_unit": false,
@@ -22,13 +33,13 @@
     },
     "restart": "on-failure",
     "restart_sec": "10s",
-    "log_prefix": "subvortex-miner-redis",
+    "log_prefix": "subvortex-miner-redis"
+  },
+  "process": {
     "configs": {
       "redis.conf": {
-        "ext": "conf",
-        "destination": "/etc/redis/redis.conf",
         "overrides": {
-          "logfile": "/var/log/subvortex-miner/subvortex-miner-redis.log"
+          "logfile": "\\\"\\\""
         }
       }
     }

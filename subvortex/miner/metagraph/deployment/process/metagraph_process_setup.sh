@@ -18,6 +18,19 @@ fi
 
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner/metagraph"
 
+# --- Load environment variables from .env file ---
+ENV_FILE="$SERVICE_WORKING_DIR/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  echo "🌱 Loading environment variables from $ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  echo "⚠️ No .env file found at $ENV_FILE"
+fi
+
 # --- Python project setup ---
 # Set the venv dir
 VENV_DIR="$SERVICE_WORKING_DIR/venv"

@@ -27,6 +27,19 @@ SERVICE_TEMPLATE="$SERVICE_WORKING_DIR/deployment/templates/$SERVICE_NAME.servic
 SERVICE_LOG_DIR="/var/log/subvortex-{{ neuron }}"
 TEMP_SERVICE_FILE="/tmp/$SERVICE_NAME.service"
 
+# --- Load environment variables from .env file ---
+ENV_FILE="$SERVICE_WORKING_DIR/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  echo "🌱 Loading environment variables from $ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  echo "⚠️ No .env file found at $ENV_FILE"
+fi
+
 {% if type == 'python' %}
 # --- Python project setup ---
 VENV_DIR="$SERVICE_WORKING_DIR/venv"
@@ -49,38 +62,9 @@ echo "🧘 Deactivating virtual environment..."
 deactivate
 
 {% elif type == 'package' %}
-# --- Package-based service setup ---
-echo "📦 Installing package dependencies..."
-if command -v apt-get &> /dev/null; then
-  echo "🧹 Removing Redis Labs repository (if present)..."
-  sudo rm -f /etc/apt/sources.list.d/redis.list
-  sudo rm -f /etc/apt/trusted.gpg.d/redis-archive-keyring.gpg
-
-  echo "🧹 Cleaning APT cache and redis-server .deb files..."
-  sudo apt-get clean
-  sudo rm -f /var/cache/apt/archives/redis-server_*.deb || true
-  sudo apt-get update
-
-  echo "📌 Installing {{ package_name }} from Ubuntu repo..."
-  sudo apt-get install --allow-downgrades -y {{ package_name }}
-
-elif command -v dnf &> /dev/null; then
-  echo "🧹 Removing Redis Labs repo from DNF (if present)..."
-  sudo rm -f /etc/yum.repos.d/redis.repo || true
-
-  echo "🧹 Cleaning DNF metadata and cache..."
-  sudo dnf clean all
-  sudo dnf makecache
-  sudo dnf install -y {{ package_name }}
-
-elif command -v pacman &> /dev/null; then
-  echo "🧹 Cleaning Pacman cache for redis-server..."
-  sudo pacman -Scc --noconfirm || true
-  sudo pacman -Sy --noconfirm {{ package_name }}
-
-else
-  echo "⚠️ Unsupported package manager. Please install {{ package_name }} manually."
-fi
+{% if provision_hooks %}
+{{ provision_hooks }}
+{% endif %}
 
 # --- Stop and mask default service to avoid conflict ---
 if systemctl list-unit-files --quiet "{{ package_name }}.service"; then

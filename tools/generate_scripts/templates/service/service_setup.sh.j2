@@ -62,8 +62,9 @@ echo "🧘 Deactivating virtual environment..."
 deactivate
 
 {% elif type == 'package' %}
-{% if provision_hooks %}
-{{ provision_hooks }}
+{% if provision_install %}
+echo "🔧 Running provision install hook..."
+{{ provision_install }}
 {% endif %}
 
 # --- Stop and mask default service to avoid conflict ---

@@ -85,25 +85,10 @@ fi
 
 {% elif type == 'package' %}
 # --- Package service cleanup ---
-echo "📦 Removing package '{{ package_name }}'..."
-
-if command -v apt-get &> /dev/null; then
-    sudo apt-get purge -y {{ package_name }}
-    sudo apt-get autoremove -y
-elif command -v dnf &> /dev/null; then
-    sudo dnf remove -y {{ package_name }}
-elif command -v pacman &> /dev/null; then
-    sudo pacman -Rns --noconfirm {{ package_name }}
-else
-    echo "⚠️ Unsupported package manager. Please uninstall {{ package_name }} manually."
-fi
-
-# Clean up leftover binary if still present
-REDIS_BIN=$(command -v redis-server 2>/dev/null || true)
-if [[ -n "$REDIS_BIN" ]]; then
-    echo "🧹 Removing leftover binary at $REDIS_BIN"
-    sudo rm -f "$REDIS_BIN" || true
-fi
+{% if provision_uninstall %}
+echo "🧹 Running provision uninstall hook..."
+{{ provision_uninstall }}
+{% endif %}
 
 {% elif type == 'binary' %}
 # --- Binary cleanup from /usr/local/bin ---

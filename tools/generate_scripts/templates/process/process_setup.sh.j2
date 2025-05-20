@@ -54,8 +54,9 @@ echo "🧘 Deactivating virtual environment..."
 deactivate
 
 {% elif type == 'package' %}
-{% if provision_hooks %}
-{{ provision_hooks }}
+{% if provision_install %}
+echo "🔧 Running provision install hook..."
+{{ provision_install }}
 {% endif %}
 
 # --- If a systemd unit for the package is running, stop and mask it ---

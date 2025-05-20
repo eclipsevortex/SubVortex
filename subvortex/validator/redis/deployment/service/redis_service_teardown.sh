@@ -71,25 +71,8 @@ else
 fi
 
 # --- Package service cleanup ---
-echo "📦 Removing package 'redis-server'..."
-
-if command -v apt-get &> /dev/null; then
-    sudo apt-get purge -y redis-server
-    sudo apt-get autoremove -y
-elif command -v dnf &> /dev/null; then
-    sudo dnf remove -y redis-server
-elif command -v pacman &> /dev/null; then
-    sudo pacman -Rns --noconfirm redis-server
-else
-    echo "⚠️ Unsupported package manager. Please uninstall redis-server manually."
-fi
-
-# Clean up leftover binary if still present
-REDIS_BIN=$(command -v redis-server 2>/dev/null || true)
-if [[ -n "$REDIS_BIN" ]]; then
-    echo "🧹 Removing leftover binary at $REDIS_BIN"
-    sudo rm -f "$REDIS_BIN" || true
-fi
+echo "🧹 Running provision uninstall hook..."
+bash "$SERVICE_WORKING_DIR/deployment/provision/redis_server_uninstall.sh"
 
 
 echo "✅ $SERVICE_NAME uninstalled successfully."

@@ -8,8 +8,8 @@ import bittensor.core.async_subtensor as btcas
 import subvortex.core.country.country as sccc
 import subvortex.core.core_bittensor.subtensor as scbs
 import subvortex.core.model.neuron.neuron as scmm
-import subvortex.core.metagraph.database as scms
-import subvortex.miner.metagraph.src.settings as smms
+import subvortex.core.metagraph.database as scmd
+import subvortex.core.metagraph.settings as scms
 
 
 class MetagraphObserver:
@@ -20,8 +20,8 @@ class MetagraphObserver:
 
     def __init__(
         self,
-        settings: smms.Settings,
-        database: scms.NeuronDatabase,
+        settings: scms.Settings,
+        database: scmd.NeuronDatabase,
         subtensor: btcas.AsyncSubtensor,
         metagraph: btcm.AsyncMetagraph,
     ):

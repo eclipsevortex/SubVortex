@@ -31,11 +31,8 @@ else
   echo "⚠️ No .env file found at $ENV_FILE"
 fi
 
-# --- Handle provisioned install/uninstall scripts (if defined) ---
-if [[ "$CURRENT_VERSION" != "$DESIRED_VERSION" ]]; then
-  bash "$SERVICE_WORKING_DIR/provision/redis_server_uninstall.sh"
-fi
-bash "$SERVICE_WORKING_DIR/provision/redis_server_install.sh"
+echo "🔧 Running provision install hook..."
+bash "$SERVICE_WORKING_DIR/deployment/provision/redis_server_install.sh"
 
 # --- If a systemd unit for the package is running, stop and mask it ---
 if systemctl list-units --type=service --all | grep -q "redis-server.service"; then

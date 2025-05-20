@@ -113,13 +113,15 @@ def generate_for_component(
         provision_dir = HERE / TEMPLATE_ROOT / "provision"
         output_provision_dir = base_output / "provision"
         package_name = merged_context.get("package_name")
-        provision_hooks = build_install_remove_hooks(
+        provision_hooks_map = build_install_remove_hooks_inline(
             provision_dir=provision_dir,
-            output_provision_dir=output_provision_dir,
+            output_provision_base=output_provision_dir,
             package_name=package_name,
-            context=merged_context,
+            context=merged_context
         )
-        merged_context["provision_hooks"] = provision_hooks
+
+        merged_context["provision_install"] = provision_hooks_map.get("install", "")
+        merged_context["provision_uninstall"] = provision_hooks_map.get("uninstall", "")
 
         env = Environment(
             loader=FileSystemLoader(deployment_template_dir),
@@ -265,6 +267,75 @@ def generate_for_component(
         print(
             f"✅ Global scripts {'would be rendered' if dry_run else 'rendered'} to: {scripts_output_dir}"
         )
+
+
+def build_install_remove_hooks_inline(
+    provision_dir: Path,
+    output_provision_base: Path,
+    package_name: str,
+    context: dict,
+) -> dict:
+    """
+    Generates inline shell command strings for invoking install/uninstall hooks
+    for each deployment type. Does NOT inject the content, just references.
+
+    Returns a dict like:
+    {
+        "process": {
+            "install": "bash \"$SERVICE_WORKING_DIR/provision/process/redis_server_install.sh\"",
+            "uninstall": "bash \"$SERVICE_WORKING_DIR/provision/process/redis_server_uninstall.sh\"",
+        },
+        ...
+    }
+    """
+    DEPLOYMENT_TYPES = ["process", "service", "container"]
+    hooks = {dep: {"install": "", "uninstall": ""} for dep in DEPLOYMENT_TYPES}
+
+    if not package_name:
+        return hooks
+
+    env = Environment(
+        loader=FileSystemLoader(provision_dir),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    provision_name = package_name.lower()
+    provision_script_prefix = provision_name.replace("-", "_")
+
+    install_template_rel = f"{provision_name}/install.sh.j2"
+    uninstall_template_rel = f"{provision_name}/uninstall.sh.j2"
+
+    install_template_path = provision_dir / install_template_rel
+    uninstall_template_path = provision_dir / uninstall_template_rel
+
+    install_rendered = (
+        env.get_template(install_template_rel).render(**context)
+        if install_template_path.exists()
+        else None
+    )
+    uninstall_rendered = (
+        env.get_template(uninstall_template_rel).render(**context)
+        if uninstall_template_path.exists()
+        else None
+    )
+
+    out_dir = output_provision_base
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if install_rendered:
+        install_path = out_dir / f"{provision_script_prefix}_install.sh"
+        install_path.write_text(install_rendered)
+        install_path.chmod(0o755)
+        hooks["install"] = f"bash \"$SERVICE_WORKING_DIR/deployment/provision/{provision_script_prefix}_install.sh\""
+
+    if uninstall_rendered:
+        uninstall_path = out_dir / f"{provision_script_prefix}_uninstall.sh"
+        uninstall_path.write_text(uninstall_rendered)
+        uninstall_path.chmod(0o755)
+        hooks["uninstall"] = f"bash \"$SERVICE_WORKING_DIR/deployment/provision/{provision_script_prefix}_uninstall.sh\""
+
+    return hooks
 
 
 def build_install_remove_hooks(

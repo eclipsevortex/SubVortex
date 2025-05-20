@@ -8,10 +8,10 @@ from subvortex.core.metagraph.database import NeuronDatabase
 
 
 class DummySettings(scms.Settings):
-    redis_host = "localhost"
-    redis_port = 6379
-    redis_index = 0
-    redis_password = "secret"
+    database_host = "localhost"
+    database_port = 6379
+    database_index = 0
+    database_password = "secret"
 
 
 @pytest.fixture

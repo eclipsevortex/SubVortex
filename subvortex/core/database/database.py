@@ -14,10 +14,10 @@ class Database:
 
     async def connect(self):
         self.database = aioredis.StrictRedis(
-            host=self.settings.redis_host,
-            port=self.settings.redis_port,
-            db=self.settings.redis_index,
-            password=self.settings.redis_password,
+            host=self.settings.database_host,
+            port=self.settings.database_port,
+            db=self.settings.database_index,
+            password=self.settings.database_password,
         )
 
         btul.logging.info("Connected to Redis", prefix=self.settings.logging_name)

@@ -43,19 +43,19 @@ def test_default_settings():
     assert settings.logging_name == "Metagraph"
     assert settings.key_prefix == "sv"
     assert settings.netuid == 7
-    assert settings.redis_host == "localhost"
-    assert settings.redis_port == 6379
-    assert settings.redis_index == 0
-    assert settings.redis_password is None
+    assert settings.database_host == "localhost"
+    assert settings.database_port == 6379
+    assert settings.database_index == 0
+    assert settings.database_password is None
 
 
 def test_custom_settings():
     # Set environment variables
     os.environ["SUBVORTEX_NETUID"] = "92"
-    os.environ["SUBVORTEX_REDIS_HOST"] = "192.168.10.1"
-    os.environ["SUBVORTEX_REDIS_PORT"] = "6380"
-    os.environ["SUBVORTEX_REDIS_INDEX"] = "14"
-    os.environ["SUBVORTEX_REDIS_PASSWORD"] = "mypassword"
+    os.environ["SUBVORTEX_DATABASE_HOST"] = "192.168.10.1"
+    os.environ["SUBVORTEX_DATABASE_PORT"] = "6380"
+    os.environ["SUBVORTEX_DATABASE_INDEX"] = "14"
+    os.environ["SUBVORTEX_DATABASE_PASSWORD"] = "mypassword"
 
     # Create parser and config
     config, parser = create_config()
@@ -66,10 +66,10 @@ def test_custom_settings():
 
     # Assert config reflects env vars
     assert settings.netuid == 92
-    assert settings.redis_host == "192.168.10.1"
-    assert settings.redis_port == 6380
-    assert settings.redis_index == 14
-    assert settings.redis_password == "mypassword"
+    assert settings.database_host == "192.168.10.1"
+    assert settings.database_port == 6380
+    assert settings.database_index == 14
+    assert settings.database_password == "mypassword"
 
 
 def test_readonly_settings():
@@ -102,10 +102,10 @@ def test_settings_are_not_included_in_config():
     assert "logging_name" not in config_dict
     assert "key_prefix" not in config_dict
     assert "netuid" not in config_dict
-    assert "redis_host" not in config_dict
-    assert "redis_port" not in config_dict
-    assert "redis_index" not in config_dict
-    assert "redis_password" not in config_dict
+    assert "database_host" not in config_dict
+    assert "database_port" not in config_dict
+    assert "database_index" not in config_dict
+    assert "database_password" not in config_dict
 
 
 def test_custom_config():

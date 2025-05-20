@@ -83,6 +83,6 @@ fi
 echo "🔧 Unmasking redis-server service (if previously masked)..."
 sudo systemctl stop redis-server.service || true
 sudo systemctl disable redis-server.service || true
-sudo systemctl unmask redis-server.service || true
+sudo systemctl mask redis-server.service || true
 
 echo "✅ redis-server installation complete."

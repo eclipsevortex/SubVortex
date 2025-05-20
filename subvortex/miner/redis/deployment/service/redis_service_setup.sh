@@ -77,11 +77,11 @@ if [[ -n "$BASE_UNIT_PATH" && -e "$BASE_UNIT_PATH" ]]; then
     echo "Alias=$SERVICE_NAME.service" >> "$CUSTOM_UNIT_PATH"
   fi
 
-  echo "✏️ Replacing PIDFile with /run/redis-server..pid"
+  echo "✏️ Replacing PIDFile with /run/redis-server.pid"
   if grep -q "^PIDFile=" "$CUSTOM_UNIT_PATH"; then
-    sed -i "s|^PIDFile=.*|PIDFile=/run/redis-server..pid|" "$CUSTOM_UNIT_PATH"
+    sed -i "s|^PIDFile=.*|PIDFile=/run/redis-server.pid|" "$CUSTOM_UNIT_PATH"
   else
-    echo "PIDFile=/var/run/redis-server..pid" >> "$CUSTOM_UNIT_PATH"
+    echo "PIDFile=/var/run/redis-server.pid" >> "$CUSTOM_UNIT_PATH"
   fi
 
   echo "✏️ Replacing ReadWritePaths inline"

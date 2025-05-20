@@ -43,7 +43,7 @@ else
         --name "$SERVICE_NAME" \
         --uid "redis" \
         --gid "redis" \
-        --cwd "$SERVICE_WORKING_DIR" 
+        --cwd "$SERVICE_WORKING_DIR" \
         -- "/etc/redis/redis.conf" \
         --daemonize no
 fi

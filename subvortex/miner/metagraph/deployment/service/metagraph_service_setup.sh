@@ -21,6 +21,7 @@ else
   echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
 fi
 
+PROJECT_EXECUTION_DIR="${SUBVORTEX_EXECUTION_DIR:-$PROJECT_WORKING_DIR}"
 SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner/metagraph"
 SERVICE_TEMPLATE="$SERVICE_WORKING_DIR/deployment/templates/$SERVICE_NAME.service"
@@ -79,7 +80,7 @@ touch "${LOG_PREFIX}.log" "${LOG_PREFIX}-error.log"
 chown root:root "${LOG_PREFIX}.log" "${LOG_PREFIX}-error.log"
 
 echo "📝 Preparing systemd service file from template..."
-sed "s|<WORKING_DIR>|$PROJECT_WORKING_DIR|g" "$SERVICE_TEMPLATE" > "$TEMP_SERVICE_FILE"
+sed "s|<WORKING_DIR>|$PROJECT_EXECUTION_DIR|g" "$SERVICE_TEMPLATE" > "$TEMP_SERVICE_FILE"
 
 echo "📝 Installing systemd service file to $SERVICE_FILE..."
 mv "$TEMP_SERVICE_FILE" "$SERVICE_FILE"

@@ -16,6 +16,7 @@ else
   echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
 fi
 
+PROJECT_EXECUTION_DIR="${SUBVORTEX_EXECUTION_DIR:-$PROJECT_WORKING_DIR}"
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner/neuron"
 
 # Stop and delete the PM2 process

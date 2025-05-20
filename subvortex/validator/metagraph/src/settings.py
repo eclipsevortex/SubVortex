@@ -6,22 +6,22 @@ from subvortex.core.metagraph.settings import Settings as MetagraphSettings
 
 @dataclass
 class Settings(MetagraphSettings):
-    redis_host: str = "localhost"
+    database_host: str = "localhost"
     """
     Host of the redis instance
     """
 
-    redis_port: int = 6379
+    database_port: int = 6379
     """
     Port of the redis instance
     """
 
-    redis_index: int = 0
+    database_index: int = 0
     """
     Index of the redis instance
     """
 
-    redis_password: str = None
+    database_password: str = None
     """
     Password of the redis instance
     """

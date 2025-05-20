@@ -181,7 +181,7 @@ class Validator:
         btul.logging.debug(str(self.dendrite))
 
         # Check if the connection to the database is successful
-        await check_redis_connection(port=self.settings.redis_port)
+        await check_redis_connection(port=self.settings.database_port)
 
         # Wait until the metagraph is ready
         await self.database.wait_until_ready("metagraph")

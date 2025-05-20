@@ -24,6 +24,10 @@ from subvortex.core.shared.checks import *
 async def check_redis_connection(port, redis_conf_path: str = "/etc/redis/redis.conf"):
     redis_password = _get_redis_password(redis_conf_path)
 
+    # When coming from redis.conf no password is an empty string
+    if redis_password == "":
+        redis_password = None
+
     assert port is not None, "Redis server port not found"
     try:
         client = aioredis.StrictRedis(

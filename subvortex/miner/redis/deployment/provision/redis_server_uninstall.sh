@@ -43,11 +43,29 @@ sudo rm -rf /var/lib/redis
 
 # Remove potential leftover systemd unit
 sudo rm -f /etc/systemd/system/redis.service
+sudo rm -f /etc/systemd/system/redis-server.service
+sudo systemctl daemon-reload
 
-# --- Clean binaries from manual installation ---
-echo "🗑️ Removing manually installed Redis binaries and configs..."
-sudo rm -f /usr/local/bin/redis-server
-sudo rm -f /usr/local/bin/redis-cli
+# --- Clean binaries from common paths ---
+echo "🗑️ Removing Redis binaries from all known locations..."
+
+BIN_PATHS=(
+  "/usr/local/bin/redis-server"
+  "/usr/local/bin/redis-cli"
+  "/usr/bin/redis-server"
+  "/usr/bin/redis-cli"
+  "/usr/sbin/redis-server"
+  "/usr/sbin/redis-cli"
+)
+
+for bin in "${BIN_PATHS[@]}"; do
+  if [[ -f "$bin" ]]; then
+    echo "❌ Removing $bin"
+    sudo rm -f "$bin"
+  fi
+done
+
+# --- Clean manually installed configs and data dirs ---
 sudo rm -rf /usr/local/etc/redis
 sudo rm -rf /usr/local/var/redis
 

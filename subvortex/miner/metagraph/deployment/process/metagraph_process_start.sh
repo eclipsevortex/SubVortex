@@ -18,6 +18,16 @@ fi
 
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner/metagraph"
 
+echo "🔍 Checking $SERVICE_NAME..."
+if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
+    CURRENT_CWD=$(pm2 info "$SERVICE_NAME" | grep -E 'exec cwd' | sed -E 's/.*exec cwd\s+│\s+([^ ]+)\s+.*/\1/')
+    if [[ "$CURRENT_CWD" != "$SERVICE_WORKING_DIR" ]]; then
+        echo "⚠️  CWD mismatch for $SERVICE_NAME (current: $CURRENT_CWD, expected: $SERVICE_WORKING_DIR)"
+        echo "💥 Deleting $SERVICE_NAME to recreate with updated CWD..."
+        pm2 delete "$SERVICE_NAME"
+    fi
+fi
+
 # Set the venv dir
 VENV_DIR="$SERVICE_WORKING_DIR/venv"
 
@@ -30,8 +40,13 @@ export $(grep -v '^#' $SERVICE_WORKING_DIR/.env | xargs)
 # Start or reload process
 echo "🔍 Checking $SERVICE_NAME..."
 if pm2 describe "$SERVICE_NAME" >/dev/null 2>&1; then
-    echo "🔁 Restarting $SERVICE_NAME with updated CLI args: ${ARGS[*]}"
-    pm2 restart "$SERVICE_NAME" --update-env
+    if pm2 status "$SERVICE_NAME" | grep -q "online"; then
+        echo "🔁 $SERVICE_NAME is already running — reloading..."
+        pm2 reload "$SERVICE_NAME" --update-env
+    else
+        echo "♻️ $SERVICE_NAME exists but not running — restarting..."
+        pm2 restart "$SERVICE_NAME" --update-env
+    fi
 else
     echo "🚀 No existing process found — starting $SERVICE_NAME via PM2..."
     pm2 start "$SERVICE_WORKING_DIR/src/main.py" \

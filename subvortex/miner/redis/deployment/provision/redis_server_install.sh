@@ -83,8 +83,4 @@ fi
 echo "🔧 Unmasking redis-server service (if previously masked)..."
 sudo systemctl unmask redis-server.service || true
 
-echo "🚀 Enabling and starting redis-server..."
-sudo systemctl enable redis-server
-sudo systemctl restart redis-server
-
 echo "✅ redis-server installation complete."

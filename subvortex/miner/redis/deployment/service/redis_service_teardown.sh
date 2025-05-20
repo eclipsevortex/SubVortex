@@ -22,6 +22,7 @@ else
   echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
 fi
 
+PROJECT_EXECUTION_DIR="${SUBVORTEX_EXECUTION_DIR:-$PROJECT_WORKING_DIR}"
 SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
 SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner/redis"
 SERVICE_LOG_DIR="/var/log/subvortex-miner"

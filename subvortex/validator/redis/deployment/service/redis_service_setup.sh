@@ -87,14 +87,17 @@ if [[ -n "$BASE_UNIT_PATH" && -e "$BASE_UNIT_PATH" ]]; then
   echo "✏️ Replacing ReadWritePaths inline"
   awk '
     BEGIN {
-      replaced = 0;
-      replacement = "ReadWritePaths=-/var/lib/redis -/var/log/redis -/run/redis -/var/log/subvortex-validator";
+      done = 0;
     }
-    /^ReadWritePaths=/ {
-      if (!replaced) {
-        print replacement;
-        replaced = 1;
-      }
+    /^ReadWriteDirectories=/ && !done {
+      print "ReadWriteDirectories=-/var/lib/redis"
+      print "ReadWriteDirectories=-/var/log/redis"
+      print "ReadWriteDirectories=-/run/redis"
+      print "ReadWriteDirectories=-/var/log/subvortex-validator"
+      done = 1;
+      next;
+    }
+    /^ReadWriteDirectories=/ && done {
       next;
     }
     { print }

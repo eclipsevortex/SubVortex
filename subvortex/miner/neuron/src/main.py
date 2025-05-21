@@ -60,7 +60,6 @@ from subvortex.miner.neuron.src.neuron import (
     wait_until_no_multiple_occurrences,
     get_validators,
 )
-from subvortex.miner.neuron.src.subtensor import SubtensorProxy
 
 # Load the environment variables for the whole process
 load_dotenv(override=True)

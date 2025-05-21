@@ -70,14 +70,14 @@ sudo apt-get update
 if [[ -n "$REDIS_VERSION" ]]; then
   echo "📥 Installing redis version: $REDIS_VERSION"
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    -o Dpkg::Options::="--force-confnew" "redis=${REDIS_VERSION}" \
+    -o Dpkg::Options::="--force-confnew" \
     "redis=$REDIS_VERSION" \
     "redis-server=$REDIS_VERSION" \
     "redis-tools=$REDIS_VERSION"
 else
   echo "📥 Installing latest available redis..."
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    -o Dpkg::Options::="--force-confnew" redis
+    -o Dpkg::Options::="--force-confnew" redis redis-server redis-tools
 fi
 
 echo "🔧 Unmasking redis-server service (if previously masked)..."

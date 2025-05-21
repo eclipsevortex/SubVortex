@@ -8,29 +8,42 @@ sudo systemctl mask redis-server.service || true
 
 # --- Remove redis-server based on package manager ---
 if command -v apt-get &> /dev/null; then
-  if dpkg -l | grep -q redis-server; then
-    echo "📦 Removing redis-server via APT..."
-    sudo apt-get remove --purge -y redis-server redis-tools || true
-    sudo apt-get autoremove -y
-    sudo apt-get autoclean
-  fi
+  echo "📦 Checking for Redis packages (APT)..."
+  REDIS_PKGS=(redis redis-server redis-tools)
+
+  for pkg in "${REDIS_PKGS[@]}"; do
+    if dpkg -l | grep -q "^ii  $pkg"; then
+      echo "❌ Removing $pkg via APT..."
+      sudo apt-get purge -y "$pkg" || true
+    fi
+  done
+
+  echo "🧼 Final APT cleanup..."
+  sudo apt-get autoremove -y
+  sudo apt-get autoclean
 
   echo "🧼 Cleaning Redis APT sources..."
   sudo rm -f /etc/apt/sources.list.d/redis.list
   sudo rm -f /usr/share/keyrings/redis-archive-keyring.gpg
 
 elif command -v dnf &> /dev/null; then
-  if rpm -q redis &> /dev/null || rpm -q redis-server &> /dev/null; then
-    echo "📦 Removing redis via DNF..."
-    sudo dnf remove -y redis redis-utils || true
-  fi
+  echo "📦 Checking for Redis packages (DNF)..."
+  REDIS_PKGS=(redis redis-server redis-utils)
+
+  for pkg in "${REDIS_PKGS[@]}"; do
+    if rpm -q "$pkg" &> /dev/null; then
+      echo "❌ Removing $pkg via DNF..."
+      sudo dnf remove -y "$pkg" || true
+    fi
+  done
 
   echo "🧼 Cleaning Redis DNF/YUM repos..."
   sudo rm -f /etc/yum.repos.d/redis.repo
 
 elif command -v pacman &> /dev/null; then
+  echo "📦 Checking for Redis package (Pacman)..."
   if pacman -Qi redis &> /dev/null; then
-    echo "📦 Removing redis via Pacman..."
+    echo "❌ Removing redis via Pacman..."
     sudo pacman -Rns --noconfirm redis || true
   fi
 fi

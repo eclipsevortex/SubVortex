@@ -20,6 +20,48 @@ fi
 PROJECT_EXECUTION_DIR="${SUBVORTEX_EXECUTION_DIR:-$PROJECT_WORKING_DIR}"
 NEURON_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner"
 
+show_help() {
+    echo "Usage: $0 [--recreate]"
+    echo
+    echo "Description:"
+    echo "  This script start the miner neuron"
+    echo
+    echo "Options:"
+    echo "  --recreate    True if you want to recreate the container, false otherwise. Used when .env or volume have changed"
+    echo "  --help        Show this help message"
+    exit 0
+}
+
+OPTIONS="rh"
+LONGOPTIONS="recreate,help"
+
+# Parse the options and their arguments
+params="$(getopt -o $OPTIONS -l $LONGOPTIONS: --name "$0" -- "$@")"
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+# Set defaults from env (can be overridden by arguments)
+RECREATE=false
+
+# Parse command-line arguments
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -r|--recreate)
+            RECREATE=true
+            shift
+        ;;
+        -h | --help)
+            show_help
+            exit 0
+        ;;
+        *)
+            echo "Unrecognized option '$1'"
+            exit 1
+        ;;
+    esac
+done
+
 # Detect Docker Compose command
 echo "🔎 Detecting Docker Compose command..."
 if command -v docker &> /dev/null && docker compose version &> /dev/null; then

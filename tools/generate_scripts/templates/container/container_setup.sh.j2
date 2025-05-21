@@ -39,7 +39,7 @@ if [ -n "${SUBVORTEX_LOCAL:-}" ]; then
     $DOCKER_CMD -f "$NEURON_WORKING_DIR/docker-compose.local.yml" build "$SERVICE_KEY"
 else
     echo "🌐 Pulling miner-neuron image from remote registry..."
-    $DOCKER_CMD -f "$NEURON_WORKING_DIR/docker-compose.yml pull" "$SERVICE_KEY"
+    $DOCKER_CMD -f "$NEURON_WORKING_DIR/docker-compose.yml" pull "$SERVICE_KEY"
 fi
 
 echo "✅ $SERVICE_NAME installed successfully."

@@ -134,7 +134,7 @@ class Miner:
         self.lock = asyncio.Lock()
         self.request_timestamps: typing.Dict = {}
         self.previous_last_updates = []
-        self.previous_last_update = None
+        self.previous_last_updated = None
         self.block_queue = asyncio.Queue()
 
         self.step = 0
@@ -266,14 +266,6 @@ class Miner:
         btul.logging.info("loading database")
         self.database = Database(settings=self.settings)
 
-        # Get the neuron
-        self.neurons = await self.database.get_neurons()
-        btul.logging.debug(f"Neurons loaded {len(self.neurons)}")
-
-        # Get the neuron
-        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
-        btul.logging.debug(f"Miner based in {self.neuron.country}")
-
         # The axon handles request processing, allowing validators to send this process requests.
         self.axon = (
             MockAxon(
@@ -302,6 +294,14 @@ class Miner:
 
         # Wait until the metagraph is ready
         await self.database.wait_until_ready("metagraph")
+
+        # Get the neuron
+        self.neurons = await self.database.get_neurons()
+        btul.logging.debug(f"Neurons loaded {len(self.neurons)}")
+
+        # Get the neuron
+        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
+        btul.logging.debug(f"Miner based in {self.neuron.country}")
 
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip have changed.
@@ -343,22 +343,29 @@ class Miner:
                     last_updated = await self.database.get_neuron_last_updated()
 
                     # Check if the neurons have been updated
-                    if self.previous_last_update != last_updated:
+                    if self.previous_last_updated != last_updated:
                         btul.logging.debug(f"Neurons changed at block #{last_updated}")
 
-                        self.previous_last_update and btul.logging.debug(
+                        self.previous_last_updated and btul.logging.debug(
                             f"Neurons changed"
                         )
 
-                        self.previous_last_update = last_updated
+                        # Store the new last updated
+                        self.previous_last_updated = last_updated
+
+                        # Get the list of neurons
                         self.neurons = await self.database.get_neurons()
+
+                        # Get the validator neuron
                         self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
 
+                        # Wait until there is only one neuron for the ip
                         btul.logging.debug("Checking ip occurrences...")
                         await wait_until_no_multiple_occurrences(
                             database=self.database, ip=self.neuron.ip
                         )
 
+                        # Wait until the neuron is registered
                         btul.logging.debug("Checking registration...")
                         await wait_until_registered(
                             database=self.database,

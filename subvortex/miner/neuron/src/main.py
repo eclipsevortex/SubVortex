@@ -14,7 +14,6 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import sys
 import typing
 import asyncio
 import threading
@@ -58,7 +57,10 @@ from subvortex.miner.neuron.src.config import (
 from subvortex.miner.neuron.src.utils import load_request_log
 from subvortex.miner.neuron.src.settings import Settings
 from subvortex.miner.neuron.src.database import Database
-from subvortex.miner.neuron.src.neuron import wait_until_no_multiple_occurrences
+from subvortex.miner.neuron.src.neuron import (
+    wait_until_no_multiple_occurrences,
+    get_validators,
+)
 
 # Load the environment variables for the whole process
 load_dotenv(override=True)
@@ -144,10 +146,10 @@ class Miner:
         synapse_type = type(synapse).__name__
 
         # Get the list of all validators
-        validators = self.metagraph.get_validators(0)
+        validators = get_validators(neurons=self.neurons)
 
         # Get the validator associated to the hotkey
-        validator = next((x for x in validators if x[1] == caller), None)
+        validator = next((x for x in validators if x.hotkey == caller), None)
 
         # Block hotkeys that are not an active validator hotkey
         if not validator:
@@ -166,7 +168,7 @@ class Miner:
 
         # Block hotkeys that do not have the minimum require stake to set weight
         weights_min_stake = get_weights_min_stake(self.subtensor.substrate)
-        if validator[2] < weights_min_stake:
+        if validator.stake < weights_min_stake:
             btul.logging.debug(
                 f"Blacklisted a {synapse_type} request from a not enought stake hotkey {caller}"
             )
@@ -263,7 +265,11 @@ class Miner:
         self.database = Database(settings=self.settings)
 
         # Get the neuron
-        self.neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
+        self.neurons = await self.database.get_neurons()
+        btul.logging.debug(f"Neurons loaded {len(self.neurons)}")
+
+        # Get the neuron
+        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
         btul.logging.debug(f"Miner based in {self.neuron.country}")
 
         # The axon handles request processing, allowing validators to send this process requests.
@@ -307,6 +313,9 @@ class Miner:
         btul.logging.info(f"Starting axon server on port: {self.config.axon.port}")
         self.axon.start()
 
+        # Update firewall if enabled
+        self.firewall and self.update_firewall()
+
         try:
             previous_last_update = None
             current_block = 0
@@ -333,6 +342,9 @@ class Miner:
                     # Get the last update of the neurons
                     last_updated = await self.database.get_neuron_last_updated()
 
+                    # Avoir to triggers the following on start
+                    previous_last_update = previous_last_update or last_updated
+
                     # Check if the neurons have been updated
                     if previous_last_update != last_updated:
                         # At least one neuron has changed
@@ -341,10 +353,11 @@ class Miner:
                         # Store the new last updated
                         previous_last_update = last_updated
 
+                        # Load the neurons
+                        self.neurons = await self.database.get_neurons()
+
                         # Update the current neuron
-                        self.neuron = await self.database.get_neuron(
-                            self.wallet.hotkey.ss58_address
-                        )
+                        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
 
                         # Update firewall if enabled
                         self.firewall and self.update_firewall()
@@ -388,8 +401,10 @@ class Miner:
         btul.logging.debug(f"Firewall specifications {specifications}")
 
         # Define the valid validators
-        validators = self.metagraph.get_validators(weights_min_stake)
-        valid_validators = [x[1] for x in validators]
+        validators = get_validators(
+            neurons=self.neurons, weights_min_stake=weights_min_stake
+        )
+        valid_validators = [x.hotkey for x in validators]
 
         # Update the firewall
         self.firewall.update(

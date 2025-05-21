@@ -29,6 +29,13 @@ class Miner:
     suspicious: bool = False
     penalty_factor: int = None
 
+    # Axon information
+    axon_version: str = None
+    ip_type: int = 0
+    protocol: int = 4
+    placeholder1: int = 0
+    placeholder2: int = 0
+
     @property
     def axon(self):
         AxonInfo.from_dict(
@@ -36,7 +43,12 @@ class Miner:
                 "coldkey": self.coldkey,
                 "hotkey": self.hotkey,
                 "ip": self.ip,
+                "ip_type": self.ip_type,
                 "port": self.port,
+                "version": self.axon_version,
+                "protocol": self.protocol,
+                "placeholder1": self.placeholder1,
+                "placeholder2": self.placeholder2,
             }
         )
 

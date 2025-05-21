@@ -20,8 +20,12 @@ class Neuron:
     last_update: int = 0
     validator_permit: bool = False
     ip: str = ""
+    ip_type: int = 0
     port: int = 0
     version: str = "0.0.0"
+    protocol: int = 4
+    placeholder1: int = 0
+    placeholder2: int = 0
     is_serving: bool = False
     country: Optional[str] = None
 
@@ -57,8 +61,12 @@ class Neuron:
             last_update=int(data["last_update"]),
             validator_permit=bool(int(data["validator_permit"])),
             ip=data["ip"],
+            ip_type=int(data["ip_type"]),
             port=int(data["port"]),
             version=data["version"],
+            protocol=int(data["protocol"]),
+            placeholder1=int(data["placeholder1"]),
+            placeholder2=int(data["placeholder2"]),
             is_serving=bool(int(data["is_serving"])),
             country=data.get("country", "") or None,
         )
@@ -84,8 +92,12 @@ class Neuron:
             last_update=neuron.last_update,
             validator_permit=neuron.validator_permit,
             ip=neuron.axon_info.ip,
+            ip_type=neuron.axon_info.ip_type,
+            protocol=neuron.axon_info.protocol,
             port=neuron.axon_info.port,
             version=neuron.axon_info.version,
+            placeholder1=neuron.axon_info.placeholder1,
+            placeholder2=neuron.axon_info.placeholder2,
             is_serving=neuron.axon_info.is_serving,
         )
 

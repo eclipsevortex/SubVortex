@@ -43,6 +43,11 @@ async def get_miners(database: Database) -> List[Miner]:
         miner.coldkey = neuron.coldkey
         miner.hotkey = neuron.hotkey
         miner.country = neuron.country
+        miner.axon_version = neuron.version
+        miner.ip_type = neuron.ip_type
+        miner.protocol = neuron.protocol
+        miner.placeholder1 = neuron.placeholder1
+        miner.placeholder2 = neuron.placeholder2
 
         # Add the new miner to the list
         miners.append(miner)
@@ -84,6 +89,11 @@ async def sync_miners(
         miner.coldkey = neuron.coldkey
         miner.hotkey = neuron.hotkey
         miner.country = neuron.country
+        miner.axon_version = neuron.version
+        miner.ip_type = neuron.ip_type
+        miner.protocol = neuron.protocol
+        miner.placeholder1 = neuron.placeholder1
+        miner.placeholder2 = neuron.placeholder2
 
         # Check if the miner has changed ownership
         if current_miner.hotkey != hotkey:

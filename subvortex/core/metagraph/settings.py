@@ -25,6 +25,11 @@ class Settings:
     Force resync every X blocks to keep neuron data fresh
     """
 
+    dry_run: bool = False
+    """
+    Run the metagraph in dry mode
+    """
+
     @classmethod
     def create(cls) -> "Settings":
         return scsu.create_settings_instance(cls)

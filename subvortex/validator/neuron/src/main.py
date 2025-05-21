@@ -221,19 +221,13 @@ class Validator:
             while True:
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
-                btul.logging.debug(f"Neurons last updated #{last_updated}")
-
-                # Check registration
-                btul.logging.debug("Checking registration...")
-                await wait_until_registered(database=self.database, hotkey=self.wallet.hotkey.ss58_address)
-               
-                # Avoid to triggers the following on start
-                previous_last_update = previous_last_update or last_updated
 
                 # Check if the neurons have changed
                 if previous_last_update != last_updated:
+                    btul.logging.debug(f"Neurons changed at block #{last_updated}")
+
                     # At least one neuron has changed
-                    btul.logging.debug(f"Neurons changed, rsync miners")
+                    previous_last_update and btul.logging.debug(f"Neurons changed, rsync miners")
 
                     # Store the new last updated
                     previous_last_update = last_updated
@@ -244,6 +238,10 @@ class Validator:
 
                     # Refresh the validator neuron
                     self.neuron = neurons.get(self.neuron.hotkey)
+
+                    # Check registration
+                    btul.logging.debug("Checking registration...")
+                    await wait_until_registered(database=self.database, hotkey=self.wallet.hotkey.ss58_address)
 
                     # Get the locations
                     locations = self.country_service.get_locations()

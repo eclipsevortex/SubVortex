@@ -21,6 +21,9 @@ load_dotenv(override=True)
 async def wait_for_database_connection(
     settings: smme.Settings, database: scmms.NeuronDatabase
 ) -> None:
+    if settings.dry_run:
+        return
+
     btul.logging.warning(
         "⏳ Waiting for Redis to become available...",
         prefix=settings.logging_name,
@@ -66,8 +69,10 @@ async def main():
         await subtensor.initialize()
         btul.logging.info(str(subtensor))
 
+        settings.dry_run and btul.logging.info("Dry run mode enabled")
+
         # Initialize the metagraph
-        # TODO: Tell OTF if i provide the subtensor the network wil be finney even if the subtensor is in test!
+        # TODO: Tell OTF if I provide the subtensor the network will be finney even if the subtensor is in test!
         metagraph = btcm.AsyncMetagraph(
             netuid=settings.netuid, network=subtensor.network, sync=False
         )

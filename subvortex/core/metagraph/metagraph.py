@@ -192,7 +192,9 @@ class MetagraphObserver:
                 f"Deleting old neuron hotkeys: {neurons_to_delete}",
                 prefix=self.settings.logging_name,
             )
-            await self.database.remove_neurons(neurons_to_delete)
+            not self.settings.dry_run and await self.database.remove_neurons(
+                neurons_to_delete
+            )
 
         # Persist updated neurons
         if updated_neurons:
@@ -200,12 +202,14 @@ class MetagraphObserver:
                 f"# of changed neurons: {len(updated_neurons)}",
                 prefix=self.settings.logging_name,
             )
-            await self.database.update_neurons(updated_neurons)
+            not self.settings.dry_run and await self.database.update_neurons(
+                updated_neurons
+            )
 
         # Only update Redis if something changed
         if updated_neurons or neurons_to_delete:
             block = await self.subtensor.get_current_block()
-            await self.database.set_last_updated(block)
+            not self.settings.dry_run and await self.database.set_last_updated(block)
             btul.logging.debug(
                 f"Last updated block set to #{block}",
                 prefix=self.settings.logging_name,
@@ -221,10 +225,10 @@ class MetagraphObserver:
             return ready
 
         btul.logging.debug("Mark metagraph as ready", prefix=self.settings.logging_name)
-        await self.database.mark_as_ready()
+        not self.settings.dry_run and await self.database.mark_as_ready()
 
         btul.logging.debug("Notify metagraph state", prefix=self.settings.logging_name)
-        await self.database.notify_state()
+        not self.settings.dry_run and await self.database.notify_state()
 
         return True
 
@@ -253,7 +257,7 @@ class MetagraphObserver:
                     prefix=self.settings.logging_name,
                 )
                 return False, 0
-            
+
             return False, registration_count
 
         btul.logging.debug(

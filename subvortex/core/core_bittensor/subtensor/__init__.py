@@ -7,7 +7,7 @@ from .subtensor import (
     process_weights_for_netuid,
     get_number_of_neurons,
     get_next_block,
-    get_hyperparameter_value
+    get_hyperparameter_value,
 )
 
 from .subtensor_settings import Settings
@@ -22,5 +22,5 @@ __all__ = [
     "process_weights_for_netuid",
     "get_number_of_neurons",
     "get_next_block",
-    "get_hyperparameter_value"
+    "get_hyperparameter_value",
 ]

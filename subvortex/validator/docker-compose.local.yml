@@ -16,6 +16,25 @@ services:
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets
 
+  validator-metagraph:
+    build:
+      context: ../../
+      dockerfile: ./subvortex/validator/metagraph/Dockerfile
+      additional_contexts:
+        wheelbuilder: docker-image://ghcr.io/eclipsevortex/subvortex-wheel-builder:latest
+    container_name: subvortex-validator-metagraph
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    env_file:
+      - ./metagraph/.env
+    depends_on:
+      - validator-redis
+    volumes:
+      - ~/.bittensor/wallets:/root/.bittensor/wallets
+
   validator-redis:
     build:
       context: ../../

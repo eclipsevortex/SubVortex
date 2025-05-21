@@ -14,6 +14,21 @@ services:
     volumes:
       - ~/.bittensor:/root/.bittensor
 
+  validator-metagraph:
+    image: ghcr.io/eclipsevortex/subvortex-validator-metagraph:${SUBVORTEX_FLOATTING_FLAG:-latest}
+    container_name: subvortex-validator-metagraph
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    env_file:
+      - ./metagraph/.env
+    depends_on:
+      - validator-redis
+    volumes:
+      - ~/.bittensor:/root/.bittensor
+
   validator-redis:
     image: ghcr.io/eclipsevortex/subvortex-validator-redis:${SUBVORTEX_FLOATTING_FLAG:-latest}
     container_name: subvortex-validator-redis

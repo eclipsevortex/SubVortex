@@ -77,7 +77,7 @@ if [[ -n "$REDIS_VERSION" ]]; then
 else
   echo "📥 Installing latest available redis..."
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    -o Dpkg::Options::="--force-confnew" redis
+    -o Dpkg::Options::="--force-confnew" redis redis-server redis-tools
 fi
 
 echo "🔧 Unmasking redis-server service (if previously masked)..."

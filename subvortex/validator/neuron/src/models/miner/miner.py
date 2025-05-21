@@ -38,7 +38,7 @@ class Miner:
 
     @property
     def axon(self):
-        AxonInfo.from_dict(
+        return AxonInfo.from_dict(
             {
                 "coldkey": self.coldkey,
                 "hotkey": self.hotkey,

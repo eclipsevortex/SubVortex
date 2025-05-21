@@ -14,9 +14,16 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import bittensor.utils.btlogging as btul
 
-from . import neuron
-from . import ecc
-from . import subtensor
-from . import utils
-from . import weights
+from subvortex.core.database.database import Database
+
+
+async def wait_until_registered(database: Database, hotkey: str):
+    good_to_go = False
+
+    while not good_to_go:
+        neuron = await database.get_neuron(hotkey)
+        good_to_go = neuron is not None
+
+    btul.logging.debug("Check registration successful")

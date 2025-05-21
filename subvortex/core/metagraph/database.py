@@ -4,7 +4,7 @@ import traceback
 import bittensor.utils.btlogging as btul
 
 import subvortex.core.model.neuron.neuron as scmm
-from subvortex.core.database.database_utils import decode_hash
+from subvortex.core.database.database_utils import decode_hash, decode_value
 from subvortex.core.database.database import Database as BaseDatabase
 from subvortex.core.model.neuron import (
     Neuron,
@@ -87,6 +87,29 @@ class NeuronReadOnlyDatabase(BaseDatabase):
 
         return []
 
+    async def get_neuron_last_updated(self):
+        """
+        Get the block of the last time the metagraph has been updated
+        """
+        # Ensure the connection is up and running
+        await self.ensure_connection()
+
+        try:
+            raw = await self.database.get(self._key("state:neuron:last_updated"))
+            return int(decode_value(raw) or 0)
+
+        except Exception as ex:
+            btul.logging.error(
+                f"[get_last_updated] Failed to read last updated block: {ex}",
+                prefix=self.settings.logging_name,
+            )
+            btul.logging.debug(
+                f"[get_last_updated] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                prefix=self.settings.logging_name,
+            )
+
+        return 0
+
 
 class NeuronDatabase(NeuronReadOnlyDatabase):
     """
@@ -153,29 +176,6 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
                 )
 
         return None
-
-    async def get_last_updated(self):
-        """
-        Get the block of the last time the metagraph has been updated
-        """
-        # Ensure the connection is up and running
-        await self.ensure_connection()
-
-        try:
-            raw = await self.database.get(self._key("state:neuron:last_updated"))
-            return int(decode_hash(raw) or 0)
-
-        except Exception as ex:
-            btul.logging.error(
-                f"[get_last_updated] Failed to read last updated block: {ex}",
-                prefix=self.settings.logging_name,
-            )
-            btul.logging.debug(
-                f"[get_last_updated] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
-                prefix=self.settings.logging_name,
-            )
-
-        return 0
 
     async def set_last_updated(self, block: int):
         """

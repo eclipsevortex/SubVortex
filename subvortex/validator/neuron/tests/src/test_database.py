@@ -145,7 +145,7 @@ async def test_remove_miner_calls_delete(db):
 async def test_get_last_update_success(db):
     db.database.get = AsyncMock(return_value=b"1000")
 
-    result = await db.get_neuron_last_update()
+    result = await db.get_neuron_last_updated()
     assert result == 1000
 
 

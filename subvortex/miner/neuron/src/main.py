@@ -14,9 +14,7 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
 import sys
-import time
 import typing
 import asyncio
 import threading
@@ -30,15 +28,18 @@ import bittensor_wallet.mock as btwm
 from dotenv import load_dotenv
 
 from subvortex.core.protocol import Score
-from subvortex.core.shared.checks import check_registration
-from subvortex.core.shared.subtensor import get_hyperparameter_value
+from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.substrate import get_weights_min_stake
-from subvortex.core.shared.mock import MockMetagraph, MockSubtensor, MockAxon
+from subvortex.core.shared.mock import MockSubtensor, MockAxon
 
 from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.metagraph import SubVortexMetagraph
 from subvortex.core.core_bittensor.axon import SubVortexAxon
 from subvortex.core.core_bittensor.synapse import Synapse
+from subvortex.core.core_bittensor.subtensor import (
+    get_next_block,
+    get_hyperparameter_value,
+)
 
 from subvortex.core.sse.sse_thread import SSEThread
 
@@ -48,15 +49,16 @@ from subvortex.core.firewall.firewall_factory import (
     create_firewall_observer,
 )
 from subvortex.miner.version import __version__ as THIS_VERSION
-from subvortex.miner.core.run import run
-from subvortex.miner.core.firewall import Firewall
+from subvortex.miner.neuron.src.firewall import Firewall
 from subvortex.miner.neuron.src.config import (
     config,
     check_config,
     add_args,
 )
-from subvortex.miner.core.utils import load_request_log
+from subvortex.miner.neuron.src.utils import load_request_log
 from subvortex.miner.neuron.src.settings import Settings
+from subvortex.miner.neuron.src.database import Database
+from subvortex.miner.neuron.src.neuron import wait_until_no_multiple_occurrences
 
 # Load the environment variables for the whole process
 load_dotenv(override=True)
@@ -120,138 +122,6 @@ class Miner:
         btul.logging.set_trace(self.config.logging.trace)
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
         btul.logging.info(str(self.config))
-
-        # Display the settings
-        btul.logging.info(f"miner settings: {self.settings}")
-
-        # Show the pid
-        pid = os.getpid()
-        btul.logging.debug(f"miner PID: {pid}")
-
-        # Show miner version
-        btul.logging.debug(f"miner version {THIS_VERSION}")
-
-        # File monitor
-        self.file_monitor = FileMonitor()
-        self.file_monitor.start()
-
-        # Server-Sent Events
-        self.sse = SSEThread(ip=self.config.sse.firewall.ip, port=self.config.sse.port)
-        self.sse.server.add_stream("firewall")
-        self.sse.start()
-
-        # Firewall
-        self.firewall = None
-        if self.config.firewall.on:
-            btul.logging.debug(
-                f"Starting firewall on interface {self.config.firewall.interface}"
-            )
-            port = (
-                self.config.axon.external_port
-                if self.config.axon.external_port is not None
-                else self.config.axon.port
-            )
-            self.firewall = Firewall(
-                observer=create_firewall_observer(),
-                tool=create_firewall_tool(),
-                sse=self.sse.server,
-                port=port,
-                interface=self.config.firewall.interface,
-                config_file=self.config.firewall.config,
-            )
-            self.file_monitor.add_file_provider(self.firewall.provider)
-            self.firewall.start()
-
-        # Init wallet.
-        btul.logging.debug("loading wallet")
-        self.wallet = (
-            btwm.MockWallet(config=self.config)
-            if self.config.mock
-            else btw.Wallet(config=self.config)
-        )
-        self.wallet.create_if_non_existent()
-        btul.logging.debug(f"wallet: {str(self.wallet)}")
-
-        # Init subtensor
-        btul.logging.debug("loading subtensor")
-        self.subtensor = (
-            MockSubtensor(self.config.netuid, wallet=self.wallet)
-            if self.config.miner.mock_subtensor
-            else btcs.Subtensor(config=self.config, network="local")
-        )
-        btul.logging.debug(str(self.subtensor))
-        self.current_block = self.subtensor.get_current_block()
-
-        btul.logging.debug("checking wallet registration")
-        check_registration(self.subtensor, self.wallet, self.config.netuid)
-
-        # Init metagraph.
-        btul.logging.debug("loading metagraph")
-        self.metagraph = (
-            MockMetagraph(self.config.netuid, subtensor=self.subtensor)
-            if self.config.mock
-            else SubVortexMetagraph(
-                netuid=self.config.netuid, network=self.subtensor.network, sync=False
-            )
-        )
-
-        self.metagraph.sync(subtensor=self.subtensor)  # Sync metagraph with subtensor.
-        btul.logging.debug(str(self.metagraph))
-
-        self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
-        btul.logging.info(f"Running miner on uid: {self.uid}")
-
-        # The axon handles request processing, allowing validators to send this process requests.
-        self.axon = (
-            MockAxon(
-                wallet=self.wallet,
-                config=self.config,
-                external_ip=btun.get_external_ip(),
-                blacklist_fn=self._blacklist,
-            )
-            if self.config.mock
-            else SubVortexAxon(
-                wallet=self.wallet,
-                config=self.config,
-                external_ip=btun.get_external_ip(),
-                blacklist_fn=self._blacklist,
-            )
-        )
-        btul.logging.info(f"Axon {self.axon}")
-        btul.logging.info(f"Axon version {self.axon.info().version}")
-
-        # Attach determiners which functions are called when servicing a request.
-        btul.logging.info("Attaching forward functions to axon.")
-        self.axon.attach(
-            forward_fn=self._score,
-            blacklist_fn=self._blacklist_score,
-        )
-
-        # Serve passes the axon information to the network + netuid we are hosting on.
-        # This will auto-update if the axon port of external ip have changed.
-        btul.logging.info(
-            f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
-        )
-        self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
-
-        # Check there is not another miner running on the machine
-        btul.logging.debug(f"Checking number of miners on same ip")
-        number_of_miners = len(
-            [axon for axon in self.metagraph.axons if self.axon.external_ip == axon.ip]
-        )
-        if number_of_miners > 1:
-            btul.logging.error(
-                "At least one miner is already running on this machine. If you run more than one miner you will penalise all of your miners until you get de-registered or start each miner on a unique machine"
-            )
-            sys.exit(1)
-
-        # File monitor
-        self.file_monitor = FileMonitor()
-        self.file_monitor.start()
-
-        # Start  starts the miner's axon, making it active on the network.
-        btul.logging.info(f"Starting axon server on port: {self.config.axon.port}")
-        self.axon.start()
 
         # Init the event loop.
         self.loop = asyncio.get_event_loop()
@@ -330,71 +200,177 @@ class Miner:
     def _blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
         return self._blacklist(synapse)
 
-    def run(self):
-        run(self)
+    async def run(self):
+        # Display the settings
+        btul.logging.info(f"Settings: {self.settings}")
 
-    def run_in_background_thread(self):
-        """
-        Starts the miner's operations in a separate background thread.
-        This is useful for non-blocking operations.
-        """
-        if not self.is_running:
-            btul.logging.debug("Starting miner in background thread.")
-            self.should_exit = False
-            self.thread = threading.Thread(target=self.run, daemon=True)
-            self.thread.start()
-            self.is_running = True
-            btul.logging.debug("Started")
+        # Show miner version
+        btul.logging.debug(f"Version {THIS_VERSION}")
 
-    def stop_run_thread(self):
-        """
-        Stops the miner's operations that are running in the background thread.
-        """
-        if self.is_running:
-            btul.logging.debug("Stopping miner in background thread.")
-            self.should_exit = True
-            self.thread.join(5)
-            self.is_running = False
-            btul.logging.debug("Stopped")
+        # File monitor
+        self.file_monitor = FileMonitor()
+        self.file_monitor.start()
 
-    def __enter__(self):
-        """
-        Starts the miner's operations in a background thread upon entering the context.
-        This method facilitates the use of the miner in a 'with' statement.
-        """
-        self.run_in_background_thread()
+        # Server-Sent Events
+        self.sse = SSEThread(ip=self.config.sse.firewall.ip, port=self.config.sse.port)
+        self.sse.server.add_stream("firewall")
+        self.sse.start()
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        """
-        Stops the miner's background operations upon exiting the context.
-        This method facilitates the use of the miner in a 'with' statement.
+        # Firewall
+        self.firewall = None
+        if self.config.firewall.on:
+            btul.logging.debug(
+                f"Starting firewall on interface {self.config.firewall.interface}"
+            )
+            port = (
+                self.config.axon.external_port
+                if self.config.axon.external_port is not None
+                else self.config.axon.port
+            )
+            self.firewall = Firewall(
+                observer=create_firewall_observer(),
+                tool=create_firewall_tool(),
+                sse=self.sse.server,
+                port=port,
+                interface=self.config.firewall.interface,
+                config_file=self.config.firewall.config,
+            )
+            self.file_monitor.add_file_provider(self.firewall.provider)
+            self.firewall.start()
 
-        Args:
-            exc_type: The type of the exception that caused the context to be exited.
-                      None if the context was exited without an exception.
-            exc_value: The instance of the exception that caused the context to be exited.
-                       None if the context was exited without an exception.
-            traceback: A traceback object encoding the stack trace.
-                       None if the context was exited without an exception.
-        """
-        self.stop_run_thread()
-
-    def should_sync_metagraph(self):
-        """
-        True if the metagraph has been resynced, False otherwise.
-        """
-        last_updates = self.subtensor.substrate.query(
-            module="SubtensorModule",
-            storage_function="LastUpdate",
-            params=[self.config.netuid],
+        # Init wallet.
+        btul.logging.debug("loading wallet")
+        self.wallet = (
+            btwm.MockWallet(config=self.config)
+            if self.config.mock
+            else btw.Wallet(config=self.config)
         )
-        if self.previous_last_updates == last_updates:
-            return False
+        self.wallet.create_if_non_existent()
+        btul.logging.debug(f"wallet: {str(self.wallet)}")
 
-        # Save the new updates
-        self.previous_last_updates = last_updates
+        # Init subtensor
+        btul.logging.debug("loading subtensor")
+        self.subtensor = (
+            MockSubtensor(self.config.netuid, wallet=self.wallet)
+            if self.config.miner.mock_subtensor
+            else btcs.Subtensor(config=self.config, network="local")
+        )
+        btul.logging.debug(str(self.subtensor))
+        self.current_block = self.subtensor.get_current_block()
 
-        return True
+        # Initialize the database
+        btul.logging.info("loading database")
+        self.database = Database(settings=self.settings)
+
+        # Get the neuron
+        self.neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
+        btul.logging.debug(f"Miner based in {self.neuron.country}")
+
+        # The axon handles request processing, allowing validators to send this process requests.
+        self.axon = (
+            MockAxon(
+                wallet=self.wallet,
+                config=self.config,
+                external_ip=btun.get_external_ip(),
+                blacklist_fn=self._blacklist,
+            )
+            if self.config.mock
+            else SubVortexAxon(
+                wallet=self.wallet,
+                config=self.config,
+                external_ip=btun.get_external_ip(),
+                blacklist_fn=self._blacklist,
+            )
+        )
+        btul.logging.info(f"Axon {self.axon}")
+        btul.logging.info(f"Axon version {self.axon.info().version}")
+
+        # Attach determiners which functions are called when servicing a request.
+        btul.logging.info("Attaching forward functions to axon.")
+        self.axon.attach(
+            forward_fn=self._score,
+            blacklist_fn=self._blacklist_score,
+        )
+
+        # Serve passes the axon information to the network + netuid we are hosting on.
+        # This will auto-update if the axon port of external ip have changed.
+        btul.logging.info(
+            f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+        )
+        self.axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
+
+        # File monitor
+        self.file_monitor = FileMonitor()
+        self.file_monitor.start()
+
+        # Start  starts the miner's axon, making it active on the network.
+        btul.logging.info(f"Starting axon server on port: {self.config.axon.port}")
+        self.axon.start()
+
+        try:
+            previous_last_update = None
+            current_block = 0
+            while True:
+                try:
+                    # Get the current block
+                    current_block = get_next_block(
+                        subtensor=self.subtensor, block=current_block
+                    )
+                    btul.logging.debug(f"Block #{current_block}")
+
+                    # Check duplicate ips
+                    btul.logging.debug("Checking ip occurrences...")
+                    await wait_until_no_multiple_occurrences(
+                        database=self.database, ip=self.neuron.ip
+                    )
+
+                    # Check registration
+                    btul.logging.debug("Checking registration...")
+                    await wait_until_registered(
+                        database=self.database, hotkey=self.wallet.hotkey.ss58_address
+                    )
+
+                    # Get the last update of the neurons
+                    last_updated = await self.database.get_neuron_last_updated()
+
+                    # Check if the neurons have been updated
+                    if previous_last_update != last_updated:
+                        # At least one neuron has changed
+                        btul.logging.debug(f"Neurons changed")
+
+                        # Store the new last updated
+                        previous_last_update = last_updated
+
+                        # Update the current neuron
+                        self.neuron = await self.database.get_neuron(
+                            self.wallet.hotkey.ss58_address
+                        )
+
+                        # Update firewall if enabled
+                        self.firewall and self.update_firewall()
+
+                except Exception as ex:
+                    btul.logging.error(f"Unhandled exception: {ex}")
+                    btul.logging.debug(traceback.format_exc())
+
+        except KeyboardInterrupt:
+            btul.logging.info("Keyboard interrupt detected, exiting.")
+
+        # Stop services
+        self.sse and self.sse.stop()
+        self.firewall and self.firewall.stop()
+        self.file_monitor and self.file_monitor.stop()
+        self.axon and self.axon.stop()
+
+        # Stop loop events
+        if not self.loop.is_closed():
+            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            self.loop.close()
+
+        # Stop subtensor
+        if hasattr(self, "subtensor"):
+            btul.logging.debug("Closing subtensor connection")
+            self.subtensor.close()
 
     def update_firewall(self):
         # Get version and min stake
@@ -423,41 +399,5 @@ class Miner:
         btul.logging.debug("Firewall updated")
 
 
-def run_miner():
-    """
-    Main function to run the neuron.
-
-    This function initializes and runs the neuron. It handles the main loop, state management, and interaction
-    with the Bittensor network.
-    """
-    miner = None
-    try:
-        miner = Miner()
-        miner.run_in_background_thread()
-
-        while 1:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        btul.logging.info("Keyboard interrupt detected, exiting.")
-        sys.exit(0)
-    except Exception as e:
-        btul.logging.error(traceback.format_exc())
-        btul.logging.error(f"Unhandled exception: {e}")
-        sys.exit(1)
-    finally:
-        if miner and miner.sse:
-            miner.sse.stop()
-
-        if miner and miner.firewall:
-            miner.firewall.stop()
-
-        if miner and miner.file_monitor:
-            miner.file_monitor.stop()
-
-        if miner:
-            btul.logging.info("Stopping axon")
-            miner.axon.stop()
-
-
 if __name__ == "__main__":
-    run_miner()
+    asyncio.run(Miner().run())

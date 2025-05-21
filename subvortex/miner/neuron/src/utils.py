@@ -14,19 +14,30 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import bittensor.core.subtensor as btcs
+import os
+import json
 import bittensor.utils.btlogging as btul
 
 
-def check_registration(subtensor: btcs.Subtensor, wallet, netuid):
-    if not subtensor.is_hotkey_registered(
-        netuid=netuid,
-        hotkey_ss58=wallet.hotkey.ss58_address,
-    ):
-        btul.logging.error(
-            f"Wallet: {wallet} is not registered on netuid {netuid}. "
-            f"Please register the hotkey using `btcli subnets register` before trying again."
-        )
-        exit()
+def load_request_log(request_log_path: str) -> dict:
+    """
+    Loads the request logger from disk if it exists.
 
-    pass
+    Args:
+        log_path (str): The path to the directory containing the request log.
+
+    Returns:
+        Dict: The request log data, if it exists, or an empty dictionary.
+
+    This method loads the request log from disk if it exists. If not, it returns an empty dictionary.
+    """
+    if os.path.exists(request_log_path):
+        try:
+            with open(request_log_path, "r") as f:
+                request_log = json.load(f)
+        except Exception as e:
+            btul.logging.error(f"Error loading request log: {e}. Resetting.")
+            request_log = {}
+    else:
+        request_log = {}
+    return request_log

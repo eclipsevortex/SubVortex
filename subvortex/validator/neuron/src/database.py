@@ -247,25 +247,3 @@ class Database(NeuronReadOnlyDatabase):
                 )
 
         return None
-
-    async def get_neuron_last_update(self):
-        """
-        Get the block of the last time the metagraph has been updated.
-        """
-        await self.ensure_connection()
-
-        try:
-            raw = await self.database.get(self._key("state:neuron:last_updated"))
-            return int(decode_value(raw) or 0)
-
-        except Exception as ex:
-            btul.logging.error(
-                f"[get_neuron_last_update] Read failed for last updated: {ex}",
-                prefix=self.settings.logging_name,
-            )
-            btul.logging.debug(
-                f"[get_neuron_last_update] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
-                prefix=self.settings.logging_name,
-            )
-
-        return 0

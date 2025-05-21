@@ -18,7 +18,7 @@ import os
 import subprocess
 from redis import asyncio as aioredis
 
-from subvortex.core.shared.checks import *
+from subvortex.core.shared.neuron import *
 
 
 async def check_redis_connection(port, redis_conf_path: str = "/etc/redis/redis.conf"):

@@ -1,9 +1,11 @@
+import time
 import typing
 import random
 import netaddr
 import numpy as np
 from numpy.typing import NDArray
 
+import bittensor.core.config as btcc
 import bittensor.core.subtensor as btcs
 import bittensor.utils.btlogging as btul
 import bittensor.utils.weight_utils as btuwu
@@ -11,6 +13,18 @@ import bittensor.utils.weight_utils as btuwu
 import bittensor.core.async_subtensor as btcas
 
 U16_MAX = 65535
+
+
+def get_next_block(subtensor: btcs.Subtensor, block: int = 0):
+    current_block = subtensor.get_current_block()
+
+    while current_block - block < 1:
+        # --- Wait for next block.
+        time.sleep(1)
+
+        current_block = subtensor.get_current_block()
+
+    return current_block
 
 
 def get_number_of_neurons(subtensor: btcs.Subtensor, netuid: int):
@@ -206,3 +220,27 @@ def process_weights_for_netuid(
     btul.logging.debug(f"final_weights: {normalized_weights}")
 
     return non_zero_weight_uids, normalized_weights
+
+
+def get_hyperparameter_value(subtensor: "btcs.Subtensor", param_name: str, netuid: int):
+    """
+    Get the value of the requested hyperparameter
+    """
+    hex_bytes_result = subtensor.query_runtime_api(
+        runtime_api="SubnetInfoRuntimeApi",
+        method="get_subnet_hyperparams",
+        params=[netuid],
+    )
+
+    if hex_bytes_result is None:
+        return []
+
+    if hex_bytes_result.startswith("0x"):
+        bytes_result = bytes.fromhex(hex_bytes_result[2:])
+    else:
+        bytes_result = bytes.fromhex(hex_bytes_result)
+
+    # Print the bytes object
+    subnet = btcc.SubnetHyperparameters.from_vec_u8(bytes_result)
+    value = subnet.__dict__[param_name]
+    return value

@@ -14,7 +14,6 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import time
 import asyncio
 import traceback
 import threading
@@ -31,11 +30,14 @@ from dotenv import load_dotenv
 from subvortex.core.monitor.monitor import Monitor
 from subvortex.core.country.country_service import CountryService
 from subvortex.core.file.file_monitor import FileMonitor
-from subvortex.core.shared.checks import check_registration
+from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.mock import MockDendrite, MockSubtensor
 from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
-from subvortex.core.core_bittensor.subtensor import get_number_of_neurons, wait_for_block
+from subvortex.core.core_bittensor.subtensor import (
+    get_number_of_neurons,
+    get_next_block,
+)
 from subvortex.core.version import to_spec_version
 
 from subvortex.validator.version import __version__ as THIS_VERSION
@@ -139,6 +141,7 @@ class Validator:
             else btw.Wallet(config=self.config)
         )
         self.wallet.create_if_non_existent()
+        btul.logging.debug(f"wallet: {str(self.wallet)}")
 
         # Init subtensor
         btul.logging.debug("loading subtensor")
@@ -148,12 +151,6 @@ class Validator:
             else btcs.Subtensor(config=self.config)
         )
         btul.logging.debug(str(self.subtensor))
-
-        # Check registration
-        btul.logging.debug("checking registration")
-        check_registration(self.subtensor, self.wallet, self.config.netuid)
-
-        btul.logging.debug(f"wallet: {str(self.wallet)}")
 
         # Initialize the database
         btul.logging.info("loading database")
@@ -166,9 +163,7 @@ class Validator:
         btul.logging.debug(f"# of neurons: {self.number_of_neurons}")
 
         # Init Weights.
-        btul.logging.debug("loading moving_averaged_scores")
         self.moving_averaged_scores = np.zeros(self.number_of_neurons)
-        btul.logging.debug(str(self.moving_averaged_scores))
 
         # Dendrite pool for querying the network.
         btul.logging.debug("loading dendrite_pool")
@@ -216,21 +211,32 @@ class Validator:
         # Load the state
         load_state(self, number_of_neurons=self.number_of_neurons)
 
+        # Display moving averages
+        btul.logging.trace("loading moving_averaged_scores")
+        btul.logging.trace(str(self.moving_averaged_scores))
+
         previous_last_update = None
-        prev_step_block = 0
+        current_block = 0
         try:
             while True:
                 # Get the last time neurons have been updated
-                last_update = await self.database.get_neuron_last_update()
-                btul.logging.debug(f"Neurons last updated #{last_update}")
+                last_updated = await self.database.get_neuron_last_updated()
+                btul.logging.debug(f"Neurons last updated #{last_updated}")
 
-                # Avoir to triggers the following on start
-                previous_last_update = previous_last_update or last_update
+                # Check registration
+                btul.logging.debug("Checking registration...")
+                await wait_until_registered(database=self.database, hotkey=self.wallet.hotkey.ss58_address)
+               
+                # Avoid to triggers the following on start
+                previous_last_update = previous_last_update or last_updated
 
                 # Check if the neurons have changed
-                if previous_last_update != last_update:
+                if previous_last_update != last_updated:
                     # At least one neuron has changed
                     btul.logging.debug(f"Neurons changed, rsync miners")
+
+                    # Store the new last updated
+                    previous_last_update = last_updated
 
                     # Get the neurons
                     neurons = await self.database.get_neurons()
@@ -255,20 +261,11 @@ class Validator:
                     # Save in database
                     await self.database.update_miners(miners=self.miners)
 
-                # Check validator is registered
-                neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
-                if neuron is None:
-                    raise Exception(f"Validator is not registered")
-
-                # --- Wait until next step epoch.
-                current_block = self.subtensor.get_current_block()
-                while current_block - prev_step_block < 1:
-                    # --- Wait for next block.
-                    time.sleep(1)
-                    current_block = self.subtensor.get_current_block()
-
-                prev_step_block = current_block
-                btul.logging.debug(f"Step block #{prev_step_block}")
+                # Wait until next step epoch.
+                current_block = get_next_block(
+                    subtensor=self.subtensor, block=current_block
+                )
+                btul.logging.debug(f"Step block #{current_block}")
 
                 # Run multiple forwards.
                 coroutines = [forward(self)]

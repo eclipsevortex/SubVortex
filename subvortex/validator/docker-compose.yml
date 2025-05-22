@@ -11,6 +11,7 @@ services:
       - ./neuron/.env
     depends_on:
       - validator-redis
+      - validator-metagraph
     volumes:
       - ~/.bittensor:/root/.bittensor
 

@@ -13,6 +13,9 @@ services:
       - NET_RAW
     env_file:
       - ./neuron/.env
+    depends_on:
+      - validator-redis
+      - validator-metagraph
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets
 

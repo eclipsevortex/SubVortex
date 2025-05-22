@@ -8,7 +8,7 @@ ARG COMPONENT_VERSION="0.0.0"
 LABEL maintainer=$MAINTAINER
 LABEL version=$VERSION
 LABEL validator.version=$ROLE_VERSION
-LABEL validator.neuron.redis=$COMPONENT_VERSION
+LABEL validator.redis.version=$COMPONENT_VERSION
 
 # ---------- Environment ----------
 ENV PYTHONUNBUFFERED=1

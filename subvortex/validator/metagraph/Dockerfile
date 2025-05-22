@@ -24,8 +24,8 @@ ARG ROLE_VERSION="0.0.0"
 ARG COMPONENT_VERSION="0.0.0"
 LABEL maintainer=$MAINTAINER
 LABEL version=$VERSION
-LABEL miner.version=$ROLE_VERSION
-LABEL miner.metagraph.version=$COMPONENT_VERSION
+LABEL validator.version=$ROLE_VERSION
+LABEL validator.metagraph.version=$COMPONENT_VERSION
 
 # ---------- Environment ----------
 ENV PYTHONUNBUFFERED=1

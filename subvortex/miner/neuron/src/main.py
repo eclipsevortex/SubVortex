@@ -141,6 +141,229 @@ class Miner:
 
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
+    async def run(self):
+        try:
+            await self._initialize()
+            await self._serve()
+            await self._main_loop()
+        except KeyboardInterrupt:
+            btul.logging.info("Keyboard interrupt detected, exiting.")
+        finally:
+            await self._shutdown()
+
+    async def _initialize(self):
+        btul.logging.info("Initializing wallet, subtensor, and database...")
+
+        self.wallet = (
+            btwm.MockWallet(config=self.config)
+            if self.config.mock
+            else btw.Wallet(config=self.config)
+        )
+        self.wallet.create_if_non_existent()
+        btul.logging.info(f"Wallet initialized: {self.wallet}")
+
+        self.subtensor = (
+            MockSubtensor(self.config.netuid, wallet=self.wallet)
+            if self.config.miner.mock_subtensor
+            else btcas.AsyncSubtensor(config=self.config, network="local")
+        )
+        await self._retry_initialize_subtensor()
+        btul.logging.info(f"Subtensor initialized: {str(self.subtensor)}")
+
+        # Initialize database
+        btul.logging.info("Waiting for database readiness...")
+        self.database = Database(settings=self.settings)
+        await self.database.wait_until_ready("metagraph")
+        btul.logging.info("Database is ready.")
+
+        # Get the list of neurons
+        self.neurons = await self.database.get_neurons()
+        btul.logging.info(f"Loaded {len(self.neurons)} neurons from the database.")
+
+        # Get the miner
+        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
+        btul.logging.info(f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})")
+
+        btul.logging.success("Initialization complete.")
+
+    async def _serve(self):
+        # Initialise the file monitor
+        self.file_monitor = FileMonitor()
+        self.file_monitor.start()
+
+        # Initialize the SSE 
+        self.sse = SSEThread(ip=self.config.sse.firewall.ip, port=self.config.sse.port)
+        self.sse.server.add_stream("firewall")
+        self.sse.start()
+
+        # Initialize firewall if enabled
+        if self.config.firewall.on:
+            btul.logging.debug("Starting firewall...")
+            self.firewall = Firewall(
+                observer=create_firewall_observer(),
+                tool=create_firewall_tool(),
+                sse=self.sse.server,
+                port=self.config.axon.external_port or self.config.axon.port,
+                interface=self.config.firewall.interface,
+                config_file=self.config.firewall.config,
+            )
+            self.file_monitor.add_file_provider(self.firewall.provider)
+            self.firewall.start()
+
+        # Initialize the axon
+        self.axon = (
+            MockAxon(
+                wallet=self.wallet,
+                config=self.config,
+                external_ip=btun.get_external_ip(),
+                blacklist_fn=self._blacklist,
+            )
+            if self.config.mock
+            else SubVortexAxon(
+                wallet=self.wallet,
+                config=self.config,
+                external_ip=btun.get_external_ip(),
+                blacklist_fn=self._blacklist,
+            )
+        )
+        self.axon.attach(forward_fn=self._score, blacklist_fn=self._blacklist_score)
+
+        # Start the axon
+        await self.subtensor.serve_axon(netuid=self.config.netuid, axon=self.axon)
+        self.axon.start()
+
+        # Update the firewall if enable
+        if self.firewall:
+            await self._update_firewall()
+
+    async def _main_loop(self):
+        btul.logging.info(
+            "Entering main loop. Monitoring new blocks and updating firewall if needed."
+        )
+        must_init_subtensor = False
+
+        while not self.should_exit:
+            try:
+                # Re-initialize the subtensor if needed
+                if must_init_subtensor:
+                    btul.logging.warning(
+                        "Reinitializing subtensor due to previous failure..."
+                    )
+                    await self._retry_initialize_subtensor()
+                    must_init_subtensor = False
+
+                # Wait for the next block
+                result = await wait_for_block(subtensor=self.subtensor)
+                if not result:
+                    continue
+
+                # Get the current block
+                current_block = await self.subtensor.get_current_block()
+                btul.logging.debug(f"Block #{current_block}")
+
+                # Get the last time the neurons have been updated
+                last_updated = await self.database.get_neuron_last_updated()
+                if self.previous_last_updated != last_updated:
+                    # Neurons have changed
+                    self.previous_last_updated = last_updated
+
+                    # Get the list of neurons
+                    self.neurons = await self.database.get_neurons()
+                    btul.logging.debug(f"Loaded {len(self.neurons)} neurons from the database.")
+
+                    # Get the miner
+                    self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
+                    btul.logging.info(f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})")
+
+                    # Wait until there is only one neuron for the current ip
+                    # Ensure we have only one ip per miner
+                    await wait_until_no_multiple_occurrences(
+                        self.database, self.neuron.ip
+                    )
+
+                    # Wait until the miner is registered
+                    # Ensure the miner is registered
+                    await wait_until_registered(
+                        self.database, self.wallet.hotkey.ss58_address
+                    )
+
+                    # Update the firewall is enabled
+                    self.firewall and await self._update_firewall()
+
+            except (
+                BrokenPipeError,
+                ConnectionError,
+                TimeoutError,
+                websockets.exceptions.ConnectionClosedError,
+            ) as e:
+                btul.logging.error(f"Connection issue in main loop: {e}")
+                btul.logging.debug(traceback.format_exc())
+                must_init_subtensor = True
+                await asyncio.sleep(5)
+
+            except Exception as ex:
+                btul.logging.error(f"Unhandled exception in main loop: {ex}")
+                btul.logging.debug(traceback.format_exc())
+                await asyncio.sleep(5)
+
+    async def _retry_initialize_subtensor(self, max_attempts: int = 5):
+        backoff = 2
+        for attempt in range(max_attempts):
+            try:
+                btul.logging.info(f"Initializing subtensor (attempt {attempt + 1})...")
+                await self.subtensor.initialize()
+                btul.logging.success("Subtensor initialized.")
+                return
+            except Exception as e:
+                btul.logging.error(f"Subtensor init failed: {e}")
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 30)
+        raise RuntimeError("Failed to initialize subtensor after retries.")
+
+    async def _update_firewall(self):
+        # Get version and min stake
+        version = await self.subtensor.get_hyperparameter(
+            "weights_version", netuid=self.settings.uid
+        )
+
+        # Get the min stake to set weight
+        weights_min_stake = await get_weights_min_stake_async(self.subtensor.substrate)
+
+        # Update the specifications
+        specifications = {
+            "neuron_version": version,
+            "synapses": self.axon.forward_class_types,
+            "hotkey": self.wallet.hotkey.ss58_address,
+        }
+        btul.logging.debug(f"Firewall specifications {specifications}")
+
+        # Define the valid validators
+        validators = get_validators(
+            neurons=self.neurons.values(), weights_min_stake=weights_min_stake
+        )
+        valid_validators = [x.hotkey for x in validators]
+
+        # Update the firewall
+        self.firewall.update(
+            specifications=specifications,
+            whitelist_hotkeys=valid_validators,
+        )
+        btul.logging.debug("Firewall updated")
+
+    async def _shutdown(self):
+        btul.logging.info("Shutting down miner services...")
+        self.sse and self.sse.stop()
+        self.firewall and self.firewall.stop()
+        self.file_monitor and self.file_monitor.stop()
+        self.axon and self.axon.stop()
+
+        if not self.loop.is_closed():
+            await self.loop.shutdown_asyncgens()
+            self.loop.close()
+
+        if hasattr(self, "subtensor"):
+            await self.subtensor.close()
+
     async def _blacklist(self, synapse: Synapse) -> typing.Tuple[bool, str]:
         caller = synapse.dendrite.hotkey
         caller_version = synapse.dendrite.neuron_version or 0
@@ -204,253 +427,6 @@ class Miner:
 
     async def _blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
         return await self._blacklist(synapse)
-
-    async def run(self):
-        # Display the settings
-        btul.logging.info(f"Settings: {self.settings}")
-
-        # Show miner version
-        btul.logging.debug(f"Version {THIS_VERSION}")
-
-        # File monitor
-        self.file_monitor = FileMonitor()
-        self.file_monitor.start()
-
-        # Server-Sent Events
-        self.sse = SSEThread(ip=self.config.sse.firewall.ip, port=self.config.sse.port)
-        self.sse.server.add_stream("firewall")
-        self.sse.start()
-
-        # Firewall
-        self.firewall = None
-        if self.config.firewall.on:
-            btul.logging.debug(
-                f"Starting firewall on interface {self.config.firewall.interface}"
-            )
-            port = (
-                self.config.axon.external_port
-                if self.config.axon.external_port is not None
-                else self.config.axon.port
-            )
-            self.firewall = Firewall(
-                observer=create_firewall_observer(),
-                tool=create_firewall_tool(),
-                sse=self.sse.server,
-                port=port,
-                interface=self.config.firewall.interface,
-                config_file=self.config.firewall.config,
-            )
-            self.file_monitor.add_file_provider(self.firewall.provider)
-            self.firewall.start()
-
-        # Init wallet.
-        btul.logging.debug("loading wallet")
-        self.wallet = (
-            btwm.MockWallet(config=self.config)
-            if self.config.mock
-            else btw.Wallet(config=self.config)
-        )
-        self.wallet.create_if_non_existent()
-        btul.logging.debug(f"wallet: {str(self.wallet)}")
-
-        # Init subtensor
-        btul.logging.debug("loading subtensor")
-        self.subtensor = (
-            MockSubtensor(self.config.netuid, wallet=self.wallet)
-            if self.config.miner.mock_subtensor
-            else btcas.AsyncSubtensor(config=self.config, network="local")
-        )
-        btul.logging.debug(str(self.subtensor))
-
-        # Initialize the database
-        btul.logging.info("loading database")
-        self.database = Database(settings=self.settings)
-
-        # The axon handles request processing, allowing validators to send this process requests.
-        self.axon = (
-            MockAxon(
-                wallet=self.wallet,
-                config=self.config,
-                external_ip=btun.get_external_ip(),
-                blacklist_fn=self._blacklist,
-            )
-            if self.config.mock
-            else SubVortexAxon(
-                wallet=self.wallet,
-                config=self.config,
-                external_ip=btun.get_external_ip(),
-                blacklist_fn=self._blacklist,
-            )
-        )
-        btul.logging.info(f"Axon {self.axon}")
-        btul.logging.info(f"Axon version {self.axon.info().version}")
-
-        # Attach determiners which functions are called when servicing a request.
-        btul.logging.info("Attaching forward functions to axon.")
-        self.axon.attach(
-            forward_fn=self._score,
-            blacklist_fn=self._blacklist_score,
-        )
-
-        # Wait until the metagraph is ready
-        await self.database.wait_until_ready("metagraph")
-
-        # Get the neuron
-        self.neurons = await self.database.get_neurons()
-        btul.logging.debug(f"Neurons loaded {len(self.neurons)}")
-
-        # Get the neuron
-        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
-        btul.logging.debug(f"Miner based in {self.neuron.country}")
-
-        # Serve passes the axon information to the network + netuid we are hosting on.
-        # This will auto-update if the axon port of external ip have changed.
-        btul.logging.info(
-            f"Serving axon {self.axon} on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
-        )
-        await self.subtensor.serve_axon(netuid=self.config.netuid, axon=self.axon)
-
-        # File monitor
-        self.file_monitor = FileMonitor()
-        self.file_monitor.start()
-
-        # Start  starts the miner's axon, making it active on the network.
-        btul.logging.info(f"Starting axon server on port: {self.config.axon.port}")
-        self.axon.start()
-
-        # Update firewall if enabled
-        self.firewall and await self.update_firewall()
-
-        try:
-            current_block = None
-            must_init_subtensor = True
-            while True:
-                try:
-                    if must_init_subtensor:
-                        must_init_subtensor = False
-
-                        # Initialize subtensor
-                        await self.subtensor.initialize()
-
-                    result = await wait_for_block(subtensor=self.subtensor)
-                    if not result:
-                        continue
-
-                    current_block = await self.subtensor.get_current_block()
-                    btul.logging.debug(f"Block #{current_block}")
-
-                    # Get the last update of the neurons
-                    last_updated = await self.database.get_neuron_last_updated()
-
-                    # Check if the neurons have been updated
-                    if self.previous_last_updated != last_updated:
-                        btul.logging.debug(f"Neurons changed at block #{last_updated}")
-
-                        self.previous_last_updated and btul.logging.debug(
-                            f"Neurons changed"
-                        )
-
-                        # Store the new last updated
-                        self.previous_last_updated = last_updated
-
-                        # Get the list of neurons
-                        self.neurons = await self.database.get_neurons()
-
-                        # Get the validator neuron
-                        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
-
-                        # Wait until there is only one neuron for the ip
-                        btul.logging.debug("Checking ip occurrences...")
-                        await wait_until_no_multiple_occurrences(
-                            database=self.database, ip=self.neuron.ip
-                        )
-
-                        # Wait until the neuron is registered
-                        btul.logging.debug("Checking registration...")
-                        await wait_until_registered(
-                            database=self.database,
-                            hotkey=self.wallet.hotkey.ss58_address,
-                        )
-
-                        self.firewall and self.update_firewall()
-
-                except (BrokenPipeError, ConnectionError, TimeoutError) as e:
-                    btul.logging.error(f"Connection error: {e}")
-                    btul.logging.debug(traceback.format_exc())
-                    btul.logging.info("Reconnecting in 5 seconds...")
-                    time.sleep(5)
-                    must_init_subtensor = True
-
-                except websockets.exceptions.ConnectionClosedError as e:
-                    btul.logging.error(f"Connection closed unexpectedly: {e}")
-                    btul.logging.debug(traceback.format_exc())
-                    self._try_to_reconnect()
-
-                except Exception as ex:
-                    btul.logging.error(f"Unhandled exception: {ex}")
-                    btul.logging.debug(traceback.format_exc())
-
-        except KeyboardInterrupt:
-            btul.logging.info("Keyboard interrupt detected, exiting.")
-
-        # Stop services
-        self.sse and self.sse.stop()
-        self.firewall and self.firewall.stop()
-        self.file_monitor and self.file_monitor.stop()
-        self.axon and self.axon.stop()
-
-        # Stop loop events
-        if not self.loop.is_closed():
-            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            self.loop.close()
-
-        # Stop subtensor
-        if hasattr(self, "subtensor"):
-            await self.subtensor.close()
-
-    async def update_firewall(self):
-        # Get version and min stake
-        version = await self.subtensor.get_hyperparameter(
-            "weights_version", netuid=self.settings.uid
-        )
-
-        # Get the min stake to set weight
-        weights_min_stake = await get_weights_min_stake_async(self.subtensor.substrate)
-
-        # Update the specifications
-        specifications = {
-            "neuron_version": version,
-            "synapses": self.axon.forward_class_types,
-            "hotkey": self.wallet.hotkey.ss58_address,
-        }
-        btul.logging.debug(f"Firewall specifications {specifications}")
-
-        # Define the valid validators
-        validators = get_validators(
-            neurons=self.neurons.values(), weights_min_stake=weights_min_stake
-        )
-        valid_validators = [x.hotkey for x in validators]
-
-        # Update the firewall
-        self.firewall.update(
-            specifications=specifications,
-            whitelist_hotkeys=valid_validators,
-        )
-        btul.logging.debug("Firewall updated")
-
-    def _try_to_reconnect(self):
-        while True:
-            try:
-                # Sleep 5 seconds before connecting
-                time.sleep(5)
-
-                # Connect the websocket
-                self.subtensor.substrate.ws.connect(True)
-
-                # Connection successful, we stop the loop
-                break
-            except:
-                pass
 
 
 if __name__ == "__main__":

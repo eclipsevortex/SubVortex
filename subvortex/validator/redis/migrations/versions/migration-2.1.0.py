@@ -20,3 +20,11 @@ async def rollout(database: aioredis.Redis):
 async def rollback(database: aioredis.Redis):
     await _rename_keys(database, "sv:stats", "stats")
     await _rename_keys(database, "sv:selection", "selection")
+
+    # Remove all keys with prefix sv:neuron:
+    keys_to_delete = []
+    async for key in database.scan_iter("sv:neuron:*"):
+        keys_to_delete.append(key)
+    
+    if keys_to_delete:
+        await database.delete(*keys_to_delete)

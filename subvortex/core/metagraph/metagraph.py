@@ -44,7 +44,11 @@ class MetagraphObserver:
         last_synced_block = 0
         sync_interval = self.settings.sync_interval
 
-        btul.logging.info("Service starting...", prefix=self.settings.logging_name)
+        btul.logging.info(
+            "🚀 MetagraphObserver service starting...",
+            prefix=self.settings.logging_name,
+        )
+        btul.logging.debug(f"Settings: {self.settings}")
 
         try:
             while not self.should_exit.is_set():
@@ -55,7 +59,7 @@ class MetagraphObserver:
 
                     block = await self.subtensor.get_current_block()
                     btul.logging.info(
-                        f"Block: #{block}", prefix=self.settings.logging_name
+                        f"📦 Block #{block} detected", prefix=self.settings.logging_name
                     )
 
                     # Detect any new neuron registration
@@ -79,28 +83,37 @@ class MetagraphObserver:
                         or time_to_resync
                     )
 
-                    # Nothing changed, so we do nothing
                     if not must_resync:
+                        btul.logging.debug(
+                            "No changes detected; skipping sync.",
+                            prefix=self.settings.logging_name,
+                        )
                         continue
 
-                    btul.logging.info("Syncing neurons")
+                    if has_axons_changed:
+                        reason = "hotkey/IP changes detected"
+                    elif time_to_resync:
+                        reason = "periodic sync interval reached"
+                    elif has_new_registration:
+                        reason = "new neuron registration detected"
+                    else:
+                        reason = "no relevant changes"
+
+                    btul.logging.info(
+                        f"🔄 Syncing neurons due to {reason}.",
+                        prefix=self.settings.logging_name,
+                    )
 
                     # Sync from chain and update Redis
                     axons = await self._resync()
-
-                    # Update the last synced block
                     last_synced_block = block
-
-                    # Notify listeners if this is the first successful sync
                     ready = await self._notify_if_needed(ready)
-
-                    # Update known axons to track future IP changes
                     axons = new_axons
 
                 except Exception as e:
-                    # Catch and log any unexpected runtime errors
                     btul.logging.error(
-                        f"Unhandled error: {e}", prefix=self.settings.logging_name
+                        f"❌ Unhandled error in loop: {e}",
+                        prefix=self.settings.logging_name,
                     )
                     btul.logging.debug(
                         traceback.format_exc(), prefix=self.settings.logging_name
@@ -108,7 +121,10 @@ class MetagraphObserver:
 
         finally:
             self.finished.set()
-            btul.logging.info("Service exiting...", prefix=self.settings.logging_name)
+            btul.logging.info(
+                "🛑 MetagraphObserver service exiting...",
+                prefix=self.settings.logging_name,
+            )
 
     async def stop(self):
         """
@@ -116,118 +132,116 @@ class MetagraphObserver:
         """
         self.should_exit.set()
         await self.finished.wait()
-        btul.logging.info(f"Service stopped", prefix=self.settings.logging_name)
+        btul.logging.info(
+            f"✅ MetagraphObserver service stopped", prefix=self.settings.logging_name
+        )
 
     async def _resync(self) -> dict[str, str]:
-        """
-        Fully resyncs the metagraph and updates the Redis neuron storage.
-        - Updates changed or new neurons
-        - Deletes outdated neurons (e.g., when hotkey has changed)
-        - Returns a map of {hotkey: ip} to track IPs for change detection
-        """
         await self.metagraph.sync(subtensor=self.subtensor, lite=False)
-        btul.logging.debug("Metagraph synced", prefix=self.settings.logging_name)
+        btul.logging.debug(
+            "📡 Full metagraph sync complete", prefix=self.settings.logging_name
+        )
 
         new_axons: dict[str, str] = {}
         updated_neurons: list[scmm.Neuron] = []
         neurons_to_delete: list[str] = []
 
         stored_neurons = await self.database.get_neurons()
-        btul.logging.debug(f"Neurons loaded: {len(stored_neurons)}")
+        btul.logging.debug(
+            f"💾 Neurons loaded from Redis: {len(stored_neurons)}",
+            prefix=self.settings.logging_name,
+        )
 
         for mneuron in self.metagraph.neurons:
             new_axons[mneuron.hotkey] = mneuron.axon_info.ip
-
-            # Create the new neuron
             new_neuron = scmm.Neuron.from_proto(mneuron)
-
-            # Find matching stored neuron by UID
             current_neuron = next(
                 (n for n in stored_neurons.values() if n.uid == new_neuron.uid), None
             )
 
-            # Check if the neuron has changed
             if new_neuron == current_neuron:
-                btul.logging.debug(
-                    f"Unchanged neuron {mneuron.hotkey} (uid={mneuron.uid}), skipping",
+                btul.logging.trace(
+                    f"🔍 Neuron {mneuron.hotkey} (uid={mneuron.uid}) unchanged",
                     prefix=self.settings.logging_name,
                 )
                 continue
 
-            # If hotkey changed (same UID but different owner), remove old record
+            hotkey_changed = False
+            ip_changed = False
+
             if current_neuron and current_neuron.hotkey != mneuron.hotkey:
+                hotkey_changed = True
                 btul.logging.debug(
-                    f"Neuron uid={mneuron.uid} changed hotkey from {current_neuron.hotkey} to {mneuron.hotkey}",
+                    f"🔁 Neuron UID={mneuron.uid} hotkey changed: {current_neuron.hotkey} -> {mneuron.hotkey}",
                     prefix=self.settings.logging_name,
                 )
                 neurons_to_delete.append(current_neuron)
 
-            # Log if IP changed and we're about to fetch a new country
             if current_neuron and current_neuron.ip != mneuron.axon_info.ip:
+                ip_changed = True
                 btul.logging.debug(
-                    f"Neuron {mneuron.hotkey} IP changed from {current_neuron.ip} to {mneuron.axon_info.ip}, refetching country",
+                    f"🌍 Neuron {mneuron.hotkey} IP changed: {current_neuron.ip} -> {mneuron.axon_info.ip}",
                     prefix=self.settings.logging_name,
                 )
 
-            # Update country only if IP changed
+            if current_neuron and not hotkey_changed and not ip_changed:
+                btul.logging.debug(
+                    f"⚙️ Neuron {new_neuron.hotkey} (uid={new_neuron.uid}) changed",
+                    prefix=self.settings.logging_name,
+                )
+
             country = (
-                current_neuron.country
-                if current_neuron and current_neuron.ip == mneuron.axon_info.ip
+                new_neuron.country
+                if current_neuron and current_neuron.ip == new_neuron.ip
                 else (
                     sccc.get_country(mneuron.axon_info.ip)
                     if mneuron.axon_info.ip != "0.0.0.0"
                     else None
                 )
             )
-
-            # Update the country of the new neuron
             new_neuron.country = country
 
-            # Add the new neuron to the list of neuron to update
             updated_neurons.append(new_neuron)
 
-        # Delete old records if needed
         if neurons_to_delete:
             btul.logging.debug(
-                f"Deleting old neuron hotkeys: {neurons_to_delete}",
+                f"🗑️ Removing old hotkeys: {[n.hotkey for n in neurons_to_delete]}",
                 prefix=self.settings.logging_name,
             )
             not self.settings.dry_run and await self.database.remove_neurons(
                 neurons_to_delete
             )
 
-        # Persist updated neurons
         if updated_neurons:
             btul.logging.info(
-                f"# of changed neurons: {len(updated_neurons)}",
+                f"🧠 Neurons updated: {len(updated_neurons)}",
                 prefix=self.settings.logging_name,
             )
             not self.settings.dry_run and await self.database.update_neurons(
                 updated_neurons
             )
 
-        # Only update Redis if something changed
         if updated_neurons or neurons_to_delete:
             block = await self.subtensor.get_current_block()
             not self.settings.dry_run and await self.database.set_last_updated(block)
             btul.logging.debug(
-                f"Last updated block set to #{block}",
+                f"📅 Last updated block recorded: #{block}",
                 prefix=self.settings.logging_name,
             )
 
         return new_axons
 
     async def _notify_if_needed(self, ready):
-        """
-        If metagraph has not been marked ready yet, mark it and notify listeners.
-        """
         if ready:
             return ready
 
-        btul.logging.debug("Mark metagraph as ready", prefix=self.settings.logging_name)
+        btul.logging.debug(
+            "🔔 Metagraph marked ready", prefix=self.settings.logging_name
+        )
         not self.settings.dry_run and await self.database.mark_as_ready()
-
-        btul.logging.debug("Notify metagraph state", prefix=self.settings.logging_name)
+        btul.logging.debug(
+            "📣 Broadcasting metagraph ready state", prefix=self.settings.logging_name
+        )
         not self.settings.dry_run and await self.database.notify_state()
 
         return True
@@ -235,10 +249,6 @@ class MetagraphObserver:
     async def _has_new_neuron_registered(
         self, registration_count, block
     ) -> tuple[bool, int]:
-        """
-        Checks if the registration count has increased,
-        or if we're at the next adjustment block (in which case registration may have reset).
-        """
         new_count = await scbs.get_number_of_registration(
             subtensor=self.subtensor, netuid=self.settings.netuid
         )
@@ -253,7 +263,7 @@ class MetagraphObserver:
 
             if block == next_block:
                 btul.logging.debug(
-                    f"At adjustment block #{block}; resetting registration count to 0",
+                    f"🔄 Adjustment block #{block}; reset registration count",
                     prefix=self.settings.logging_name,
                 )
                 return False, 0
@@ -261,34 +271,31 @@ class MetagraphObserver:
             return False, registration_count
 
         btul.logging.debug(
-            f"New neuron registered: count changed from {registration_count} to {new_count}",
+            f"🆕 Neuron registration count changed: {registration_count} -> {new_count}",
             prefix=self.settings.logging_name,
         )
-
         return True, new_count
 
     async def _has_neuron_ip_changed(
         self, axons: dict[str, str]
     ) -> tuple[bool, dict[str, str]]:
-        """
-        Detects whether any IP addresses have changed for the tracked axons.
-        """
         if not axons:
             return False, {}
 
         latest_axons = await scbs.get_axons(
-            subtensor=self.subtensor,
-            netuid=self.settings.netuid,
-            hotkeys=axons.keys(),
+            subtensor=self.subtensor, netuid=self.settings.netuid, hotkeys=axons.keys()
         )
 
         for hotkey, ip in latest_axons.items():
             if axons.get(hotkey) != ip:
                 btul.logging.debug(
-                    f"Axon IP changed for {hotkey}: {axons[hotkey]} -> {ip}",
+                    f"📡 IP changed for {hotkey}: {axons[hotkey]} -> {ip}",
                     prefix=self.settings.logging_name,
                 )
-
                 return True, latest_axons
 
+        btul.logging.debug(
+            "✅ No IP changes detected among tracked axons",
+            prefix=self.settings.logging_name,
+        )
         return False, latest_axons

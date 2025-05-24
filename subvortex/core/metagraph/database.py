@@ -29,7 +29,7 @@ class NeuronReadOnlyDatabase(BaseDatabase):
         # Register neuron models keyed by their version
         self.models["neuron"] = {x.version: x for x in [NeuronModel210()]}
 
-    async def get_neuron(self, hotkey: str) -> typing.List[scmm.Neuron]:
+    async def get_neuron(self, hotkey: str) -> scmm.Neuron:
         # Ensure the connection is up and running
         await self.ensure_connection()
 

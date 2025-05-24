@@ -1,5 +1,8 @@
-from dataclasses import dataclass, field, asdict
 from typing import Optional
+from dataclasses import dataclass, asdict
+
+import bittensor.core.chain_data as btccd
+
 
 @dataclass
 class Neuron:
@@ -22,7 +25,7 @@ class Neuron:
     ip: str = ""
     ip_type: int = 0
     port: int = 0
-    version: str = "0.0.0"
+    version: int = 0
     protocol: int = 4
     placeholder1: int = 0
     placeholder2: int = 0
@@ -32,12 +35,14 @@ class Neuron:
     def to_dict(self) -> dict:
         """Convert Neuron instance to a dict with consistent types."""
         data = asdict(self)
-        data.update({
-            "active": int(self.active),
-            "validator_permit": int(self.validator_permit),
-            "is_serving": int(self.is_serving),
-            "country": self.country or ""
-        })
+        data.update(
+            {
+                "active": int(self.active),
+                "validator_permit": int(self.validator_permit),
+                "is_serving": int(self.is_serving),
+                "country": self.country or "",
+            }
+        )
         return data
 
     @staticmethod
@@ -63,7 +68,7 @@ class Neuron:
             ip=data["ip"],
             ip_type=int(data["ip_type"]),
             port=int(data["port"]),
-            version=data["version"],
+            version=int(data["version"]),
             protocol=int(data["protocol"]),
             placeholder1=int(data["placeholder1"]),
             placeholder2=int(data["placeholder2"]),
@@ -72,7 +77,7 @@ class Neuron:
         )
 
     @staticmethod
-    def from_proto(neuron) -> "Neuron":
+    def from_proto(neuron: btccd.NeuronInfo) -> "Neuron":
         """Create a Neuron instance from a cbc.NeuronInfo object."""
         return Neuron(
             uid=neuron.uid,

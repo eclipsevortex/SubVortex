@@ -63,11 +63,14 @@ done
 # Check maandatory args
 check_required_args EXECUTION
 
-# Build the command and arguments
+# Loop through and start each component
+{% for component in ordered_components %}
+echo "🚀 Restarting {{ component }}..."
 CMD="$NEURON_WORKING_DIR/{{ component }}/scripts/{{ component }}_start.sh --execution $EXECUTION"
-if [[ "$RECREATE" == "true" || "$RECREATE" == "True" ]]; then
+if [[ "${RECREATE:-false}" == "true" || "${RECREATE:-false}" == "True" ]]; then
     CMD+=" --recreate"
 fi
-
-# Setup the auto upgrade as container
 eval "$CMD"
+{% endfor %}
+
+echo "✅ All components started."

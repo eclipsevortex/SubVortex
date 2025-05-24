@@ -111,7 +111,7 @@ async def test_get_last_updated_success(database):
     with patch(
         "subvortex.core.metagraph.database.decode_hash", return_value="123456"
     ):
-        block = await database.get_last_updated()
+        block = await database.get_neuron_last_updated()
 
     assert block == 123456
     database.database.get.assert_awaited_once_with("sv:state:neuron:last_updated")
@@ -124,7 +124,7 @@ async def test_get_last_updated_failure(database):
     with patch(
         "subvortex.core.metagraph.database.decode_hash", return_value="0"
     ):
-        block = await database.get_last_updated()
+        block = await database.get_neuron_last_updated()
 
     assert block == 0
 

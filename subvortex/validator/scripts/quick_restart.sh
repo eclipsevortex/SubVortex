@@ -63,11 +63,24 @@ done
 # Check maandatory args
 check_required_args EXECUTION
 
-# Build the command and arguments
-CMD="$NEURON_WORKING_DIR//scripts/_start.sh --execution $EXECUTION"
-if [[ "$RECREATE" == "true" || "$RECREATE" == "True" ]]; then
+# Loop through and start each component
+echo "🚀 Restarting redis..."
+CMD="$NEURON_WORKING_DIR/redis/scripts/redis_start.sh --execution $EXECUTION"
+if [[ "${RECREATE:-false}" == "true" || "${RECREATE:-false}" == "True" ]]; then
     CMD+=" --recreate"
 fi
-
-# Setup the auto upgrade as container
 eval "$CMD"
+echo "🚀 Restarting metagraph..."
+CMD="$NEURON_WORKING_DIR/metagraph/scripts/metagraph_start.sh --execution $EXECUTION"
+if [[ "${RECREATE:-false}" == "true" || "${RECREATE:-false}" == "True" ]]; then
+    CMD+=" --recreate"
+fi
+eval "$CMD"
+echo "🚀 Restarting neuron..."
+CMD="$NEURON_WORKING_DIR/neuron/scripts/neuron_start.sh --execution $EXECUTION"
+if [[ "${RECREATE:-false}" == "true" || "${RECREATE:-false}" == "True" ]]; then
+    CMD+=" --recreate"
+fi
+eval "$CMD"
+
+echo "✅ All components started."

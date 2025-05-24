@@ -17,7 +17,7 @@ show_help() {
 OPTIONS="v:h"
 LONGOPTIONS="version:,help:"
 
-REDIS_VERSION="6:8.0.0-1rl1~jammy1"
+REDIS_VERSION="6:8.0.0-1rl1"
 
 # Parse arguments
 while [ "$#" -gt 0 ]; do
@@ -40,6 +40,10 @@ while [ "$#" -gt 0 ]; do
         ;;
     esac
 done
+
+# Detect Ubuntu codename
+UBUNTU_CODENAME=$(lsb_release -cs)
+REDIS_VERSION="${VERSION_PREFIX}~${UBUNTU_CODENAME}1"
 
 echo "📦 Installing redis-server${REDIS_VERSION:+ (version $REDIS_VERSION)}..."
 

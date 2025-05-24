@@ -41,6 +41,10 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Detect Ubuntu codename
+UBUNTU_CODENAME=$(lsb_release -cs)
+REDIS_VERSION="${VERSION_PREFIX}~${UBUNTU_CODENAME}1"
+
 echo "📦 Installing redis-server${REDIS_VERSION:+ (version $REDIS_VERSION)}..."
 
 echo "🔐 Setting up Redis official APT repository for latest version..."

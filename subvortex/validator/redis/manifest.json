@@ -14,7 +14,7 @@
     "user": "redis",
     "group": "redis",
     "package_name": "redis-server",
-    "package_version": "6:8.0.0-1rl1~jammy1",
+    "package_version": "6:8.0.0-1rl1",
     "configs": {
       "redis.conf": {
         "ext": "conf",

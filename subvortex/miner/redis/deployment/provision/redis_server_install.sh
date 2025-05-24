@@ -43,7 +43,13 @@ done
 
 # Detect Ubuntu codename
 UBUNTU_CODENAME=$(lsb_release -cs)
-REDIS_VERSION="${VERSION_PREFIX}~${UBUNTU_CODENAME}1"
+
+# Strip any suffix from user-provided version
+if [[ "$REDIS_VERSION" == *"~"* ]]; then
+    REDIS_VERSION="${REDIS_VERSION%%~*}"
+fi
+
+REDIS_VERSION="${REDIS_VERSION}~${UBUNTU_CODENAME}1"
 
 echo "📦 Installing redis-server${REDIS_VERSION:+ (version $REDIS_VERSION)}..."
 

@@ -119,10 +119,7 @@ async def wait_for_block(
         target_block = current_block["header"]["number"] + 1
 
     await subtensor.substrate._get_block_handler(
-        current_block_hash,
-        header_only=True,
-        finalized_only=False,
-        subscription_handler=handler,
+        current_block_hash, header_only=True, subscription_handler=handler
     )
     return True
 

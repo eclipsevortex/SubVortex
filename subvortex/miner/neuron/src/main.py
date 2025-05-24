@@ -143,6 +143,12 @@ class Miner:
 
     async def run(self):
         try:
+            # Display the settings
+            btul.logging.info(f"Settings: {self.settings}")
+            
+            # Show miner version
+            btul.logging.debug(f"Version: {THIS_VERSION}")
+
             await self._initialize()
             await self._serve()
             await self._main_loop()
@@ -152,8 +158,6 @@ class Miner:
             await self._shutdown()
 
     async def _initialize(self):
-        btul.logging.info("Initializing wallet, subtensor, and database...")
-
         self.wallet = (
             btwm.MockWallet(config=self.config)
             if self.config.mock
@@ -168,7 +172,6 @@ class Miner:
             else btcas.AsyncSubtensor(config=self.config, network="local")
         )
         await self._retry_initialize_subtensor()
-        btul.logging.info(f"Subtensor initialized: {str(self.subtensor)}")
 
         # Initialize database
         btul.logging.info("Waiting for database readiness...")
@@ -197,6 +200,7 @@ class Miner:
         self.sse.start()
 
         # Initialize firewall if enabled
+        self.firewall = None
         if self.config.firewall.on:
             btul.logging.debug("Starting firewall...")
             self.firewall = Firewall(
@@ -237,11 +241,7 @@ class Miner:
             await self._update_firewall()
 
     async def _main_loop(self):
-        btul.logging.info(
-            "Entering main loop. Monitoring new blocks and updating firewall if needed."
-        )
         must_init_subtensor = False
-
         while not self.should_exit:
             try:
                 # Re-initialize the subtensor if needed
@@ -318,6 +318,7 @@ class Miner:
                 btul.logging.error(f"Subtensor init failed: {e}")
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 30)
+
         raise RuntimeError("Failed to initialize subtensor after retries.")
 
     async def _update_firewall(self):

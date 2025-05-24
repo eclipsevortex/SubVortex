@@ -13,12 +13,12 @@ async def _rename_keys(database: aioredis.Redis, old_prefix: str, new_prefix: st
 
 
 async def rollout(database: aioredis.Redis):
-    await _rename_keys(database, "stats", "sv:stats")
+    await _rename_keys(database, "stats", "sv:miner")
     await _rename_keys(database, "selection", "sv:selection")
 
 
 async def rollback(database: aioredis.Redis):
-    await _rename_keys(database, "sv:stats", "stats")
+    await _rename_keys(database, "sv:miner", "stats")
     await _rename_keys(database, "sv:selection", "selection")
 
     # Remove all keys with prefix sv:neuron:

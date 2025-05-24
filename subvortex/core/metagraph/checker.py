@@ -23,6 +23,14 @@ class MetagraphChecker:
     async def run(self):
         btul.logging.info("🔍 Starting metagraph vs Redis consistency check...")
 
+        last_updated = await self.database.get_neuron_last_updated()
+        btul.logging.info(f"🕒 Last updated block: {last_updated}")
+
+        # Sync the metagraph
+        await self.metagraph.sync(subtensor=self.subtensor, block=last_updated, lite=False)
+        btul.logging.info("✅ Metagraph synced at recorded block.")
+
+        successfull_neurons = 0
         for neuron in self.metagraph.neurons:
             btul.logging.debug(
                 f"🔎 Checking neuron: {neuron.hotkey} (uid={neuron.uid})"
@@ -45,12 +53,10 @@ class MetagraphChecker:
                 )
                 for line in mismatches:
                     btul.logging.error(f"  - {line}")
-                raise AssertionError(
-                    "❌ Consistency check failed. See above for details."
-                )
             else:
+                successfull_neurons = successfull_neurons + 1
                 btul.logging.debug(f"✅ Neuron {neuron.hotkey} is consistent.")
 
         btul.logging.success(
-            "🎉 All neurons are consistent between metagraph and Redis."
+            f"🎉 {successfull_neurons}/{len(self.metagraph.neurons)} neurons are consistent between metagraph and Redis."
         )

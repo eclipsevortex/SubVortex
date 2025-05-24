@@ -145,7 +145,7 @@ class Miner:
         try:
             # Display the settings
             btul.logging.info(f"Settings: {self.settings}")
-            
+
             # Show miner version
             btul.logging.debug(f"Version: {THIS_VERSION}")
 
@@ -185,7 +185,9 @@ class Miner:
 
         # Get the miner
         self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
-        btul.logging.info(f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})")
+        btul.logging.info(
+            f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})"
+        )
 
         btul.logging.success("Initialization complete.")
 
@@ -194,7 +196,7 @@ class Miner:
         self.file_monitor = FileMonitor()
         self.file_monitor.start()
 
-        # Initialize the SSE 
+        # Initialize the SSE
         self.sse = SSEThread(ip=self.config.sse.firewall.ip, port=self.config.sse.port)
         self.sse.server.add_stream("firewall")
         self.sse.start()
@@ -264,16 +266,24 @@ class Miner:
                 # Get the last time the neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
                 if self.previous_last_updated != last_updated:
+                    btul.logging.debug(
+                        f"Neurons have changed at block #{current_block}"
+                    )
+
                     # Neurons have changed
                     self.previous_last_updated = last_updated
 
                     # Get the list of neurons
                     self.neurons = await self.database.get_neurons()
-                    btul.logging.debug(f"Loaded {len(self.neurons)} neurons from the database.")
+                    btul.logging.debug(
+                        f"Loaded {len(self.neurons)} neurons from the database."
+                    )
 
                     # Get the miner
                     self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
-                    btul.logging.info(f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})")
+                    btul.logging.info(
+                        f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})"
+                    )
 
                     # Wait until there is only one neuron for the current ip
                     # Ensure we have only one ip per miner

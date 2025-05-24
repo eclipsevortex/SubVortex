@@ -14,127 +14,131 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import copy
-import time
-import threading
+import requests
 import ipaddress
-import bittensor.utils.btlogging as btul
-from typing import List
 
-from subvortex.core.country.country_constants import (
-    COUNTRY_URL,
-    COUNTRY_LOGGING_NAME,
-    COUNTRY_SLEEP,
-    COUNTRY_ATTEMPTS
-)
-from subvortex.core.file.file_google_drive_monitor import FileGoogleDriveMonitor
-from subvortex.core.localisation import (
-    get_country_by_country_is,
-    get_country_by_ip_api,
-    get_country_by_ipinfo_io,
-    get_country_by_my_api,
-)
+MY_API_BASE_URL = "http://api.ip-from.com"
+COUNTRY_IS_BASE_URL = "https://api.country.is"
+IP_API_BASE_URL = "http://ip-api.com/json"
+IPINFO_IO_BASE_URL = "https://ipinfo.io"
+
+countries = {}
 
 
-class CountryService:
-    def __init__(self, netuid: int):
-        self._lock = threading.Lock()
-        self._data = {}
-        self.first_try = True
+def get_country(ip: str):
+    """
+    Get the country code of the ip
+    """
+    ip_ipv4 = get_ipv4(ip)
 
-        self.provider = FileGoogleDriveMonitor(
-            logger_name=COUNTRY_LOGGING_NAME,
-            file_url=COUNTRY_URL.get(netuid),
-            check_interval=COUNTRY_SLEEP,
-            callback=self.run,
-        )
+    country, reason1 = _get_country_by_my_api(ip_ipv4)
+    if country:
+        return country
 
-    def _is_custom_api_enabled(self):
-        with self._lock:
-            return self._data.get("enable_custom_api", True)
+    country, reason2 = _get_country_by_country_is(ip_ipv4)
+    if country:
+        return country
 
-    def get_last_modified(self):
-        with self._lock:
-            return self._data.get("last-modified")
+    country, reason3 = _get_country_by_ip_api(ip_ipv4)
+    if country:
+        return country
 
-    def get_locations(self) -> List[str]:
-        with self._lock:
-            localisations = self._data.get("localisations", {})
-            return copy.deepcopy(localisations)
+    country, reason4 = _get_country_by_ipinfo_io(ip_ipv4)
+    if country:
+        return country
 
-    def get_ipv4(self, ip):
-        try:
-            # First, try to interpret the input as an IPv4 address
-            ipv4 = ipaddress.IPv4Address(ip)
-            return str(ipv4)
-        except ipaddress.AddressValueError:
-            pass
+    return None
 
-        try:
-            # Next, try to interpret the input as an IPv6 address
-            ipv6 = ipaddress.IPv6Address(ip)
-            if ipv6.ipv4_mapped:
-                return str(ipv6.ipv4_mapped)
-        except ipaddress.AddressValueError:
-            pass
 
-        return ip
+def _get_country_by_my_api(ip: str):
+    """
+    Get the country code of the ip (use Maxwind and IpInfo)
+    Reference: http://api.ip-from.com
+    """
+    url = f"{MY_API_BASE_URL}/{ip}"
 
-    def get_country(self, ip: str):
-        """
-        Get the country code of the ip
-        """
-        ip_ipv4 = self.get_ipv4(ip)
+    response = requests.get(url)
 
-        country = None
-        with self._lock:
-            overrides = self._data.get("overrides") or {}
-            country = overrides.get(ip_ipv4)
+    if response.status_code != 200:
+        return None, response.reason
 
-        if country:
-            return country
+    data = response.json()
 
-        country, reason1 = (
-            get_country_by_my_api(ip_ipv4)
-            if self._is_custom_api_enabled()
-            else (None, None)
-        )
-        if country:
-            return country
+    # New property to use
+    country = data.get("country")
 
-        country, reason2 = get_country_by_country_is(ip_ipv4)
-        if country:
-            return country
+    # Depcreated
+    country = country or data.get("maxmind_country")
+    country = country or data.get("ipinfo_country")
 
-        country, reason3 = get_country_by_ip_api(ip_ipv4)
-        if country:
-            return country
+    return (country, None)
 
-        country, reason4 = get_country_by_ipinfo_io(ip_ipv4)
-        if country:
-            return country
 
-        btul.logging.warning(
-            f"Could not get the country of the ip {ip_ipv4}: Api 1: {reason1} / Api 2: {reason2} / Api 3: {reason3} / Api 4: {reason4}"
-        )
-        return None
+def _get_country_by_country_is(ip: str):
+    """
+    Get the country code of the ip
+    Reference: https://country.is/
+    """
+    url = f"{COUNTRY_IS_BASE_URL}/{ip}"
 
-    def wait(self):
-        """
-        Wait until we have execute the run method at least one
-        """
-        attempt = 1
-        while self.first_try and attempt <= COUNTRY_ATTEMPTS:
-            btul.logging.debug(f"[{COUNTRY_LOGGING_NAME}][{attempt}] Waiting file to be process...")
-            time.sleep(1)
-            attempt += 1
+    response = requests.get(url)
 
-    def run(self, data):
-        with self._lock:
-            self._data = data
+    if response.status_code != 200:
+        return None, response.reason
 
-        self.first_try = False
+    data = response.json()
 
-        btul.logging.success(
-            f"[{COUNTRY_LOGGING_NAME}] File proceed successfully",
-        )
+    return data.get("country"), None
+
+
+def _get_country_by_ip_api(ip: str):
+    """
+    Get the country code of the ip
+    Reference: https://ip-api.com/
+    """
+    url = f"{IP_API_BASE_URL}/{ip}"
+
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        return None, response.reason
+
+    data = response.json()
+
+    return data.get("countryCode"), None
+
+
+def _get_country_by_ipinfo_io(ip: str):
+    """
+    Get the country code of the ip
+    Reference: https://ipinfo.io/
+    """
+    url = f"{IPINFO_IO_BASE_URL}/{ip}"
+
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        return None, response.reason
+
+    data = response.json()
+
+    return data.get("country"), None
+
+
+def get_ipv4(ip):
+    try:
+        # First, try to interpret the input as an IPv4 address
+        ipv4 = ipaddress.IPv4Address(ip)
+        return str(ipv4)
+    except ipaddress.AddressValueError:
+        pass
+
+    try:
+        # Next, try to interpret the input as an IPv6 address
+        ipv6 = ipaddress.IPv6Address(ip)
+        if ipv6.ipv4_mapped:
+            return str(ipv6.ipv4_mapped)
+    except ipaddress.AddressValueError:
+        pass
+
+    return ip

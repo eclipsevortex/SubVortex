@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subvortex-validator-metagraph"
+version = "3.1.0-alpha.1"
+description = "SubVortex Validator Metagraph"
+authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.license]
+text = "MIT"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+"*" = [
+    "deployment/**/*",
+    "requirements.txt",
+    "README.md",
+    "pyproject.toml",
+    "env.template",
+    "docker-compose.yml",
+    "manifest.json"
+]

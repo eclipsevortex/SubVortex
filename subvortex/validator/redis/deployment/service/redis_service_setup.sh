@@ -2,146 +2,164 @@
 
 set -euo pipefail
 
-# Ensure script run as root
+SERVICE_NAME=subvortex-validator-redis
+PROJECT_WORKING_DIR="${SUBVORTEX_WORKING_DIR:-}"
+
 if [[ "$EUID" -ne 0 ]]; then
-  echo "🛑 This script must be run as root. Re-running with sudo..."
+  echo "🛑 Must be run as root. Re-running with sudo..."
   exec sudo "$0" "$@"
 fi
 
-# Determine working directory: prefer SUBVORTEX_WORKING_DIR, fallback to script location
-SCRIPT_DIR="$(cd "$(dirname "$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$0")")" && pwd)"
+echo "🔧 Starting $SERVICE_NAME setup..."
 
-# Find project root by walking up until LICENSE is found
-find_project_root() {
-    local dir="$1"
-    while [[ "$dir" != "/" ]]; do
-        [[ -f "$dir/LICENSE" ]] && { echo "$dir"; return; }
-        dir="$(dirname "$dir")"
-    done
-    return 1
-}
-
-PROJECT_ROOT="$(find_project_root "$SCRIPT_DIR")" || {
-    echo "❌ Could not detect project root (LICENSE not found)"
-    exit 1
-}
-
-# Resolve final working directory
-if [[ -n "${SUBVORTEX_WORKING_DIR:-}" ]]; then
-    REL_PATH="${SCRIPT_DIR#$PROJECT_ROOT/}"
-    TARGET_DIR="$SUBVORTEX_WORKING_DIR/$REL_PATH"
-    [[ -d "$TARGET_DIR" ]] || { echo "❌ Target directory does not exist: $TARGET_DIR"; exit 1; }
-    echo "📁 Using SUBVORTEX_WORKING_DIR: $TARGET_DIR"
-    cd "$TARGET_DIR/../.."
+# Fallback to script location if PROJECT_WORKING_DIR is not set
+if [[ -z "$PROJECT_WORKING_DIR" ]]; then
+  SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PROJECT_WORKING_DIR="$(realpath "$SCRIPT_PATH/../../../../../")"
+  echo "📁 PROJECT_WORKING_DIR not set — using fallback: $PROJECT_WORKING_DIR"
 else
-    echo "📁 Using fallback PROJECT_ROOT: $SCRIPT_DIR"
-    cd "$SCRIPT_DIR/../.."
+  echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
 fi
 
-echo "📍 Working directory: $(pwd)"
+PROJECT_EXECUTION_DIR="${SUBVORTEX_EXECUTION_DIR:-$PROJECT_WORKING_DIR}"
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
+SERVICE_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/validator/redis"
+SERVICE_TEMPLATE="$SERVICE_WORKING_DIR/deployment/templates/$SERVICE_NAME.service"
+SERVICE_LOG_DIR="/var/log/subvortex-validator"
+TEMP_SERVICE_FILE="/tmp/$SERVICE_NAME.service"
 
-source ../../scripts/tools.sh
+# --- Load environment variables from .env file ---
+ENV_FILE="$SERVICE_WORKING_DIR/.env"
 
-# Define constants and paths
-NEURON_NAME=subvortex-validator
-SERVICE_NAME="${NEURON_NAME}-redis"
-DEPLOY_TEMPLATES="./deployment/templates"
-SYSTEMD_DEST="/etc/systemd/system"
-SYSTEMD_UNIT="${SYSTEMD_DEST}/${SERVICE_NAME}.service"
-CHECKSUM_DIR="/var/tmp/subvortex.checksums/${SERVICE_NAME}-checksums"
-REDIS_USER="redis"
-REDIS_GROUP="redis"
-REDIS_CONF="${SUBVORTEX_REDIS_CONFIG:-/etc/redis/redis.conf}"
-
-echo "🔧 Setting up $SERVICE_NAME..."
-
-# Load environment variables from .env safely
-set -a
-source .env
-set +a
-
-# Create checksum directory if it doesn't exist
-mkdir -p "$CHECKSUM_DIR"
-
-# Install Redis server if not already installed
-install_specific_redis
-
-## Stop default redis-server
-echo "🛑 Stopping and disabling default redis-server systemd service..."
-systemctl stop redis-server || true
-systemctl disable redis-server || true
-
-# Prepare /etc/redis directory
-echo "📂 Preparing redis directory..."
-mkdir -p "$(dirname "$REDIS_CONF")"
-chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
-
-# Install updated redis.conf if changes are detected
-echo "📄 Installing updated redis.conf..."
-TEMPLATE_CONF="$DEPLOY_TEMPLATES/${SERVICE_NAME}.conf"
-cp "$TEMPLATE_CONF" "$REDIS_CONF"
-chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_CONF"
-
-# Update or remove Redis password in redis.conf based on SUBVORTEX_REDIS_PASSWORD
-if [[ -v SUBVORTEX_REDIS_PASSWORD && -n "$SUBVORTEX_REDIS_PASSWORD" ]]; then
-    current_pass=$(grep -E '^\s*requirepass\s+' "$REDIS_CONF" | awk '{print $2}' || true)
-    if [[ "$current_pass" != "$SUBVORTEX_REDIS_PASSWORD" ]]; then
-        echo "🔐 Injecting or updating Redis password in redis.conf..."
-        if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
-            sed -i "s|^\s*requirepass\s\+.*|requirepass $SUBVORTEX_REDIS_PASSWORD|" "$REDIS_CONF"
-        elif grep -q "^# *requirepass" "$REDIS_CONF"; then
-            sed -i "/^# *requirepass/a requirepass $SUBVORTEX_REDIS_PASSWORD" "$REDIS_CONF"
-        else
-            echo "requirepass $SUBVORTEX_REDIS_PASSWORD" | tee -a "$REDIS_CONF" > /dev/null
-        fi
-    else
-        echo "🔐 Redis password already up-to-date — no changes made."
-    fi
+if [[ -f "$ENV_FILE" ]]; then
+  echo "🌱 Loading environment variables from $ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
 else
-    if grep -qE '^\s*requirepass\s+' "$REDIS_CONF"; then
-        echo "❌ Removing Redis password from redis.conf (SUBVORTEX_REDIS_PASSWORD is unset or empty)..."
-        sed -i '/^\s*requirepass\s\+/d' "$REDIS_CONF"
-    else
-        echo "⚠️ SUBVORTEX_REDIS_PASSWORD is unset or empty — no password configured in redis.conf."
-    fi
+  echo "⚠️ No .env file found at $ENV_FILE"
 fi
 
-# Parse log path from redis.conf
-echo "📁 Parsing log path from redis.conf..."
-log_path=$(grep -E '^\s*logfile\s+' "$REDIS_CONF" | awk '{print $2}')
+echo "🔧 Running provision install hook..."
+bash "$SERVICE_WORKING_DIR/deployment/provision/redis_server_install.sh"
 
-# Prepare log directory if logfile is specified
-if [[ -z "$log_path" || "$log_path" == '""' ]]; then
-    echo "ℹ️ No logfile configured — Redis will log to stdout/stderr"
-else
-    log_dir=$(dirname "$log_path")
-    echo "📁 Preparing log directory: $log_dir"
-    mkdir -p "$log_dir"
-    chown "$REDIS_USER:$REDIS_GROUP" "$log_dir"
-    echo "✅ Log directory ready and owned by $REDIS_USER:$REDIS_GROUP"
+# --- Stop and mask default service to avoid conflict ---
+if systemctl list-unit-files --quiet "redis-server.service"; then
+  if systemctl is-active --quiet "redis-server.service"; then
+    echo "🛑 Stopping running service: redis-server.service"
+    systemctl stop "redis-server.service"
+  fi
+  echo "🚫 Masking redis-server.service"
+  systemctl mask "redis-server.service"
 fi
 
-# Mask default redis-server systemd service
-echo "🚫 Masking default redis-server systemd service..."
-systemctl mask redis-server || true
+# --- Promote and patch system unit to /etc/systemd/system ---
+CUSTOM_UNIT_PATH="/etc/systemd/system/$SERVICE_NAME.service"
 
-# Install updated systemd unit file if changes are detected
-echo "📄 Installing updated systemd unit file..."
-TEMPLATE_SERVICE="$DEPLOY_TEMPLATES/${SERVICE_NAME}.service"
-cp "$TEMPLATE_SERVICE" "$SYSTEMD_UNIT"
+# Prefer vendor-provided unit file from /lib/systemd/system
+if [[ -f "/lib/systemd/system/redis-server.service" ]]; then
+  BASE_UNIT_PATH="/lib/systemd/system/redis-server.service"
+else
+  BASE_UNIT_PATH=$(systemctl show -p FragmentPath redis-server.service | cut -d= -f2)
+fi
 
-# Reload systemd daemon to apply changes
-echo "🔧 Reloading systemd daemon..."
+if [[ -n "$BASE_UNIT_PATH" && -e "$BASE_UNIT_PATH" ]]; then
+  echo "📄 Found base unit at: $BASE_UNIT_PATH"
+  echo "📄 Copying to: $CUSTOM_UNIT_PATH"
+  cp "$BASE_UNIT_PATH" "$CUSTOM_UNIT_PATH"
+
+  echo "✏️ Patching Description and Alias"
+  sed -i "s|^Description=.*|Description=SubVortex Validator Redis|" "$CUSTOM_UNIT_PATH"
+
+  if grep -q "^Alias=" "$CUSTOM_UNIT_PATH"; then
+    sed -i "s|^Alias=.*|Alias=$SERVICE_NAME.service|" "$CUSTOM_UNIT_PATH"
+  else
+    echo "Alias=$SERVICE_NAME.service" >> "$CUSTOM_UNIT_PATH"
+  fi
+
+  echo "✏️ Replacing PIDFile with /run/redis-server.pid"
+  if grep -q "^PIDFile=" "$CUSTOM_UNIT_PATH"; then
+    sed -i "s|^PIDFile=.*|PIDFile=/run/redis-server.pid|" "$CUSTOM_UNIT_PATH"
+  else
+    echo "PIDFile=/var/run/redis-server.pid" >> "$CUSTOM_UNIT_PATH"
+  fi
+
+  echo "✏️ Replacing ReadWritePaths inline"
+  awk '
+    BEGIN {
+      done = 0;
+    }
+    /^ReadWriteDirectories=/ && !done {
+      print "ReadWriteDirectories=-/var/lib/redis"
+      print "ReadWriteDirectories=-/var/log/redis"
+      print "ReadWriteDirectories=-/run/redis"
+      print "ReadWriteDirectories=-/var/log/subvortex-validator"
+      done = 1;
+      next;
+    }
+    /^ReadWriteDirectories=/ && done {
+      next;
+    }
+    { print }
+  ' "$CUSTOM_UNIT_PATH" > "$CUSTOM_UNIT_PATH.tmp" && mv "$CUSTOM_UNIT_PATH.tmp" "$CUSTOM_UNIT_PATH"
+
+  chmod 644 "$CUSTOM_UNIT_PATH"
+else
+  echo "⚠️ Could not locate base unit file for redis-server.service"
+fi
+
+# --- Handle optional configuration templates ---
+CONFIG_DIR="$SERVICE_WORKING_DIR/deployment/templates"
+
+TEMPLATE_FILE="$CONFIG_DIR/subvortex-validator-redis.conf"
+DEST_FILE="/etc/redis/redis.conf"
+
+if [[ -f "$TEMPLATE_FILE" ]]; then
+  echo "📄 Found template: $TEMPLATE_FILE → copying to $DEST_FILE"
+  cp "$TEMPLATE_FILE" "$DEST_FILE"
+else
+  echo "⚠️ Template not found: $TEMPLATE_FILE — will attempt to patch $DEST_FILE if it exists"
+fi
+
+if [[ -f "$DEST_FILE" ]]; then
+  echo "🔧 Applying overrides to $DEST_FILE"
+  if grep -q "^logfile\s*" "$DEST_FILE"; then
+    sed -i "s|^logfile[[:space:]]*.*|logfile /var/log/subvortex-validator/subvortex-validator-redis.log|" "$DEST_FILE"
+  else
+    echo "logfile /var/log/subvortex-validator/subvortex-validator-redis.log" >> "$DEST_FILE"
+  fi
+  if grep -q "^requirepass\s*" "$DEST_FILE"; then
+    sed -i "s|^requirepass[[:space:]]*.*|requirepass ${SUBVORTEX_REDIS_PASSWORD:-\"\"}|" "$DEST_FILE"
+  else
+    echo "requirepass ${SUBVORTEX_REDIS_PASSWORD:-\"\"}" >> "$DEST_FILE"
+  fi
+else
+  echo "🛑 Destination file $DEST_FILE does not exist — cannot apply overrides"
+fi
+
+
+echo "📁 Preparing log directory..."
+mkdir -p "$SERVICE_LOG_DIR"
+chown redis:redis "$SERVICE_LOG_DIR"
+
+# --- Create log files and adjust permissions ---
+LOG_PREFIX="$SERVICE_LOG_DIR/subvortex-validator-redis"
+echo "🔒 Adjusting permissions for logs with prefix: $LOG_PREFIX"
+
+# Ensure the log directory exists
+mkdir -p "$(dirname "$LOG_PREFIX")"
+
+# Create the log files if they don't exist
+touch "${LOG_PREFIX}.log" "${LOG_PREFIX}-error.log"
+
+# Set correct ownership
+chown redis:redis "${LOG_PREFIX}.log" "${LOG_PREFIX}-error.log"
+
+echo "ℹ️ Skipping systemd service file generation (generate_unit=false)"
+
+echo "🔄 Reloading systemd and completing setup..."
+systemctl daemon-reexec
 systemctl daemon-reload
 
-# Ensure Redis data directory exists and has correct permissions
-REDIS_DATA_DIR=$(grep -E '^\s*dir\s+' "$REDIS_CONF" | awk '{print $2}')
-if [[ -n "$REDIS_DATA_DIR" ]]; then
-    echo "📁 Ensuring Redis data directory exists: $REDIS_DATA_DIR"
-    mkdir -p "$REDIS_DATA_DIR"
-    chown "$REDIS_USER:$REDIS_GROUP" "$REDIS_DATA_DIR"
-else
-    echo "⚠️ Could not determine Redis data directory from redis.conf."
-fi
-
-echo "✅ Validator Redis setup completed successfully."
+echo "✅ $SERVICE_NAME installed successfully."

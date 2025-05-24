@@ -1,0 +1,48 @@
+{
+  "id": "miner-redis",
+  "name": "subvortex-miner-redis",
+  "description": "SubVortex Miner Redis",
+  "version": "3.1.0-alpha.1",
+  "miner.version": "3.1.0-alpha.1",
+  "miner.redis.version": "3.1.0-alpha.1",
+  "type": "package",
+  "neuron": "miner",
+  "component": "redis",
+  "migration_type": "redis",
+  "migration": "./migrations/versions",
+  "common": {
+    "user": "redis",
+    "group": "redis",
+    "package_name": "redis-server",
+    "package_version": "6:8.0.0-1rl1",
+    "configs": {
+      "redis.conf": {
+        "ext": "conf",
+        "destination": "/etc/redis/redis.conf",
+        "overrides": {
+          "logfile": "/var/log/subvortex-miner/subvortex-miner-redis.log",
+          "requirepass": "${SUBVORTEX_REDIS_PASSWORD:-\\\"\\\"}"
+        }
+      }
+    }
+  },
+  "service": {
+    "generate_unit": false,
+    "environment": {
+      "PYTHONUNBUFFERED": 1
+    },
+    "restart": "on-failure",
+    "restart_sec": "10s",
+    "log_prefix": "subvortex-miner-redis"
+  },
+  "process": {
+    "configs": {
+      "redis.conf": {
+        "overrides": {
+          "logfile": "\\\"\\\""
+        }
+      }
+    }
+  },
+  "depends_on": []
+}

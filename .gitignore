@@ -174,7 +174,8 @@ firewall-events.json
 DS_Store
 *secrets
 *.txt
+!requirements*.txt
 ga-*.json
 .build
 redis.conf
-pyproject.toml
+/pyproject.toml

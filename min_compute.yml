@@ -14,7 +14,7 @@ compute_spec:
   miner:
 
     cpu:
-      min_cores: 4            # Minimum number of CPU cores
+      min_cores: 8            # Minimum number of CPU cores
       min_speed: 2.5          # Minimum speed per core (GHz)
       recommended_cores: 8    # Recommended number of CPU cores
       recommended_speed: 3.5  # Recommended speed per core (GHz)
@@ -43,7 +43,7 @@ compute_spec:
   validator:
 
     cpu:
-      min_cores: 4            # Minimum number of CPU cores
+      min_cores: 8            # Minimum number of CPU cores
       min_speed: 2.5          # Minimum speed per core (GHz)
       recommended_cores: 8    # Recommended number of CPU cores
       recommended_speed: 3.5  # Recommended speed per core (GHz)

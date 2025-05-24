@@ -19,7 +19,6 @@ import uuid
 import uvicorn
 import bittensor.core.config as btcc
 import bittensor.core.axon as btca
-import bittensor.core.settings as btcs
 import bittensor.core.threadpool as btct
 import bittensor.utils.networking as btun
 import bittensor.utils.btlogging as btul

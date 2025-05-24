@@ -1,0 +1,48 @@
+{
+  "id": "validator-redis",
+  "name": "subvortex-validator-redis",
+  "description": "SubVortex Validator Redis",
+  "version": "3.1.0-alpha.1",
+  "validator.version": "3.1.0-alpha.1",
+  "validator.redis.version": "3.1.0-alpha.1",
+  "type": "package",
+  "neuron": "validator",
+  "component": "redis",
+  "migration_type": "redis",
+  "migration": "./migrations/versions",
+  "common": {
+    "user": "redis",
+    "group": "redis",
+    "package_name": "redis-server",
+    "package_version": "6:8.0.0-1rl1",
+    "configs": {
+      "redis.conf": {
+        "ext": "conf",
+        "destination": "/etc/redis/redis.conf",
+        "overrides": {
+          "logfile": "/var/log/subvortex-validator/subvortex-validator-redis.log",
+          "requirepass": "${SUBVORTEX_REDIS_PASSWORD:-\\\"\\\"}"
+        }
+      }
+    }
+  },
+  "service": {
+    "generate_unit": false,
+    "environment": {
+      "PYTHONUNBUFFERED": 1
+    },
+    "restart": "on-failure",
+    "restart_sec": "10s",
+    "log_prefix": "subvortex-validator-redis"
+  },
+  "process": {
+    "configs": {
+      "redis.conf": {
+        "overrides": {
+          "logfile": "\\\"\\\""
+        }
+      }
+    }
+  },
+  "depends_on": []
+}

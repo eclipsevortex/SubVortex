@@ -2,13 +2,13 @@
 
 set -e
 
-echo "🔄 Updating metadata.json with correct versions"
+echo "🔄 Updating metadata.json and manifest.json with correct versions"
 
 # Define components and their services
 COMPONENTS=("miner" "validator")
 declare -A SERVICES
-SERVICES["miner"]="neuron"
-SERVICES["validator"]="neuron redis"
+SERVICES["miner"]="neuron metagraph redis"
+SERVICES["validator"]="neuron metagraph redis"
 
 # Function to extract version from a directory
 get_version() {
@@ -38,6 +38,33 @@ if [[ "$ROOT_VERSION" == "VERSION_NOT_FOUND" ]]; then
   exit 1
 fi
 
+# Helper to update a given JSON file (metadata.json or manifest.json)
+update_json_file() {
+  local file_path="$1"
+  local component="$2"
+  local service="$3"
+  local root_version="$4"
+  local component_version="$5"
+  local service_version="$6"
+
+  tmpfile=$(mktemp)
+  if [ -f "$file_path" ]; then
+    jq --arg root_version "$root_version" \
+       --arg comp_version "$component_version" \
+       --arg svc_version "$service_version" \
+       '.version = $root_version
+        | ."'"$component"'.version" = $comp_version
+        | ."'"$component"'.'"$service"'.version" = $svc_version' \
+       "$file_path" > "$tmpfile" && mv "$tmpfile" "$file_path"
+  else
+    echo "{
+  \"version\": \"$root_version\",
+  \"$component.version\": \"$component_version\",
+  \"$component.$service.version\": \"$service_version\"
+}" > "$file_path"
+  fi
+}
+
 # Iterate over all components
 for COMPONENT in "${COMPONENTS[@]}"; do
   echo "📦 Processing component: $COMPONENT"
@@ -66,31 +93,14 @@ for COMPONENT in "${COMPONENTS[@]}"; do
       continue
     fi
 
-    # Metadata file
-    metadata_path="$SERVICE_PATH/metadata.json"
-    tmpfile=$(mktemp)
-
-    # Build/update JSON
-    if [ -f "$metadata_path" ]; then
-      jq --arg root_version "$ROOT_VERSION" \
-         --arg comp_version "$COMPONENT_VERSION" \
-         --arg svc_version "$SERVICE_VERSION" \
-         '.version = $root_version
-          | ."'"$COMPONENT"'.version" = $comp_version
-          | ."'"$COMPONENT"'.'"$SERVICE"'.version" = $svc_version' \
-         "$metadata_path" > "$tmpfile" && mv "$tmpfile" "$metadata_path"
-    else
-      echo "{
-  \"version\": \"$ROOT_VERSION\",
-  \"$COMPONENT.version\": \"$COMPONENT_VERSION\",
-  \"$COMPONENT.$SERVICE.version\": \"$SERVICE_VERSION\"
-}" > "$metadata_path"
-    fi
-
-    echo "🏷️  Updated $metadata_path with:"
-    echo "    ➡️ version=$ROOT_VERSION"
-    echo "    ➡️ $COMPONENT.version=$COMPONENT_VERSION"
-    echo "    ➡️ $COMPONENT.$SERVICE.version=$SERVICE_VERSION"
+    for FILE in metadata.json manifest.json; do
+      FILE_PATH="$SERVICE_PATH/$FILE"
+      update_json_file "$FILE_PATH" "$COMPONENT" "$SERVICE" "$ROOT_VERSION" "$COMPONENT_VERSION" "$SERVICE_VERSION"
+      echo "📁 Updated $FILE_PATH:"
+      echo "    ➡️ version=$ROOT_VERSION"
+      echo "    ➡️ $COMPONENT.version=$COMPONENT_VERSION"
+      echo "    ➡️ $COMPONENT.$SERVICE.version=$SERVICE_VERSION"
+    done
   done
 done
 

@@ -1,0 +1,189 @@
+#---------------------------------------------------------------------
+# Example configuration for a possible web application.  See the
+# full configuration options online.
+#
+#   https://www.haproxy.org/download/3.1/doc/configuration.txt
+#   https://cbonte.github.io/haproxy-dconv/3.1/configuration.html
+#
+#---------------------------------------------------------------------
+
+# TODO: event_sub to have events about new server, remove server etc
+
+#---------------------------------------------------------------------
+# Global settings
+#---------------------------------------------------------------------
+global
+    # to have these messages end up in /var/log/haproxy.log you will
+    # need to:
+    #
+    # 1) configure syslog to accept network log events.  This is done
+    #    by adding the '-r' option to the SYSLOGD_OPTIONS in
+    #    /etc/sysconfig/syslog
+    #
+    # 2) configure local2 events to go to the /var/log/haproxy.log
+    #   file. A line like the following can be added to
+    #   /etc/sysconfig/syslog
+    #
+    #    local2.*                       /var/log/haproxy.log
+    #
+    log stdout format raw daemon debug
+
+    # Tune SSL cache size (roughly equivalent to nginx’s session cache size)
+    tune.ssl.cachesize 10000
+    
+    ssl-default-bind-options no-sslv3 no-tls-tickets
+    ssl-default-bind-ciphers HIGH:!aNULL:!MD5
+    
+    # Or pre-3.1-bug if needed
+    tune.lua.bool-sample-conversion pre-3.1-bug
+
+    pidfile     /var/run/haproxy/haproxy.pid
+    maxconn     4000
+    user        {{user}}
+    group       {{group}}
+    expose-deprecated-directives
+
+    # turn on stats unix socket
+    stats socket /var/lib/haproxy/stats mode 777 level admin
+
+    # Load the lua scripts
+    lua-load {{HAPROXY_DIR}}/scripts/set_lua_paths.lua
+    lua-load {{HAPROXY_DIR}}/scripts/check_rate_limit.lua
+
+#---------------------------------------------------------------------
+# common defaults that all the 'listen' and 'backend' sections will
+# use if not designated in their block
+#---------------------------------------------------------------------
+defaults
+    mode                    http
+    log                     global
+    option log-health-checks
+    #option                  tcplog
+    log-format              '{"ts":"%t","req_uri":"%HU","http_protocol":"%HP","http_method":"%HM","status":%ST,"client_ip":"%ci","backend_name":"%b","server_ip":"%si:%sp","terminationStatus":"%ts","total_time":%Tt,"user_time":%Tu,"active_time":%Ta}'
+    option                  dontlognull
+    option http-server-close
+    option                  redispatch
+    retries                 3
+    timeout http-request    10s
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          1m
+    timeout server          1m
+    timeout http-keep-alive 10s
+    timeout check           10s
+    maxconn                 3000
+
+#---------------------------------------------------------------------
+# example how to define user and enable Data Plane API on tcp/5555
+# more information: https://github.com/haproxytech/dataplaneapi and
+#   https://www.haproxy.com/documentation/hapee/2-0r1/configuration/dataplaneapi/
+#---------------------------------------------------------------------
+# userlist haproxy-dataplane-api
+#     user admin insecure-password password
+
+# program api
+#    command /usr/local/bin/dataplaneapi --host 0.0.0.0 --port 5555 --haproxy-bin /usr/local/sbin/haproxy --config-file /usr/local{{HAPROXY_DIR}}/haproxy.cfg --reload-cmd "kill -SIGUSR2 1" --restart-cmd "kill -SIGUSR2 1" --reload-delay 5 --userlist haproxy-dataplane-api
+#    no option start-on-reload
+
+#---------------------------------------------------------------------
+# Docker DNS resolver
+#---------------------------------------------------------------------
+resolvers docker
+    nameserver dns 127.0.0.11:53
+    resolve_retries 3
+    timeout retry 1s
+    hold other 30s
+    hold refused 30s
+    hold nx 30s
+    hold timeout 30s
+    hold valid 30s
+
+#---------------------------------------------------------------------
+# stats frontend for health check
+#---------------------------------------------------------------------
+# frontend frontend-health-check
+#     mode http
+#     bind *:3001
+#     acl is_health path_beg /health
+#     use_backend backend-health-check if is_health
+
+#---------------------------------------------------------------------
+# stats frontend for statistics
+#---------------------------------------------------------------------
+frontend stats
+    mode http
+    bind *:8404
+    stats enable
+    stats hide-version
+    stats uri /stats
+
+    # Allow anonymous access only from localhost (127.0.0.1)
+    acl is_local src 127.0.0.1
+    stats auth haproxy:{{HAPROXY_PWD}} unless is_local
+
+#---------------------------------------------------------------------
+# frontend for nodes
+#---------------------------------------------------------------------
+frontend frontend-nodes
+    mode http
+    bind *:443 ssl crt /etc/ssl/private/tensordaemon.ai.pem alpn h2,http/1.1 ssl-min-ver TLSv1.2
+
+    acl is_health_check path_beg /health
+    http-request return status 200 content-type "text/plain" string "OK" if is_health_check
+
+    acl host_bittensor hdr_beg(host) -i bittensor
+    use_backend backend-bittensor-nodes if host_bittensor
+
+    default_backend backend-finney
+
+#---------------------------------------------------------------------
+# backend for whitelist validators
+#---------------------------------------------------------------------
+frontend frontend-validators
+    mode tcp
+    bind 0.0.0.0:9944 transparent
+
+    # Reject all traffic from an IP if it has made more than 1 request in the last minute
+    stick-table type ip size 100k expire 10m store conn_rate(60s)
+    tcp-request connection track-sc0 src
+    tcp-request connection reject if { sc0_conn_rate gt 1 }
+    
+    default backend-bittensor-nodes
+
+#---------------------------------------------------------------------
+# frontend for miner
+#---------------------------------------------------------------------
+frontend frontend-miner
+    mode tcp
+    bind 0.0.0.0:8091
+
+    # Reject all traffic from an IP if it has made more than 1 request in the last minute
+    stick-table type ip size 100k expire 10m store conn_rate(60s)
+    tcp-request connection track-sc0 src
+    tcp-request connection reject if { sc0_conn_rate gt 1 }
+
+    default_backend backend-miner
+
+#---------------------------------------------------------------------
+# backend for nodes
+#---------------------------------------------------------------------
+backend backend-bittensor-nodes
+    mode http
+    option httpchk
+    balance leastconn
+
+#---------------------------------------------------------------------
+# backend for miner
+#---------------------------------------------------------------------
+backend backend-miner
+    mode tcp
+    balance leastconn
+    server miner 127.0.0.1:7091 check
+
+#---------------------------------------------------------------------
+# backend testnet
+#---------------------------------------------------------------------
+backend backend-finney
+    mode http
+    balance roundrobin
+    server finney entrypoint-finney.opentensor.ai:443 ssl verify none

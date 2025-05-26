@@ -43,6 +43,7 @@ class MetagraphObserver:
         ready = False
         last_synced_block = 0
         sync_interval = self.settings.sync_interval
+        has_missing_country = False
 
         btul.logging.info(
             "🚀 MetagraphObserver service starting...",
@@ -80,6 +81,7 @@ class MetagraphObserver:
                         not ready
                         or has_new_registration
                         or has_axons_changed
+                        or has_missing_country
                         or time_to_resync
                     )
 
@@ -92,6 +94,8 @@ class MetagraphObserver:
 
                     if has_axons_changed:
                         reason = "hotkey/IP changes detected"
+                    elif has_missing_country:
+                        reason = "missing country"
                     elif time_to_resync:
                         reason = "periodic sync interval reached"
                     elif has_new_registration:
@@ -105,7 +109,7 @@ class MetagraphObserver:
                     )
 
                     # Sync from chain and update Redis
-                    axons = await self._resync()
+                    axons, has_missing_country = await self._resync()
                     last_synced_block = block
                     ready = await self._notify_if_needed(ready)
                     axons = new_axons
@@ -145,6 +149,7 @@ class MetagraphObserver:
         new_axons: dict[str, str] = {}
         updated_neurons: list[scmm.Neuron] = []
         neurons_to_delete: list[str] = []
+        has_missing_country = False
 
         stored_neurons = await self.database.get_neurons()
         btul.logging.debug(
@@ -152,14 +157,45 @@ class MetagraphObserver:
             prefix=self.settings.logging_name,
         )
 
+        mhotkeys = set()
         for mneuron in self.metagraph.neurons:
             new_axons[mneuron.hotkey] = mneuron.axon_info.ip
-            new_neuron = scmm.Neuron.from_proto(mneuron)
+
+            # Get the current neuron
             current_neuron = next(
-                (n for n in stored_neurons.values() if n.uid == new_neuron.uid), None
+                (n for n in stored_neurons.values() if n.uid == mneuron.uid), None
             )
 
-            if new_neuron == current_neuron:
+            # Create teh new neuron from the metagraph
+            new_neuron = scmm.Neuron.from_proto(mneuron)
+
+            # Set the country for the new neuron
+            country = (
+                current_neuron.country
+                # The is a country for an ip that has not changed
+                if current_neuron
+                and current_neuron.ip == new_neuron.ip
+                and current_neuron.country is not None
+                else (
+                    # Get the country for the ip if provided
+                    sccc.get_country(new_neuron.ip)
+                    if new_neuron.ip != "0.0.0.0"
+                    else None
+                )
+            )
+            new_neuron.country = country
+
+            # Add the hotkey of the neuron
+            mhotkeys.add(new_neuron.hotkey)
+
+            # True if the neuron should have a country set
+            has_country_none = (
+                current_neuron
+                and current_neuron.country is None
+                and current_neuron.ip != "0.0.0.0"
+            )
+
+            if new_neuron == current_neuron and not has_country_none:
                 btul.logging.trace(
                     f"🔍 Neuron {mneuron.hotkey} (uid={mneuron.uid}) unchanged",
                     prefix=self.settings.logging_name,
@@ -169,43 +205,83 @@ class MetagraphObserver:
             hotkey_changed = False
             ip_changed = False
 
-            if current_neuron and current_neuron.hotkey != mneuron.hotkey:
+            # Check if hotkey has changed
+            if current_neuron and current_neuron.hotkey != new_neuron.hotkey:
                 hotkey_changed = True
                 btul.logging.debug(
-                    f"🔁 Neuron UID={mneuron.uid} hotkey changed: {current_neuron.hotkey} -> {mneuron.hotkey}",
+                    f"🔁 Hotkey change detected for Neuron uid={new_neuron.uid}: {current_neuron.hotkey} -> {new_neuron.hotkey}",
                     prefix=self.settings.logging_name,
                 )
                 neurons_to_delete.append(current_neuron)
 
-            if current_neuron and current_neuron.ip != mneuron.axon_info.ip:
+            # Check if ip has changed
+            if current_neuron and current_neuron.ip != new_neuron.ip:
                 ip_changed = True
                 btul.logging.debug(
-                    f"🌍 Neuron {mneuron.hotkey} IP changed: {current_neuron.ip} -> {mneuron.axon_info.ip}",
+                    f"🌍 IP change detected for Neuron uid={new_neuron.uid} (hotkey={new_neuron.hotkey}): {current_neuron.ip} -> {new_neuron.ip}",
                     prefix=self.settings.logging_name,
                 )
 
-            if current_neuron and not hotkey_changed and not ip_changed:
+            # Check if country is currently not set
+            if has_country_none:
                 btul.logging.debug(
-                    f"⚙️ Neuron {new_neuron.hotkey} (uid={new_neuron.uid}) changed",
+                    f"🌐 Missing country for Neuron uid={new_neuron.uid} (hotkey={new_neuron.hotkey}, IP={new_neuron.ip})",
                     prefix=self.settings.logging_name,
                 )
 
-            country = (
-                new_neuron.country
-                if current_neuron and current_neuron.ip == new_neuron.ip
-                else (
-                    sccc.get_country(mneuron.axon_info.ip)
-                    if mneuron.axon_info.ip != "0.0.0.0"
-                    else None
+            if (
+                current_neuron
+                and not hotkey_changed
+                and not ip_changed
+                and not has_country_none
+            ):
+                btul.logging.debug(
+                    f"⚙️ Neuron uid={new_neuron.uid} updated (hotkey={new_neuron.hotkey}) with other changes.",
+                    prefix=self.settings.logging_name,
                 )
+
+                # Display the details of the changes
+                mismatches = self._get_details_changed(
+                    current_neuron=current_neuron, new_neuron=new_neuron
+                )
+                btul.logging.debug(mismatches)
+
+            # Flag missing country if there is at least one neuron with no country but an ip
+            has_missing_country = has_missing_country or (
+                country is None and new_neuron.ip != "0.0.0.0"
             )
-            new_neuron.country = country
+
+            print(f"{country} {new_neuron.ip} {has_missing_country}")
 
             updated_neurons.append(new_neuron)
 
+        # 🔥 Remove neurons in Redis that are no longer in the metagraph
+        stale_neurons = [
+            neuron
+            for hotkey, neuron in stored_neurons.items()
+            if hotkey not in mhotkeys and neuron not in neurons_to_delete
+        ]
+
+        if stale_neurons:
+            btul.logging.debug(
+                f"🗑️ # Stale neurons removed: {len(stale_neurons)}",
+                prefix=self.settings.logging_name,
+            )
+            btul.logging.trace(
+                f"🗑️ Stale neurons: {list(stale_neurons)}",
+                prefix=self.settings.logging_name,
+            )
+            not self.settings.dry_run and await self.database.remove_neurons(
+                stale_neurons
+            )
+
         if neurons_to_delete:
             btul.logging.debug(
-                f"🗑️ Removing old hotkeys: {[n.hotkey for n in neurons_to_delete]}",
+                f"🗑️ # Neurons removed: {len(neurons_to_delete)}",
+                prefix=self.settings.logging_name,
+            )
+            btul.logging.trace(
+                f"🗑️ Neurons removed: {[n.hotkey for n in neurons_to_delete]}",
                 prefix=self.settings.logging_name,
             )
             not self.settings.dry_run and await self.database.remove_neurons(
@@ -213,8 +289,12 @@ class MetagraphObserver:
             )
 
         if updated_neurons:
-            btul.logging.info(
-                f"🧠 Neurons updated: {len(updated_neurons)}",
+            btul.logging.debug(
+                f"🧠 # Neurons updated: {len(updated_neurons)}",
+                prefix=self.settings.logging_name,
+            )
+            btul.logging.trace(
+                f"🧠 Neurons updated: {[n.hotkey for n in updated_neurons]}",
                 prefix=self.settings.logging_name,
             )
             not self.settings.dry_run and await self.database.update_neurons(
@@ -228,8 +308,13 @@ class MetagraphObserver:
                 f"📅 Last updated block recorded: #{block}",
                 prefix=self.settings.logging_name,
             )
+        else:
+            btul.logging.info(
+                "✅ Metagraph is in sync with Redis — no changes detected.",
+                prefix=self.settings.logging_name,
+            )
 
-        return new_axons
+        return new_axons, has_missing_country
 
     async def _notify_if_needed(self, ready):
         if ready:
@@ -283,19 +368,43 @@ class MetagraphObserver:
             return False, {}
 
         latest_axons = await scbs.get_axons(
-            subtensor=self.subtensor, netuid=self.settings.netuid, hotkeys=axons.keys()
+            subtensor=self.subtensor,
+            netuid=self.settings.netuid,
+            hotkeys=axons.keys(),
         )
 
-        for hotkey, ip in latest_axons.items():
-            if axons.get(hotkey) != ip:
+        changed_axons = {}
+
+        for hotkey, latest_ip in latest_axons.items():
+            old_ip = axons.get(hotkey)
+            if old_ip != latest_ip:
+                changed_axons[hotkey] = latest_ip
                 btul.logging.debug(
-                    f"📡 IP changed for {hotkey}: {axons[hotkey]} -> {ip}",
+                    f"📡 IP changed for {hotkey}: {old_ip} -> {latest_ip}",
                     prefix=self.settings.logging_name,
                 )
-                return True, latest_axons
+
+        if changed_axons:
+            btul.logging.info(
+                f"📈 {len(changed_axons)} neurons with changed IPs: {list(changed_axons.keys())}",
+                prefix=self.settings.logging_name,
+            )
+            return True, changed_axons
 
         btul.logging.debug(
             "✅ No IP changes detected among tracked axons",
             prefix=self.settings.logging_name,
         )
         return False, latest_axons
+
+    def _get_details_changed(self, new_neuron, current_neuron):
+        mismatches = []
+
+        for key, expected_value in new_neuron.__dict__.items():
+            actual_value = getattr(current_neuron, key, None)
+            if expected_value != actual_value:
+                mismatches.append(
+                    f"{key}: expected={expected_value}, actual={actual_value}"
+                )
+
+        return mismatches

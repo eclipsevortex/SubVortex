@@ -45,6 +45,20 @@ async def main():
     btul.logging.add_args(parser)
     btcas.AsyncSubtensor.add_args(parser)
 
+    parser.add_argument(
+        "--uid",
+        type=int,
+        help="Uid of the neuron to check",
+        default=None,
+    )
+
+    parser.add_argument(
+        "--with_country",
+        action="store_true",
+        help="True if you want to check the country too",
+        default=False,
+    )
+
     # Create the configuration
     config = btcc.Config(parser)
 
@@ -83,6 +97,8 @@ async def main():
             subtensor=subtensor,
             metagraph=metagraph,
             database=database,
+            with_country=config.with_country,
+            uid=config.uid,
         )
 
         # Run the check

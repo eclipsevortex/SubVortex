@@ -1,5 +1,5 @@
 from typing import Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, fields
 
 import bittensor.core.chain_data as btccd
 
@@ -48,6 +48,12 @@ class Neuron:
     @staticmethod
     def from_dict(data: dict) -> "Neuron":
         """Create a Neuron instance from a dictionary."""
+        country = data.get("country")
+        country = (
+            country.strip().upper()
+            if isinstance(country, str) and country.strip()
+            else None
+        )
         return Neuron(
             uid=int(data["uid"]),
             hotkey=data["hotkey"],
@@ -73,7 +79,7 @@ class Neuron:
             placeholder1=int(data["placeholder1"]),
             placeholder2=int(data["placeholder2"]),
             is_serving=bool(int(data["is_serving"])),
-            country=data.get("country", "") or None,
+            country=country,
         )
 
     @staticmethod
@@ -109,3 +115,12 @@ class Neuron:
     def update_from_proto(self, neuron) -> None:
         """Update this instance using a cbc.NeuronInfo object."""
         self.__dict__.update(Neuron.from_proto(neuron).__dict__)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Neuron):
+            return NotImplemented
+
+        for f in fields(self):
+            if getattr(self, f.name) != getattr(other, f.name):
+                return False
+        return True

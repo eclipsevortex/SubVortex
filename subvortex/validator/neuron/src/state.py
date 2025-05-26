@@ -24,6 +24,7 @@ import bittensor.utils.btlogging as btul
 from wandb.apis import public
 from typing import List
 from datetime import datetime
+from collections import Counter
 
 from subvortex.core.constants import TESTNET_SUBNET_UID, MAIN_SUBNET_UID
 
@@ -119,10 +120,16 @@ def log_miners_table(self, miners: List[Miner], commit=False):
 
 
 def log_distribution(miners: List[Miner], verified=True, commit=False):
+    # Define the ip occurences
+    ip_occurrences = Counter(miner.ip for miner in miners)
+
     # Build the data for the metric
     country_counts = {}
     for miner in miners:
-        if verified and (not miner.verified or miner.has_ip_conflicts):
+        # Define if miner has ip conflicts or not
+        has_ip_conflicts = ip_occurrences.get(miner.ip, 0) > 1
+
+        if verified and (not miner.verified or has_ip_conflicts):
             continue
 
         miner_country = miner.country

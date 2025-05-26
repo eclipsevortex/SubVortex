@@ -13,9 +13,51 @@ services:
       - NET_RAW
     env_file:
       - ./neuron/.env
+    depends_on:
+      - miner-redis
+      - miner-metagraph
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets
-      - /var/log:/app/logs
+
+  miner-metagraph:
+    build:
+      context: ../../
+      dockerfile: ./subvortex/miner/metagraph/Dockerfile
+      additional_contexts:
+        wheelbuilder: docker-image://ghcr.io/eclipsevortex/subvortex-wheel-builder:latest
+    container_name: subvortex-miner-metagraph
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    env_file:
+      - ./metagraph/.env
+    depends_on:
+      - miner-redis
+    volumes:
+      - ~/.bittensor/wallets:/root/.bittensor/wallets
+
+  miner-redis:
+    build:
+      context: ../../
+      dockerfile: ./subvortex/miner/redis/Dockerfile
+    container_name: subvortex-miner-redis
+    restart: always
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${SUBVORTEX_REDIS_PASSWORD:-}", "--raw", "incr", "ping" ]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+    command:
+      - redis-server
+      - /etc/redis/redis.conf
+    ports:
+      - ${SUBVORTEX_REDIS_PORT:-6379}:6379
+    env_file:
+      - ./redis/.env
+    volumes:
+      - ./redis/deployment/templates/subvortex-miner-redis.conf:/etc/redis/redis.conf:ro
 
 networks:
   subvortex:

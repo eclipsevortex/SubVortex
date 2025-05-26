@@ -1,0 +1,44 @@
+[Unit]
+Description=SubVortex {{ neuron | title }} Redis
+After=network.target
+Documentation=https://redis.io/docs, man:redis-server(1)
+
+[Service]
+Type=notify
+User={{ user }}
+Group={{ group }}
+ExecStart=/usr/bin/redis-server /etc/redis/redis.conf
+ExecStop=/bin/kill -s TERM $MAINPID
+PIDFile=/run/redis/redis-server.pid
+
+Restart=always
+TimeoutStopSec=0
+
+UMask=007
+RuntimeDirectory=redis
+RuntimeDirectoryMode=2755
+
+# Security
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=full
+ReadOnlyDirectories=/
+ReadWriteDirectories=-/var/lib/redis
+ReadWriteDirectories=-/var/log/subvortex-{{ neuron }}
+ReadWriteDirectories=-/run/redis
+ReadWriteDirectories=-/etc/redis
+
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID CAP_SYS_RESOURCE
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryDenyWriteExecute=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+
+[Install]
+WantedBy=multi-user.target
+Alias=subvortex-{{ neuron }}-redis.service

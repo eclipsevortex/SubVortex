@@ -1,19 +1,31 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-# Determine script directory dynamically to ensure everything runs in ./scripts/api/
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/.."
+SERVICE_NAME=
+PROJECT_WORKING_DIR="${SUBVORTEX_WORKING_DIR:-}"
 
-source ../scripts/utils.sh
+# Fallback to script location if PROJECT_WORKING_DIR is not set
+if [[ -z "$PROJECT_WORKING_DIR" ]]; then
+  SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PROJECT_WORKING_DIR="$(realpath "$SCRIPT_PATH/../../../")"
+  echo "📁 PROJECT_WORKING_DIR not set — using fallback: $PROJECT_WORKING_DIR"
+else
+  echo "📁 Using PROJECT_WORKING_DIR from environment: $PROJECT_WORKING_DIR"
+fi
+
+PROJECT_EXECUTION_DIR="${SUBVORTEX_EXECUTION_DIR:-$PROJECT_WORKING_DIR}"
+NEURON_WORKING_DIR="$PROJECT_WORKING_DIR/subvortex/miner"
+
+# Load some utils
+source "$NEURON_WORKING_DIR/../scripts/utils.sh"
 
 # Help function
 show_help() {
     echo "Usage: $0 [--execution=process|container|service]"
     echo
     echo "Description:"
-    echo "  This script stop the miner's components"
+    echo "  This script start the validator's components"
     echo
     echo "Options:"
     echo "  --execution   Specify the execution method (default: service)"
@@ -40,7 +52,7 @@ while [ "$#" -gt 0 ]; do
         --)
             shift
             break
-            ;;
+        ;;
         *)
             echo "Unrecognized option '$1'"
             exit 1
@@ -51,6 +63,12 @@ done
 # Check maandatory args
 check_required_args EXECUTION
 
-# Stop and teardown neuron
-./neuron/scripts/neuron_stop.sh --execution $EXECUTION
-./neuron/scripts/neuron_teardown.sh --execution $EXECUTION
+echo "🛑 Stopping miner components..."
+"$NEURON_WORKING_DIR/neuron/scripts/neuron_stop.sh" --execution $EXECUTION || true
+"$NEURON_WORKING_DIR/metagraph/scripts/metagraph_stop.sh" --execution $EXECUTION || true
+"$NEURON_WORKING_DIR/redis/scripts/redis_stop.sh" --execution $EXECUTION || true
+
+echo "🧹 Tearing down miner components..."
+"$NEURON_WORKING_DIR/neuron/scripts/neuron_teardown.sh" --execution $EXECUTION || true
+"$NEURON_WORKING_DIR/metagraph/scripts/metagraph_teardown.sh" --execution $EXECUTION || true
+"$NEURON_WORKING_DIR/redis/scripts/redis_teardown.sh" --execution $EXECUTION || true

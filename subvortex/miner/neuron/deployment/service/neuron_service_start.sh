@@ -2,98 +2,18 @@
 
 set -euo pipefail
 
-# Ensure script run as root
+SERVICE_NAME=subvortex-miner-neuron
+
+# --- Basic Checks ---
 if [[ "$EUID" -ne 0 ]]; then
-    echo "🛑 This script must be run as root. Re-running with sudo..."
-    exec sudo "$0" "$@"
+  echo "🛑 Must be run as root. Re-running with sudo..."
+  exec sudo "$0" "$@"
 fi
 
-# Determine working directory: prefer SUBVORTEX_WORKING_DIR, fallback to script location
-SCRIPT_DIR="$(cd "$(dirname "$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$0")")" && pwd)"
-
-# Find project root by walking up until LICENSE is found
-find_project_root() {
-    local dir="$1"
-    while [[ "$dir" != "/" ]]; do
-        [[ -f "$dir/LICENSE" ]] && { echo "$dir"; return; }
-        dir="$(dirname "$dir")"
-    done
-    return 1
-}
-
-PROJECT_ROOT="$(find_project_root "$SCRIPT_DIR")" || {
-    echo "❌ Could not detect project root (LICENSE not found)"
-    exit 1
-}
-
-# Resolve final working directory
-if [[ -n "${SUBVORTEX_WORKING_DIR:-}" ]]; then
-    REL_PATH="${SCRIPT_DIR#$PROJECT_ROOT/}"
-    TARGET_DIR="$SUBVORTEX_WORKING_DIR/$REL_PATH"
-    [[ -d "$TARGET_DIR" ]] || { echo "❌ Target directory does not exist: $TARGET_DIR"; exit 1; }
-    echo "📁 Using SUBVORTEX_WORKING_DIR: $TARGET_DIR"
-    cd "$TARGET_DIR/../.."
-else
-    echo "📁 Using fallback PROJECT_ROOT: $SCRIPT_DIR"
-    cd "$SCRIPT_DIR/../.."
-fi
-
-echo "📍 Working directory: $(pwd)"
-
-NEURON_NAME="subvortex-miner"
-SERVICE_NAME="$NEURON_NAME-neuron"
-
-source ../../scripts/utils.sh
-
-# Activate virtual environment
-echo "🐍 Activating Python virtual environment..."
-source venv/bin/activate
-
-# Load environment variables
-echo "🔍 Loading environment variables from .env..."
-export $(grep -v '^#' .env | xargs)
-
-# Build CLI args from SUBVORTEX_ environment variables
-eval "ARGS=( $(convert_env_var_to_args) )"
-
-# Build the full ExecStart command
-PYTHON_EXEC="venv/bin/python3"
-MODULE="subvortex.miner.neuron.src.main"
-ESCAPED_ARGS=$(printf '%q ' "${ARGS[@]}")
-FULL_EXEC_START="$PYTHON_EXEC -m $MODULE $ESCAPED_ARGS"
-USE_LOCAL_WORKDIR="${SUBVORTEX_USE_LOCAL_WORKDIR:-}"
-
-# Determine WorkingDirectory based on --local
-WORKING_DIR="/root/subvortex/subvortex/miner/neuron"
-if [[ "${USE_LOCAL_WORKDIR,,}" == "true" ]]; then
-    WORKING_DIR="$(pwd)"
-fi
-
-echo "📝 Building systemd service file..."
-
-TEMPLATE_PATH="./deployment/templates/${SERVICE_NAME}.service"
-TEMP_TEMPLATE="/tmp/${SERVICE_NAME}.service.template"
-
-# Replace ExecStart in template before envsubst
-sed -e "s|^ExecStart=.*|ExecStart=$WORKING_DIR/$FULL_EXEC_START|" \
--e "s|^EnvironmentFile=.*|EnvironmentFile=$WORKING_DIR/.env|" \
--e "s|^WorkingDirectory=.*|WorkingDirectory=$WORKING_DIR|" \
-"$TEMPLATE_PATH" > "$TEMP_TEMPLATE"
-
-# Inject any remaining env vars
-cp "$TEMP_TEMPLATE" "/etc/systemd/system/${SERVICE_NAME}.service"
-
-# Prepare log folder
-echo "📁 Preparing log directory for $NEURON_NAME..."
-mkdir -p /var/log/$NEURON_NAME
-chown root:root /var/log/$NEURON_NAME
-
-# Reload systemd
-echo "🔄 Reloading systemd daemon..."
-systemctl daemon-reexec
-systemctl daemon-reload
+echo "🚀 Starting $SERVICE_NAME..."
 
 # Start or restart the service
+echo "🔍 Checking $SERVICE_NAME..."
 if systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "🔁 $SERVICE_NAME is already running — restarting..."
     systemctl restart "$SERVICE_NAME"
@@ -102,5 +22,4 @@ else
     systemctl start "$SERVICE_NAME"
 fi
 
-# Final status check
-echo "✅ Miner Neuron started successfully."
+echo "✅ $SERVICE_NAME started successfully."

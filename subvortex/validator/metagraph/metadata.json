@@ -1,9 +1,9 @@
 {
-  "id": "miner-metagraph",
-  "name": "subvortex-miner-metagraph",
-  "version": "3.1.0-rc.2",
-  "validator.version": "3.1.0-rc.2",
-  "validator.metagraph.version": "3.1.0-rc.2",
+  "id": "validator-metagraph",
+  "name": "subvortex-validator-metagraph",
+  "version": "3.1.0",
+  "validator.version": "3.1.0",
+  "validator.metagraph.version": "3.1.0",
   "depends_on": [
     "validator-redis"
   ]

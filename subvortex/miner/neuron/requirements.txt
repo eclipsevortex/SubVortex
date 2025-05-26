@@ -1,9 +1,10 @@
-bittensor==9.4.0
-bittensor-wallet==3.0.9
+bittensor==9.6.0
+bittensor-wallet==3.0.10
 loguru==0.7.0
 netfilterqueue==1.1.0; sys_platform == 'linux'
 numpy==2.0.1
 pydantic==2.8.2
 python-dotenv==1.0.1
+redis==5.0.1
 setuptools==70.0.0
 substrate_interface==1.7.9

@@ -12,8 +12,8 @@ ACTIONS_miner := bump-major bump-minor bump-patch bump-alpha bump-rc
 ACTIONS_validator := bump-major bump-minor bump-patch bump-alpha bump-rc
 
 # Services per component
-SERVICES_miner := neuron
-SERVICES_validator := neuron redis
+SERVICES_miner := neuron metagraph redis
+SERVICES_validator := neuron metagraph redis
 
 # All components
 COMPONENTS := miner validator
@@ -272,8 +272,8 @@ unprerelease:
 		[ -d "$$comp" ] || continue; \
 		comp_name=$$(basename "$$comp"); \
 		case $$comp_name in \
-			miner) services="neuron" ;; \
-			validator) services="neuron redis" ;; \
+			miner) services="$(SERVICES_miner)" ;; \
+			validator) services="$(SERVICES_validator)" ;; \
 			*) services="$$comp_name" ;; \
 		esac; \
 		for service in $$services; do \
@@ -318,8 +318,8 @@ unrelease:
 		[ -d "$$comp" ] || continue; \
 		comp_name=$$(basename "$$comp"); \
 		case $$comp_name in \
-			miner) services="neuron" ;; \
-			validator) services="neuron redis" ;; \
+			miner) services="$(SERVICES_miner)" ;; \
+			validator) services="$(SERVICES_validator)" ;; \
 			*) services="$$comp_name" ;; \
 		esac; \
 		for service in $$services; do \
@@ -343,6 +343,44 @@ release:
  		--target $(CURRENT_BRANCH) \
  		$(DIST_DIR)/*.tar.gz \
  		$(DIST_DIR)/*.whl || true
+
+# =========
+# 🧪 Tests
+# =========
+TARGETS += test
+
+test:
+	@echo "🧪 Running tests in all components/services..."
+	@PYTHONPATH=. ; \
+	for comp in $(COMPONENTS); do \
+		case "$$comp" in \
+			miner) SERVICES="$(SERVICES_miner)";; \
+			validator) SERVICES="$(SERVICES_validator)";; \
+			*) echo "Unknown component: $$comp"; exit 1;; \
+		esac; \
+		for svc in $$SERVICES; do \
+			svc_path=subvortex/$$comp/$$svc; \
+			if [ -d "$$svc_path" ]; then \
+				echo "🔍 Testing $$svc_path..."; \
+				PYTHONPATH=. pytest "$$svc_path"|| test $$? -eq 5 || exit $$?; \
+			else \
+				echo "⚠️ Warning: Path $$svc_path not found, skipping..."; \
+			fi \
+		done \
+	done; \
+	if [ -d "subvortex/core" ]; then \
+		echo "🔍 Testing subvortex/core..."; \
+		PYTHONPATH=. pytest subvortex/core || test $$? -eq 5 || exit $$?; \
+	else \
+		echo "⚠️ Warning: subvortex/core not found, skipping..."; \
+	fi
+
+
+# ==========
+# 📜 Scripts 
+# ==========
+generate:
+	python3 tools/generate_scripts/src/main.py
 
 # =====================
 # Add the last target
@@ -385,6 +423,7 @@ help:
 	@echo ""
 	@echo "  build                         – Build all components"
 	@echo "  clean                         – Clean all components"
+	@echo "  test                          – Run pytest in all service folders"
 	@echo ""
 	@echo "🏷️ Tag/Untag:"
 	@echo ""

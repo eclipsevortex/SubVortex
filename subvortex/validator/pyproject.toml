@@ -47,4 +47,5 @@ where = ["."]
     "version.py",
     "docker-compose.yml",
     "**/metadata.json",
+    "**/manifest.json",
 ]

@@ -1,0 +1,26 @@
+{
+  "id": "miner-metagraph",
+  "name": "subvortex-miner-metagraph",
+  "description": "SubVortex Miner Metagraph",
+  "version": "3.1.0",
+  "miner.version": "3.1.0",
+  "miner.metagraph.version": "3.1.0",
+  "type": "python",
+  "neuron": "miner",
+  "component": "metagraph",
+  "common": {
+    "user": "root",
+    "group": "root"
+  },
+  "service": {
+    "environment": {
+      "PYTHONUNBUFFERED": 1
+    },
+    "restart": "on-failure",
+    "restart_sec": "10s",
+    "log_prefix": "subvortex-miner-metagraph"
+  },
+  "depends_on": [
+    "miner-redis"
+  ]
+}

@@ -26,6 +26,7 @@ from typing import List, Union, Any, Dict
 from scalecodec.base import RuntimeConfiguration
 from scalecodec.type_registry import load_type_registry_preset
 from substrateinterface import SubstrateInterface
+from async_substrate_interface import AsyncSubstrateInterface
 
 
 def _get_weights_min_stake(substrate: SubstrateInterface, storage_function: str):
@@ -39,6 +40,22 @@ def _get_weights_min_stake(substrate: SubstrateInterface, storage_function: str)
         pass
 
     return weight_min_stake
+
+
+async def get_weights_min_stake_async(substrate: AsyncSubstrateInterface):
+    """
+    Return the minimum of TAO a validator need to have the set weight
+    """
+    # WeightsMinStake has been renamed StakeThreshold
+    result = await substrate.query(
+        module="SubtensorModule", storage_function="StakeThreshold", params=[]
+    )
+
+    weight_min_stake = result.value if result is not None else 0
+    btul.logging.debug(f"get_weights_min_stake() {weight_min_stake}")
+
+    # Convert Rao to Tao
+    return int(float(weight_min_stake) * 10**-9)
 
 
 def get_weights_min_stake(substrate: SubstrateInterface):

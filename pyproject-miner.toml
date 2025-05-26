@@ -38,6 +38,7 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["."]
 include = [
+    "scripts",
     "subvortex",
     "subvortex.core",
     "subvortex.miner",
@@ -45,6 +46,7 @@ include = [
 ]
 
 [tool.setuptools.package-data]
+"scripts" = ["**/utils/*.sh"]
 "subvortex" = ["pyproject.toml"]
 "subvortex.miner" = [
     "**/*.py",
@@ -56,6 +58,7 @@ include = [
     "**/env.template",
     "**/docker-compose.yml",
     "**/metadata.json",
+    "**/manifest.json",
 ]
 "subvortex.core" = ["**/*.py"]
 "subvortex.scripts" = ["**/*.sh", "wss/**/*"]

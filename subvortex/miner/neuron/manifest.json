@@ -1,0 +1,27 @@
+{
+  "id": "miner-neuron",
+  "name": "subvortex-miner-neuron",
+  "description": "SubVortex Miner Neuron",
+  "version": "3.1.0",
+  "miner.version": "3.1.0",
+  "miner.neuron.version": "3.1.0",
+  "type": "python",
+  "neuron": "miner",
+  "component": "neuron",
+  "common": {
+    "user": "root",
+    "group": "root"
+  },
+  "service": {
+    "environment": {
+      "PYTHONUNBUFFERED": 1
+    },
+    "restart": "on-failure",
+    "restart_sec": "10s",
+    "log_prefix": "subvortex-miner-neuron"
+  },
+  "depends_on": [
+    "miner-redis",
+    "miner-metagraph"
+  ]
+}

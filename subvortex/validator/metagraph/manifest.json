@@ -1,0 +1,26 @@
+{
+  "id": "validator-metagraph",
+  "name": "subvortex-validator-metagraph",
+  "description": "SubVortex Validator Metagraph",
+  "version": "3.1.0",
+  "validator.version": "3.1.0",
+  "validator.metagraph.version": "3.1.0",
+  "type": "python",
+  "neuron": "validator",
+  "component": "metagraph",
+  "common": {
+    "user": "root",
+    "group": "root"
+  },
+  "service": {
+    "environment": {
+      "PYTHONUNBUFFERED": 1
+    },
+    "restart": "on-failure",
+    "restart_sec": "10s",
+    "log_prefix": "subvortex-validator-metagraph"
+  },
+  "depends_on": [
+    "validator-redis"
+  ]
+}

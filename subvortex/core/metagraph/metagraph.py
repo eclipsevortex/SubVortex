@@ -244,7 +244,7 @@ class MetagraphObserver:
                 mismatches = self._get_details_changed(
                     current_neuron=current_neuron, new_neuron=new_neuron
                 )
-                btul.logging.debug(mismatches)
+                btul.logging.trace(mismatches)
 
             # Flag missing country if there is at least one neuron with no country but an ip
             has_missing_country = has_missing_country or (

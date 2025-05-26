@@ -616,3 +616,109 @@ async def test_resync_removes_stale_neuron(observer):
 
     observer.database.remove_neurons.assert_called_once_with([stored])
     observer.database.update_neurons.assert_called_once_with([new])
+
+
+@pytest.mark.asyncio
+async def test_non_ipv4_address_not_considered_change(observer):
+    fake_proto = MagicMock()
+    fake_proto.uid = 10
+    fake_proto.axon_info.ip = "::1"  # Not an IPv4
+    fake_proto.hotkey = "ipv6_hotkey"
+
+    # Original neuron had the same IP and no country
+    stored = scmm.Neuron(uid=10, ip="::1", hotkey="ipv6_hotkey", country=None)
+    observer.metagraph = AsyncMock()
+    observer.metagraph.neurons = [fake_proto]
+    observer.database.get_neurons = AsyncMock(return_value={"ipv6_hotkey": stored})
+    observer.database.update_neurons = AsyncMock()
+    observer.database.remove_neurons = AsyncMock()
+
+    with patch(
+        "subvortex.core.model.neuron.neuron.Neuron.from_proto", return_value=stored
+    ), patch("subvortex.core.country.country.get_country", return_value=None):
+        axons, has_missing_country = await observer._resync()
+
+    observer.database.update_neurons.assert_not_called()
+    observer.database.remove_neurons.assert_not_called()
+    assert axons["ipv6_hotkey"] == "::1"
+    assert has_missing_country is False
+
+
+@pytest.mark.asyncio
+async def test_non_ipv4_address_but_other_change_triggers_update(observer):
+    fake_proto = MagicMock()
+    fake_proto.uid = 11
+    fake_proto.axon_info.ip = "abcd"  # Not a valid IPv4
+    fake_proto.hotkey = "weird_ip_hotkey"
+
+    stored = scmm.Neuron(uid=11, ip="abcd", hotkey="weird_ip_hotkey", country=None)
+    updated = scmm.Neuron(
+        uid=11, ip="abcd", hotkey="weird_ip_hotkey", country=None, incentive=0.1
+    )
+
+    observer.metagraph = AsyncMock()
+    observer.metagraph.neurons = [fake_proto]
+    observer.database.get_neurons = AsyncMock(return_value={"weird_ip_hotkey": stored})
+    observer.database.update_neurons = AsyncMock()
+    observer.database.remove_neurons = AsyncMock()
+
+    with patch(
+        "subvortex.core.model.neuron.neuron.Neuron.from_proto", return_value=updated
+    ), patch("subvortex.core.country.country.get_country", return_value=None):
+        axons, has_missing_country = await observer._resync()
+
+    observer.database.update_neurons.assert_called_once_with([updated])
+    observer.database.remove_neurons.assert_not_called()
+    assert axons["weird_ip_hotkey"] == "abcd"
+    assert has_missing_country is True
+
+
+@pytest.mark.asyncio
+async def test_change_from_non_ipv4_to_ipv4(observer):
+    fake_proto = MagicMock()
+    fake_proto.uid = 12
+    fake_proto.axon_info.ip = "8.8.8.8"  # valid IPv4
+    fake_proto.hotkey = "ipv4_later"
+
+    old = scmm.Neuron(uid=12, ip="not-an-ip", hotkey="ipv4_later", country=None)
+    new = scmm.Neuron(uid=12, ip="8.8.8.8", hotkey="ipv4_later", country="US")
+
+    observer.metagraph = AsyncMock()
+    observer.metagraph.neurons = [fake_proto]
+    observer.database.get_neurons = AsyncMock(return_value={"ipv4_later": old})
+    observer.database.update_neurons = AsyncMock()
+    observer.database.remove_neurons = AsyncMock()
+
+    with patch(
+        "subvortex.core.model.neuron.neuron.Neuron.from_proto", return_value=new
+    ), patch("subvortex.core.country.country.get_country", return_value="US"):
+        axons, has_missing_country = await observer._resync()
+
+    observer.database.remove_neurons.assert_not_called()
+    observer.database.update_neurons.assert_called_once_with([new])
+    assert axons["ipv4_later"] == "8.8.8.8"
+    assert has_missing_country is False
+
+
+@pytest.mark.asyncio
+async def test_zero_ip_and_non_ipv4_not_considered_missing_country(observer):
+    fake_proto = MagicMock()
+    fake_proto.uid = 13
+    fake_proto.axon_info.ip = "0.0.0.0"  # should be skipped
+    fake_proto.hotkey = "zero_ip"
+
+    stored = scmm.Neuron(uid=13, ip="0.0.0.0", hotkey="zero_ip", country=None)
+
+    observer.metagraph = AsyncMock()
+    observer.metagraph.neurons = [fake_proto]
+    observer.database.get_neurons = AsyncMock(return_value={"zero_ip": stored})
+    observer.database.update_neurons = AsyncMock()
+
+    with patch(
+        "subvortex.core.model.neuron.neuron.Neuron.from_proto", return_value=stored
+    ):
+        axons, has_missing_country = await observer._resync()
+
+    observer.database.remove_neurons.assert_not_called()
+    observer.database.update_neurons.assert_not_called()
+    assert has_missing_country is False

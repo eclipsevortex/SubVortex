@@ -10,6 +10,7 @@ import subvortex.core.core_bittensor.subtensor as scbs
 import subvortex.core.model.neuron.neuron as scmm
 import subvortex.core.metagraph.database as scmd
 import subvortex.core.metagraph.settings as scms
+import subvortex.core.utils as scsu
 
 
 class MetagraphObserver:
@@ -179,7 +180,7 @@ class MetagraphObserver:
                 else (
                     # Get the country for the ip if provided
                     sccc.get_country(new_neuron.ip)
-                    if new_neuron.ip != "0.0.0.0"
+                    if new_neuron.ip != "0.0.0.0" and scsu.is_valid_ipv4(new_neuron.ip)
                     else None
                 )
             )
@@ -193,6 +194,7 @@ class MetagraphObserver:
                 current_neuron
                 and current_neuron.country is None
                 and current_neuron.ip != "0.0.0.0"
+                and scsu.is_valid_ipv4(new_neuron.ip)
             )
 
             if new_neuron == current_neuron and not has_country_none:
@@ -250,8 +252,6 @@ class MetagraphObserver:
             has_missing_country = has_missing_country or (
                 country is None and new_neuron.ip != "0.0.0.0"
             )
-
-            print(f"{country} {new_neuron.ip} {has_missing_country}")
 
             updated_neurons.append(new_neuron)
 

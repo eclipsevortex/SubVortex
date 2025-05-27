@@ -9,9 +9,12 @@ import bittensor.core.async_subtensor as btcas
 
 import subvortex.core.model.neuron as scmn
 import subvortex.core.core_bittensor.subtensor as scbs
+import subvortex.validator.core.challenger.model as ccm
 import subvortex.validator.core.challenger.database as sccd
 import subvortex.validator.core.challenger.scheduler as sccc
 import subvortex.validator.core.challenger.settings as sccs
+import subvortex.validator.core.challenger.challenges.executor as svccce
+import subvortex.validator.core.model.miner as cmm
 
 
 class Challenger:
@@ -71,6 +74,9 @@ class Challenger:
                 btul.logging.info(
                     f"# of miners: {len(miners)}", prefix=self.settings.logging_name
                 )
+
+                # Compute the ip occurences
+                ip_occurences = Counter([x.ip for x in miners])
 
                 # Get the list of country
                 countries = self._get_countries(miners)
@@ -153,24 +159,9 @@ class Challenger:
                     )
 
                     # Get the list of challengers for the scheduled country
-                    challengers: typing.List[scmn.Neuron] = [
+                    challengers: typing.List[cmm.Miner] = [
                         m for m in miners if m.country == country
                     ]
-
-                    # Compute the default scores
-                    default_scores = {
-                        x.hotkey: cm.Score(uid=x.uid, hotkey=x.hotkey)
-                        for x in challengers
-                    }
-
-                    # Get the current scores for each challenger
-                    challenger_hotkeys = [x.hotkey for x in challengers]
-                    scores = await self.database.get_scores(challenger_hotkeys)
-                    scores = {**default_scores, **scores}
-                    btul.logging.debug(
-                        f"[{step_index}] Scores loaded from database",
-                        prefix=self.settings.logging_name,
-                    )
 
                     # Set the start time of the block we have to wait before challenging
                     wait_block_start = time.time()
@@ -178,7 +169,40 @@ class Challenger:
                     # Do not challenge if there are no challengers
                     challenge = None
                     if len(challengers) > 0:
-                        pass
+                        # Wait next block to let miners proxy whitelisting the validator
+                        btul.logging.debug(
+                            "Waiting miners proxy to be set up",
+                            prefix=self.settings.logging_name,
+                        )
+                        await scbs.wait_for_block(subtensor=self.subtensor)
+                        wait_block_time = time.time() - wait_block_start
+
+                        # # Get the list of identities
+                        # identities = await get_challengee_identities(
+                        #     subtensor=self.subtensor,
+                        #     netuid=self.config.netuid,
+                        # )
+                        # btul.logging.debug(
+                        #     f"# of identities: {len(identities)}",
+                        #     prefix=self.settings.logging_name,
+                        # )
+
+                        # Challenge the challengers
+                        challenge_start_time = time.time()
+                        challenges_result, challenge = (
+                            await self._challenge_challengers(
+                                step_index=step_index,
+                                settings=self.settings,
+                                ip_occurences=ip_occurences,
+                                challengers=challengers,
+                                identities=identities,
+                            )
+                        )
+                        challenge_time = time.time() - challenge_start_time
+                        btul.logging.debug(
+                            f"[{step_index}] Challenge completed in {challenge_time} seconds",
+                            prefix=self.settings.logging_name,
+                        )
                     else:
                         wait_block_time = time.time() - wait_block_start
 
@@ -195,7 +219,7 @@ class Challenger:
                     )
 
                     # Store the challenge
-                    await self.database.set_challenge(
+                    await self.database.add_challenge(
                         schedule_id=step.id,
                         challenge=challenge,
                         process_time=step_time - wait_block_time,
@@ -206,15 +230,16 @@ class Challenger:
                     )
 
                     # Notify analytic
-                    await self.database.notify_analytic(
-                        "challenge",
-                        schedule_id=step.id,
-                        hotkeys=",".join(challenger_hotkeys),
-                    )
-                    btul.logging.trace(
-                        f"[{step_index}] Challenge {step.id} sent",
-                        prefix=self.settings.logging_name,
-                    )
+                    # hotkeys = [x.hotkey for x in challengers]
+                    # await self.database.notify_analytic(
+                    #     "challenge",
+                    #     schedule_id=step.id,
+                    #     hotkeys=",".join(hotkeys),
+                    # )
+                    # btul.logging.trace(
+                    #     f"[{step_index}] Challenge {step.id} sent",
+                    #     prefix=self.settings.logging_name,
+                    # )
 
                     btul.logging.debug(
                         f"[{step_index}] Waiting until block: #{step.block_end}",
@@ -242,6 +267,81 @@ class Challenger:
         btul.logging.info(
             f"✅ MetagraphObserver service stopped", prefix=self.settings.logging_name
         )
+
+    async def _challenge_challengers(
+        self,
+        step_index: int,
+        settings: sccs.Settings,
+        ip_occurences: Counter,
+        challengers: typing.List[cmm.Miner],
+        identities: typing.Dict[str, typing.List],
+    ):
+        # Define the result
+        checks_result = {}
+
+        # Define the available challengers
+        available_challengers = list(challengers)
+
+        # Execute some checks
+        for challenger in challengers:
+            ip = challenger.ip
+            hotkey = challenger.hotkey
+
+        # Execute some checks
+        for challenger in challengers:
+            ip = challenger.ip
+            hotkey = challenger.hotkey
+
+            # Check the identity of the miners are set
+            identity = identities.get(hotkey)
+            if identity is None:
+                checks_result[hotkey] = ccm.ChallengeResult.create_failed(
+                    reason="Identity is not set",
+                    challenge_attempts=settings.default_challenge_max_iteration,
+                    avg_process_time=settings.challenge_timeout,
+                )
+                continue
+
+            # Check if the ip is associated to more than 1 miner
+            if ip_occurences[ip] > 1:
+                checks_result[hotkey] = ccm.ChallengeResult.create_failed(
+                    reason=f"{ip_occurences[ip]} miners associated with the ip {ip}",
+                    challenge_attempts=settings.default_challenge_max_iteration,
+                    avg_process_time=settings.challenge_timeout,
+                )
+                continue
+
+            # Check there are some challenges for the different node!
+
+        # Filter out challengers that failed the different checks
+        available_challengers = list(
+            set(available_challengers)
+            - set([x for x in available_challengers if x.hotkey in checks_result])
+        )
+
+        challenge = None
+        challenges_result = {}
+        if len(available_challengers) > 0:
+            # Execute challenge
+            challenges_result, challenge = await svccce.execute_challenge(
+                settings=settings,
+                subtensor=self.subtensor,
+                challengers=available_challengers,
+                nodes=identities,
+            )
+        else:
+            btul.logging.warning(
+                f"[{step_index}] Skip the challenge as no challengers have nodes registered",
+                prefix=self.settings.logging_name,
+            )
+
+        # Build result
+        result = {
+            **checks_result,
+            **challenges_result,
+        }
+
+        return result, challenge
 
     def _is_validator(neuron: scmn.Neuron):
         return neuron.validator_trust > 0 and neuron.stake >= 1000

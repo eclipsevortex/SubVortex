@@ -9,12 +9,12 @@ class Settings:
     """
     Prefix to use when logging
     """
-    
+
     netuid: int = 7
     """
     UID of the subnet
     """
-    
+
     default_challenge_max_iteration = 1  # TODO: Resotre 64 when going to prod
     """
     Number of connection that can be opened to a node at the same time.

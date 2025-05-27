@@ -3,7 +3,7 @@ import traceback
 import bittensor.utils.btlogging as btul
 
 from subvortex.core.database.database_utils import decode_hash, decode_value
-from subvortex.validator.core.challenger.database import NeuronReadOnlyDatabase
+from subvortex.core.metagraph.database import NeuronReadOnlyDatabase
 from subvortex.validator.core.model.schedule import (
     Schedule,
     ScheduleModel210,
@@ -82,7 +82,7 @@ class ChallengerDatabase(NeuronReadOnlyDatabase):
     async def add_challenge(self, challenge: Challenge):
         # Ensure the connection is up and running
         await self.ensure_connection()
-        
+
         # Get the active versions
         _, active = await self._get_migration_status("miner")
 
@@ -105,7 +105,6 @@ class ChallengerDatabase(NeuronReadOnlyDatabase):
                 )
 
         return None
-
 
     def _key(self, key: str):
         # Prefixes keys to namespace them under this service

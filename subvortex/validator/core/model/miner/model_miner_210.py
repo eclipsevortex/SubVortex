@@ -1,7 +1,7 @@
 from redis import asyncio as Redis
 
 from subvortex.core.database.database_utils import decode_hash
-from subvortex.validator.neuron.src.models.miner import Miner
+from subvortex.validator.core.model.miner import Miner
 
 
 class MinerModel:

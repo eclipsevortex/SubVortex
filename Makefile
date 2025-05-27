@@ -358,6 +358,12 @@ test:
 			validator) SERVICES="$(SERVICES_validator)";; \
 			*) echo "Unknown component: $$comp"; exit 1;; \
 		esac; \
+		if [ -d "subvortex/$$comp/core" ]; then \
+			echo "🔍 Testing subvortex/$$comp/core..."; \
+			PYTHONPATH=. pytest subvortex/$$comp/core || test $$? -eq 5 || exit $$?; \
+		else \
+			echo "⚠️ Warning: subvortex/$$comp/core not found, skipping..."; \
+		fi; \
 		for svc in $$SERVICES; do \
 			svc_path=subvortex/$$comp/$$svc; \
 			if [ -d "$$svc_path" ]; then \

@@ -1,0 +1,2 @@
+bittensor==9.6.0
+bittensor-wallet==3.0.10

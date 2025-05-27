@@ -45,8 +45,7 @@ class MockSubtensor(btum.MockSubtensor):
     def __init__(self, netuid, n=16, wallet=None, network="mock"):
         super().__init__(network=network)
 
-        if not self.subnet_exists(netuid):
-            self.create_subnet(netuid)
+        self.create_subnet(netuid)
 
         # Register ourself (the validator) as a neuron at uid=0
         if wallet is not None:

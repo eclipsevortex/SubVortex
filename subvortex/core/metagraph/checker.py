@@ -57,7 +57,11 @@ class MetagraphChecker:
             expected_neuron = scmm.Neuron.from_proto(neuron)
 
             if self.with_country:
-                expected_neuron.country = sccc.get_country(expected_neuron.ip)
+                expected_neuron.country = (
+                    sccc.get_country(expected_neuron.ip)
+                    if expected_neuron.ip != "0.0.0.0"
+                    else None
+                )
 
             mismatches = []
             for key, expected_value in expected_neuron.__dict__.items():

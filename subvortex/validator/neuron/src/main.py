@@ -248,7 +248,7 @@ class Validator:
                     btul.logging.debug(f"Locations loaded {len(locations)}")
 
                     # Sync the miners
-                    await sync_miners(
+                    self.miners = await sync_miners(
                         database=self.database,
                         neurons=neurons,
                         miners=self.miners,

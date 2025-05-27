@@ -62,6 +62,8 @@ async def sync_miners(
     validator: Neuron,
     locations: List[str],
 ) -> List[Miner]:
+    miners_updates: List[Miner] = []
+
     # Resync the miners
     for hotkey, neuron in neurons.items():
         # Get the associated miner
@@ -115,11 +117,13 @@ async def sync_miners(
                 f"[{miner.uid}] Miner moved from {miner} to {neuron.ip}"
             )
 
+        miners_updates.append(miner)
+
     # Define the ip occurences
     ip_occurrences = Counter(neuron.ip for neuron in neurons.values())
 
     # Recompute the miners scores
-    for miner in miners:
+    for miner in miners_updates:
         # Define if miner has ip conflicts or not
         has_ip_conflicts = ip_occurrences.get(miner.ip, 0) > 1
 
@@ -138,6 +142,8 @@ async def sync_miners(
 
         # Refresh the final score
         miner.score = compute_final_score(miner)
+
+    return miners_updates
 
 
 async def reset_reliability_score(database: Database, miners: List[Miner]):

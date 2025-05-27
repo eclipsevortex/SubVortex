@@ -12,7 +12,7 @@ import subvortex.core.core_bittensor.config.config_utils as scccu
 import subvortex.core.metagraph.checker as scmc
 import subvortex.core.metagraph.database as scmms
 
-import subvortex.miner.metagraph.src.settings as smme
+import subvortex.validator.metagraph.src.settings as smme
 
 # Load the environment variables for the whole process
 load_dotenv(override=True)

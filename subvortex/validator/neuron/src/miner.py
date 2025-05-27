@@ -62,6 +62,8 @@ async def sync_miners(
     validator: Neuron,
     locations: List[str],
 ) -> List[Miner]:
+    miners_updates: List[Miner] = []
+
     # Resync the miners
     for hotkey, neuron in neurons.items():
         # Get the associated miner
@@ -70,17 +72,26 @@ async def sync_miners(
         # Check if the miner did not exist
         if current_miner is None:
             # Create the new miner
-            miner = Miner.create_new_miner(
+            current_miner = Miner.create_new_miner(
                 uid=neuron.uid,
             )
+        elif current_miner.hotkey != hotkey:
+            # Remove the old miner
+            await database.remove_miner(miner=current_miner)
 
-            # Add the new miner
-            await database.add_miner(miner)
+            # Reset the updated miner
+            current_miner.reset()
 
-            # Add the new miner to the list
-            miners.append(miner)
+            # Log the success
+            btul.logging.success(
+                f"[{current_miner.uid}] New miner {hotkey} added to the list"
+            )
 
-            continue
+        # Check if the miner has changed localisation
+        if current_miner.ip != neuron.ip:
+            btul.logging.success(
+                f"[{current_miner.uid}] Miner moved from {current_miner.ip} to {neuron.ip}"
+            )
 
         # Create an updated miner
         miner = current_miner.clone()
@@ -95,31 +106,13 @@ async def sync_miners(
         miner.placeholder1 = neuron.placeholder1
         miner.placeholder2 = neuron.placeholder2
 
-        # Check if the miner has changed ownership
-        if current_miner.hotkey != hotkey:
-            # Remove the old miner
-            await database.remove_miner(miner=miner)
-
-            # Reset the updated miner
-            miner.reset()
-
-            # Add the new miner
-            await database.add_miner(miner=miner)
-
-            # Log the success
-            btul.logging.success(f"[{miner.uid}] New miner {hotkey} added to the list")
-
-        # Check if the miner has changed localisation
-        if current_miner.ip != neuron.ip:
-            btul.logging.success(
-                f"[{miner.uid}] Miner moved from {miner} to {neuron.ip}"
-            )
+        miners_updates.append(miner)
 
     # Define the ip occurences
     ip_occurrences = Counter(neuron.ip for neuron in neurons.values())
 
     # Recompute the miners scores
-    for miner in miners:
+    for miner in miners_updates:
         # Define if miner has ip conflicts or not
         has_ip_conflicts = ip_occurrences.get(miner.ip, 0) > 1
 
@@ -138,6 +131,8 @@ async def sync_miners(
 
         # Refresh the final score
         miner.score = compute_final_score(miner)
+
+    return miners_updates
 
 
 async def reset_reliability_score(database: Database, miners: List[Miner]):

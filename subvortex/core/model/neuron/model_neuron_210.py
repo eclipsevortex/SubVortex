@@ -54,8 +54,8 @@ class NeuronModel:
                 pipe.hmset(key, data)
             await pipe.execute()
 
-    async def delete(self, redis: Redis, hotkey: str):
-        key = self._key(hotkey)
+    async def delete(self, redis: Redis, neuron: Neuron):
+        key = self._key(neuron.hotkey)
         await redis.delete(key)
 
     async def delete_all(self, redis: Redis, neurons: list[Neuron]):

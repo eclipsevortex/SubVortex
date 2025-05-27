@@ -73,9 +73,9 @@ class MinerModel:
 
         await pipe.execute()
 
-    async def delete(self, redis: Redis, ss58_address: str):
+    async def delete(self, redis: Redis, miner: Miner):
         """
         Delete the statistics entry for a given hotkey.
         """
-        key = self._key(ss58_address)
+        key = self._key(miner.hotkey)
         await redis.delete(key)

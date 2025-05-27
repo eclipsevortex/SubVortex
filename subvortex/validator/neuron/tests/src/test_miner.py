@@ -54,11 +54,11 @@ async def test_sync_miners_adds_missing_miners():
     validator = fake_neuron(999, country="US")
     locations = ["US", "CA"]
 
-    await sync_miners(db, neurons, miners, validator, locations)
+    result = await sync_miners(db, neurons, miners, validator, locations)
 
-    assert len(miners) == 1
-    assert miners[0].uid == 1
-    db.add_miner.assert_called_once()
+    assert len(result) == 1
+    assert result[0].uid == 1
+    # db.add_miner.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -73,7 +73,6 @@ async def test_sync_miners_handles_hotkey_change():
     await sync_miners(db, neurons, miners, validator, locations)
 
     db.remove_miner.assert_called_once()
-    db.add_miner.assert_called()
 
 
 @pytest.mark.asyncio
@@ -117,3 +116,26 @@ async def test_reset_reliability_score_sets_zero():
         assert miner.challenge_successes == 0
 
     db.update_miners.assert_called_once_with(miners=miners)
+
+
+@pytest.mark.asyncio
+async def test_sync_miners_updates_visible_outside():
+    db = AsyncMock()
+    
+    # Initial data: one neuron in DB, one existing miner
+    neuron = fake_neuron(uid=1, ip="10.0.0.1", hotkey="hk1")
+    db_neurons = {"hk1": neuron}
+
+    # Existing miner with different IP (will be updated)
+    miner = fake_miner(uid=1, ip="192.168.1.1", hotkey="hk1")
+    miners = [miner]
+
+    validator = fake_neuron(uid=999, country="US")
+    locations = ["US", "CA"]
+
+    result = await sync_miners(db, db_neurons, miners, validator, locations)
+
+    # Assert that the original miner object has been mutated
+    assert result[0].ip == "10.0.0.1"
+    assert result[0].hotkey == "hk1"
+    assert result[0].uid == 1

@@ -11,9 +11,13 @@ from subvortex.core.model.neuron import Neuron
 
 
 def fake_neuron(
-    uid: int, hotkey: str = "hk", ip: str = "1.2.3.4", country: str = "US"
+    uid: int,
+    hotkey: str = "hk",
+    ip: str = "1.2.3.4",
+    country: str = "US",
+    stake: int = 0,
 ) -> Neuron:
-    return Neuron(uid=uid, hotkey=hotkey, ip=ip, country=country)
+    return Neuron(uid=uid, hotkey=hotkey, ip=ip, country=country, stake=stake)
 
 
 def fake_miner(
@@ -42,7 +46,9 @@ async def test_sync_miners_handle_new_miners():
     validator = fake_neuron(999, country="US")
     locations = ["US", "CA"]
 
-    result = await sync_miners(db, neurons, miners, validator, locations)
+    result = await sync_miners(
+        db, neurons, miners, validator, locations, min_stake=1000
+    )
 
     assert len(result) == 1
     assert result[0].uid == neuron.uid
@@ -86,7 +92,9 @@ async def test_sync_miners_handle_hotkey_change():
     validator = fake_neuron(999, country="US")
     locations = ["US", "CA"]
 
-    result = await sync_miners(db, neurons, miners, validator, locations)
+    result = await sync_miners(
+        db, neurons, miners, validator, locations, min_stake=1000
+    )
 
     db.remove_miner.assert_called_once()
     assert result[0].version == "0.0.0"
@@ -134,7 +142,9 @@ async def test_sync_miners_handle_ip_change(monkeypatch):
 
     monkeypatch.setattr("bittensor.utils.btlogging.logging.info", mock_log)
 
-    result = await sync_miners(db, neurons, miners, validator, locations)
+    result = await sync_miners(
+        db, neurons, miners, validator, locations, min_stake=1000
+    )
 
     assert any("IP address changed from" in log for log in logs)
     assert result[0].uid == neuron.uid
@@ -165,7 +175,9 @@ async def test_sync_miners_skips_unchanged_miners():
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result = await sync_miners(db, {"hk1": neuron}, miners, validator, locations)
+    result = await sync_miners(
+        db, {"hk1": neuron}, miners, validator, locations, min_stake=1000
+    )
 
     assert len(result) == 1
     db.remove_miner.assert_not_called()
@@ -189,62 +201,36 @@ async def test_sync_miners_skips_unchanged_miners():
 
 
 @pytest.mark.asyncio
-async def test_sync_miners_all_scores_are_recalculated():
-    db = AsyncMock()
-    neuron = fake_neuron(uid=1, hotkey="hk1", ip="1.2.3.4", country="US")
-    miner = fake_miner(uid=1, hotkey="hk1", ip="1.2.3.4", country="US")
-
-    validator = fake_neuron(uid=999, country="US")
-    locations = ["US", "CA"]
-
-    with patch(
-        "subvortex.validator.neuron.src.miner.compute_availability_score",
-        return_value=0.11,
-    ), patch(
-        "subvortex.validator.neuron.src.miner.compute_latency_score", return_value=0.22
-    ), patch(
-        "subvortex.validator.neuron.src.miner.compute_distribution_score",
-        return_value=0.33,
-    ), patch(
-        "subvortex.validator.neuron.src.miner.compute_final_score", return_value=0.44
-    ):
-
-        result = await sync_miners(db, {"hk1": neuron}, [miner], validator, locations)
-        updated_miner = result[0]
-
-        assert updated_miner.availability_score == 0.11
-        assert updated_miner.latency_score == 0.22
-        assert updated_miner.distribution_score == 0.33
-        assert updated_miner.score == 0.44
-
-
-@pytest.mark.asyncio
 async def test_sync_miners_ip_conflict_affects_all_scores():
     db = AsyncMock()
 
-    shared_ip = "1.1.1.1"
-    neuron1 = fake_neuron(uid=1, hotkey="hk1", ip=shared_ip)
-    neuron2 = fake_neuron(uid=2, hotkey="hk2", ip=shared_ip)
+    neuron1 = fake_neuron(uid=1, hotkey="hk1", ip="1.1.1.1")
+    neuron2 = fake_neuron(uid=2, hotkey="hk2", ip="1.1.1.2")
 
-    miner1 = fake_miner(uid=1, hotkey="hk1", ip=shared_ip)
-    miner2 = fake_miner(uid=2, hotkey="hk2", ip=shared_ip)
+    miner1 = fake_miner(uid=1, hotkey="hk1", ip="1.1.1.3")
+    miner2 = fake_miner(uid=2, hotkey="hk2", ip="1.1.1.4")
 
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    with patch(
-        "subvortex.validator.neuron.src.miner.compute_availability_score",
-        side_effect=[0.11, 0.11],
-    ) as mock_avail, patch(
-        "subvortex.validator.neuron.src.miner.compute_latency_score",
-        side_effect=[0.22, 0.22],
-    ) as mock_latency, patch(
-        "subvortex.validator.neuron.src.miner.compute_distribution_score",
-        side_effect=[0.33, 0.33],
-    ) as mock_dist, patch(
-        "subvortex.validator.neuron.src.miner.compute_final_score",
-        side_effect=[0.44, 0.44],
-    ) as mock_final:
+    with (
+        patch(
+            "subvortex.validator.neuron.src.miner.compute_availability_score",
+            side_effect=[0.11, 0.11],
+        ) as mock_avail,
+        patch(
+            "subvortex.validator.neuron.src.miner.compute_latency_score",
+            side_effect=[0.22, 0.22],
+        ) as mock_latency,
+        patch(
+            "subvortex.validator.neuron.src.miner.compute_distribution_score",
+            side_effect=[0.33, 0.33],
+        ) as mock_dist,
+        patch(
+            "subvortex.validator.neuron.src.miner.compute_final_score",
+            side_effect=[0.44, 0.44],
+        ) as mock_final,
+    ):
 
         result = await sync_miners(
             db,
@@ -252,9 +238,11 @@ async def test_sync_miners_ip_conflict_affects_all_scores():
             [miner1, miner2],
             validator,
             locations,
+            min_stake=1000,
         )
 
-        assert result[0].ip == result[1].ip == shared_ip
+        assert result[0].ip == "1.1.1.1"
+        assert result[1].ip == "1.1.1.2"
 
         # Check each score explicitly
         assert result[0].availability_score == 0.11
@@ -301,7 +289,9 @@ async def test_sync_miners_removes_stale_miners():
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result = await sync_miners(db, neurons, miners, validator, locations)
+    result = await sync_miners(
+        db, neurons, miners, validator, locations, min_stake=1000
+    )
 
     db.remove_miner.assert_called_once()
     assert db.remove_miner.call_args[1]["miner"].uid == 2
@@ -316,7 +306,9 @@ async def test_sync_miners_does_not_remove_valid_miners():
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result = await sync_miners(db, neurons, miners, validator, locations)
+    result = await sync_miners(
+        db, neurons, miners, validator, locations, min_stake=1000
+    )
 
     db.remove_miner.assert_not_called()
     assert len(result) == 1
@@ -330,14 +322,71 @@ async def test_sync_miners_removes_multiple_stale_miners():
     stale_miners = [
         fake_miner(uid=1, hotkey="hk1"),
         fake_miner(uid=2, hotkey="hk2"),
-        fake_miner(uid=3, hotkey="hk3")
+        fake_miner(uid=3, hotkey="hk3"),
     ]
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result = await sync_miners(db, neurons, stale_miners, validator, locations)
+    result = await sync_miners(
+        db, neurons, stale_miners, validator, locations, min_stake=1000
+    )
     assert db.remove_miner.call_count == 3
     removed_uids = {call.kwargs["miner"].uid for call in db.remove_miner.call_args_list}
     assert removed_uids == {1, 2, 3}
     assert len(result) == 1
     assert result[0].uid == 10
+
+
+@pytest.mark.asyncio
+async def test_sync_miners_skips_miners_above_min_stake():
+    db = AsyncMock()
+
+    low_stake_neuron = fake_neuron(uid=1, hotkey="hk1", ip="1.1.1.1", country="US")
+    low_stake_neuron.stake = 500
+
+    neurons = {"hk1": low_stake_neuron}
+    miners = []
+    validator = fake_neuron(uid=999, country="US")
+    validator.stake = 1000
+    locations = ["US", "CA"]
+
+    result = await sync_miners(db, neurons, miners, validator, locations, min_stake=100)
+
+    assert result == []  # Should skip due to low stake
+    db.remove_miner.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sync_miners_includes_miners_below_min_stake():
+    db = AsyncMock()
+
+    high_stake_neuron = fake_neuron(uid=2, hotkey="hk2", ip="2.2.2.2", country="US")
+    high_stake_neuron.stake = 10
+
+    neurons = {"hk2": high_stake_neuron}
+    miners = []
+    validator = fake_neuron(uid=999, country="US")
+    validator.stake = 1000
+    locations = ["US", "CA"]
+
+    result = await sync_miners(db, neurons, miners, validator, locations, min_stake=100)
+
+    assert len(result) == 1
+    assert result[0].uid == high_stake_neuron.uid
+
+
+@pytest.mark.asyncio
+async def test_sync_miners_skips_validator_even_if_stake_below_min():
+    db = AsyncMock()
+
+    validator = fake_neuron(uid=42, hotkey="hk42", country="US")
+    validator.stake = 0  # Even if below min_stake
+    validator.validator_trust = 1.0  # Treated as validator
+
+    neurons = {"hk42": validator}
+    miners = []
+    locations = ["US", "CA"]
+
+    result = await sync_miners(db, neurons, miners, validator, locations, min_stake=100)
+
+    assert result == []

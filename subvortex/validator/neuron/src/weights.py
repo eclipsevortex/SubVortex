@@ -22,14 +22,26 @@ import bittensor_wallet.wallet as btw
 
 import subvortex.core.core_bittensor.subtensor as scbs
 from subvortex.core.version import to_spec_version
+from subvortex.core.model.neuron import Neuron
 from subvortex.validator.version import __version__ as THIS_VERSION
 from subvortex.validator.neuron.src.settings import Settings
 from subvortex.validator.neuron.src.models.miner import Miner
 
 
 def should_set_weights(
-    settings: Settings, subtensor: btcs.Subtensor, uid: int, block: int
+    settings: Settings,
+    subtensor: btcs.Subtensor,
+    neuron: Neuron,
+    block: int,
+    min_stake: int,
 ):
+    has_enough_stake = neuron.stake >= min_stake
+    if has_enough_stake == False:
+        btul.logging.warning(
+            f"Not enough stake t{neuron.stake} to set weight, require a minimum of t{min_stake}. Please stake more if you do not want to be de-registered!"
+        )
+        return False
+
     # Get the weight rate limit
     weights_rate_limit = subtensor.weights_rate_limit(settings.netuid)
     btul.logging.debug(
@@ -43,7 +55,9 @@ def should_set_weights(
     )
 
     # Get the last time the validator set weights
-    validator_last_update = last_update[uid] if uid < len(last_update) else 0
+    validator_last_update = (
+        last_update[neuron.uid] if neuron.uid < len(last_update) else 0
+    )
     btul.logging.debug(
         f"Last set weight at block #{validator_last_update}",
         prefix=settings.logging_name,
@@ -149,9 +163,11 @@ def reset_scores_for_not_serving_miners(
         A new NumPy array with scores reset to 0 for bad miners.
     """
     updated_scores = moving_averaged_scores.copy()
+    uid_to_miner = {miner.uid: miner for miner in miners}
 
-    for miner in miners:
-        if miner.ip == "0.0.0.0" and 0 <= miner.uid < len(updated_scores):
-            updated_scores[miner.uid] = 0.0
+    for uid in range(len(updated_scores)):
+        miner = uid_to_miner.get(uid)
+        if miner is None or miner.ip == "0.0.0.0":
+            updated_scores[uid] = 0.0
 
     return updated_scores

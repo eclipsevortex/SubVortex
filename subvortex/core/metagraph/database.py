@@ -4,7 +4,7 @@ import traceback
 import bittensor.utils.btlogging as btul
 
 import subvortex.core.model.neuron.neuron as scmm
-from subvortex.core.database.database_utils import decode_value
+from subvortex.core.database.database_utils import decode_hash, decode_value
 from subvortex.core.database.database import Database as BaseDatabase
 from subvortex.core.model.neuron import (
     Neuron,

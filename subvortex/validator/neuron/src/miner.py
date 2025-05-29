@@ -87,6 +87,19 @@ async def sync_miners(
         # Add the updated miner in the list
         miners_updates.append(miner)
 
+    # Remove stale miners not in the updated list
+    updated_uids = {m.uid for m in miners_updates}
+    previous_uids = {m.uid for m in miners}
+    stale_uids = previous_uids - updated_uids
+
+    for uid in stale_uids:
+        stale_miner = next((m for m in miners if m.uid == uid), None)
+        if stale_miner:
+            btul.logging.info(
+                f"[{miner.uid}] Stale miner detected (hotkey: {miner.hotkey}, IP: {miner.ip}). Miner removed from local state as it is no longer present in the live metagraph."
+            )
+            await database.remove_miner(miner=stale_miner)
+
     # Define the ip occurences
     ip_occurrences = Counter(neuron.ip for neuron in neurons.values())
 

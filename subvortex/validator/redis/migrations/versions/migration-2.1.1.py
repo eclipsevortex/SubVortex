@@ -1,10 +1,11 @@
 from redis import asyncio as aioredis
 
-from subvortex.core.database.database_utils import decode_hash
-from subvortex.validator.neuron.src.models.miner import Miner
-
 revision = "2.1.1"
 down_revision = "2.1.0"
+
+
+def decode_hash(raw: dict[bytes, bytes]) -> dict[str, str]:
+    return {k.decode(): v.decode() for k, v in raw.items()}
 
 
 async def rollout(database: aioredis.Redis):
@@ -18,6 +19,7 @@ async def rollout(database: aioredis.Redis):
             # Skip if neuron not found
             continue
 
+        # Decode the neuron
         neuron_data = decode_hash(raw_neuron)
 
         # Fetch miner
@@ -33,4 +35,4 @@ async def rollout(database: aioredis.Redis):
 
 async def rollback(database: aioredis.Redis):
     async for key in database.scan_iter(match="sv:miner:*"):
-        await database.hdel(key, "ip")
+        await database.hdel(key, "ip", "hotkey")

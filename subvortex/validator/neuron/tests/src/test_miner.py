@@ -291,3 +291,53 @@ async def test_reset_reliability_score_sets_zero():
         assert miner.challenge_successes == 0
 
     db.update_miners.assert_called_once_with(miners=miners)
+
+
+@pytest.mark.asyncio
+async def test_sync_miners_removes_stale_miners():
+    db = AsyncMock()
+    neurons = {"hk1": fake_neuron(uid=1, hotkey="hk1")}
+    miners = [fake_miner(uid=2, hotkey="hk2")]  # stale
+    validator = fake_neuron(uid=999, country="US")
+    locations = ["US", "CA"]
+
+    result = await sync_miners(db, neurons, miners, validator, locations)
+
+    db.remove_miner.assert_called_once()
+    assert db.remove_miner.call_args[1]["miner"].uid == 2
+    assert result[0].uid == 1
+
+
+@pytest.mark.asyncio
+async def test_sync_miners_does_not_remove_valid_miners():
+    db = AsyncMock()
+    neurons = {"hk1": fake_neuron(uid=1, hotkey="hk1")}
+    miners = [fake_miner(uid=1, hotkey="hk1")]
+    validator = fake_neuron(uid=999, country="US")
+    locations = ["US", "CA"]
+
+    result = await sync_miners(db, neurons, miners, validator, locations)
+
+    db.remove_miner.assert_not_called()
+    assert len(result) == 1
+    assert result[0].uid == 1
+
+
+@pytest.mark.asyncio
+async def test_sync_miners_removes_multiple_stale_miners():
+    db = AsyncMock()
+    neurons = {"hk10": fake_neuron(uid=10, hotkey="hk10")}
+    stale_miners = [
+        fake_miner(uid=1, hotkey="hk1"),
+        fake_miner(uid=2, hotkey="hk2"),
+        fake_miner(uid=3, hotkey="hk3")
+    ]
+    validator = fake_neuron(uid=999, country="US")
+    locations = ["US", "CA"]
+
+    result = await sync_miners(db, neurons, stale_miners, validator, locations)
+    assert db.remove_miner.call_count == 3
+    removed_uids = {call.kwargs["miner"].uid for call in db.remove_miner.call_args_list}
+    assert removed_uids == {1, 2, 3}
+    assert len(result) == 1
+    assert result[0].uid == 10

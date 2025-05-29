@@ -14,6 +14,7 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import typing
 import numpy as np
 import bittensor.core.subtensor as btcs
 import bittensor.utils.btlogging as btul
@@ -23,6 +24,7 @@ import subvortex.core.core_bittensor.subtensor as scbs
 from subvortex.core.version import to_spec_version
 from subvortex.validator.version import __version__ as THIS_VERSION
 from subvortex.validator.neuron.src.settings import Settings
+from subvortex.validator.neuron.src.models.miner import Miner
 
 
 def should_set_weights(
@@ -131,3 +133,25 @@ def set_weights(
 
         # Wait for the next block
         subtensor.wait_for_block()
+
+
+def reset_scores_for_not_serving_miners(
+    miners: typing.List[Miner], moving_averaged_scores: np.ndarray
+) -> np.ndarray:
+    """
+    Sets scores to zero for all miners whose IP is "0.0.0.0".
+
+    Args:
+        miners: List of Miner instances.
+        moving_averaged_scores: A NumPy array of scores indexed by UID (length 256).
+
+    Returns:
+        A new NumPy array with scores reset to 0 for bad miners.
+    """
+    updated_scores = moving_averaged_scores.copy()
+
+    for miner in miners:
+        if miner.ip == "0.0.0.0" and 0 <= miner.uid < len(updated_scores):
+            updated_scores[miner.uid] = 0.0
+
+    return updated_scores

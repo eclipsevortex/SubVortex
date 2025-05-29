@@ -58,8 +58,11 @@ from subvortex.validator.neuron.src.weights import (
 )
 from subvortex.validator.neuron.src.settings import Settings
 from subvortex.validator.neuron.src.database import Database
-from subvortex.validator.neuron.src.miner import get_miners, sync_miners
-from subvortex.validator.neuron.src.weights import should_set_weights
+from subvortex.validator.neuron.src.miner import sync_miners
+from subvortex.validator.neuron.src.weights import (
+    should_set_weights,
+    reset_scores_for_not_serving_miners,
+)
 
 
 # Load the environment variables for the whole process
@@ -205,7 +208,7 @@ class Validator:
             init_wandb(self)
 
         # Init miners
-        self.miners = await get_miners(database=self.database)
+        self.miners = (await self.database.get_miners()).values()
         btul.logging.debug(f"Miners loaded {len(self.miners)}")
 
         # Load the state
@@ -215,19 +218,25 @@ class Validator:
         btul.logging.trace("loading moving_averaged_scores")
         btul.logging.trace(str(self.moving_averaged_scores))
 
-        previous_last_update = None
+        previous_last_update = 0
         current_block = 0
         try:
             while True:
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
+                if last_updated == 0:
+                    btul.logging.warning(
+                        f"Could not get the neuron last updated from redis. Pleaase check your metagraph."
+                    )
 
                 # Check if the neurons have changed
                 if previous_last_update != last_updated:
                     btul.logging.debug(f"Neurons changed at block #{last_updated}")
 
                     # At least one neuron has changed
-                    previous_last_update and btul.logging.debug(f"Neurons changed, rsync miners")
+                    previous_last_update and btul.logging.debug(
+                        f"Neurons changed, rsync miners"
+                    )
 
                     # Store the new last updated
                     previous_last_update = last_updated
@@ -241,7 +250,9 @@ class Validator:
 
                     # Check registration
                     btul.logging.debug("Checking registration...")
-                    await wait_until_registered(database=self.database, hotkey=self.wallet.hotkey.ss58_address)
+                    await wait_until_registered(
+                        database=self.database, hotkey=self.wallet.hotkey.ss58_address
+                    )
 
                     # Get the locations
                     locations = self.country_service.get_locations()
@@ -258,6 +269,12 @@ class Validator:
 
                     # Save in database
                     await self.database.update_miners(miners=self.miners)
+
+                    # Check if the moving scores have to be reset for some miners that have no axons
+                    self.moving_averaged_scores = reset_scores_for_not_serving_miners(
+                        miners=self.miners,
+                        moving_averaged_scores=self.moving_averaged_scores,
+                    )
 
                 # Wait until next step epoch.
                 current_block = get_next_block(

@@ -58,26 +58,11 @@ class Miner:
             uid=uid,
         )
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Miner":
-        return cls(
-            uid=int(data.get("uid", -1)),
-            country=data.get("country", None),
-            version=data.get("version", "0.0.0"),
-            verified=bool(int(data.get("verified", 0))),
-            score=float(data.get("score", 0)),
-            availability_score=float(data.get("availability_score", 0)),
-            latency_score=float(data.get("latency_score", 0)),
-            reliability_score=float(data.get("reliability_score", 0)),
-            distribution_score=float(data.get("distribution_score", 0)),
-            challenge_successes=int(data.get("challenge_successes", 0)),
-            challenge_attempts=int(data.get("challenge_attempts", 0)),
-            process_time=float(data.get("process_time", 0)),
-        )
-
-    def to_redis_mapping(self) -> Dict[str, str]:
+    def to_dict(self) -> Dict[str, str]:
         return {
             "uid": self.uid,
+            "hotkey": self.hotkey,
+            "ip": self.ip or "0.0.0.0",
             "country": self.country or "",
             "version": self.version,
             "verified": int(self.verified),
@@ -91,10 +76,12 @@ class Miner:
             "process_time": self.process_time,
         }
 
-    @classmethod
-    def from_redis_mapping(cls, data: Dict[str, str]) -> "Miner":
-        return cls(
+    @staticmethod
+    def from_dict(data: Dict[str, str]) -> "Miner":
+        return Miner(
             uid=int(data.get("uid", -1)),
+            hotkey=data.get("hotkey", None),
+            ip=data.get("ip", "0.0.0.0"),
             country=data.get("country", None),
             version=data.get("version", "0.0.0"),
             verified=bool(int(data.get("verified", 0))),

@@ -26,9 +26,9 @@ class MinerModel:
         raw = await redis.hgetall(key)
         if not raw:
             return None
-        
+
         data = decode_hash(raw)
-        return Miner.from_redis_mapping(data)
+        return Miner.from_dict(data)
 
     async def read_all(self, redis: Redis) -> dict[str, Miner]:
         """
@@ -46,7 +46,7 @@ class MinerModel:
                 continue
 
             data = decode_hash(raw)
-            miners[ss58_address] = Miner.from_redis_mapping(data)
+            miners[ss58_address] = Miner.from_dict(data)
 
         return miners
 
@@ -57,7 +57,7 @@ class MinerModel:
         Converts all values to string before storing.
         """
         key = self._key(miner.hotkey)
-        data = Miner.to_redis_mapping(miner)
+        data = Miner.to_dict(miner)
         await redis.hset(key, mapping=data)
 
     async def write_all(self, redis: Redis, miners: list[Miner]):
@@ -68,7 +68,7 @@ class MinerModel:
 
         for miner in miners:
             key = self._key(miner.hotkey)
-            data = Miner.to_redis_mapping(miner)
+            data = Miner.to_dict(miner)
             pipe.hset(key, mapping=data)
 
         await pipe.execute()

@@ -8,10 +8,12 @@ from subvortex.core.database.database_utils import decode_value
 from subvortex.validator.neuron.src.models.selection import (
     SelectionModel200,
     SelectionModel210,
+    SelectionModel211,
 )
 from subvortex.validator.neuron.src.models.miner import (
     Miner,
     MinerModel210,
+    MinerModel211,
 )
 
 
@@ -35,9 +37,12 @@ class Database(NeuronReadOnlyDatabase):
 
         self.setup_neuron_models()
         self.models["selection"] = {
-            x.version: x for x in [SelectionModel200(), SelectionModel210()]
+            x.version: x
+            for x in [SelectionModel200(), SelectionModel210(), SelectionModel211()]
         }
-        self.models["miner"] = {x.version: x for x in [MinerModel210()]}
+        self.models["miner"] = {
+            x.version: x for x in [MinerModel210(), MinerModel211()]
+        }
 
     async def get_selected_miners(self, ss58_address: str):
         """

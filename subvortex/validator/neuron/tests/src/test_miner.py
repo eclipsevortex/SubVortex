@@ -141,8 +141,8 @@ async def test_sync_miners_handle_hotkey_change():
 async def test_sync_miners_handle_ip_change(monkeypatch):
     db = AsyncMock()
     neuron = fake_neuron(1, ip="1.1.1.1")
-    neurons = {"hk1": neuron}
-    miner = fake_miner(1, hotkey="old_hk")
+    neurons = {neuron.hotkey: neuron}
+    miner = fake_miner(1)
     miner.version = "3.1.1"
     miner.verified = True
     miner.sync = True

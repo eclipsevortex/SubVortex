@@ -32,6 +32,7 @@ from subvortex.core.country.country_service import CountryService
 from subvortex.core.file.file_monitor import FileMonitor
 from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.mock import MockDendrite, MockSubtensor
+from subvortex.core.shared.substrate import get_weights_min_stake
 from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
 from subvortex.core.core_bittensor.subtensor import (
@@ -229,6 +230,10 @@ class Validator:
                         f"Could not get the neuron last updated from redis. Pleaase check your metagraph."
                     )
 
+                # Get min stake to set weight
+                min_stake = get_weights_min_stake(substrate=self.subtensor.substrate)
+                btul.logging.debug(f"Minimum stake to set weights: {min_stake}")
+
                 # Check if the neurons have changed
                 if previous_last_update != last_updated:
                     btul.logging.debug(f"Neurons changed at block #{last_updated}")
@@ -265,6 +270,7 @@ class Validator:
                         miners=self.miners,
                         validator=self.neuron,
                         locations=locations,
+                        min_stake=min_stake,
                     )
 
                     # Save in database
@@ -286,13 +292,14 @@ class Validator:
                 coroutines = [forward(self)]
                 await asyncio.gather(*coroutines)
 
-                # Set weights if time for it
+                # Set weights if time for it and enough stake
                 btul.logging.info("Checking if should set weights")
                 must_set_weight = should_set_weights(
                     settings=self.settings,
                     subtensor=self.subtensor,
-                    uid=self.neuron.uid,
+                    neuron=self.neuron,
                     block=current_block,
+                    min_stake=min_stake,
                 )
                 btul.logging.debug(
                     f"Should validator check weights? -> {must_set_weight}"

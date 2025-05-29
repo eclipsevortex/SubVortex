@@ -224,8 +224,10 @@ class Validator:
             while True:
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
-
-                # TODO: display a message if the last updated can be retrieve and miners are empty!!
+                if last_updated == 0:
+                    btul.logging.warning(
+                        f"Could not get the neuron last updated from redis. Pleaase check your metagraph."
+                    )
 
                 # Check if the neurons have changed
                 if previous_last_update != last_updated:

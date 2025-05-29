@@ -58,7 +58,6 @@ class Miner:
             uid=uid,
         )
 
-    @classmethod
     def to_dict(self) -> Dict[str, str]:
         return {
             "uid": self.uid,

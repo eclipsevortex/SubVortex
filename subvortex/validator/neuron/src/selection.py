@@ -20,14 +20,17 @@ from typing import List
 
 from subvortex.core.constants import DEFAULT_CHUNK_SIZE
 from subvortex.core.core_bittensor.subtensor import get_block_seed
+from subvortex.validator.neuron.src.models.miner import Miner
 
 
 def get_available_uids(self, exclude: list = []):
     available_uids = []
-    for miner in self.miners:
+
+    miners: List[Miner] = self.miners
+    for miner in miners:
         if miner.ip == "0.0.0.0" or miner.uid in exclude:
             continue
-        
+
         available_uids.append(miner.uid)
     btul.logging.debug(f"returning available uids: {available_uids}")
     return available_uids

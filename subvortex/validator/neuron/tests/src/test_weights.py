@@ -4,7 +4,12 @@ from unittest.mock import MagicMock, patch
 import bittensor_wallet.wallet as btw
 
 from subvortex.validator.neuron.src.settings import Settings
-from subvortex.validator.neuron.src.weights import should_set_weights, set_weights
+from subvortex.validator.neuron.src.weights import (
+    should_set_weights,
+    set_weights,
+    reset_scores_for_not_serving_miners,
+)
+from subvortex.validator.neuron.src.models.miner import Miner
 
 
 def test_should_set_weights_allows_after_interval():
@@ -149,3 +154,102 @@ def test_set_weights_handles_weight_processing_error(mock_process):
         set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores)
     except Exception as e:
         assert str(e) == "Invalid input"
+
+
+def test_no_miner_with_bad_ip():
+    scores = np.random.rand(256)
+    miners = [Miner(uid=i, ip="1.2.3.4") for i in range(10)]
+
+    result = reset_scores_for_not_serving_miners(miners, scores)
+    np.testing.assert_array_equal(result, scores)
+
+
+def test_single_bad_miner_resets_score():
+    scores = np.random.rand(256)
+    miners = [Miner(uid=42, ip="0.0.0.0")]
+
+    result = reset_scores_for_not_serving_miners(miners, scores)
+
+    assert result[42] == 0.0
+    assert np.all(result[:42] == scores[:42])
+    assert np.all(result[43:] == scores[43:])
+
+
+def test_multiple_bad_miners():
+    scores = np.random.rand(256)
+    bad_uids = [10, 100, 200]
+    miners = [Miner(uid=uid, ip="0.0.0.0") for uid in bad_uids]
+
+    result = reset_scores_for_not_serving_miners(miners, scores)
+
+    for uid in bad_uids:
+        assert result[uid] == 0.0
+
+    for i in range(256):
+        if i not in bad_uids:
+            assert result[i] == scores[i]
+
+
+def test_ignores_out_of_bounds_uids():
+    scores = np.random.rand(256)
+    miners = [
+        Miner(uid=999, ip="0.0.0.0"),  # invalid UID
+        Miner(uid=42, ip="0.0.0.0"),  # valid UID
+    ]
+
+    result = reset_scores_for_not_serving_miners(miners, scores)
+
+    assert result[42] == 0.0
+    assert len(result) == 256
+    assert all(result[i] == scores[i] for i in range(256) if i != 42)
+
+
+def test_empty_miners_does_nothing():
+    scores = np.random.rand(256)
+    miners = []
+
+    result = reset_scores_for_not_serving_miners(miners, scores)
+    np.testing.assert_array_equal(result, scores)
+
+
+def test_empty_scores_array():
+    scores = np.array([])
+    miners = [Miner(uid=0, ip="0.0.0.0")]
+
+    result = reset_scores_for_not_serving_miners(miners, scores)
+    assert result.size == 0
+
+
+def test_original_array_not_mutated():
+    scores = np.random.rand(256)
+    original = scores.copy()
+
+    miners = [Miner(uid=123, ip="0.0.0.0")]
+    _ = reset_scores_for_not_serving_miners(miners, scores)
+
+    np.testing.assert_array_equal(scores, original)
+
+
+def test_duplicate_uids_still_zeroed():
+    scores = np.random.rand(256)
+    miners = [Miner(uid=7, ip="0.0.0.0"), Miner(uid=7, ip="0.0.0.0")]
+
+    result = reset_scores_for_not_serving_miners(miners, scores)
+    assert result[7] == 0.0
+
+
+def test_mixed_good_and_bad_miners():
+    scores = np.random.rand(256)
+    miners = [
+        Miner(uid=10, ip="0.0.0.0"),
+        Miner(uid=20, ip="1.2.3.4"),
+        Miner(uid=30, ip="0.0.0.0"),
+        Miner(uid=40, ip="8.8.8.8"),
+    ]
+
+    result = reset_scores_for_not_serving_miners(miners, scores)
+
+    assert result[10] == 0.0
+    assert result[30] == 0.0
+    assert result[20] == scores[20]
+    assert result[40] == scores[40]

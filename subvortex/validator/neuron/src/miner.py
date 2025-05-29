@@ -99,7 +99,7 @@ async def sync_miners(
             )
 
         # Check if the miner has changed its ip
-        if current_miner.ip != neuron.ip:
+        elif current_miner.ip != neuron.ip:
             btul.logging.info(
                 f"[{current_miner.uid}] IP address changed from {current_miner.ip} to {neuron.ip}. This may indicate redeployment or failover."
             )

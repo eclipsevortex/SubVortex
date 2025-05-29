@@ -58,7 +58,7 @@ from subvortex.validator.neuron.src.weights import (
 )
 from subvortex.validator.neuron.src.settings import Settings
 from subvortex.validator.neuron.src.database import Database
-from subvortex.validator.neuron.src.miner import sync_miners
+from subvortex.validator.neuron.src.miner import get_miners, sync_miners
 from subvortex.validator.neuron.src.weights import (
     should_set_weights,
     reset_scores_for_not_serving_miners,
@@ -208,7 +208,8 @@ class Validator:
             init_wandb(self)
 
         # Init miners
-        self.miners = []
+        self.miners = await get_miners(database=self.database)
+        btul.logging.debug(f"Miners loaded {len(self.miners)}")
 
         # Load the state
         load_state(self, number_of_neurons=self.number_of_neurons)

@@ -3,7 +3,6 @@ from unittest.mock import patch
 from unittest.mock import AsyncMock
 
 from subvortex.validator.neuron.src.miner import (
-    get_miners,
     sync_miners,
     reset_reliability_score,
 )
@@ -32,38 +31,6 @@ def fake_miner(
     miner.challenge_attempts = challenge_attempts
     miner.challenge_successes = challenge_successes
     return miner
-
-
-@pytest.mark.asyncio
-async def test_get_miners_creates_new_miners():
-    db = AsyncMock()
-    neuron = fake_neuron(1)
-    db.get_neurons.return_value = {neuron.hotkey: neuron}
-    db.get_miner.return_value = None
-
-    miners = await get_miners(db)
-
-    assert len(miners) == 1
-    assert miners[0].uid == neuron.uid
-    assert miners[0].ip == neuron.ip
-    assert miners[0].hotkey == neuron.hotkey
-    assert miners[0].country == neuron.country
-    db.add_miner.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_get_miners_returns_existing_miners():
-    db = AsyncMock()
-    neuron = fake_neuron(1)
-    miner = fake_miner(1)
-    db.get_neurons.return_value = {neuron.hotkey: neuron}
-    db.get_miner.return_value = miner
-
-    miners = await get_miners(db)
-
-    assert miners == [miner]
-    assert miners[0] == miner
-    db.add_miner.assert_not_called()
 
 
 @pytest.mark.asyncio

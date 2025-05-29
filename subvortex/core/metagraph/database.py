@@ -4,11 +4,12 @@ import traceback
 import bittensor.utils.btlogging as btul
 
 import subvortex.core.model.neuron.neuron as scmm
-from subvortex.core.database.database_utils import decode_hash, decode_value
+from subvortex.core.database.database_utils import decode_value
 from subvortex.core.database.database import Database as BaseDatabase
 from subvortex.core.model.neuron import (
     Neuron,
     NeuronModel210,
+    NeuronModel211,
 )
 
 
@@ -27,7 +28,7 @@ class NeuronReadOnlyDatabase(BaseDatabase):
 
     def setup_neuron_models(self):
         # Register neuron models keyed by their version
-        self.models["neuron"] = {x.version: x for x in [NeuronModel210()]}
+        self.models["neuron"] = {x.version: x for x in [NeuronModel210(), NeuronModel211()]}
 
     async def get_neuron(self, hotkey: str) -> scmm.Neuron:
         # Ensure the connection is up and running

@@ -1,7 +1,4 @@
 from redis import asyncio as Redis
-from traceback import print_exception
-
-import bittensor.utils.btlogging as btul
 
 from subvortex.core.model.neuron import Neuron
 from subvortex.core.database.database_utils import decode_hash

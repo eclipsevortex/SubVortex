@@ -15,46 +15,6 @@ from subvortex.validator.neuron.src.models.miner import Miner
 from subvortex.validator.neuron.src.database import Database
 
 
-async def get_miners(database: Database) -> List[Miner]:
-    miners: List[Miner] = []
-
-    # Get the list of neuron
-    neurons = await database.get_neurons()
-    if not neurons:
-        return []
-
-    for hotkey, neuron in neurons.items():
-        # Get the miner
-        miner = await database.get_miner(hotkey=hotkey)
-        if not miner:
-            # Miner does not exist in the database
-
-            # Create an instance of miner
-            miner = Miner.create_new_miner(
-                uid=neuron.uid,
-            )
-
-            # Add the new miner
-            await database.add_miner(miner)
-
-        # Set the property that comes from neuron
-        miner.ip = neuron.ip
-        miner.port = neuron.port
-        miner.coldkey = neuron.coldkey
-        miner.hotkey = neuron.hotkey
-        miner.country = neuron.country
-        miner.axon_version = neuron.version
-        miner.ip_type = neuron.ip_type
-        miner.protocol = neuron.protocol
-        miner.placeholder1 = neuron.placeholder1
-        miner.placeholder2 = neuron.placeholder2
-
-        # Add the new miner to the list
-        miners.append(miner)
-
-    return miners
-
-
 async def sync_miners(
     database: Database,
     neurons: Dict[str, Neuron],

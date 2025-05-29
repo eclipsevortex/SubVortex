@@ -27,7 +27,11 @@ async def sync_miners(
 
     # Resync the miners
     for hotkey, neuron in neurons.items():
-        if neuron.stake >= min_stake or neuron.validator_trust > 0 or neuron.uid == validator.uid:
+        if (
+            neuron.stake >= min_stake
+            or neuron.validator_trust > 0
+            or neuron.uid == validator.uid
+        ):
             # It is a validator
             continue
 
@@ -101,7 +105,7 @@ async def sync_miners(
         stale_miner = next((m for m in miners if m.uid == uid), None)
         if stale_miner:
             btul.logging.info(
-                f"[{stale_miner.uid}] Stale miner detected (hotkey: {stale_miner.hotkey}, IP: {stale_miner.ip}). Miner removed from local state as it is no longer present in the live metagraph."
+                f"[{stale_miner.uid}] Miner removed (hotkey: {stale_miner.hotkey}, IP: {stale_miner.ip}) — no longer eligible for sync."
             )
             await database.remove_miner(miner=stale_miner)
 

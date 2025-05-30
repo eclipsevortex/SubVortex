@@ -496,11 +496,28 @@ async def test_sync_miners_returns_reset_miners_on_hotkey_change():
 
 
 @pytest.mark.asyncio
-async def test_sync_miners_returns_reset_miners_on_ip_change():
+async def test_sync_miners_returns_reset_miners_on_ip_change_and_same_country():
     db = AsyncMock()
-    neuron = fake_neuron(1, ip="5.5.5.5")
+    neuron = fake_neuron(1, ip="9.9.9.9", country="US")
+    miners = [fake_miner(1, ip="1.1.1.1", country="US")]
     neurons = {neuron.hotkey: neuron}
-    miner = fake_miner(1, ip="1.1.1.1")
+    validator = fake_neuron(999, country="US")
+    locations = ["US", "CA"]
+
+    updated_miners, reset_miners = await sync_miners(
+        db, neurons, miners, validator, locations, min_stake=1000
+    )
+
+    assert len(updated_miners) == 1
+    assert len(reset_miners) == 0
+
+
+@pytest.mark.asyncio
+async def test_sync_miners_returns_reset_miners_on_ip_change_and_different_country():
+    db = AsyncMock()
+    neuron = fake_neuron(1, ip="5.5.5.5", country="US")
+    neurons = {neuron.hotkey: neuron}
+    miner = fake_miner(1, ip="1.1.1.1", country="FR")
     miners = [miner]
     validator = fake_neuron(999, country="US")
     locations = ["US", "CA"]

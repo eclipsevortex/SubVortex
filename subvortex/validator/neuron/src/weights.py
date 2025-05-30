@@ -76,6 +76,7 @@ def set_weights(
     wallet: "btw.Wallet",
     uid: int,
     moving_scores: "np.NDArray",
+    version: str
 ):
     # Get the uids form teh moving scores array
     uids = np.arange(moving_scores.shape[0])
@@ -105,7 +106,7 @@ def set_weights(
             weights=weights_proceed.tolist(),
             wait_for_inclusion=True,
             wait_for_finalization=False,
-            version_key=to_spec_version(THIS_VERSION),
+            version_key=to_spec_version(version),
             max_retries=2,
         )
 
@@ -150,7 +151,9 @@ def set_weights(
 
 
 def reset_scores_for_not_serving_miners(
-    miners: typing.List[Miner], moving_averaged_scores: np.ndarray
+    miners: typing.List[Miner],
+    moving_averaged_scores: np.ndarray,
+    reset_miners: typing.List[Miner],
 ) -> np.ndarray:
     """
     Sets scores to zero for all miners whose IP is "0.0.0.0".
@@ -163,11 +166,13 @@ def reset_scores_for_not_serving_miners(
         A new NumPy array with scores reset to 0 for bad miners.
     """
     updated_scores = moving_averaged_scores.copy()
+
     uid_to_miner = {miner.uid: miner for miner in miners}
+    uid_to_reset = {miner.uid: miner for miner in reset_miners}
 
     for uid in range(len(updated_scores)):
         miner = uid_to_miner.get(uid)
-        if miner is None or miner.ip == "0.0.0.0":
+        if miner is None or miner.ip == "0.0.0.0" or uid_to_reset.get(uid):
             updated_scores[uid] = 0.0
 
     return updated_scores

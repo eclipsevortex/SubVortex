@@ -11,9 +11,9 @@ import bittensor.core.metagraph as btcm
 import subvortex.core.core_bittensor.config.config_utils as scccu
 import subvortex.core.metagraph.metagraph as scmm
 import subvortex.core.metagraph.database as scmms
+import subvortex.core.version as scv
 
 import subvortex.validator.metagraph.src.settings as svme
-
 
 # Load the environment variables for the whole process
 load_dotenv(override=True)
@@ -57,7 +57,11 @@ async def main():
     btul.logging.debug(str(config))
 
     # Display the settings
-    btul.logging.info(f"metagraph settings: {settings}")
+    btul.logging.info(f"Settings: {settings}")
+
+    # Show miner version
+    version = scv.get_version()
+    btul.logging.debug(f"Version: {version}")
 
     database = None
     metagraph_observer = None

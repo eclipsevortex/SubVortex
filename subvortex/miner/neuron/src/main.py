@@ -32,6 +32,7 @@ from subvortex.core.protocol import Score
 from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.substrate import get_weights_min_stake_async
 from subvortex.core.shared.mock import MockSubtensor, MockAxon
+from subvortex.core.version import get_version
 
 from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.metagraph import SubVortexMetagraph
@@ -46,7 +47,6 @@ from subvortex.core.firewall.firewall_factory import (
     create_firewall_tool,
     create_firewall_observer,
 )
-from subvortex.miner.version import __version__ as THIS_VERSION
 from subvortex.miner.neuron.src.firewall import Firewall
 from subvortex.miner.neuron.src.config import (
     config,
@@ -147,7 +147,8 @@ class Miner:
             btul.logging.info(f"Settings: {self.settings}")
 
             # Show miner version
-            btul.logging.debug(f"Version: {THIS_VERSION}")
+            self.version = get_version()
+            btul.logging.debug(f"Version: {self.version}")
 
             await self._initialize()
             await self._serve()
@@ -186,9 +187,9 @@ class Miner:
         # Get the miner
         self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
         btul.logging.info(
-            f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})"
+            f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
         )
-
+        
         btul.logging.success("Initialization complete.")
 
     async def _serve(self):
@@ -432,7 +433,7 @@ class Miner:
         )
         btul.logging.success(f"[{validator_uid}] Score {synapse.score}")
 
-        synapse.version = THIS_VERSION
+        synapse.version = self.version
 
         return synapse
 

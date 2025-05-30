@@ -264,7 +264,7 @@ class Validator:
                     btul.logging.debug(f"Locations loaded {len(locations)}")
 
                     # Sync the miners
-                    self.miners = await sync_miners(
+                    self.miners, reset_miners = await sync_miners(
                         database=self.database,
                         neurons=neurons,
                         miners=self.miners,
@@ -280,6 +280,7 @@ class Validator:
                     self.moving_averaged_scores = reset_scores_for_not_serving_miners(
                         miners=self.miners,
                         moving_averaged_scores=self.moving_averaged_scores,
+                        reset_miners=reset_miners
                     )
 
                 # Wait until next step epoch.

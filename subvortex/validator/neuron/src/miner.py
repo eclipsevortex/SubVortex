@@ -24,6 +24,7 @@ async def sync_miners(
     min_stake: int,
 ) -> List[Miner]:
     miners_updates: List[Miner] = []
+    reset_miners: List[Miner] = []
 
     # Resync the miners
     for hotkey, neuron in neurons.items():
@@ -62,6 +63,9 @@ async def sync_miners(
             # Reset the updated miner
             current_miner.reset()
 
+            # Add the miner in the reset list
+            reset_miners.append(current_miner)
+
             # Log the success
             btul.logging.debug(
                 f"[{current_miner.uid}] Miner replaced due to hotkey change. State reset for syncing."
@@ -75,6 +79,9 @@ async def sync_miners(
 
             # Reset the updated miner
             current_miner.reset()
+
+            # Add the miner in the reset list
+            reset_miners.append(current_miner)
 
             btul.logging.debug(
                 f"[{current_miner.uid}] Miner replaced due to IP change. State reset for syncing."
@@ -134,7 +141,7 @@ async def sync_miners(
         f"✅ sync_miners complete: {len(miners_updates)} miners synced from {len(neurons)} live neurons."
     )
 
-    return miners_updates
+    return miners_updates, reset_miners
 
 
 async def reset_reliability_score(database: Database, miners: List[Miner]):

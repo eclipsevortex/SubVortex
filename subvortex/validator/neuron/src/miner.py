@@ -24,6 +24,7 @@ async def sync_miners(
     min_stake: int,
 ) -> List[Miner]:
     miners_updates: List[Miner] = []
+    reset_miners: List[Miner] = []
 
     # Resync the miners
     for hotkey, neuron in neurons.items():
@@ -62,6 +63,9 @@ async def sync_miners(
             # Reset the updated miner
             current_miner.reset()
 
+            # Add the miner in the reset list
+            reset_miners.append(current_miner)
+
             # Log the success
             btul.logging.debug(
                 f"[{current_miner.uid}] Miner replaced due to hotkey change. State reset for syncing."
@@ -69,15 +73,23 @@ async def sync_miners(
 
         # Check if the miner has changed its ip
         elif current_miner.ip != neuron.ip:
+            has_country_changed = current_miner.country != neuron.country
+
             btul.logging.info(
-                f"[{current_miner.uid}] IP address changed from {current_miner.ip} to {neuron.ip}. This may indicate redeployment or failover."
+                f"[{current_miner.uid}] IP address changed from {current_miner.ip} to {neuron.ip}"
+                + (f" Country changed: {current_miner.country} → {neuron.country}. Miner will be reset." if has_country_changed else " Country unchanged. Miner will not be reset.")
             )
 
             # Reset the updated miner
             current_miner.reset()
 
+            # Add to reset list only if country changed
+            if has_country_changed:
+                reset_miners.append(current_miner)
+
+            # Optional: keep or remove this debug log
             btul.logging.debug(
-                f"[{current_miner.uid}] Miner replaced due to IP change. State reset for syncing."
+                f"[{current_miner.uid}] Miner reset due to IP change." + (" Country changed." if has_country_changed else "")
             )
 
         # Create an updated miner
@@ -134,7 +146,7 @@ async def sync_miners(
         f"✅ sync_miners complete: {len(miners_updates)} miners synced from {len(neurons)} live neurons."
     )
 
-    return miners_updates
+    return miners_updates, reset_miners
 
 
 async def reset_reliability_score(database: Database, miners: List[Miner]):

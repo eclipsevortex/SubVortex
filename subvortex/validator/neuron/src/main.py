@@ -39,9 +39,7 @@ from subvortex.core.core_bittensor.subtensor import (
     get_number_of_neurons,
     get_next_block,
 )
-from subvortex.core.version import to_spec_version
-
-from subvortex.validator.version import __version__ as THIS_VERSION
+from subvortex.core.version import to_spec_version, get_version
 
 from subvortex.validator.neuron.src.config import config, check_config, add_args
 from subvortex.validator.neuron.src.checks import check_redis_connection
@@ -135,7 +133,8 @@ class Validator:
         btul.logging.info(f"Settings: {self.settings}")
 
         # Show miner version
-        btul.logging.debug(f"Version: {THIS_VERSION}")
+        version = get_version()
+        btul.logging.debug(f"Version: {version}")
 
         # Init validator wallet.
         btul.logging.debug(f"loading wallet")
@@ -175,7 +174,7 @@ class Validator:
             self.dendrite = MockDendrite(wallet=self.wallet)
         else:
             self.dendrite = SubVortexDendrite(
-                version=to_spec_version(THIS_VERSION), wallet=self.wallet
+                version=to_spec_version(version), wallet=self.wallet
             )
         btul.logging.debug(str(self.dendrite))
 
@@ -201,7 +200,9 @@ class Validator:
 
         # Get the neuron
         self.neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
-        btul.logging.debug(f"Validator based in {self.neuron.country}")
+        btul.logging.info(
+            f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
+        )
 
         # Init wandb.
         if not self.config.wandb.off:
@@ -264,7 +265,7 @@ class Validator:
                     btul.logging.debug(f"Locations loaded {len(locations)}")
 
                     # Sync the miners
-                    self.miners = await sync_miners(
+                    self.miners, reset_miners = await sync_miners(
                         database=self.database,
                         neurons=neurons,
                         miners=self.miners,
@@ -280,6 +281,7 @@ class Validator:
                     self.moving_averaged_scores = reset_scores_for_not_serving_miners(
                         miners=self.miners,
                         moving_averaged_scores=self.moving_averaged_scores,
+                        reset_miners=reset_miners,
                     )
 
                 # Wait until next step epoch.
@@ -312,6 +314,7 @@ class Validator:
                         wallet=self.wallet,
                         uid=self.neuron.uid,
                         moving_scores=self.moving_averaged_scores,
+                        version=version
                     )
                     save_state(self)
 

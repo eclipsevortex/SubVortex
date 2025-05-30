@@ -11,6 +11,7 @@ import bittensor.core.metagraph as btcm
 import subvortex.core.core_bittensor.config.config_utils as scccu
 import subvortex.core.metagraph.metagraph as scmm
 import subvortex.core.metagraph.database as scmms
+import subvortex.core.version as scv
 
 import subvortex.miner.metagraph.src.settings as smme
 
@@ -56,6 +57,12 @@ async def main():
     btul.logging(config=config, debug=True)
     btul.logging.set_trace(config.logging.trace)
     btul.logging._stream_formatter.set_trace(config.logging.trace)
+
+    # Display the settings
+    btul.logging.info(f"Settings: {settings}")
+
+    # Show miner version
+    btul.logging.debug(f"Version: {scv.get_version()}")
 
     metagraph_observer = None
     subtensor = None

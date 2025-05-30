@@ -133,7 +133,7 @@ class Validator:
         btul.logging.info(f"Settings: {self.settings}")
 
         # Show miner version
-        version = get_version("subvortex-validator-neuron")
+        version = get_version()
         btul.logging.debug(f"Version: {version}")
 
         # Init validator wallet.

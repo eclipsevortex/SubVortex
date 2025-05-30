@@ -60,7 +60,7 @@ async def main():
     btul.logging.info(f"Settings: {settings}")
 
     # Show miner version
-    version = scv.get_version("subvortex-validator-metagraph")
+    version = scv.get_version()
     btul.logging.debug(f"Version: {version}")
 
     database = None

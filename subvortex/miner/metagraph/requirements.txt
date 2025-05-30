@@ -6,4 +6,4 @@ pydantic==2.8.2
 python-dotenv==1.0.1
 setuptools==70.0.0
 redis==5.0.1
-
+tomli==2.2.1

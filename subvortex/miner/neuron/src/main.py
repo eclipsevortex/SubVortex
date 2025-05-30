@@ -147,7 +147,7 @@ class Miner:
             btul.logging.info(f"Settings: {self.settings}")
 
             # Show miner version
-            self.version = get_version("subvortex-miner-neuron")
+            self.version = get_version()
             btul.logging.debug(f"Version: {self.version}")
 
             await self._initialize()

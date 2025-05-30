@@ -87,7 +87,7 @@ def test_set_weights_success_first_try(mock_log, mock_process):
     subtensor.blocks_since_last_update.return_value = 5
     subtensor.set_weights.return_value = (True, "Success")
 
-    set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores)
+    set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores, version="1.0.0")
 
     subtensor.set_weights.assert_called_once()
     mock_log.success.assert_called()
@@ -111,7 +111,7 @@ def test_set_weights_success_after_retry(mock_log, mock_process):
         (True, "Success"),
     ]
 
-    set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores)
+    set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores, version="1.0.0")
 
     assert subtensor.set_weights.call_count == 2
     assert mock_log.success.call_count == 1
@@ -132,7 +132,7 @@ def test_set_weights_succeeds_due_to_block_change(mock_log, mock_process):
     subtensor.blocks_since_last_update.side_effect = [10, 9]
     subtensor.set_weights.return_value = (False, "No inclusion")
 
-    set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores)
+    set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores, version="1.0.0")
 
     mock_log.success.assert_called_once()
     mock_log.warning.assert_not_called()
@@ -156,7 +156,7 @@ def test_set_weights_all_attempts_fail(mock_log, mock_process):
         (False, "timeout"),
     ]
 
-    set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores)
+    set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores, version="1.0.0")
 
     assert subtensor.set_weights.call_count == 2
     mock_log.error.assert_called_once()
@@ -173,7 +173,7 @@ def test_set_weights_handles_weight_processing_error(mock_process):
     mock_process.side_effect = Exception("Invalid input")
 
     try:
-        set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores)
+        set_weights(settings, subtensor, wallet, uid=42, moving_scores=scores, version="1.0.0")
     except Exception as e:
         assert str(e) == "Invalid input"
 

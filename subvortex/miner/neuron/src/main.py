@@ -147,7 +147,8 @@ class Miner:
             btul.logging.info(f"Settings: {self.settings}")
 
             # Show miner version
-            btul.logging.debug(f"Version: {get_version()}")
+            self.version = get_version("subvortex-miner-neuron")
+            btul.logging.debug(f"Version: {self.version}")
 
             await self._initialize()
             await self._serve()
@@ -432,7 +433,7 @@ class Miner:
         )
         btul.logging.success(f"[{validator_uid}] Score {synapse.score}")
 
-        synapse.version = get_version()
+        synapse.version = self.version
 
         return synapse
 

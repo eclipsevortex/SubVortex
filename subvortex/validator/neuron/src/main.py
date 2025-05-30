@@ -133,7 +133,8 @@ class Validator:
         btul.logging.info(f"Settings: {self.settings}")
 
         # Show miner version
-        btul.logging.debug(f"Version: {get_version()}")
+        version = get_version("subvortex-validator-neuron")
+        btul.logging.debug(f"Version: {version}")
 
         # Init validator wallet.
         btul.logging.debug(f"loading wallet")
@@ -173,7 +174,7 @@ class Validator:
             self.dendrite = MockDendrite(wallet=self.wallet)
         else:
             self.dendrite = SubVortexDendrite(
-                version=to_spec_version(get_version()), wallet=self.wallet
+                version=to_spec_version(version), wallet=self.wallet
             )
         btul.logging.debug(str(self.dendrite))
 
@@ -313,6 +314,7 @@ class Validator:
                         wallet=self.wallet,
                         uid=self.neuron.uid,
                         moving_scores=self.moving_averaged_scores,
+                        version=version
                     )
                     save_state(self)
 

@@ -76,6 +76,7 @@ def set_weights(
     wallet: "btw.Wallet",
     uid: int,
     moving_scores: "np.NDArray",
+    version: str
 ):
     # Get the uids form teh moving scores array
     uids = np.arange(moving_scores.shape[0])
@@ -105,7 +106,7 @@ def set_weights(
             weights=weights_proceed.tolist(),
             wait_for_inclusion=True,
             wait_for_finalization=False,
-            version_key=to_spec_version(THIS_VERSION),
+            version_key=to_spec_version(version),
             max_retries=2,
         )
 

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch, MagicMock, PropertyMock
 
 import subvortex.core.model.neuron.neuron as scmm
 import subvortex.core.metagraph.settings as scms
@@ -40,8 +40,11 @@ def database():
 
     mock_redis.pipeline = MagicMock(return_value=mock_pipeline_cm)
 
-    # Patch the database and connection
-    s.database = mock_redis
+    patcher = patch.object(
+        type(s), "database", new_callable=PropertyMock, return_value=mock_redis
+    )
+    patcher.start()
+
     s.ensure_connection = AsyncMock()
 
     # Patch _get_migration_status to return mock version

@@ -105,10 +105,12 @@ class FileMonitor(threading.Thread):
         btul.logging.debug(f"[{LOGGER_NAME}] run ended")
 
     def start(self):
+        btul.logging.debug(f"[{LOGGER_NAME}] starting...")
         super().start()
         btul.logging.debug(f"[{LOGGER_NAME}] started")
 
     def stop(self):
+        btul.logging.debug(f"[{LOGGER_NAME}] stopping...")
         self.stop_flag.set()
         super().join()
         btul.logging.debug(f"[{LOGGER_NAME}] stopped")

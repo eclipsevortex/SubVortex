@@ -1,5 +1,6 @@
 from typing import List, Dict
 from collections import Counter
+from numpy.typing import NDArray
 
 import bittensor.utils.btlogging as btul
 
@@ -13,9 +14,11 @@ from subvortex.validator.neuron.src.score import (
 from subvortex.core.model.neuron import Neuron
 from subvortex.validator.neuron.src.models.miner import Miner
 from subvortex.validator.neuron.src.database import Database
+from subvortex.validator.neuron.src.settings import Settings
 
 
 async def sync_miners(
+    settings: Settings,
     database: Database,
     neurons: Dict[str, Neuron],
     miners: List[Miner],
@@ -24,15 +27,15 @@ async def sync_miners(
     min_stake: int,
 ) -> List[Miner]:
     miners_updates: List[Miner] = []
-    reset_miners: List[Miner] = []
 
     # Resync the miners
     for hotkey, neuron in neurons.items():
-        if (
-            neuron.stake >= min_stake
-            or neuron.validator_trust > 0
+        is_validator = (
+            neuron.validator_trust > 0
             or neuron.uid == validator.uid
-        ):
+            or (not settings.is_test and neuron.stake >= min_stake)
+        )
+        if is_validator:
             # It is a validator
             continue
 
@@ -61,10 +64,7 @@ async def sync_miners(
             await database.remove_miner(miner=current_miner)
 
             # Reset the updated miner
-            current_miner.reset()
-
-            # Add the miner in the reset list
-            reset_miners.append(current_miner)
+            current_miner.reset(reset_moving_score=True)
 
             # Log the success
             btul.logging.debug(
@@ -77,19 +77,20 @@ async def sync_miners(
 
             btul.logging.info(
                 f"[{current_miner.uid}] IP address changed from {current_miner.ip} to {neuron.ip}"
-                + (f" Country changed: {current_miner.country} → {neuron.country}. Miner will be reset." if has_country_changed else " Country unchanged. Miner will not be reset.")
+                + (
+                    f" Country changed: {current_miner.country} → {neuron.country}. Miner will be reset."
+                    if has_country_changed
+                    else " Country unchanged. Miner will not be reset."
+                )
             )
 
             # Reset the updated miner
-            current_miner.reset()
-
-            # Add to reset list only if country changed
-            if has_country_changed:
-                reset_miners.append(current_miner)
+            current_miner.reset(reset_moving_score=has_country_changed)
 
             # Optional: keep or remove this debug log
             btul.logging.debug(
-                f"[{current_miner.uid}] Miner reset due to IP change." + (" Country changed." if has_country_changed else "")
+                f"[{current_miner.uid}] Miner reset due to IP change."
+                + (" Country changed." if has_country_changed else "")
             )
 
         # Create an updated miner
@@ -142,11 +143,20 @@ async def sync_miners(
         miner.distribution_score = new_distribution
         miner.score = new_score
 
+    # Create a sorted list of miner
+    sorted_miners = sorted(miners_updates, key=lambda m: (m.moving_score, -m.uid), reverse=True)
+
+    for miner in miners_updates:
+        # Compute the rank of the miner
+        miner.rank = next(
+            (i for i, x in enumerate(sorted_miners) if x.uid == miner.uid), -1
+        )
+
     btul.logging.info(
         f"✅ sync_miners complete: {len(miners_updates)} miners synced from {len(neurons)} live neurons."
     )
 
-    return miners_updates, reset_miners
+    return miners_updates
 
 
 async def reset_reliability_score(database: Database, miners: List[Miner]):
@@ -157,3 +167,19 @@ async def reset_reliability_score(database: Database, miners: List[Miner]):
         miner.challenge_successes = 0
 
     await database.update_miners(miners=miners)
+
+
+def get_miner_moving_score(miners: List[Miner], uid: int):
+    miner: Miner = next((x for x in miners if x.uid == uid), None)
+    return 0 if not miner else miner.moving_score
+
+
+def update_miners_with_moving_scores(miners: List[Miner], moving_scores: NDArray):
+    """
+    Updates each miner object with its current moving average score
+    from self.moving_averaged_scores using the miner's UID.
+    """
+    for miner in miners:
+        uid = miner.uid
+        if 0 <= uid < len(moving_scores):
+            miner.moving_score = moving_scores[uid].item()

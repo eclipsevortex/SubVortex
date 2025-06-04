@@ -1,7 +1,6 @@
-
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 from subvortex.validator.neuron.src.models.selection import SelectionModel200
 from subvortex.validator.neuron.src.models.miner import MinerModel210, Miner
@@ -19,8 +18,12 @@ class DummySettings:
 async def db():
     db = Database(DummySettings())
     db.ensure_connection = AsyncMock()
-    db.database = AsyncMock()
-    db.client = AsyncMock()
+
+    patcher = patch.object(
+        type(db), "database", new_callable=PropertyMock, return_value=AsyncMock()
+    )
+    patcher.start()
+
     return db
 
 

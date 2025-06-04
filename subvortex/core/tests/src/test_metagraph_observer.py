@@ -722,3 +722,78 @@ async def test_zero_ip_and_non_ipv4_not_considered_missing_country(observer):
     observer.database.remove_neurons.assert_not_called()
     observer.database.update_neurons.assert_not_called()
     assert has_missing_country is False
+
+
+@pytest.mark.asyncio
+async def test_registered_at_already_set(observer):
+    fake_proto = MagicMock()
+    fake_proto.uid = 1
+    fake_proto.axon_info.ip = "1.1.1.1"
+    fake_proto.hotkey = "registered_hotkey"
+
+    stored = scmm.Neuron(
+        uid=1,
+        ip="1.1.1.1",
+        hotkey="registered_hotkey",
+        country="US",
+        registered_at=12345,
+    )
+    new = scmm.Neuron(
+        uid=1,
+        ip="1.1.1.1",
+        hotkey="registered_hotkey",
+        country="US",
+        registered_at=12345,
+    )
+
+    observer.metagraph = AsyncMock()
+    observer.metagraph.neurons = [fake_proto]
+    observer.database.get_neurons = AsyncMock(
+        return_value={"registered_hotkey": stored}
+    )
+    observer.database.update_neurons = AsyncMock()
+
+    with patch(
+        "subvortex.core.model.neuron.neuron.Neuron.from_proto", return_value=new
+    ), patch("subvortex.core.country.country.get_country", return_value="US"), patch(
+        "subvortex.core.core_bittensor.subtensor.get_block_at_registration"
+    ) as mock_block_at_reg:
+        axons, _ = await observer._resync()
+        mock_block_at_reg.assert_not_called()
+        observer.database.update_neurons.assert_not_called()
+        assert axons["registered_hotkey"] == "1.1.1.1"
+
+
+@pytest.mark.asyncio
+async def test_registered_at_zero_triggers_fetch(observer):
+    fake_proto = MagicMock()
+    fake_proto.uid = 99
+    fake_proto.axon_info.ip = "5.5.5.5"
+    fake_proto.hotkey = "new_hotkey"
+
+    # New neuron with registered_at=0
+    new = scmm.Neuron(
+        uid=99, ip="5.5.5.5", hotkey="new_hotkey", country="US", registered_at=0
+    )
+
+    observer.metagraph = AsyncMock()
+    observer.metagraph.neurons = [fake_proto]
+    observer.database.get_neurons = AsyncMock(return_value={})
+    observer.database.update_neurons = AsyncMock()
+
+    with patch(
+        "subvortex.core.model.neuron.neuron.Neuron.from_proto", return_value=new
+    ), patch("subvortex.core.country.country.get_country", return_value="US"), patch(
+        "subvortex.core.core_bittensor.subtensor.get_block_at_registration",
+        return_value=7777,
+    ) as mock_get_block:
+        axons, _ = await observer._resync()
+
+    observer.database.update_neurons.assert_called_once()
+    updated_neuron = observer.database.update_neurons.call_args[0][0][0]
+    assert updated_neuron.registered_at == 7777
+    mock_get_block.assert_called_once_with(
+        subtensor=observer.subtensor,
+        netuid=observer.settings.netuid,
+        uid=99,
+    )

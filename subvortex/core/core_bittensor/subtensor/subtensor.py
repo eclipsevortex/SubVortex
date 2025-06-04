@@ -2,8 +2,6 @@ import time
 import typing
 import random
 import netaddr
-import asyncio
-import threading
 import numpy as np
 from numpy.typing import NDArray
 
@@ -41,6 +39,21 @@ def get_number_of_neurons(subtensor: btcs.Subtensor, netuid: int):
     )
 
     return int(number_of_neurons.value or 0)
+
+
+async def get_block_at_registration(
+    subtensor: btcas.AsyncSubtensor, netuid: int, uid: int, block: int = None
+):
+    block_hash = await subtensor.substrate.get_block_hash(block) if block else None
+
+    result = await subtensor.substrate.query(
+        module="SubtensorModule",
+        storage_function="BlockAtRegistration",
+        params=[netuid, uid],
+        block_hash=block_hash,
+    )
+
+    return result.value if result is not None else 0
 
 
 async def get_number_of_registration(subtensor: btcas.AsyncSubtensor, netuid: int):
@@ -243,3 +256,13 @@ def get_hyperparameter_value(subtensor: "btcs.Subtensor", param_name: str, netui
     subnet = btcc.SubnetHyperparameters.from_vec_u8(bytes_result)
     value = subnet.__dict__[param_name]
     return value
+
+
+def get_number_of_uids(subtensor: btcs.Subtensor, netuid: int):
+    result = subtensor.substrate.query(
+        module="SubtensorModule",
+        storage_function="SubnetworkN",
+        params=[netuid],
+    )
+
+    return int(result.value or 0)

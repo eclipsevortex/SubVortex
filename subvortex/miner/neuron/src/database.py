@@ -1,3 +1,7 @@
+import traceback
+import bittensor.utils.btlogging as btul
+
+from subvortex.miner.neuron.src.models.score import MinerScore211, Score
 from subvortex.core.metagraph.database import NeuronReadOnlyDatabase
 
 
@@ -20,3 +24,32 @@ class Database(NeuronReadOnlyDatabase):
         super().__init__(settings=settings)
 
         self.setup_neuron_models()
+        self.models["score"] = {x.version: x for x in [MinerScore211()]}
+
+    async def save_scores(self, score: Score):
+        """
+        Bulk update for a list of miners using active model versions.
+        """
+        await self.ensure_connection()
+
+        _, active = await self._get_migration_status("score")
+
+        for version in reversed(active):
+            model = self.models["score"][version]
+            if not model:
+                continue
+
+            try:
+                await model.write(self.database, score)
+
+            except Exception as ex:
+                btul.logging.warning(
+                    f"[{version}] Update score failed: {ex}",
+                    prefix=self.settings.logging_name,
+                )
+                btul.logging.debug(
+                    f"[update_score] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
+
+        return None

@@ -21,6 +21,9 @@ from subvortex.core.sse.sse_server import SSEServer
 from subvortex.core.firewall.firewall_factory import create_firewall_tool
 
 
+LOGGER_NAME = "SSE Server"
+
+
 class SSEThread(threading.Thread):
     def __init__(self, ip: str = None, port: int = 5000) -> None:
         super().__init__(daemon=True)
@@ -39,14 +42,18 @@ class SSEThread(threading.Thread):
         return self._server
 
     def stop(self) -> None:
+        btul.logging.debug(f"[{LOGGER_NAME}] stopping...")
+
         # Remove the firewall rule
-        btul.logging.warning(f"Shutting down SSE Server {self.ip}:{self.port}")
         self.tool.remove_rule(ip=self.ip, dport=self.port, protocol="tcp")
 
         # Shutdown the server
         self._server.shutdown()
 
+        # Wait the thread to finish
         super().join()
+
+        btul.logging.debug(f"[{LOGGER_NAME}] stopped")
 
     def run(self) -> None:
         self._server.serve_forever()

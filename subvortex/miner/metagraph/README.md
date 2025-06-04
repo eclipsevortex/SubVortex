@@ -14,6 +14,7 @@ This document provides a comprehensive guide on how to set up and run the Metagr
   - [As process](#uninstall-as-process)
   - [As service](#uninstall-as-service)
   - [As docker container](#uninstall-as-container)
+- [Querier](#querier)
 
 ---
 
@@ -61,6 +62,7 @@ pm2 log subvortex-miner-metagraph
 You should see something like
 
 ```bash
+
 ```
 
 ## As service <a id="installation-as-service"></a>
@@ -89,6 +91,7 @@ systemctl status subvortex-miner-metagraph
 You should see something like
 
 ```bash
+
 ```
 
 ## As docker container <a id="installation-as-container"></a>
@@ -133,6 +136,7 @@ docker logs subvortex-miner-metagraph
 You should see something like
 
 ```bash
+
 ```
 
 <br />
@@ -196,3 +200,31 @@ docker ps
 ```
 
 You should not see any container named `subvortex-miner-metagraph`.
+
+<br />
+
+# Querier
+
+# All neurons not in the US
+
+python neuron_querier.py --filter "country!=US"
+
+# All neurons NOT in US or DE
+
+python neuron_querier.py --filter "country not in US,DE"
+
+# All neurons in CA or FR
+
+python neuron_querier.py --filter "country in CA,FR"
+
+# All neurons with is_serving=1 and not in US
+
+python neuron_querier.py --filter "is_serving=1" --filter "country!=US"
+
+# Neurons not in US, showing only uid and stake
+
+python neuron_querier.py --filter "country!=US" --fields uid,stake
+
+# Only serving neurons in DE, showing uid, stake, ip
+
+python neuron_querier.py --filter "country=DE" --filter "is_serving=1" --fields uid,stake,ip

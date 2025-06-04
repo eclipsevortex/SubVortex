@@ -99,11 +99,13 @@ class Firewall(threading.Thread):
             return list(self._rules)
 
     def start(self):
+        btul.logging.debug(f"{FIREWALL_LOGGING_NAME} starting...")
         self.monitor.start()
         super().start()
         btul.logging.debug(f"{FIREWALL_LOGGING_NAME} started")
 
     def stop(self):
+        btul.logging.debug(f"{FIREWALL_LOGGING_NAME} stopping...")
         self.observer.stop()
         self.monitor.stop()
         super().join()

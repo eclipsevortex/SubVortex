@@ -186,6 +186,22 @@ class MetagraphObserver:
             )
             new_neuron.country = country
 
+            # Set the registered at for the new neuron
+            new_neuron.registered_at = (
+                current_neuron.registered_at
+                if current_neuron
+                else new_neuron.registered_at
+            )
+
+            # Get the registered at from the chain if missing
+            if new_neuron.registered_at in [-1, 0]:
+                registered_at = await scbs.get_block_at_registration(
+                    subtensor=self.subtensor,
+                    netuid=self.settings.netuid,
+                    uid=mneuron.uid,
+                )
+                new_neuron.registered_at = registered_at
+
             # Add the hotkey of the neuron
             mhotkeys.add(new_neuron.hotkey)
 
@@ -197,6 +213,7 @@ class MetagraphObserver:
                 and scsu.is_valid_ipv4(new_neuron.ip)
             )
 
+            # Check if nothing changed
             if new_neuron == current_neuron and not has_country_none:
                 btul.logging.trace(
                     f"🔍 Neuron {mneuron.hotkey} (uid={mneuron.uid}) unchanged",

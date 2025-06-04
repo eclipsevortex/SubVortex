@@ -8,6 +8,8 @@ from .subtensor import (
     get_number_of_neurons,
     get_next_block,
     get_hyperparameter_value,
+    get_number_of_uids,
+    get_block_at_registration,
 )
 
 from .subtensor_settings import Settings
@@ -23,4 +25,6 @@ __all__ = [
     "get_number_of_neurons",
     "get_next_block",
     "get_hyperparameter_value",
+    "get_number_of_uids",
+    "get_block_at_registration"
 ]

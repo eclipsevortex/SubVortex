@@ -75,16 +75,16 @@ def set_weights(
     subtensor: "btcs.Subtensor",
     wallet: "btw.Wallet",
     uid: int,
-    moving_scores: "np.NDArray",
+    weights: "np.NDArray",
     version: str
 ):
     # Get the uids form teh moving scores array
-    uids = np.arange(moving_scores.shape[0])
+    uids = np.arange(weights.shape[0])
 
     # Process weights for the subnet
     uids_proceed, weights_proceed = scbs.process_weights_for_netuid(
         uids=uids,
-        weights=moving_scores,
+        weights=weights,
         netuid=settings.netuid,
         subtensor=subtensor,
     )

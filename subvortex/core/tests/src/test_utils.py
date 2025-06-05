@@ -11,6 +11,7 @@ from subvortex.core.utils import is_valid_ipv4
         "127.0.0.1",
         "0.0.0.0",
         "255.255.255.255",
+        "::ffff:8.8.8.8", 
     ],
 )
 def test_valid_ipv4_addresses(ip):
@@ -23,8 +24,8 @@ def test_valid_ipv4_addresses(ip):
         "::1",
         "2001:db8::1",
         "fe80::",
-        "::ffff:192.0.2.128",  # IPv4-mapped IPv6
         "abcd::1234",
+        "abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd",
     ],
 )
 def test_valid_ipv6_addresses(ip):

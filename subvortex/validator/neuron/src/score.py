@@ -75,7 +75,7 @@ def can_compute_reliability_score(miner: Miner, has_ip_conflicts: bool):
     """
     True if we can compute the reliability score, false to get the penalty
     """
-    return True
+    return not has_ip_conflicts
 
 
 async def compute_reliability_score(miner: Miner, has_ip_conflicts: bool):
@@ -85,10 +85,6 @@ async def compute_reliability_score(miner: Miner, has_ip_conflicts: bool):
     if not can_compute_reliability_score(miner, has_ip_conflicts):
         return RELIABILLITY_FAILURE_REWARD
 
-    # Step 1: Retrieve statistics
-    is_successful = miner.verified and not has_ip_conflicts
-    miner.challenge_successes = miner.challenge_successes + int(is_successful)
-    miner.challenge_attempts = miner.challenge_attempts + 1
     btul.logging.trace(
         f"[{miner.uid}][Score][Reliability] # challenge attempts {miner.challenge_attempts}"
     )

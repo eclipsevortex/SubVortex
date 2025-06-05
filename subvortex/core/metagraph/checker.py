@@ -6,6 +6,7 @@ import subvortex.core.country.country as sccc
 import subvortex.core.model.neuron.neuron as scmm
 import subvortex.core.metagraph.database as scmd
 import subvortex.core.metagraph.settings as scms
+import subvortex.core.utils as scsu
 
 
 class MetagraphChecker:
@@ -14,9 +15,10 @@ class MetagraphChecker:
         settings: scms.Settings,
         database: scmd.NeuronDatabase,
         subtensor: btcas.AsyncSubtensor,
-        metagraph: btcm.AsyncMetagraph,
+        metagraph: btcm.AsyncMetagraph = None,
         with_country: bool = False,
         uid: int = None,
+        verbose: bool = True,
     ):
         self.settings = settings
         self.database = database
@@ -24,70 +26,93 @@ class MetagraphChecker:
         self.metagraph = metagraph
         self.with_country = with_country
         self.uid = uid
+        self.verbose = verbose
 
     async def run(self):
-        btul.logging.info("🔍 Starting metagraph vs Redis consistency check...")
-
-        btul.logging.info(f"🌐 Country detection enabled: {self.with_country}")
+        self._log("info", "🔍 Starting metagraph vs Redis consistency check...")
+        self._log("info", f"🌐 Country detection enabled: {self.with_country}")
 
         last_updated = await self.database.get_neuron_last_updated()
-        btul.logging.info(f"🕒 Last updated block: {last_updated}")
+        self._log("info", f"🕒 Last updated block: {last_updated}")
 
-        # Sync the metagraph
+        if self.metagraph is None:
+            self.metagraph = await self.subtensor.metagraph(netuid=self.settings.netuid)
+
         await self.metagraph.sync(
             subtensor=self.subtensor,
             block=last_updated,
             lite=False,
         )
-        btul.logging.info(f"✅ Metagraph synced at block {last_updated}.")
+        self._log("info", f"✅ Metagraph synced at block {last_updated}.")
 
         successfull_neurons = 0
+        all_mismatches = []
         for neuron in self.metagraph.neurons:
             if self.uid is not None and self.uid != neuron.uid:
                 continue
 
-            btul.logging.debug(
-                f"🔎 Checking neuron: {neuron.hotkey} (uid={neuron.uid})"
+            self._log(
+                "debug", f"🔎 Checking neuron: {neuron.hotkey} (uid={neuron.uid})"
             )
 
-            # Get the neuron stored
             stored_neuron = await self.database.get_neuron(neuron.hotkey)
-
-            # Build the neuron from the metagraph
             expected_neuron = scmm.Neuron.from_proto(neuron)
 
             if self.with_country:
                 expected_neuron.country = (
                     sccc.get_country(expected_neuron.ip)
                     if expected_neuron.ip != "0.0.0.0"
+                    and scsu.is_valid_ipv4(expected_neuron.ip)
                     else None
                 )
 
-            mismatches = []
+            neuron_mismatches = []
             for key, expected_value in expected_neuron.__dict__.items():
                 if key == "country" and not self.with_country:
                     continue
 
                 stored_value = getattr(stored_neuron, key, None)
                 if expected_value != stored_value:
-                    mismatches.append(
-                        f"{key}: expected={expected_value}, actual={stored_value}"
+                    mismatch = {
+                        "hotkey": neuron.hotkey,
+                        "uid": neuron.uid,
+                        "field": key,
+                        "expected": expected_value,
+                        "actual": stored_value,
+                    }
+                    neuron_mismatches.append(mismatch)
+
+            if neuron_mismatches:
+                self._log(
+                    "error",
+                    f"❌ Neuron mismatch for hotkey={neuron.hotkey} (uid={neuron.uid}):",
+                )
+                for mismatch in neuron_mismatches:
+                    self._log(
+                        "error",
+                        f"  - {mismatch['field']}: expected={mismatch['expected']}, actual={mismatch['actual']}",
                     )
 
-            if mismatches:
-                btul.logging.error(
-                    f"❌ Neuron mismatch for hotkey={neuron.hotkey} (uid={neuron.uid}):"
-                )
-                for line in mismatches:
-                    btul.logging.error(f"  - {line}")
+                all_mismatches.extend(neuron_mismatches)
             else:
-                successfull_neurons = successfull_neurons + 1
-                properties = expected_neuron.__dict__.items()
-                btul.logging.debug(
-                    f"✅ Neuron {neuron.hotkey} is consistent ({(len(properties))} properties)."
+                successfull_neurons += 1
+                self._log(
+                    "debug",
+                    f"✅ Neuron {neuron.hotkey} is consistent ({len(expected_neuron.__dict__)} properties).",
                 )
 
-        total = len(self.metagraph.neurons) if not self.uid else 1
-        btul.logging.success(
-            f"🎉 {successfull_neurons}/{total} neurons are consistent between metagraph and Redis."
+        total = len(self.metagraph.neurons) if self.uid is None else 1
+        self._log(
+            "success",
+            f"🎉 {successfull_neurons}/{total} neurons are consistent between metagraph and Redis.",
         )
+
+        return (successfull_neurons, total, all_mismatches)
+
+    def _log(self, level: str, message: str):
+        if not self.verbose:
+            return
+
+        log_func = getattr(btul.logging, level, None)
+        if log_func:
+            log_func(message)

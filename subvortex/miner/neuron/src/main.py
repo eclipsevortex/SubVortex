@@ -14,10 +14,10 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import time
+import sys
 import typing
+import signal
 import asyncio
-import threading
 import traceback
 import websockets
 import bittensor.core.config as btcc
@@ -39,14 +39,13 @@ from subvortex.core.core_bittensor.metagraph import SubVortexMetagraph
 from subvortex.core.core_bittensor.axon import SubVortexAxon
 from subvortex.core.core_bittensor.synapse import Synapse
 from subvortex.core.core_bittensor.subtensor import wait_for_block
-
 from subvortex.core.sse.sse_thread import SSEThread
-
 from subvortex.core.file.file_monitor import FileMonitor
 from subvortex.core.firewall.firewall_factory import (
     create_firewall_tool,
     create_firewall_observer,
 )
+
 from subvortex.miner.neuron.src.firewall import Firewall
 from subvortex.miner.neuron.src.config import (
     config,
@@ -56,6 +55,7 @@ from subvortex.miner.neuron.src.config import (
 from subvortex.miner.neuron.src.utils import load_request_log
 from subvortex.miner.neuron.src.settings import Settings
 from subvortex.miner.neuron.src.database import Database
+from subvortex.miner.neuron.src.score import save_scores
 from subvortex.miner.neuron.src.neuron import (
     wait_until_no_multiple_occurrences,
     get_validators,
@@ -109,11 +109,13 @@ class Miner:
 
     def __init__(self):
         self.config, parser = Miner.config()
-        self.check_config(self.config)
 
         # Create settings
         self.settings = Settings.create()
         update_config(self.settings, self.config, parser)
+
+        # Check the config
+        self.check_config(self.config)
 
         btul.logging(
             config=self.config,
@@ -124,39 +126,27 @@ class Miner:
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
         btul.logging.info(str(self.config))
 
-        # Init the event loop.
-        self.loop = asyncio.get_event_loop()
-
         # Instantiate runners
-        self.should_exit: bool = False
+        self.should_exit = asyncio.Event()
+        self.run_complete = asyncio.Event()
         self.is_running: bool = False
-        self.thread: threading.Thread = None
-        self.lock = asyncio.Lock()
         self.request_timestamps: typing.Dict = {}
-        self.previous_last_updates = []
         self.previous_last_updated = None
-        self.block_queue = asyncio.Queue()
 
         self.step = 0
 
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
     async def run(self):
-        try:
-            # Display the settings
-            btul.logging.info(f"Settings: {self.settings}")
+        btul.logging.info(f"Settings: {self.settings}")
 
-            # Show miner version
-            self.version = get_version()
-            btul.logging.debug(f"Version: {self.version}")
+        # Show miner version
+        self.version = get_version()
+        btul.logging.debug(f"Version: {self.version}")
 
-            await self._initialize()
-            await self._serve()
-            await self._main_loop()
-        except KeyboardInterrupt:
-            btul.logging.info("Keyboard interrupt detected, exiting.")
-        finally:
-            await self._shutdown()
+        await self._initialize()
+        await self._serve()
+        await self._main_loop()
 
     async def _initialize(self):
         self.wallet = (
@@ -189,7 +179,7 @@ class Miner:
         btul.logging.info(
             f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
         )
-        
+
         btul.logging.success("Initialization complete.")
 
     async def _serve(self):
@@ -240,12 +230,11 @@ class Miner:
         self.axon.start()
 
         # Update the firewall if enable
-        if self.firewall:
-            await self._update_firewall()
+        self.firewall and await self._update_firewall()
 
     async def _main_loop(self):
         must_init_subtensor = False
-        while not self.should_exit:
+        while not self.should_exit.is_set():
             try:
                 # Re-initialize the subtensor if needed
                 if must_init_subtensor:
@@ -301,6 +290,21 @@ class Miner:
                     # Update the firewall is enabled
                     self.firewall and await self._update_firewall()
 
+                # Get the next block
+                current_block = await self.subtensor.get_current_block()
+
+                # Ensure the subvortex metagraph has been synced within its mandatory interval
+                assert last_updated >= (
+                    current_block - self.settings.metagraph_sync_interval
+                ), (
+                    f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                    f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                )
+
+            except AssertionError:
+                # We already display a log, so need to do more here
+                pass
+
             except (
                 BrokenPipeError,
                 ConnectionError,
@@ -310,12 +314,14 @@ class Miner:
                 btul.logging.error(f"Connection issue in main loop: {e}")
                 btul.logging.debug(traceback.format_exc())
                 must_init_subtensor = True
-                await asyncio.sleep(5)
+                await asyncio.sleep(2)
 
             except Exception as ex:
-                btul.logging.error(f"Unhandled exception in main loop: {ex}")
+                btul.logging.error(f"Unhandled exception {type(ex)} in main loop: {ex}")
                 btul.logging.debug(traceback.format_exc())
-                await asyncio.sleep(5)
+
+        # Signal the neuron has finished
+        self.run_complete.set()
 
     async def _retry_initialize_subtensor(self, max_attempts: int = 5):
         backoff = 2
@@ -363,18 +369,29 @@ class Miner:
         btul.logging.debug("Firewall updated")
 
     async def _shutdown(self):
-        btul.logging.info("Shutting down miner services...")
-        self.sse and self.sse.stop()
-        self.firewall and self.firewall.stop()
-        self.file_monitor and self.file_monitor.stop()
-        self.axon and self.axon.stop()
+        btul.logging.info("Shutting down miner...")
 
-        if not self.loop.is_closed():
-            await self.loop.shutdown_asyncgens()
-            self.loop.close()
+        # Wait the neuron to stop
+        await self.run_complete.wait()
 
-        if hasattr(self, "subtensor"):
+        if getattr(self, "axon", None):
+            self.axon.stop()
+            btul.logging.debug("Axon stopped")
+
+        if getattr(self, "subtensor", None):
             await self.subtensor.close()
+            btul.logging.debug("Subtensor stopped")
+
+        if getattr(self, "sse", None):
+            self.sse.stop()
+
+        if getattr(self, "firewall", None):
+            self.firewall.stop()
+
+        if getattr(self, "file_monitor", None):
+            self.file_monitor.stop()
+
+        btul.logging.info("Shutting down miner completed")
 
     async def _blacklist(self, synapse: Synapse) -> typing.Tuple[bool, str]:
         caller = synapse.dendrite.hotkey
@@ -415,25 +432,49 @@ class Miner:
         btul.logging.trace(f"Not Blacklisting recognized hotkey {caller}")
         return False, "Hotkey recognized!"
 
-    def _score(self, synapse: Score) -> Score:
+    async def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
+        # Display the block of the challenge
+        btul.logging.info(f"[{validator_uid}] Challenge at block #{synapse.block}")
+
+        # Display error if there are more than 1 miner running on this machine
         if synapse.count > 1:
             btul.logging.error(
                 f"[{validator_uid}] {synapse.count} miners are running on this machine"
             )
 
-        btul.logging.info(
+        # Display the penalty factor
+        if synapse.penalty_factor:
+            btul.logging.warning(
+                f"[{validator_uid}] Penalty factor {synapse.penalty_factor}"
+            )
+        else:
+            btul.logging.debug(f"[{validator_uid}] No penalty factor")
+
+        # Display scores
+        btul.logging.debug(
             f"[{validator_uid}] Availability score {synapse.availability}"
         )
-        btul.logging.info(f"[{validator_uid}] Latency score {synapse.latency}")
-        btul.logging.info(f"[{validator_uid}] Reliability score {synapse.reliability}")
-        btul.logging.info(
+        btul.logging.debug(f"[{validator_uid}] Latency score {synapse.latency}")
+        btul.logging.debug(f"[{validator_uid}] Reliability score {synapse.reliability}")
+        btul.logging.debug(
             f"[{validator_uid}] Distribution score {synapse.distribution}"
         )
-        btul.logging.success(f"[{validator_uid}] Score {synapse.score}")
+        btul.logging.info(f"[{validator_uid}] Score {synapse.score}")
+        btul.logging.info(f"[{validator_uid}] Moving score {synapse.moving_score}")
+        btul.logging.success(f"[{validator_uid}] Rank {synapse.rank}")
 
+        # Update the version
         synapse.version = self.version
+
+        # Save the scores
+        await save_scores(
+            settings=self.settings,
+            database=self.database,
+            synapse=synapse,
+            path=self.config.miner.full_path,
+        )
 
         return synapse
 
@@ -442,4 +483,24 @@ class Miner:
 
 
 if __name__ == "__main__":
-    asyncio.run(Miner().run())
+    miner = Miner()
+
+    async def _graceful_shutdown():
+        # Notify neuron to stop
+        miner.should_exit.set()
+
+        # Shutdown the neuron
+        await miner._shutdown()
+
+    def _handle_signal(sig, frame):
+        asyncio.create_task(_graceful_shutdown())
+
+    signal.signal(signal.SIGINT, _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
+
+    try:
+        asyncio.run(miner.run())
+
+    except KeyboardInterrupt:
+        _graceful_shutdown()
+        sys.exit(0)

@@ -52,7 +52,6 @@ async def get_weights_min_stake_async(substrate: AsyncSubstrateInterface):
     )
 
     weight_min_stake = result.value if result is not None else 0
-    btul.logging.debug(f"get_weights_min_stake() {weight_min_stake}")
 
     # Convert Rao to Tao
     return int(float(weight_min_stake) * 10**-9)
@@ -68,7 +67,6 @@ def get_weights_min_stake(substrate: SubstrateInterface):
         result = _get_weights_min_stake(substrate, "WeightsMinStake")
 
     weight_min_stake = result.value if result is not None else 0
-    btul.logging.debug(f"get_weights_min_stake() {weight_min_stake}")
 
     # Convert Rao to Tao
     return int(float(weight_min_stake) * 10**-9)

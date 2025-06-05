@@ -31,6 +31,7 @@ class Neuron:
     placeholder2: int = 0
     is_serving: bool = False
     country: Optional[str] = None
+    registered_at: int = 0
 
     def to_dict(self) -> dict:
         """Convert Neuron instance to a dict with consistent types."""
@@ -79,6 +80,7 @@ class Neuron:
             placeholder1=int(data["placeholder1"]),
             placeholder2=int(data["placeholder2"]),
             is_serving=bool(int(data["is_serving"])),
+            registered_at=int(data.get("registered_at", -1)),
             country=country,
         )
 

@@ -1,4 +1,6 @@
+import asyncio
 from redis import asyncio as aioredis
+from weakref import WeakKeyDictionary
 from packaging.version import parse as parse_version
 
 import bittensor.utils.btlogging as btul
@@ -10,17 +12,21 @@ class Database:
     def __init__(self, settings):
         self.models = {}
         self.settings = settings
-        self.database = None
+        self._clients = WeakKeyDictionary()
 
-    async def connect(self):
-        self.database = aioredis.StrictRedis(
-            host=self.settings.database_host,
-            port=self.settings.database_port,
-            db=self.settings.database_index,
-            password=self.settings.database_password,
-        )
+    @property
+    def database(self):
+        loop = asyncio.get_running_loop()
+        if loop not in self._clients:
+            self._clients[loop] = aioredis.StrictRedis(
+                host=self.settings.database_host,
+                port=self.settings.database_port,
+                db=self.settings.database_index,
+                password=self.settings.database_password,
+                decode_responses=False,
+            )
 
-        btul.logging.info("Connected to Redis", prefix=self.settings.logging_name)
+        return self._clients[loop]
 
     async def is_connection_alive(self) -> bool:
         try:
@@ -31,15 +37,13 @@ class Database:
             return False
 
     async def ensure_connection(self):
-        if self.database is None or not await self.is_connection_alive():
+        if not await self.is_connection_alive():
             btul.logging.warning(
-                "Reconnecting to Redis...",
-                prefix=self.settings.logging_name,
+                "Reconnecting to Redis...", prefix=self.settings.logging_name
             )
-            await self.connect()
+            # Nothing to do: database creates a fresh one as needed
 
     async def wait_until_ready(self, name: str):
-        # Ensure the connection is ip and running
         await self.ensure_connection()
 
         message_key = self._key(f"state:{name}")
@@ -47,7 +51,6 @@ class Database:
         last_id = "$"
 
         try:
-            # Step 1: check the message key first
             snapshot = await self.database.get(message_key)
             if snapshot and snapshot.decode() == "ready":
                 btul.logging.info(
@@ -56,7 +59,6 @@ class Database:
                 )
                 return
 
-            # Step 2: wait for stream messages
             btul.logging.debug(
                 f"Waiting on stream: {stream_key}", prefix=self.settings.logging_name
             )
@@ -78,7 +80,7 @@ class Database:
                                 prefix=self.settings.logging_name,
                             )
                             return
-                        last_id = msg_id  # move forward
+                        last_id = msg_id
         except Exception as err:
             btul.logging.warning(
                 f"Failed to read the state of {name}: {err}",
@@ -86,13 +88,6 @@ class Database:
             )
 
     async def _get_migration_status(self, model_name: str):
-        """
-        Returns:
-            - latest_version: the 'new' version
-            - active_versions: versions marked 'dual' or 'new',
-            or fallback to latest if none are active.
-        """
-        # Ensure the connection is ip and running
         await self.ensure_connection()
 
         latest = None
@@ -106,7 +101,6 @@ class Database:
 
             if mode == "new":
                 latest = version
-
             if mode in ("dual", "new"):
                 active.append(version)
 

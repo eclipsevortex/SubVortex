@@ -4,7 +4,6 @@ import traceback
 import bittensor.utils.btlogging as btul
 
 from subvortex.core.metagraph.database import NeuronReadOnlyDatabase
-from subvortex.core.database.database_utils import decode_value
 from subvortex.validator.neuron.src.models.selection import (
     SelectionModel200,
     SelectionModel210,

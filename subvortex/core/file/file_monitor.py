@@ -46,7 +46,11 @@ class FileMonitor(threading.Thread):
         while not self.stop_flag.is_set():
             try:
                 # Wait a specific time before starting
-                await asyncio.sleep(file.check_interval)
+                await self._sleep_interruptibly(file.check_interval)
+
+                # Check if stop has been requested
+                if self.stop_flag.is_set():
+                    break
 
                 btul.logging.debug(
                     f"[{LOGGER_NAME}][{file.logger_name}] Checking file..."
@@ -94,6 +98,16 @@ class FileMonitor(threading.Thread):
                     btul.logging.error(error_message)
                     self.last_error_shown = error_message
 
+    async def _sleep_interruptibly(self, duration: float):
+        """Sleep in small intervals to check stop_flag during sleep."""
+        interval = 0.1  # 100ms
+        slept = 0.0
+        while slept < duration:
+            if self.stop_flag.is_set():
+                break
+            await asyncio.sleep(interval)
+            slept += interval
+
     def run(self):
         try:
             self.loop.run_until_complete(self._run_async())
@@ -102,13 +116,13 @@ class FileMonitor(threading.Thread):
             self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             self.loop.close()
 
-        btul.logging.debug(f"[{LOGGER_NAME}] run ended")
-
     def start(self):
+        btul.logging.debug(f"[{LOGGER_NAME}] starting...")
         super().start()
         btul.logging.debug(f"[{LOGGER_NAME}] started")
 
     def stop(self):
+        btul.logging.debug(f"[{LOGGER_NAME}] stopping...")
         self.stop_flag.set()
         super().join()
         btul.logging.debug(f"[{LOGGER_NAME}] stopped")

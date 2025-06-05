@@ -50,7 +50,6 @@ class MetagraphObserver:
             "🚀 MetagraphObserver service starting...",
             prefix=self.settings.logging_name,
         )
-        btul.logging.debug(f"Settings: {self.settings}")
 
         try:
             while not self.should_exit.is_set():

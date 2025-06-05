@@ -36,7 +36,7 @@ from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.mock import MockDendrite, MockSubtensor
 from subvortex.core.shared.substrate import get_weights_min_stake
 from subvortex.core.core_bittensor.config.config_utils import update_config
-from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
+from subvortex.core.core_bittensor.dendrite import SubVortexDendrite, close_dendrite
 from subvortex.core.core_bittensor.subtensor import (
     get_number_of_neurons,
     get_next_block,
@@ -122,8 +122,9 @@ class Validator:
 
         # Instantiate runners
         self.step = 0
-        self.should_exit: bool = False
         self.miners: List[Miner] = []
+        self.should_exit = asyncio.Event()
+        self.run_complete = asyncio.Event()
 
     async def run(self):
         # Display the settings
@@ -233,187 +234,194 @@ class Validator:
 
         previous_last_update = 0
         current_block = 0
-        try:
-            while self.should_exit:
+        while not self.should_exit.is_set():
 
-                try:
-                    # Get the last time neurons have been updated
-                    last_updated = await self.database.get_neuron_last_updated()
-                    if last_updated == 0:
-                        btul.logging.warning(
-                            f"Could not get the neuron last updated from redis. Pleaase check your metagraph."
-                        )
-
-                    # Get min stake to set weight
-                    min_stake = get_weights_min_stake(
-                        substrate=self.subtensor.substrate
-                    )
-                    btul.logging.debug(f"Minimum stake to set weights: {min_stake}")
-
-                    # Check if the neurons have changed
-                    if previous_last_update != last_updated:
-                        btul.logging.debug(f"Neurons changed at block #{last_updated}")
-
-                        # At least one neuron has changed
-                        previous_last_update and btul.logging.debug(
-                            f"Neurons changed, rsync miners"
-                        )
-
-                        # Store the new last updated
-                        previous_last_update = last_updated
-
-                        # Get the neurons
-                        neurons = await self.database.get_neurons()
-                        btul.logging.trace(f"Neurons loaded {len(neurons)}")
-
-                        # Refresh the validator neuron
-                        self.neuron = neurons.get(self.neuron.hotkey)
-                        btul.logging.trace(
-                            f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
-                        )
-
-                        # Check registration
-                        btul.logging.debug("Checking registration...")
-                        await wait_until_registered(
-                            database=self.database,
-                            hotkey=self.wallet.hotkey.ss58_address,
-                        )
-
-                        # Get the locations
-                        locations = self.country_service.get_locations()
-                        btul.logging.debug(f"Locations loaded {len(locations)}")
-
-                        # Sync the miners
-                        self.miners = await sync_miners(
-                            settings=self.settings,
-                            database=self.database,
-                            neurons=neurons,
-                            miners=self.miners,
-                            validator=self.neuron,
-                            locations=locations,
-                            min_stake=min_stake,
-                        )
-
-                        # Save in database
-                        await self.database.update_miners(miners=self.miners)
-
-                    # Get the next block
-                    current_block = get_next_block(
-                        subtensor=self.subtensor, block=current_block
+            try:
+                # Get the last time neurons have been updated
+                last_updated = await self.database.get_neuron_last_updated()
+                if last_updated == 0:
+                    btul.logging.warning(
+                        f"Could not get the neuron last updated from redis. Pleaase check your metagraph."
                     )
 
-                    # Ensure the subvortex metagraph has been synced within its mandatory interval
-                    assert last_updated >= (
-                        current_block - self.settings.metagraph_sync_interval
-                    ), (
-                        f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
-                        f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                # Get min stake to set weight
+                min_stake = get_weights_min_stake(substrate=self.subtensor.substrate)
+                btul.logging.debug(f"Minimum stake to set weights: {min_stake}")
+
+                # Check if the neurons have changed
+                if previous_last_update != last_updated:
+                    btul.logging.debug(f"Neurons changed at block #{last_updated}")
+
+                    # At least one neuron has changed
+                    previous_last_update and btul.logging.debug(
+                        f"Neurons changed, rsync miners"
                     )
 
-                    # Run multiple forwards.
-                    coroutines = [forward(self)]
-                    await asyncio.gather(*coroutines)
+                    # Store the new last updated
+                    previous_last_update = last_updated
 
-                    # Get the next block
-                    current_block = get_next_block(
-                        subtensor=self.subtensor, block=current_block
+                    # Get the neurons
+                    neurons = await self.database.get_neurons()
+                    btul.logging.trace(f"Neurons loaded {len(neurons)}")
+
+                    # Refresh the validator neuron
+                    self.neuron = neurons.get(self.neuron.hotkey)
+                    btul.logging.trace(
+                        f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
                     )
 
-                    # Set weights if time for it and enough stake
-                    must_set_weight = should_set_weights(
+                    # Check registration
+                    btul.logging.debug("Checking registration...")
+                    await wait_until_registered(
+                        database=self.database,
+                        hotkey=self.wallet.hotkey.ss58_address,
+                    )
+
+                    # Get the locations
+                    locations = self.country_service.get_locations()
+                    btul.logging.debug(f"Locations loaded {len(locations)}")
+
+                    # Sync the miners
+                    self.miners = await sync_miners(
                         settings=self.settings,
-                        subtensor=self.subtensor,
-                        neuron=self.neuron,
-                        block=current_block,
+                        database=self.database,
+                        neurons=neurons,
+                        miners=self.miners,
+                        validator=self.neuron,
+                        locations=locations,
                         min_stake=min_stake,
                     )
-                    btul.logging.debug(
-                        f"Should set weights at block #{current_block}? -> {must_set_weight}"
+
+                    # Save in database
+                    await self.database.update_miners(miners=self.miners)
+
+                # Get the next block
+                current_block = get_next_block(
+                    subtensor=self.subtensor, block=current_block
+                )
+
+                # Ensure the subvortex metagraph has been synced within its mandatory interval
+                assert last_updated >= (
+                    current_block - self.settings.metagraph_sync_interval
+                ), (
+                    f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                    f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                )
+
+                # Run multiple forwards.
+                # coroutines = [forward(self)]
+                # await asyncio.gather(*coroutines)
+                await forward(self)
+
+                # Check if stop has been requested
+                if self.should_exit.is_set():
+                    break
+
+                # Get the next block
+                current_block = get_next_block(
+                    subtensor=self.subtensor, block=current_block
+                )
+
+                # Set weights if time for it and enough stake
+                must_set_weight = should_set_weights(
+                    settings=self.settings,
+                    subtensor=self.subtensor,
+                    neuron=self.neuron,
+                    block=current_block,
+                    min_stake=min_stake,
+                )
+                btul.logging.debug(
+                    f"Should set weights at block #{current_block}? -> {must_set_weight}"
+                )
+                if must_set_weight:
+                    # Get the number of uids
+                    number_of_neurons = get_number_of_uids(
+                        subtensor=self.subtensor, netuid=self.settings.netuid
                     )
-                    if must_set_weight:
-                        # Get the number of uids
-                        number_of_neurons = get_number_of_uids(
-                            subtensor=self.subtensor, netuid=self.settings.netuid
-                        )
 
-                        # Build the weights from the miners list
-                        weights = np.array(
-                            [
-                                get_miner_moving_score(self.miners, uid)
-                                for uid in range(number_of_neurons)
-                            ]
-                        )
-                        btul.logging.debug(f"Setting weights {weights}")
+                    # Build the weights from the miners list
+                    weights = np.array(
+                        [
+                            get_miner_moving_score(self.miners, uid)
+                            for uid in range(number_of_neurons)
+                        ]
+                    )
+                    btul.logging.debug(f"Setting weights {weights}")
 
-                        # Set weights
-                        set_weights(
-                            settings=self.settings,
-                            subtensor=self.subtensor,
-                            wallet=self.wallet,
-                            uid=self.neuron.uid,
-                            weights=weights,
-                            version=version,
-                        )
+                    # Set weights
+                    set_weights(
+                        settings=self.settings,
+                        subtensor=self.subtensor,
+                        wallet=self.wallet,
+                        uid=self.neuron.uid,
+                        weights=weights,
+                        version=version,
+                    )
 
-                    # Rollover wandb to a new run.
-                    if should_reinit_wandb(self):
-                        btul.logging.info("Reinitializing wandb")
-                        finish_wandb()
-                        init_wandb(self)
+                # Check if stop has been requested
+                if self.should_exit.is_set():
+                    break
 
-                    self.step += 1
+                # Rollover wandb to a new run.
+                if should_reinit_wandb(self):
+                    btul.logging.info("Reinitializing wandb")
+                    finish_wandb()
+                    init_wandb(self)
 
-                except AssertionError:
-                    # We already display a log, so need to do more here
-                    pass
+                self.step += 1
 
-        except Exception as ex:
-            btul.logging.error(f"Unhandled exception: {ex}")
-            btul.logging.debug(traceback.format_exc())
-            finish_wandb()
+            except AssertionError:
+                # We already display a log, so need to do more here
+                pass
 
-        # After all we have to ensure subtensor connection is closed properly
-        finally:
-            if self.file_monitor:
-                self.file_monitor.stop()
+            except Exception as ex:
+                btul.logging.error(f"Unhandled exception: {ex}")
+                btul.logging.debug(traceback.format_exc())
 
-            if hasattr(self, "subtensor"):
-                btul.logging.debug("Closing subtensor connection")
-                self.subtensor.close()
+        # Signal the neuron has finished
+        self.run_complete.set()
 
     async def _shutdown(self):
-        btul.logging.info("Shutting down miner services...")
+        btul.logging.info("Waiting validator to complete its work...")
 
-        if getattr(self, "dendrite", None):
-            self.dendrite.close_session()
-            btul.logging.debug("Dendrite stopped")
+        # Wait the neuron to stop
+        await self.run_complete.wait()
+
+        btul.logging.info("Shutting down validator...")
 
         if getattr(self, "subtensor", None):
             self.subtensor.close()
             btul.logging.debug("Subtensor stopped")
 
+        if getattr(self, "dendrite", None):
+            await close_dendrite(self.dendrite)
+
         if getattr(self, "file_monitor", None):
             self.file_monitor.stop()
 
-        btul.logging.info("Shutting down miner services completed")
+        btul.logging.info("✅ Shutting down validator completed")
 
 
 if __name__ == "__main__":
     validator = Validator()
 
-    async def main():
-        try:
-            await validator.run()
-        except asyncio.CancelledError:
-            pass
-
     async def _graceful_shutdown():
-        btul.logging.debug(
-            "🛑 Termination signal received. Shutting down gracefully..."
-        )
-        validator.should_exit = True
+        # Notify neuron to stop
+        validator.should_exit.set()
+
+        # Shutdown the neuron
         await validator._shutdown()
-        btul.logging.success("✅ Shutdown complete.")
+
+    # def setup_signal_handlers():
+    #     loop = asyncio.get_running_loop()
+    #     for sig in (signal.SIGINT, signal.SIGTERM):
+    #         loop.add_signal_handler(
+    #             sig, lambda: asyncio.create_task(_graceful_shutdown())
+    #         )
+
+    # async def runner():
+    #     setup_signal_handlers()
+    #     await validator.run()
 
     def _handle_signal(sig, frame):
         asyncio.create_task(_graceful_shutdown())
@@ -422,6 +430,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, _handle_signal)
 
     try:
-        asyncio.run(main())
+        asyncio.run(validator.run())
+
     except KeyboardInterrupt:
+        _graceful_shutdown()
         sys.exit(0)

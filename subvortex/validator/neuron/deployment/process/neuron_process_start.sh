@@ -53,7 +53,8 @@ else
     pm2 start "$SERVICE_WORKING_DIR/src/main.py" \
     --name "$SERVICE_NAME" \
     --cwd "$SERVICE_WORKING_DIR" \
-    --interpreter "$VENV_DIR/bin/python3"
+    --interpreter "$VENV_DIR/bin/python3" \
+    --kill-timeout 60000
 fi
 
 

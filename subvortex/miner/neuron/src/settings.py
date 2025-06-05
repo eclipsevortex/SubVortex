@@ -69,6 +69,11 @@ class Settings:
     Whether to save the scores returned by the forward method
     """
 
+    score_max_entries: int = 100
+    """
+    Maximum number of scores to keep (in file or Redis)
+    """
+
     score_saving_target: str = "json"
     """
     Where to save the scores — options are 'json' or 'redis'

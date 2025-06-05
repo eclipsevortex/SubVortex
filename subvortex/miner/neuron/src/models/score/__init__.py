@@ -1,4 +1,4 @@
 from .score import Score
-from .model_score_211 import ScoreModel as MinerScore211
+from .model_score_100 import ScoreModel as MinerScore100
 
-__all__ = ["Miner", "MinerScore211"]
+__all__ = ["Miner", "MinerScore100"]

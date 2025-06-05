@@ -127,7 +127,8 @@ class Miner:
         btul.logging.info(str(self.config))
 
         # Instantiate runners
-        self.should_exit: bool = False
+        self.should_exit = asyncio.Event()
+        self.run_complete = asyncio.Event()
         self.is_running: bool = False
         self.request_timestamps: typing.Dict = {}
         self.previous_last_updated = None
@@ -233,7 +234,7 @@ class Miner:
 
     async def _main_loop(self):
         must_init_subtensor = False
-        while not self.should_exit:
+        while not self.should_exit.is_set():
             try:
                 # Re-initialize the subtensor if needed
                 if must_init_subtensor:
@@ -319,6 +320,9 @@ class Miner:
                 btul.logging.error(f"Unhandled exception {type(ex)} in main loop: {ex}")
                 btul.logging.debug(traceback.format_exc())
 
+        # Signal the neuron has finished
+        self.run_complete.set()
+
     async def _retry_initialize_subtensor(self, max_attempts: int = 5):
         backoff = 2
         for attempt in range(max_attempts):
@@ -365,7 +369,10 @@ class Miner:
         btul.logging.debug("Firewall updated")
 
     async def _shutdown(self):
-        btul.logging.info("Shutting down miner services...")
+        btul.logging.info("Shutting down miner...")
+
+        # Wait the neuron to stop
+        await self.run_complete.wait()
 
         if getattr(self, "axon", None):
             self.axon.stop()
@@ -384,7 +391,7 @@ class Miner:
         if getattr(self, "file_monitor", None):
             self.file_monitor.stop()
 
-        btul.logging.info("Shutting down miner services completed")
+        btul.logging.info("Shutting down miner completed")
 
     async def _blacklist(self, synapse: Synapse) -> typing.Tuple[bool, str]:
         caller = synapse.dendrite.hotkey
@@ -478,17 +485,12 @@ class Miner:
 if __name__ == "__main__":
     miner = Miner()
 
-    async def main():
-        try:
-            await miner.run()
-        except asyncio.CancelledError:
-            pass
-
     async def _graceful_shutdown():
-        btul.logging.debug("🛑 Termination signal received. Shutting down gracefully...")
-        miner.should_exit = True
+        # Notify neuron to stop
+        miner.should_exit.set()
+
+        # Shutdown the neuron
         await miner._shutdown()
-        btul.logging.success("✅ Shutdown complete.")
 
     def _handle_signal(sig, frame):
         asyncio.create_task(_graceful_shutdown())
@@ -497,6 +499,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, _handle_signal)
 
     try:
-        asyncio.run(main())
+        asyncio.run(miner.run())
+
     except KeyboardInterrupt:
+        _graceful_shutdown()
         sys.exit(0)

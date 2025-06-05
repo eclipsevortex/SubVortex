@@ -31,30 +31,40 @@ async def save_scores(
         if settings.score_saving_target == "json":
             scores_path = f"{settings.score_saving_json_path or path}/scores.json"
 
-            # Load existing scores list if file exists and is valid
+            # Load existing scores
             if os.path.exists(scores_path):
-                with open(scores_path, "r") as f:
-                    try:
+                try:
+                    with open(scores_path, "r") as f:
                         scores = json.load(f)
                         if not isinstance(scores, list):
                             btul.logging.warning(
-                                "scores.json does not contain a list. Resetting file."
+                                "scores.json is not a list. Resetting."
                             )
                             scores = []
-                    except json.JSONDecodeError:
-                        btul.logging.warning(
-                            "scores.json is not valid JSON. Resetting file."
-                        )
-                        scores = []
+                except json.JSONDecodeError:
+                    btul.logging.warning("scores.json is invalid. Resetting.")
+                    scores = []
             else:
                 scores = []
 
+            # Append new score and trim to 100 most recent by block
             scores.append(data)
+            scores = sorted(scores, key=lambda x: x.get("block", 0), reverse=True)[
+                : settings.score_max_entries
+            ]
 
             with open(scores_path, "w") as f:
                 json.dump(scores, f, indent=2)
+
         elif settings.score_saving_target == "redis":
+            # Create the new score
             scores = Score.from_dict(data)
+
+            # Save the new score
             await database.save_scores(scores)
+
+            # Prune the old scores
+            await database.prune_scores(max_entries=settings.score_max_entries)
+            
     except Exception as e:
         btul.logging.error(f"Failed to save score: {e}")

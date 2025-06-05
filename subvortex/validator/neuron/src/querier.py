@@ -10,8 +10,8 @@ import bittensor.core.async_subtensor as btcas
 import subvortex.core.core_bittensor.config.config_utils as scccu
 from subvortex.core.querier import Querier
 
-import subvortex.miner.neuron.src.database as smnd
-import subvortex.miner.neuron.src.settings as smns
+import subvortex.validator.neuron.src.database as smnd
+import subvortex.validator.neuron.src.settings as smns
 
 # Load the environment variables for the whole process
 load_dotenv(override=True)
@@ -45,7 +45,7 @@ async def main():
         "--namespace",
         type=str,
         default=None,
-        help="Limit Redis query to specific namespaces (e.g., 'neuron'). Matches keys like s:<namespace>:*. Can be used multiple times.",
+        help="Limit Redis query to specific namespaces (e.g., 'neuron', 'score'). Matches keys like s:<namespace>:*. Can be used multiple times.",
     )
     parser.add_argument(
         "--filter",
@@ -92,6 +92,7 @@ async def main():
         # Create the contracts
         callables = {
             "neuron": database.get_neurons,
+            "miner": database.get_miners,
         }
 
         callable = callables.get(config.namespace)

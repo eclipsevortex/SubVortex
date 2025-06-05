@@ -45,7 +45,7 @@ async def main():
         "--namespace",
         type=str,
         default=None,
-        help="Limit Redis query to specific namespaces (e.g., 'neuron'). Matches keys like s:<namespace>:*. Can be used multiple times.",
+        help="Limit Redis query to specific namespaces (e.g., 'neuron', 'score'). Matches keys like s:<namespace>:*. Can be used multiple times.",
     )
     parser.add_argument(
         "--filter",
@@ -92,6 +92,7 @@ async def main():
         # Create the contracts
         callables = {
             "neuron": database.get_neurons,
+            "score": database.get_scores,
         }
 
         callable = callables.get(config.namespace)

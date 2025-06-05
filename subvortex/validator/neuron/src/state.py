@@ -18,7 +18,9 @@ import os
 import re
 import copy
 import wandb
+import signal
 import shutil
+import traceback
 import numpy as np
 import bittensor.utils.btlogging as btul
 from wandb.apis import public
@@ -33,6 +35,10 @@ from subvortex.validator.version import __version__ as THIS_VERSION
 from subvortex.validator.neuron.src.models.miner import Miner
 
 THIS_SPEC_VERSION = to_spec_version(THIS_VERSION)
+
+import os
+
+os.environ["WANDB_DEBUG"] = "true"
 
 
 def save_state(self):
@@ -229,7 +235,6 @@ def log_event(self, uids: List[int], step_length=None):
 
     try:
         miners: List[Miner] = self.miners
-        # moving_averaged_scores = self.moving_averaged_scores.tolist()
 
         # Add overview metrics
         best_miner = max(miners, key=lambda item: item.score)
@@ -310,6 +315,9 @@ def init_wandb(self):
             next_number = (int(last_number) % 10000) + 1
             name = f"validator-{self.neuron.uid}-{next_number}"
 
+        # Prevent WandB from hijacking SIGINT and SIGTERM
+        restore_signals = block_wandb_signal_handlers()
+
         # Create a new run
         wandb.init(
             anonymous="allow",
@@ -322,6 +330,9 @@ def init_wandb(self):
             tags=tags,
             name=name,
         )
+
+        # Restore your app's signal handlers
+        restore_signals()
 
         btul.logging.debug(f"[Wandb] {len(runs)} run(s) exist")
 
@@ -385,6 +396,7 @@ def init_wandb(self):
         )
     except Exception as err:
         btul.logging.warning(f"init_wandb() initialising wandb failed: {err}")
+        btul.logging.debug(traceback.format_exc())
 
 
 def should_reinit_wandb(self):
@@ -406,3 +418,25 @@ def finish_wandb():
         assert wandb.run is None
     except Exception as err:
         btul.logging.warning(f"finish_wandb() finishing wandb failed: {err}")
+
+
+def block_wandb_signal_handlers():
+    """
+    Monkey-patch signal.signal so WandB cannot register its own SIGINT/SIGTERM handlers.
+    This is the only reliable way to stop it from reacting to termination signals.
+    """
+    real_signal = signal.signal
+
+    def patched_signal(sig, handler):
+        if sig in (signal.SIGINT, signal.SIGTERM):
+            # Block WandB from setting signal handlers
+            return
+
+        return real_signal(sig, handler)
+
+    signal.signal = patched_signal
+
+    def restore():
+        signal.signal = real_signal
+
+    return restore

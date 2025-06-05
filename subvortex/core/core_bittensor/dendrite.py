@@ -15,6 +15,12 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import time
+import aiohttp
+import asyncio
+import traceback
+
+import bittensor.utils.btlogging as btul
+
 import bittensor.core.axon as btca
 import bittensor.core.dendrite as btcd
 import bittensor.core.settings as btcs
@@ -83,3 +89,72 @@ class SubVortexDendrite(btcd.Dendrite):
         synapse.dendrite.signature = f"0x{self.keypair.sign(message).hex()}"
 
         return synapse
+
+
+import asyncio
+import traceback
+import aiohttp
+
+
+async def close_dendrite(dendrite: btcd.Dendrite):
+    try:
+        session: aiohttp.ClientSession = await dendrite.session
+        connector = getattr(session, "_connector", None)
+
+        if session.closed:
+            btul.logging.debug("Session is already closed.")
+            return
+
+        # Step 1: Attempt to release all connection handlers (aggressive cleanup)
+        if connector and hasattr(connector, "_conns"):
+            try:
+                btul.logging.debug(
+                    "Releasing all idle connections from connector._conns..."
+                )
+                for key, handlers in connector._conns.items():
+                    for handler in handlers:
+                        try:
+                            transport = getattr(handler, "transport", None)
+                            if transport:
+                                transport.close()
+                        except Exception as h_ex:
+                            btul.logging.debug(
+                                f"Failed to close handler transport: {h_ex}"
+                            )
+            except Exception as ex:
+                btul.logging.warning(f"Error while releasing idle connections: {ex}")
+
+        # Step 2: Cancel any tasks using this session (helps unblock .close())
+        cancelled = 0
+        for task in asyncio.all_tasks():
+            coro = getattr(task, "_coro", None)
+            if coro and session in getattr(coro, "cr_frame", {}).f_locals.values():
+                task.cancel()
+                cancelled += 1
+        btul.logging.debug(f"Cancelled {cancelled} tasks using session.")
+
+        # Step 3: Forcibly close the connector FIRST (prevent future hangs)
+        if connector:
+            try:
+                btul.logging.debug(
+                    "Forcibly closing connector before session.close()..."
+                )
+                connector.close()
+                btul.logging.debug("Connector forcibly closed.")
+            except Exception as conn_ex:
+                btul.logging.error(f"Failed to forcibly close connector: {conn_ex}")
+
+        # Step 4: Close session with timeout — will never hang
+        try:
+            btul.logging.debug("Attempting session.close() with timeout...")
+            await session.close()
+            btul.logging.debug("Session.close() finished successfully.")
+        except asyncio.TimeoutError:
+            btul.logging.error("session.close() timed out after 3 seconds.")
+        except Exception as close_ex:
+            btul.logging.error(f"Exception during session.close(): {close_ex}")
+            btul.logging.debug(traceback.format_exc())
+
+    except Exception as ex:
+        btul.logging.error(f"Unexpected error in close_dendrite(): {ex}")
+        btul.logging.debug(traceback.format_exc())

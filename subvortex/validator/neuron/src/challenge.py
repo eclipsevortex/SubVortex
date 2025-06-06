@@ -339,13 +339,11 @@ async def challenge_data(self, block: int):
     uid_to_miner: Dict[int, Miner] = {miner.uid: miner for miner in self.miners}
 
     # Compute the scores
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Computing miners scores...")
     for idx, (uid) in enumerate(uids):
         # Get the miner
         miner: Miner = uid_to_miner[uid]
         miner_ip_occurences = ip_occurrences.get(miner.ip, 0)
-
-        btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
-        btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Country {miner.country}")
 
         # Check if the miner is suspicious
         miner.suspicious, miner.penalty_factor = is_miner_suspicious(
@@ -398,6 +396,8 @@ async def challenge_data(self, block: int):
             else miner.moving_score * miner.penalty_factor
         )
 
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Miners scores computed")
+
     # Create a sorted list of miner
     sorted_miners = sorted(
         self.miners, key=lambda m: (m.moving_score, -m.uid), reverse=True
@@ -411,6 +411,9 @@ async def challenge_data(self, block: int):
 
         # Compute the rank of the miner
         miner.rank = next((i for i, x in enumerate(sorted_miners) if x.uid == uid), -1)
+
+        # Display miner details
+        btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Country {miner.country}")
 
         # Display challenge details
         btul.logging.debug(
@@ -435,7 +438,9 @@ async def challenge_data(self, block: int):
         await self.database.update_miner(miner=miner)
 
         # Send the score details to the miner
-        miner.version = await send_scope(self, miner, miner_ip_occurences, block)
+        miner.version = await send_scope(
+            self, miner, miner_ip_occurences, block, reasons[idx]
+        )
 
     # Display step time
     forward_time = time.time() - start_time

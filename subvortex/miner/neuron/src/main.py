@@ -417,6 +417,10 @@ class Miner:
         else:
             btul.logging.debug(f"[{validator_uid}] No penalty factor")
 
+        # Display reason
+        if synapse.reason and synapse.reason.strip():
+            btul.logging.debug(f"[{validator_uid}] Reason: {synapse.reason.strip()}")
+
         # Display scores
         btul.logging.debug(
             f"[{validator_uid}] Availability score {synapse.availability}"

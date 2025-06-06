@@ -266,6 +266,7 @@ class Validator:
 
                     # Sync the miners
                     self.miners, reset_miners = await sync_miners(
+                        settings=self.settings,
                         database=self.database,
                         neurons=neurons,
                         miners=self.miners,

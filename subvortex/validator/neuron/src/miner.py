@@ -13,9 +13,11 @@ from subvortex.validator.neuron.src.score import (
 from subvortex.core.model.neuron import Neuron
 from subvortex.validator.neuron.src.models.miner import Miner
 from subvortex.validator.neuron.src.database import Database
+from subvortex.validator.neuron.src.settings import Settings
 
 
 async def sync_miners(
+    settings: Settings,
     database: Database,
     neurons: Dict[str, Neuron],
     miners: List[Miner],
@@ -28,11 +30,13 @@ async def sync_miners(
 
     # Resync the miners
     for hotkey, neuron in neurons.items():
-        if (
-            neuron.stake >= min_stake
-            or neuron.validator_trust > 0
+        is_validator = (
+            neuron.validator_trust > 0
             or neuron.uid == validator.uid
-        ):
+            or (not settings.is_test and neuron.stake >= min_stake)
+        )
+
+        if is_validator:
             # It is a validator
             continue
 
@@ -77,7 +81,11 @@ async def sync_miners(
 
             btul.logging.info(
                 f"[{current_miner.uid}] IP address changed from {current_miner.ip} to {neuron.ip}"
-                + (f" Country changed: {current_miner.country} → {neuron.country}. Miner will be reset." if has_country_changed else " Country unchanged. Miner will not be reset.")
+                + (
+                    f" Country changed: {current_miner.country} → {neuron.country}. Miner will be reset."
+                    if has_country_changed
+                    else " Country unchanged. Miner will not be reset."
+                )
             )
 
             # Reset the updated miner
@@ -89,7 +97,8 @@ async def sync_miners(
 
             # Optional: keep or remove this debug log
             btul.logging.debug(
-                f"[{current_miner.uid}] Miner reset due to IP change." + (" Country changed." if has_country_changed else "")
+                f"[{current_miner.uid}] Miner reset due to IP change."
+                + (" Country changed." if has_country_changed else "")
             )
 
         # Create an updated miner

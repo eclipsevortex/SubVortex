@@ -14,12 +14,10 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import time
 import typing
 import asyncio
 import threading
 import traceback
-import websockets
 import bittensor.core.config as btcc
 import bittensor.core.async_subtensor as btcas
 import bittensor.utils.btlogging as btul
@@ -27,6 +25,9 @@ import bittensor.utils.networking as btun
 import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
 from dotenv import load_dotenv
+
+import bittensor.core.settings as btcs
+import bittensor_wallet.utils as btwu
 
 from subvortex.core.protocol import Score
 from subvortex.core.shared.neuron import wait_until_registered
@@ -38,7 +39,7 @@ from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.metagraph import SubVortexMetagraph
 from subvortex.core.core_bittensor.axon import SubVortexAxon
 from subvortex.core.core_bittensor.synapse import Synapse
-from subvortex.core.core_bittensor.subtensor import wait_for_block
+from subvortex.core.core_bittensor.subtensor import wait_for_block, RetryAsyncSubstrate
 
 from subvortex.core.sse.sse_thread import SSEThread
 
@@ -170,9 +171,21 @@ class Miner:
         self.subtensor = (
             MockSubtensor(self.config.netuid, wallet=self.wallet)
             if self.config.miner.mock_subtensor
-            else btcas.AsyncSubtensor(config=self.config, network="local")
+            else btcas.AsyncSubtensor(
+                config=self.config, network="local", retry_forever=True
+            )
         )
-        await self._retry_initialize_subtensor()
+        # TODO: remove once OTF patched it
+        self.subtensor.substrate = RetryAsyncSubstrate(
+            url=self.subtensor.chain_endpoint,
+            ss58_format=btwu.SS58_FORMAT,
+            type_registry=btcs.TYPE_REGISTRY,
+            retry_forever=True,
+            use_remote_preset=True,
+            chain_name="Bittensor",
+            _mock=False,
+        )
+        await self.subtensor.initialize()
 
         # Initialize database
         btul.logging.info("Waiting for database readiness...")
@@ -189,7 +202,7 @@ class Miner:
         btul.logging.info(
             f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
         )
-        
+
         btul.logging.success("Initialization complete.")
 
     async def _serve(self):
@@ -244,20 +257,10 @@ class Miner:
             await self._update_firewall()
 
     async def _main_loop(self):
-        must_init_subtensor = False
         while not self.should_exit:
             try:
-                # Re-initialize the subtensor if needed
-                if must_init_subtensor:
-                    btul.logging.warning(
-                        "Reinitializing subtensor due to previous failure..."
-                    )
-                    await self._retry_initialize_subtensor()
-                    must_init_subtensor = False
-
                 # Wait for the next block
-                result = await wait_for_block(subtensor=self.subtensor)
-                if not result:
+                if not await wait_for_block(subtensor=self.subtensor):
                     continue
 
                 # Get the current block
@@ -301,36 +304,11 @@ class Miner:
                     # Update the firewall is enabled
                     self.firewall and await self._update_firewall()
 
-            except (
-                BrokenPipeError,
-                ConnectionError,
-                TimeoutError,
-                websockets.exceptions.ConnectionClosedError,
-            ) as e:
-                btul.logging.error(f"Connection issue in main loop: {e}")
-                btul.logging.debug(traceback.format_exc())
-                must_init_subtensor = True
-                await asyncio.sleep(5)
-
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception in main loop: {ex}")
                 btul.logging.debug(traceback.format_exc())
-                await asyncio.sleep(5)
 
-    async def _retry_initialize_subtensor(self, max_attempts: int = 5):
-        backoff = 2
-        for attempt in range(max_attempts):
-            try:
-                btul.logging.info(f"Initializing subtensor (attempt {attempt + 1})...")
-                await self.subtensor.initialize()
-                btul.logging.success("Subtensor initialized.")
-                return
-            except Exception as e:
-                btul.logging.error(f"Subtensor init failed: {e}")
-                await asyncio.sleep(backoff)
-                backoff = min(backoff * 2, 30)
-
-        raise RuntimeError("Failed to initialize subtensor after retries.")
+        btul.logging.debug("main loop finished")
 
     async def _update_firewall(self):
         # Get version and min stake

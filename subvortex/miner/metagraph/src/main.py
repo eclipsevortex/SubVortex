@@ -7,8 +7,11 @@ import bittensor.utils.btlogging as btul
 import bittensor.core.config as btcc
 import bittensor.core.async_subtensor as btcas
 import bittensor.core.metagraph as btcm
+import bittensor.core.settings as btcs
+import bittensor_wallet.utils as btwu
 
 import subvortex.core.core_bittensor.config.config_utils as scccu
+import subvortex.core.core_bittensor.subtensor as sccs
 import subvortex.core.metagraph.metagraph as scmm
 import subvortex.core.metagraph.database as scmms
 import subvortex.core.version as scv
@@ -73,7 +76,17 @@ async def main():
         await wait_for_database_connection(settings=settings, database=database)
 
         # Initialize the subtensor
-        subtensor = btcas.AsyncSubtensor(config=config)
+        subtensor = btcas.AsyncSubtensor(config=config, retry_forever=True)
+        # TODO: remove once OTF patched it
+        subtensor.substrate = sccs.RetryAsyncSubstrate(
+            url=subtensor.chain_endpoint,
+            ss58_format=btwu.SS58_FORMAT,
+            type_registry=btcs.TYPE_REGISTRY,
+            retry_forever=True,
+            use_remote_preset=True,
+            chain_name="Bittensor",
+            _mock=False,
+        )
         await subtensor.initialize()
         btul.logging.info(str(subtensor))
 

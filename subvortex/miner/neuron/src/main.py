@@ -14,9 +14,10 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import sys
 import typing
+import signal
 import asyncio
-import threading
 import traceback
 import bittensor.core.config as btcc
 import bittensor.core.async_subtensor as btcas
@@ -125,39 +126,29 @@ class Miner:
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
         btul.logging.info(str(self.config))
 
-        # Init the event loop.
-        self.loop = asyncio.get_event_loop()
-
         # Instantiate runners
-        self.should_exit: bool = False
-        self.is_running: bool = False
-        self.thread: threading.Thread = None
-        self.lock = asyncio.Lock()
-        self.request_timestamps: typing.Dict = {}
-        self.previous_last_updates = []
         self.previous_last_updated = None
-        self.block_queue = asyncio.Queue()
+        self.should_exit = asyncio.Event()
+        self.run_complete = asyncio.Event()
 
         self.step = 0
 
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
     async def run(self):
-        try:
-            # Display the settings
-            btul.logging.info(f"Settings: {self.settings}")
+        # Display the settings
+        btul.logging.info(f"Settings: {self.settings}")
 
-            # Show miner version
-            self.version = get_version()
-            btul.logging.debug(f"Version: {self.version}")
+        # Show miner version
+        self.version = get_version()
+        btul.logging.debug(f"Version: {self.version}")
 
-            await self._initialize()
-            await self._serve()
-            await self._main_loop()
-        except KeyboardInterrupt:
-            btul.logging.info("Keyboard interrupt detected, exiting.")
-        finally:
-            await self._shutdown()
+        await self._initialize()
+        await self._serve()
+        await self._main_loop()
+
+        # Signal the neuron has finished
+        self.run_complete.set()
 
     async def _initialize(self):
         self.wallet = (
@@ -257,7 +248,7 @@ class Miner:
             await self._update_firewall()
 
     async def _main_loop(self):
-        while not self.should_exit:
+        while not self.should_exit.is_set():
             try:
                 # Wait for the next block
                 if not await wait_for_block(subtensor=self.subtensor):
@@ -308,8 +299,6 @@ class Miner:
                 btul.logging.error(f"Unhandled exception in main loop: {ex}")
                 btul.logging.debug(traceback.format_exc())
 
-        btul.logging.debug("main loop finished")
-
     async def _update_firewall(self):
         # Get version and min stake
         version = await self.subtensor.get_hyperparameter(
@@ -341,18 +330,29 @@ class Miner:
         btul.logging.debug("Firewall updated")
 
     async def _shutdown(self):
-        btul.logging.info("Shutting down miner services...")
-        self.sse and self.sse.stop()
-        self.firewall and self.firewall.stop()
-        self.file_monitor and self.file_monitor.stop()
-        self.axon and self.axon.stop()
+        btul.logging.info("Shutting down miner...")
 
-        if not self.loop.is_closed():
-            await self.loop.shutdown_asyncgens()
-            self.loop.close()
+        # Wait the neuron to stop
+        await self.run_complete.wait()
 
-        if hasattr(self, "subtensor"):
+        if getattr(self, "axon", None):
+            self.axon.stop()
+            btul.logging.debug("Axon stopped")
+
+        if getattr(self, "subtensor", None):
             await self.subtensor.close()
+            btul.logging.debug("Subtensor stopped")
+
+        if getattr(self, "sse", None):
+            self.sse.stop()
+
+        if getattr(self, "firewall", None):
+            self.firewall.stop()
+
+        if getattr(self, "file_monitor", None):
+            self.file_monitor.stop()
+
+        btul.logging.info("Shutting down miner completed")
 
     async def _blacklist(self, synapse: Synapse) -> typing.Tuple[bool, str]:
         caller = synapse.dendrite.hotkey
@@ -420,4 +420,24 @@ class Miner:
 
 
 if __name__ == "__main__":
-    asyncio.run(Miner().run())
+    miner = Miner()
+
+    async def _graceful_shutdown():
+        # Notify neuron to stop
+        miner.should_exit.set()
+
+        # Shutdown the neuron
+        await miner._shutdown()
+
+    def _handle_signal(sig, frame):
+        asyncio.create_task(_graceful_shutdown())
+
+    signal.signal(signal.SIGINT, _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
+
+    try:
+        asyncio.run(miner.run())
+
+    except KeyboardInterrupt:
+        _graceful_shutdown()
+        sys.exit(0)

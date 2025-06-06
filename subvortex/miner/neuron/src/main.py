@@ -396,21 +396,37 @@ class Miner:
     def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
+        # Display the block of the challenge
+        btul.logging.info(f"[{validator_uid}] Challenge at block #{synapse.block}")
+
+        # Display error if there are more than 1 miner running on this machine
         if synapse.count > 1:
             btul.logging.error(
                 f"[{validator_uid}] {synapse.count} miners are running on this machine"
             )
 
-        btul.logging.info(
+        # Display the penalty factor
+        if synapse.penalty_factor:
+            btul.logging.warning(
+                f"[{validator_uid}] Penalty factor {synapse.penalty_factor}"
+            )
+        else:
+            btul.logging.debug(f"[{validator_uid}] No penalty factor")
+
+        # Display scores
+        btul.logging.debug(
             f"[{validator_uid}] Availability score {synapse.availability}"
         )
-        btul.logging.info(f"[{validator_uid}] Latency score {synapse.latency}")
-        btul.logging.info(f"[{validator_uid}] Reliability score {synapse.reliability}")
-        btul.logging.info(
+        btul.logging.debug(f"[{validator_uid}] Latency score {synapse.latency}")
+        btul.logging.debug(f"[{validator_uid}] Reliability score {synapse.reliability}")
+        btul.logging.debug(
             f"[{validator_uid}] Distribution score {synapse.distribution}"
         )
-        btul.logging.success(f"[{validator_uid}] Score {synapse.score}")
+        btul.logging.info(f"[{validator_uid}] Score {synapse.score}")
+        btul.logging.info(f"[{validator_uid}] Moving score {synapse.moving_score}")
+        btul.logging.success(f"[{validator_uid}] Rank {synapse.rank}")
 
+        # Update the version
         synapse.version = self.version
 
         return synapse

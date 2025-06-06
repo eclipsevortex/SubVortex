@@ -1,5 +1,6 @@
 from typing import List, Dict
 from collections import Counter
+from numpy.typing import NDArray
 
 import bittensor.utils.btlogging as btul
 
@@ -61,11 +62,8 @@ async def sync_miners(
                 f"[{current_miner.uid}] Hotkey change detected: old={current_miner.hotkey}, new={hotkey}. This may indicate key rotation or a new node replacing the old one."
             )
 
-            # Remove the old miner
-            await database.remove_miner(miner=current_miner)
-
             # Reset the updated miner
-            current_miner.reset()
+            current_miner.reset(reset_moving_score=True)
 
             # Add the miner in the reset list
             reset_miners.append(current_miner)
@@ -89,11 +87,7 @@ async def sync_miners(
             )
 
             # Reset the updated miner
-            current_miner.reset()
-
-            # Add to reset list only if country changed
-            if has_country_changed:
-                reset_miners.append(current_miner)
+            current_miner.reset(reset_moving_score=has_country_changed)
 
             # Optional: keep or remove this debug log
             btul.logging.debug(
@@ -155,7 +149,7 @@ async def sync_miners(
         f"✅ sync_miners complete: {len(miners_updates)} miners synced from {len(neurons)} live neurons."
     )
 
-    return miners_updates, reset_miners
+    return miners_updates
 
 
 async def reset_reliability_score(database: Database, miners: List[Miner]):
@@ -166,3 +160,19 @@ async def reset_reliability_score(database: Database, miners: List[Miner]):
         miner.challenge_successes = 0
 
     await database.update_miners(miners=miners)
+
+
+def get_miner_moving_score(miners: List[Miner], uid: int):
+    miner: Miner = next((x for x in miners if x.uid == uid), None)
+    return 0 if not miner else miner.moving_score
+
+
+def update_miners_with_moving_scores(miners: List[Miner], moving_scores: NDArray):
+    """
+    Updates each miner object with its current moving average score
+    from self.moving_averaged_scores using the miner's UID.
+    """
+    for miner in miners:
+        uid = miner.uid
+        if 0 <= uid < len(moving_scores):
+            miner.moving_score = moving_scores[uid].item()

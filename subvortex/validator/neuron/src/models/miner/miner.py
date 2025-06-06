@@ -7,6 +7,7 @@ from bittensor.core.axon import AxonInfo
 
 @dataclass
 class Miner:
+    rank: int = -1
     uid: int = -1
     coldkey: str = None
     hotkey: str = None
@@ -14,6 +15,7 @@ class Miner:
     port: int = 0
     version: str = "0.0.0"
     country: str = None
+    moving_score: float = 0
     score: float = 0
     availability_score: float = 0
     reliability_score: float = 0
@@ -61,11 +63,13 @@ class Miner:
     def to_dict(self) -> Dict[str, str]:
         return {
             "uid": self.uid,
+            "rank": self.rank,
             "hotkey": self.hotkey,
             "ip": self.ip or "0.0.0.0",
             "country": self.country or "",
             "version": self.version,
             "verified": int(self.verified),
+            "moving_score": self.moving_score,
             "score": self.score,
             "availability_score": self.availability_score,
             "latency_score": self.latency_score,
@@ -80,11 +84,13 @@ class Miner:
     def from_dict(data: Dict[str, str]) -> "Miner":
         return Miner(
             uid=int(data.get("uid", -1)),
+            rank=int(data.get("rank", -1)),
             hotkey=data.get("hotkey", None),
             ip=data.get("ip", "0.0.0.0"),
             country=data.get("country", None),
             version=data.get("version", "0.0.0"),
             verified=bool(int(data.get("verified", 0))),
+            moving_score=float(data.get("moving_score", 0)),
             score=float(data.get("score", 0)),
             availability_score=float(data.get("availability_score", 0)),
             latency_score=float(data.get("latency_score", 0)),
@@ -95,12 +101,14 @@ class Miner:
             process_time=float(data.get("process_time", 0)),
         )
 
-    def reset(self):
+    def reset(self, reset_moving_score: bool = False):
+        self.rank = -1
         self.version = "0.0.0"
         self.verified = False
         self.sync = False
         self.suspicious = False
         self.penalty_factor = None
+        self.moving_score = 0 if reset_moving_score else self.moving_score
         self.score = 0
         self.availability_score = 0
         self.reliability_score = 0

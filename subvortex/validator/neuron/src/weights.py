@@ -14,7 +14,6 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import typing
 import numpy as np
 import bittensor.core.subtensor as btcs
 import bittensor.utils.btlogging as btul
@@ -75,16 +74,16 @@ def set_weights(
     subtensor: "btcs.Subtensor",
     wallet: "btw.Wallet",
     uid: int,
-    moving_scores: "np.NDArray",
-    version: str
+    weights: "np.NDArray",
+    version: str,
 ):
     # Get the uids form teh moving scores array
-    uids = np.arange(moving_scores.shape[0])
+    uids = np.arange(weights.shape[0])
 
     # Process weights for the subnet
     uids_proceed, weights_proceed = scbs.process_weights_for_netuid(
         uids=uids,
-        weights=moving_scores,
+        weights=weights,
         netuid=settings.netuid,
         subtensor=subtensor,
     )
@@ -148,31 +147,3 @@ def set_weights(
 
         # Wait for the next block
         subtensor.wait_for_block()
-
-
-def reset_scores_for_not_serving_miners(
-    miners: typing.List[Miner],
-    moving_averaged_scores: np.ndarray,
-    reset_miners: typing.List[Miner],
-) -> np.ndarray:
-    """
-    Sets scores to zero for all miners whose IP is "0.0.0.0".
-
-    Args:
-        miners: List of Miner instances.
-        moving_averaged_scores: A NumPy array of scores indexed by UID (length 256).
-
-    Returns:
-        A new NumPy array with scores reset to 0 for bad miners.
-    """
-    updated_scores = moving_averaged_scores.copy()
-
-    uid_to_miner = {miner.uid: miner for miner in miners}
-    uid_to_reset = {miner.uid: miner for miner in reset_miners}
-
-    for uid in range(len(updated_scores)):
-        miner = uid_to_miner.get(uid)
-        if miner is None or miner.ip == "0.0.0.0" or uid_to_reset.get(uid):
-            updated_scores[uid] = 0.0
-
-    return updated_scores

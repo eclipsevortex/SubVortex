@@ -47,7 +47,7 @@ async def test_sync_miners_handle_new_miners():
     validator = fake_neuron(999, country="US")
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=1000
     )
 
@@ -93,11 +93,10 @@ async def test_sync_miners_handle_hotkey_change():
     validator = fake_neuron(999, country="US")
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=1000
     )
 
-    db.remove_miner.assert_called_once()
     assert result[0].version == "0.0.0"
     assert result[0].verified == False
     assert result[0].sync == False
@@ -143,7 +142,7 @@ async def test_sync_miners_handle_ip_change(monkeypatch):
 
     monkeypatch.setattr("bittensor.utils.btlogging.logging.info", mock_log)
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=1000
     )
 
@@ -168,25 +167,6 @@ async def test_sync_miners_handle_ip_change(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_sync_miners_resets_on_hotkey_and_ip_change():
-    db = AsyncMock()
-    neurons = {"new_hk": fake_neuron(1, hotkey="new_hk", ip="2.2.2.2")}
-    current = fake_miner(1, hotkey="old_hk", ip="1.1.1.1")
-
-    miners = [current]
-    validator = fake_neuron(999, country="US")
-    locations = ["US", "CA"]
-
-    result, reset_miners = await sync_miners(
-        Settings(), db, neurons, miners, validator, locations, min_stake=1000
-    )
-
-    db.remove_miner.assert_called_once()
-    assert result[0].hotkey == "new_hk"
-    assert result[0].ip == "2.2.2.2"
-
-
-@pytest.mark.asyncio
 async def test_sync_miners_skips_unchanged_miners():
     db = AsyncMock()
     neuron = fake_neuron(uid=1, hotkey="hk1", ip="1.2.3.4", country="US")
@@ -195,7 +175,7 @@ async def test_sync_miners_skips_unchanged_miners():
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, {"hk1": neuron}, miners, validator, locations, min_stake=1000
     )
 
@@ -252,8 +232,9 @@ async def test_sync_miners_ip_conflict_affects_all_scores():
         ) as mock_final,
     ):
 
-        result, reset_miners = await sync_miners(
-            Settings(), db,
+        result = await sync_miners(
+            Settings(),
+            db,
             {"hk1": neuron1, "hk2": neuron2},
             [miner1, miner2],
             validator,
@@ -309,7 +290,7 @@ async def test_sync_miners_removes_stale_miners():
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=1000
     )
 
@@ -326,7 +307,7 @@ async def test_sync_miners_does_not_remove_valid_miners():
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=1000
     )
 
@@ -347,7 +328,7 @@ async def test_sync_miners_removes_multiple_stale_miners():
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, stale_miners, validator, locations, min_stake=1000
     )
     assert db.remove_miner.call_count == 3
@@ -370,7 +351,7 @@ async def test_sync_miners_skips_miners_above_min_stake():
     validator.stake = 1000
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=100
     )
 
@@ -391,7 +372,7 @@ async def test_sync_miners_includes_miners_below_min_stake():
     validator.stake = 1000
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=100
     )
 
@@ -411,7 +392,7 @@ async def test_sync_miners_skips_validator_even_if_stake_below_min():
     miners = []
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=100
     )
 
@@ -421,8 +402,9 @@ async def test_sync_miners_skips_validator_even_if_stake_below_min():
 @pytest.mark.asyncio
 async def test_sync_miners_empty_inputs():
     db = AsyncMock()
-    result, reset_miners = await sync_miners(
-        Settings(), db,
+    result = await sync_miners(
+        Settings(),
+        db,
         neurons={},
         miners=[],
         validator=fake_neuron(999),
@@ -453,7 +435,7 @@ async def test_sync_miners_multiple_new_miners():
     validator = fake_neuron(999, country="US")
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, miners, validator, locations, min_stake=1000
     )
     assert len(result) == 2
@@ -468,124 +450,9 @@ async def test_sync_miners_removes_and_readds_stale_miner():
     validator = fake_neuron(uid=999, country="US")
     locations = ["US", "CA"]
 
-    result, reset_miners = await sync_miners(
+    result = await sync_miners(
         Settings(), db, neurons, [old_miner], validator, locations, min_stake=1000
     )
 
-    db.remove_miner.assert_called_once()
     assert result[0].hotkey == "new_hk"
     assert result[0].ip == "2.2.2.2"
-
-
-@pytest.mark.asyncio
-async def test_sync_miners_returns_reset_miners_on_hotkey_change():
-    db = AsyncMock()
-    neurons = {"new_hk": fake_neuron(1, hotkey="new_hk")}
-    current = fake_miner(1, hotkey="old_hk")
-    miners = [current]
-    validator = fake_neuron(999, country="US")
-    locations = ["US", "CA"]
-
-    updated_miners, reset_miners = await sync_miners(
-        Settings(), db, neurons, miners, validator, locations, min_stake=1000
-    )
-
-    assert len(updated_miners) == 1
-    assert len(reset_miners) == 1
-    assert reset_miners[0].uid == 1
-    assert reset_miners[0].hotkey == "old_hk"
-
-
-@pytest.mark.asyncio
-async def test_sync_miners_returns_reset_miners_on_ip_change_and_same_country():
-    db = AsyncMock()
-    neuron = fake_neuron(1, ip="9.9.9.9", country="US")
-    miners = [fake_miner(1, ip="1.1.1.1", country="US")]
-    neurons = {neuron.hotkey: neuron}
-    validator = fake_neuron(999, country="US")
-    locations = ["US", "CA"]
-
-    updated_miners, reset_miners = await sync_miners(
-        Settings(), db, neurons, miners, validator, locations, min_stake=1000
-    )
-
-    assert len(updated_miners) == 1
-    assert len(reset_miners) == 0
-
-
-@pytest.mark.asyncio
-async def test_sync_miners_returns_reset_miners_on_ip_change_and_different_country():
-    db = AsyncMock()
-    neuron = fake_neuron(1, ip="5.5.5.5", country="US")
-    neurons = {neuron.hotkey: neuron}
-    miner = fake_miner(1, ip="1.1.1.1", country="FR")
-    miners = [miner]
-    validator = fake_neuron(999, country="US")
-    locations = ["US", "CA"]
-
-    updated_miners, reset_miners = await sync_miners(
-        Settings(), db, neurons, miners, validator, locations, min_stake=1000
-    )
-
-    assert len(updated_miners) == 1
-    assert len(reset_miners) == 1
-    assert reset_miners[0].uid == 1
-    assert reset_miners[0].ip == "1.1.1.1"
-
-
-@pytest.mark.asyncio
-async def test_sync_miners_returns_reset_miners_on_hotkey_change():
-    db = AsyncMock()
-    neuron = fake_neuron(1, ip="1.1.1.1", hotkey="new-hk")
-    neurons = {neuron.hotkey: neuron}
-    miner = fake_miner(1, ip="1.1.1.1")
-    miners = [miner]
-    validator = fake_neuron(999, country="US")
-    locations = ["US", "CA"]
-
-    updated_miners, reset_miners = await sync_miners(
-        Settings(), db, neurons, miners, validator, locations, min_stake=1000
-    )
-
-    assert len(updated_miners) == 1
-    assert len(reset_miners) == 1
-    assert reset_miners[0].uid == 1
-    assert reset_miners[0].hotkey == "hk"
-    assert reset_miners[0].ip == "1.1.1.1"
-
-
-@pytest.mark.asyncio
-async def test_sync_miners_returns_reset_miners_on_hotkey_and_ip_change():
-    db = AsyncMock()
-    neuron = fake_neuron(1, ip="5.5.5.5", hotkey="new-hk")
-    neurons = {neuron.hotkey: neuron}
-    miner = fake_miner(1, ip="1.1.1.1")
-    miners = [miner]
-    validator = fake_neuron(999, country="US")
-    locations = ["US", "CA"]
-
-    updated_miners, reset_miners = await sync_miners(
-        Settings(), db, neurons, miners, validator, locations, min_stake=1000
-    )
-
-    assert len(updated_miners) == 1
-    assert len(reset_miners) == 1
-    assert reset_miners[0].uid == 1
-    assert reset_miners[0].hotkey == "hk"
-    assert reset_miners[0].ip == "1.1.1.1"
-
-
-@pytest.mark.asyncio
-async def test_sync_miners_no_reset_on_new_miner():
-    db = AsyncMock()
-    neurons = {"hk1": fake_neuron(1, hotkey="new-hk")}
-    miners = []
-    validator = fake_neuron(999, country="US")
-    locations = ["US", "CA"]
-
-    updated_miners, reset_miners = await sync_miners(
-        Settings(), db, neurons, miners, validator, locations, min_stake=1000
-    )
-
-    assert len(updated_miners) == 1
-    assert len(reset_miners) == 0

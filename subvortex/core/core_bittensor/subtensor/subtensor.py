@@ -446,3 +446,13 @@ def get_hyperparameter_value(subtensor: "btcs.Subtensor", param_name: str, netui
     subnet = btcc.SubnetHyperparameters.from_vec_u8(bytes_result)
     value = subnet.__dict__[param_name]
     return value
+
+
+def get_number_of_uids(subtensor: btcs.Subtensor, netuid: int):
+    result = subtensor.substrate.query(
+        module="SubtensorModule",
+        storage_function="SubnetworkN",
+        params=[netuid],
+    )
+
+    return int(result.value or 0)

@@ -183,19 +183,18 @@ def log_score(self, name: str, uids: List[int], miners: List[Miner], commit=Fals
     btul.logging.trace(f"log_score() {name} {len(data)} scores")
 
 
-def log_moving_averaged_score(
-    self, uids: List[int], moving_averaged_scores: List, commit=False
-):
+def log_moving_averaged_score(self, uids: List[int], miners: List[Miner], commit=False):
     """
     Create a graph showing the moving score for each miner over time
     """
     # Build the data for the metric
     data = {}
-    for uid, (score) in enumerate(moving_averaged_scores):
+    for miner in miners:
+        uid = miner.uid
         if uid not in uids:
             continue
 
-        data[str(uid)] = score
+        data[str(uid)] = miner.moving_score
 
     # Create the graph
     wandb.run.log({"04. Scores/moving_averaged_score": data}, commit=commit)
@@ -230,7 +229,6 @@ def log_event(self, uids: List[int], step_length=None):
 
     try:
         miners: List[Miner] = self.miners
-        moving_averaged_scores = self.moving_averaged_scores.tolist()
 
         # Add overview metrics
         best_miner = max(miners, key=lambda item: item.score)
@@ -251,7 +249,7 @@ def log_event(self, uids: List[int], step_length=None):
         log_score(self, "latency", uids, miners)
         log_score(self, "reliability", uids, miners)
         log_score(self, "distribution", uids, miners)
-        log_moving_averaged_score(self, uids, moving_averaged_scores)
+        log_moving_averaged_score(uids, miners)
 
         # Add miscellaneous
         log_completion_times(self, uids, miners, True)

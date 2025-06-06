@@ -325,9 +325,6 @@ async def challenge_data(self, block: int):
         tasks.append(asyncio.create_task(handle_challenge(self, uid, challenge)))
         reasons = await asyncio.gather(*tasks)
 
-    # Initialise the rewards object
-    rewards = np.zeros(len(uids), dtype=np.float32)
-
     btul.logging.info(f"[{CHALLENGE_NAME}] Starting evaluation")
 
     # Update moving_averaged_scores with rewards produced by this step.
@@ -387,7 +384,6 @@ async def challenge_data(self, block: int):
 
         # Compute final score
         miner.score = compute_final_score(miner)
-        rewards[idx] = miner.score
 
         # Compute moving score
         miner.moving_score = (

@@ -14,7 +14,6 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import sys
 import typing
 import signal
 import asyncio
@@ -254,6 +253,8 @@ class Miner:
                 if not await wait_for_block(subtensor=self.subtensor):
                     continue
 
+                self.subtensor.wait_for_block
+
                 # Get the current block
                 current_block = await self.subtensor.get_current_block()
                 btul.logging.debug(f"Block #{current_block}")
@@ -331,6 +332,9 @@ class Miner:
 
     async def _shutdown(self):
         btul.logging.info("Shutting down miner...")
+
+        # Notify the miner to stop
+        self.should_exit.set()
 
         # Wait the neuron to stop
         await self.run_complete.wait()
@@ -438,22 +442,25 @@ class Miner:
 if __name__ == "__main__":
     miner = Miner()
 
-    async def _graceful_shutdown():
-        # Notify neuron to stop
-        miner.should_exit.set()
-
-        # Shutdown the neuron
-        await miner._shutdown()
-
     def _handle_signal(sig, frame):
-        asyncio.create_task(_graceful_shutdown())
+        loop.call_soon_threadsafe(lambda: asyncio.create_task(miner._shutdown()))
 
+    # Create and set a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Register signal handlers (in main thread)
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
 
     try:
-        asyncio.run(miner.run())
+        # Run the miner
+        loop.run_until_complete(miner.run())
 
-    except KeyboardInterrupt:
-        _graceful_shutdown()
-        sys.exit(0)
+    except Exception as e:
+        btul.logging.error(f"Unhandled exception: {e}")
+        btul.logging.debug(traceback.format_exc())
+    finally:
+        # Cleanup async generators and close loop
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()

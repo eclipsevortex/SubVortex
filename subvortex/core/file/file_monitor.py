@@ -36,10 +36,9 @@ class FileMonitor(threading.Thread):
         self.stop_flag = threading.Event()
         self.last_error_shown = None
         self.coroutines = []
-        self.loop = asyncio.new_event_loop()
 
     def add_file_provider(self, file_provider: FileProvider):
-        task = self.loop.create_task(self._check_file(file_provider))
+        task = asyncio.create_task(self._check_file(file_provider))
         self.coroutines.append(task)
 
     async def _check_file(self, file: FileProvider):

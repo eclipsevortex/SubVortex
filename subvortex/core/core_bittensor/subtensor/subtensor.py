@@ -1,3 +1,19 @@
+# The MIT License (MIT)
+# Copyright © 2024 Eclipse Vortex
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+# the Software.
+
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 import time
 import typing
 import random
@@ -35,6 +51,7 @@ RETRYABLE_EXCEPTIONS = (
     EOFError,  # Stream ended early (common during abrupt disconnects)
     socket.gaierror,  # DNS resolution failure
     asyncio.TimeoutError,  # Node hang or await timeout
+    RuntimeError,  # Catch asyncio loop mismatch (filtered by message content)
 )
 
 
@@ -124,6 +141,10 @@ class RetryAsyncSubstrate(btcas.AsyncSubstrateInterface):
         try:
             return await method_(*args, **kwargs)
         except RETRYABLE_EXCEPTIONS as e:
+            if isinstance(e, RuntimeError) and not self._is_loop_mismatch_error(e):
+                # only retry RuntimeError if it's a loop mismatch
+                raise
+
             try:
                 await self._reinstantiate_substrate(e)
                 return await method_(*args, **kwargs)
@@ -132,6 +153,9 @@ class RetryAsyncSubstrate(btcas.AsyncSubstrateInterface):
                     f"Max retries exceeded with {self.url}. No more fallback chains."
                 )
                 raise MaxRetriesExceeded
+
+    def _is_loop_mismatch_error(self, e: Exception) -> bool:
+        return isinstance(e, RuntimeError) and "attached to a different loop" in str(e)
 
 
 def get_next_block(subtensor: btcs.Subtensor, block: int = 0):
@@ -270,6 +294,8 @@ async def wait_for_block(
                     done_event.set()
                     return True
 
+                return None
+
             async def watchdog():
                 while not done_event.is_set():
                     await asyncio.sleep(1)
@@ -300,31 +326,9 @@ async def wait_for_block(
             await subtensor.substrate._reinstantiate_substrate()
 
             if attempt > 0:
-                delay = min(subtensor.delay * (2**attempt), subtensor.max_delay)
-                await asyncio.sleep(delay)
+                await asyncio.sleep(1)
 
             attempt += 1
-
-
-# async def wait_for_block(
-#     subtensor: btcas.AsyncSubtensor, block: typing.Optional[int] = None
-# ):
-#     async def handler(block_data: dict):
-#         if block_data["header"]["number"] >= target_block:
-#             return True
-#         return None
-
-#     current_block = await subtensor.substrate.get_block()
-#     current_block_hash = current_block.get("header", {}).get("hash")
-#     if block is not None:
-#         target_block = block
-#     else:
-#         target_block = current_block["header"]["number"] + 1
-
-#     await subtensor.substrate._get_block_handler(
-#         current_block_hash, header_only=True, subscription_handler=handler
-#     )
-#     return True
 
 
 def current_block_hash(subtensor: btcs.Subtensor):

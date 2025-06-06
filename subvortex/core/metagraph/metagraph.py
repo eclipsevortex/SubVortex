@@ -32,7 +32,7 @@ class MetagraphObserver:
         self.metagraph = metagraph
 
         self.should_exit = asyncio.Event()
-        self.finished = asyncio.Event()
+        self.run_complete = asyncio.Event()
 
     async def start(self):
         """
@@ -125,7 +125,7 @@ class MetagraphObserver:
                     )
 
         finally:
-            self.finished.set()
+            self.run_complete.set()
             btul.logging.info(
                 "🛑 MetagraphObserver service exiting...",
                 prefix=self.settings.logging_name,
@@ -135,8 +135,12 @@ class MetagraphObserver:
         """
         Signals the observer to stop and waits for the loop to exit cleanly.
         """
+        # Signal the service to exit
         self.should_exit.set()
-        await self.finished.wait()
+
+        # Wait until service has finished
+        await self.run_complete.wait()
+
         btul.logging.info(
             f"✅ MetagraphObserver service stopped", prefix=self.settings.logging_name
         )

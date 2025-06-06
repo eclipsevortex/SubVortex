@@ -235,7 +235,7 @@ async def test_start_and_stop(observer):
         await asyncio.wait_for(task, timeout=1.0)
 
     # Assertions
-    assert observer.finished.is_set()
+    assert observer.run_complete.is_set()
     observer._resync.assert_called_once()
     observer._notify_if_needed.assert_called_once()
     observer._has_new_neuron_registered.assert_called_once()

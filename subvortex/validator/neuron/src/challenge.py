@@ -30,10 +30,7 @@ from subvortex.core.constants import DEFAULT_PROCESS_TIME
 from subvortex.core.protocol import Synapse
 from subvortex.validator.neuron.src.miner import Miner
 from subvortex.validator.neuron.src.synapse import send_scope
-from subvortex.validator.neuron.src.security import (
-    is_miner_suspicious,
-    deregister_suspicious_uid,
-)
+from subvortex.validator.neuron.src.security import is_miner_suspicious
 from subvortex.validator.neuron.src.selection import get_next_uids
 from subvortex.validator.neuron.src.state import log_event
 from subvortex.validator.neuron.src.score import (

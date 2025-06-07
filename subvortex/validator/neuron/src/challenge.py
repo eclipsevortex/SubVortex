@@ -334,7 +334,8 @@ async def challenge_data(self, block: int):
     for uid in uids:
         # Send the challenge to the miner
         tasks.append(asyncio.create_task(handle_challenge(self, uid, challenge)))
-        reasons, details = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
+        reasons, details = zip(*results)
 
     btul.logging.info(f"[{CHALLENGE_NAME}] Starting evaluation")
 

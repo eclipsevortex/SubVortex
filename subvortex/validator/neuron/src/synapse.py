@@ -22,7 +22,7 @@ from subvortex.core.constants import DEFAULT_PROCESS_TIME
 from subvortex.validator.neuron.src.models.miner import Miner
 
 
-async def send_scope(self, miner: Miner, ip_occurences: int, block: int, reason: str):
+async def send_scope(self, miner: Miner, ip_occurences: int, block: int, reason: str, moving_score: float):
     """
     Send the scope synapse to the miner and return the version
     """
@@ -39,7 +39,7 @@ async def send_scope(self, miner: Miner, ip_occurences: int, block: int, reason:
                 reliability=miner.reliability_score,
                 distribution=miner.distribution_score,
                 score=miner.score,
-                moving_score=miner.moving_score,
+                moving_score=moving_score,
                 penalty_factor=miner.penalty_factor if miner.suspicious else None,
                 block=block,
                 reason=reason,

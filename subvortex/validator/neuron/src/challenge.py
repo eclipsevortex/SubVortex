@@ -448,7 +448,12 @@ async def challenge_data(self, block: int):
 
         # Send the score details to the miner
         miner.version = await send_scope(
-            self, miner, miner_ip_occurences, block, reasons[idx]
+            self,
+            miner,
+            miner_ip_occurences,
+            block,
+            reasons[idx],
+            self.moving_scores[miner.uid].item(),
         )
 
     # Display step time

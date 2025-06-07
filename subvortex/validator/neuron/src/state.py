@@ -188,7 +188,7 @@ def log_score(self, name: str, uids: List[int], miners: List[Miner], commit=Fals
     btul.logging.trace(f"log_score() {name} {len(data)} scores")
 
 
-def log_moving_averaged_score(self, uids: List[int], moving_scores, commit=False):
+def log_moving_averaged_score(uids: List[int], moving_scores, commit=False):
     """
     Create a graph showing the moving score for each miner over time
     """

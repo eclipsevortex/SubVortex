@@ -150,7 +150,7 @@ async def challenge_miner(self, miner: Miner):
         verified = status_code == 200
         reason = status_message
 
-        return (verified, reason)
+        return (verified, reason, None)
     except Exception as ex:
         reason = "Unexpected exception"
         details = str(ex)

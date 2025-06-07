@@ -14,9 +14,9 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import signal
 import asyncio
 import traceback
-import numpy as np
 import bittensor.core.config as btcc
 import bittensor.core.subtensor as btcs
 import bittensor.core.metagraph as btcm
@@ -33,7 +33,7 @@ from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.mock import MockDendrite, MockSubtensor
 from subvortex.core.shared.substrate import get_weights_min_stake
 from subvortex.core.core_bittensor.config.config_utils import update_config
-from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
+from subvortex.core.core_bittensor.dendrite import SubVortexDendrite, close_dendrite
 from subvortex.core.core_bittensor.subtensor import (
     get_number_of_uids,
     get_next_block,
@@ -209,8 +209,8 @@ class Validator:
 
         previous_last_update = 0
         current_block = 0
-        try:
-            while True:
+        while not self.should_exit.is_set():
+            try:
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
                 if last_updated == 0:
@@ -247,7 +247,8 @@ class Validator:
                     # Check registration
                     btul.logging.debug("Checking registration...")
                     await wait_until_registered(
-                        database=self.database, hotkey=self.wallet.hotkey.ss58_address
+                        database=self.database,
+                        hotkey=self.wallet.hotkey.ss58_address,
                     )
 
                     # Get the locations
@@ -272,13 +273,14 @@ class Validator:
 
                     # Save state
                     save_state(
-                        path=self.config.neuron.full_path, moving_scores=self.moving_scores
+                        path=self.config.neuron.full_path,
+                        moving_scores=self.moving_scores,
                     )
                     btul.logging.trace(f"State saved")
 
                 # Get the next block
                 current_block = self.subtensor.get_current_block()
-                
+
                 # Ensure the subvortex metagraph has been synced within its mandatory interval
                 assert last_updated >= (
                     current_block - self.settings.metagraph_sync_interval
@@ -338,27 +340,63 @@ class Validator:
 
                 self.step += 1
 
-        except Exception as ex:
-            btul.logging.error(f"Unhandled exception: {ex}")
-            btul.logging.debug(traceback.format_exc())
-            finish_wandb()
+            except AssertionError:
+                # We already display a log, so need to do more here
+                pass
 
-        # After all we have to ensure subtensor connection is closed properly
-        finally:
-            if self.file_monitor:
-                self.file_monitor.stop()
+            except Exception as ex:
+                btul.logging.error(f"Unhandled exception: {ex}")
+                btul.logging.debug(traceback.format_exc())
 
-            if self.loop.is_running():
-                self.loop.stop()
+        # Finish wandb
+        finish_wandb()
 
-            if not self.loop.is_closed():
-                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-                self.loop.close()
+        # Signal the neuron has finished
+        self.run_complete.set()
 
-            if hasattr(self, "subtensor"):
-                btul.logging.debug("Closing subtensor connection")
-                self.subtensor.close()
+    async def _shutdown(self):
+        btul.logging.info("Waiting validator to complete its work...")
+
+        # Wait the neuron to stop
+        await self.run_complete.wait()
+
+        btul.logging.info("Shutting down validator...")
+
+        if getattr(self, "subtensor", None):
+            self.subtensor.close()
+            btul.logging.debug("Subtensor stopped")
+
+        if getattr(self, "dendrite", None):
+            await close_dendrite(self.dendrite)
+
+        if getattr(self, "file_monitor", None):
+            self.file_monitor.stop()
+
+        btul.logging.info("✅ Shutting down validator completed")
 
 
 if __name__ == "__main__":
-    asyncio.run(Validator().run())
+    validator = Validator()
+
+    def _handle_signal(sig, frame):
+        loop.call_soon_threadsafe(lambda: asyncio.create_task(validator._shutdown()))
+
+    # Create and set a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Register signal handlers (in main thread)
+    signal.signal(signal.SIGINT, _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
+
+    try:
+        # Run the miner
+        loop.run_until_complete(validator.run())
+
+    except Exception as e:
+        btul.logging.error(f"Unhandled exception: {e}")
+        btul.logging.debug(traceback.format_exc())
+    finally:
+        # Cleanup async generators and close loop
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()

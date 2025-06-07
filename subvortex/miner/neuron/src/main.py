@@ -307,6 +307,10 @@ class Miner:
                     f"but current block is {current_block}. Ensure your metagraph is syncing properly."
                 )
 
+            except AssertionError:
+                # We already display a log, so need to do more here
+                pass
+
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception in main loop: {ex}")
                 btul.logging.debug(traceback.format_exc())

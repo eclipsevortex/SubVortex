@@ -329,7 +329,9 @@ class Miner:
                     )
 
             except Exception as ex:
-                btul.logging.error(f"[SyncChecker] Error while checking metagraph sync: {ex}")
+                btul.logging.error(
+                    f"[SyncChecker] Error while checking metagraph sync: {ex}"
+                )
                 btul.logging.debug(traceback.format_exc())
 
     async def _update_firewall(self):
@@ -451,8 +453,9 @@ class Miner:
 
         # Display reason
         if synapse.reason and synapse.reason.strip():
+            detail = synapse.detail.strip() if synapse.detail else ""
             btul.logging.debug(
-                f"[{validator_uid}] Reason: {synapse.reason.strip()}, Detail: {synapse.detail.strip()}"
+                f"[{validator_uid}] Reason: {synapse.reason.strip()}, Detail: {detail}"
             )
 
         # Display scores

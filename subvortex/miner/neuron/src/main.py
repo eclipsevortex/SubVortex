@@ -430,7 +430,9 @@ class Miner:
 
         # Display reason
         if synapse.reason and synapse.reason.strip():
-            btul.logging.debug(f"[{validator_uid}] Reason: {synapse.reason.strip()}")
+            btul.logging.debug(
+                f"[{validator_uid}] Reason: {synapse.reason.strip()}, Detail: {synapse.detail.strip()}"
+            )
 
         # Display scores
         btul.logging.debug(

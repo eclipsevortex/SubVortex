@@ -18,7 +18,6 @@ import time
 import random
 import asyncio
 import traceback
-import numpy as np
 import bittensor.core.chain_data as btccd
 import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
@@ -135,6 +134,7 @@ async def challenge_miner(self, miner: Miner):
     """
     verified = False
     reason = None
+    details = None
 
     try:
         response = await self.dendrite(
@@ -151,10 +151,11 @@ async def challenge_miner(self, miner: Miner):
         reason = status_message
 
         return (verified, reason)
-    except Exception as e:
-        reason = f"Unexpected error occurred: {e}"
+    except Exception as ex:
+        reason = "Unexpected exception"
+        details = str(ex)
 
-    return (verified, reason)
+    return (verified, reason, details)
 
 
 def challenge_subtensor(miner: Miner, challenge):
@@ -164,6 +165,7 @@ def challenge_subtensor(miner: Miner, challenge):
     substrate = None
     verified = False
     reason = None
+    details = None
     process_time = None
 
     try:
@@ -180,9 +182,9 @@ def challenge_subtensor(miner: Miner, challenge):
                 url=f"ws://{miner.ip}:9944",
             )
 
-        except Exception:
+        except Exception as ex:
             reason = "Failed to connect to Subtensor node at the given IP."
-            return (verified, reason, process_time)
+            return (verified, reason, str(ex), process_time)
 
         # Set the socket timeout
         substrate.ws.socket.settimeout(DEFAULT_PROCESS_TIME)
@@ -202,22 +204,22 @@ def challenge_subtensor(miner: Miner, challenge):
 
             # Convert to a neuron entity
             neuron = btccd.NeuronInfoLite.from_dict(result.value)
-        except KeyError:
+        except KeyError as ex:
             reason = "Invalid netuid or uid provided."
-            return (verified, reason, process_time)
-        except ValueError:
+            return (verified, reason, str(ex), process_time)
+        except ValueError as ex:
             reason = "Invalid or unavailable block number."
-            return (verified, reason, process_time)
-        except (Exception, BaseException):
+            return (verified, reason, str(ex), process_time)
+        except (Exception, BaseException) as ex:
             reason = "Failed to retrieve neuron details."
-            return (verified, reason, process_time)
+            return (verified, reason, str(ex), process_time)
 
         # Access the specified property
         try:
             miner_value = getattr(neuron, neuron_property)
-        except AttributeError:
+        except AttributeError as ex:
             reason = "Property not found in the neuron."
-            return (verified, reason, process_time)
+            return (verified, reason, str(ex), process_time)
 
         # Compute the process time
         process_time = time.time() - start_time
@@ -225,13 +227,15 @@ def challenge_subtensor(miner: Miner, challenge):
         # Verify the challenge
         verified = expected_value == miner_value
 
-    except Exception as err:
-        reason = f"An unexpected error occurred: {str(err)}"
+    except Exception as ex:
+        reason = "Unexpected exception"
+        details = str(ex)
+
     finally:
         if substrate:
             substrate.close()
 
-    return (verified, reason, process_time)
+    return (verified, reason, details, process_time)
 
 
 async def handle_challenge(self, uid: int, challenge):
@@ -248,7 +252,7 @@ async def handle_challenge(self, uid: int, challenge):
 
     # Challenge Miner - Ping time
     btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging miner")
-    miner_verified, miner_reason = await challenge_miner(self, miner)
+    miner_verified, miner_reason, miner_details = await challenge_miner(self, miner)
     if miner_verified:
         btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
     else:
@@ -257,12 +261,12 @@ async def handle_challenge(self, uid: int, challenge):
         )
 
     # Challenge Subtensor if the miner is verified
-    subtensor_verified, subtensor_reason = (False, None)
+    subtensor_verified, subtensor_reason, subtensor_details = (False, None, None)
     if miner_verified:
         # Challenge Subtensor - Process time + check the challenge
         btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging subtensor")
-        subtensor_verified, subtensor_reason, subtensor_time = challenge_subtensor(
-            miner, challenge
+        subtensor_verified, subtensor_reason, subtensor_details, subtensor_time = (
+            challenge_subtensor(miner, challenge)
         )
         if subtensor_verified:
             btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
@@ -285,7 +289,10 @@ async def handle_challenge(self, uid: int, challenge):
     # Increment the number of successful challenge
     miner.challenge_successes = miner.challenge_successes + int(miner.verified)
 
-    return miner_reason if not miner_verified else subtensor_reason
+    reason = miner_reason if not miner_verified else subtensor_reason
+    details = miner_details if not miner_verified else subtensor_details
+
+    return reason, details
 
 
 async def challenge_data(self, block: int):
@@ -323,10 +330,11 @@ async def challenge_data(self, block: int):
     # Execute the challenges
     tasks = []
     reasons = []
+    details = []
     for uid in uids:
         # Send the challenge to the miner
         tasks.append(asyncio.create_task(handle_challenge(self, uid, challenge)))
-        reasons = await asyncio.gather(*tasks)
+        reasons, details = await asyncio.gather(*tasks)
 
     btul.logging.info(f"[{CHALLENGE_NAME}] Starting evaluation")
 
@@ -358,7 +366,7 @@ async def challenge_data(self, block: int):
         # Check if the miner/subtensor are verified
         if not miner.verified:  # or not miner.sync:
             btul.logging.warning(
-                f"[{CHALLENGE_NAME}][{miner.uid}] Not verified: {reasons[idx]}"
+                f"[{CHALLENGE_NAME}][{miner.uid}] Not verified: {reasons[idx]} - {details[idx]}"
             )
 
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
@@ -455,6 +463,7 @@ async def challenge_data(self, block: int):
             miner_ip_occurences,
             block,
             reasons[idx],
+            details[idx],
             self.moving_scores[miner.uid].item(),
         )
 

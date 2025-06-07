@@ -32,6 +32,7 @@ class Score(Synapse):
     count: typing.Optional[int] = 0
     penalty_factor: typing.Optional[float] = None
     reason: typing.Optional[str] = None
+    detail: typing.Optional[str] = None
 
     # Returns
     version: typing.Optional[str] = None

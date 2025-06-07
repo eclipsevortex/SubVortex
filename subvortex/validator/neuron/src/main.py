@@ -317,7 +317,7 @@ class Validator:
                 if must_set_weight:
                     # Get the weights
                     weights = self.moving_scores
-                    btul.logging.debug(f"Setting weights {weights}")
+                    btul.logging.debug(f"[{version}] Setting weights {weights}")
 
                     # Set weights
                     set_weights(

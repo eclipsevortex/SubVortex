@@ -277,7 +277,7 @@ class Validator:
                     btul.logging.trace(f"State saved")
 
                 # Get the next block
-                current_block = await self.subtensor.get_current_block()
+                current_block = self.subtensor.get_current_block()
                 
                 # Ensure the subvortex metagraph has been synced within its mandatory interval
                 assert last_updated >= (

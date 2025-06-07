@@ -300,8 +300,9 @@ class Miner:
                 current_block = await self.subtensor.get_current_block()
 
                 # Ensure the subvortex metagraph has been synced within its mandatory interval
+                # We add a buffer of 5 minutes to ensure metagraph has time to sync
                 assert last_updated >= (
-                    current_block - self.settings.metagraph_sync_interval
+                    current_block - (self.settings.metagraph_sync_interval + 25)
                 ), (
                     f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
                     f"but current block is {current_block}. Ensure your metagraph is syncing properly."

@@ -77,7 +77,7 @@ def set_weights(
     weights: "np.NDArray",
     version: str,
 ):
-    # Get the uids form teh moving scores array
+    # Get the uids form the moving scores array
     uids = np.arange(weights.shape[0])
 
     # Process weights for the subnet

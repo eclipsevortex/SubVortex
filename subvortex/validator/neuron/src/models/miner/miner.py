@@ -7,15 +7,14 @@ from bittensor.core.axon import AxonInfo
 
 @dataclass
 class Miner:
-    rank: int = -1
     uid: int = -1
+    rank: int = -1
     coldkey: str = None
     hotkey: str = None
     ip: str = "0.0.0.0"
     port: int = 0
     version: str = "0.0.0"
     country: str = None
-    moving_score: float = 0
     score: float = 0
     availability_score: float = 0
     reliability_score: float = 0
@@ -69,7 +68,6 @@ class Miner:
             "country": self.country or "",
             "version": self.version,
             "verified": int(self.verified),
-            "moving_score": self.moving_score,
             "score": self.score,
             "availability_score": self.availability_score,
             "latency_score": self.latency_score,
@@ -90,7 +88,6 @@ class Miner:
             country=data.get("country", None),
             version=data.get("version", "0.0.0"),
             verified=bool(int(data.get("verified", 0))),
-            moving_score=float(data.get("moving_score", 0)),
             score=float(data.get("score", 0)),
             availability_score=float(data.get("availability_score", 0)),
             latency_score=float(data.get("latency_score", 0)),
@@ -101,14 +98,13 @@ class Miner:
             process_time=float(data.get("process_time", 0)),
         )
 
-    def reset(self, reset_moving_score: bool = False):
+    def reset(self):
         self.rank = -1
         self.version = "0.0.0"
         self.verified = False
         self.sync = False
         self.suspicious = False
         self.penalty_factor = None
-        self.moving_score = 0 if reset_moving_score else self.moving_score
         self.score = 0
         self.availability_score = 0
         self.reliability_score = 0

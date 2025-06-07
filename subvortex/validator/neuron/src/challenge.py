@@ -40,6 +40,7 @@ from subvortex.validator.neuron.src.score import (
     compute_distribution_score,
     compute_final_score,
 )
+from subvortex.validator.neuron.src.state import save_state
 
 CHALLENGE_NAME = "Challenge"
 
@@ -337,6 +338,7 @@ async def challenge_data(self, block: int):
 
     # Compute the scores
     btul.logging.debug(f"[{CHALLENGE_NAME}] Computing miners scores...")
+    miners = []
     for idx, (uid) in enumerate(uids):
         # Get the miner
         miner: Miner = uid_to_miner[uid]
@@ -386,17 +388,31 @@ async def challenge_data(self, block: int):
         miner.score = compute_final_score(miner)
 
         # Compute moving score
-        miner.moving_score = (
-            alpha * miner.score + (1 - alpha) * miner.moving_score
+        self.moving_scores[uid] = (
+            alpha * miner.score + (1 - alpha) * self.moving_scores[uid]
             if not miner.suspicious
-            else miner.moving_score * miner.penalty_factor
+            else self.moving_scores[uid] * miner.penalty_factor
         )
+
+        # Add the miner to the list
+        miners.append(miner)
+
+        # Display end of computation
+        btul.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Scores computed")
 
     btul.logging.debug(f"[{CHALLENGE_NAME}] Miners scores computed")
 
+    # Save data in database
+    await self.database.update_miners(miners=miners)
+    btul.logging.trace(f"[{CHALLENGE_NAME}] Miners saved")
+
+    # Save state
+    save_state(path=self.config.neuron.full_path, weights=self.moving_scores)
+    btul.logging.trace(f"[{CHALLENGE_NAME}] State saved")
+
     # Create a sorted list of miner
     sorted_miners = sorted(
-        self.miners, key=lambda m: (m.moving_score, -m.uid), reverse=True
+        self.miners, key=lambda m: (self.moving_scores[m.uid], -m.uid), reverse=True
     )
 
     # Compute the rank, display the scores details and save in database
@@ -426,12 +442,9 @@ async def challenge_data(self, block: int):
         )
         btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Final score {miner.score}")
         btul.logging.info(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Moving score {miner.moving_score:.6f}"
+            f"[{CHALLENGE_NAME}][{miner.uid}] Moving score {self.moving_scores[uid]:.6f}"
         )
         btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Rank {miner.rank}")
-
-        # Save miner snapshot in database
-        await self.database.update_miner(miner=miner)
 
         # Send the score details to the miner
         miner.version = await send_scope(

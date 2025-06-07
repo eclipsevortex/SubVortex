@@ -14,7 +14,6 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import os
 import asyncio
 import traceback
 import numpy as np
@@ -36,7 +35,7 @@ from subvortex.core.shared.substrate import get_weights_min_stake
 from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.dendrite import SubVortexDendrite
 from subvortex.core.core_bittensor.subtensor import (
-    get_number_of_neurons,
+    get_number_of_uids,
     get_next_block,
     get_number_of_uids,
 )
@@ -48,6 +47,7 @@ from subvortex.validator.neuron.src.forward import forward
 from subvortex.validator.neuron.src.models.miner import Miner
 from subvortex.validator.neuron.src.state import (
     load_state,
+    save_state,
     init_wandb,
     finish_wandb,
     should_reinit_wandb,
@@ -57,11 +57,7 @@ from subvortex.validator.neuron.src.weights import (
 )
 from subvortex.validator.neuron.src.settings import Settings
 from subvortex.validator.neuron.src.database import Database
-from subvortex.validator.neuron.src.miner import (
-    sync_miners,
-    get_miner_moving_score,
-    update_miners_with_moving_scores,
-)
+from subvortex.validator.neuron.src.miner import sync_miners
 from subvortex.validator.neuron.src.weights import should_set_weights
 
 
@@ -154,13 +150,10 @@ class Validator:
         self.database = Database(settings=self.settings)
 
         # Get the numbers of neuron
-        self.number_of_neurons = get_number_of_neurons(
+        self.number_of_uids = get_number_of_uids(
             subtensor=self.subtensor, netuid=self.settings.netuid
         )
         btul.logging.debug(f"# of neurons: {self.number_of_neurons}")
-
-        # Init Weights.
-        self.moving_averaged_scores = np.zeros(self.number_of_neurons)
 
         # Dendrite pool for querying the network.
         btul.logging.debug("loading dendrite_pool")
@@ -207,26 +200,12 @@ class Validator:
         self.miners = (await self.database.get_miners()).values()
         btul.logging.debug(f"Miners loaded {len(self.miners)}")
 
-        # DEPRECATED: load the state
-        state_file = f"{self.config.neuron.full_path}/model.npz"
-        if os.path.exists(state_file):
-            # Load state
-            load_state(self, number_of_neurons=self.number_of_neurons)
-
-            # Update the moving score
-            update_miners_with_moving_scores(
-                miners=self.miners, moving_scores=self.moving_averaged_scores
-            )
-
-            # Save in database
-            await self.database.update_miners(miners=self.miners)
-
-            # Remove the state file
-            os.remove(state_file)
-
-        # Display moving averages
-        btul.logging.trace("loading moving_averaged_scores")
-        btul.logging.trace(str(self.moving_averaged_scores))
+        # Load state
+        self.moving_scores = load_state(
+            path=self.config.neuron.full_path,
+            number_of_neurons=self.number_of_uids,
+        )
+        btul.logging.debug(f"State loaded {self.moving_scores}")
 
         previous_last_update = 0
         current_block = 0
@@ -273,10 +252,10 @@ class Validator:
 
                     # Get the locations
                     locations = self.country_service.get_locations()
-                    btul.logging.debug(f"Locations loaded {len(locations)}")
+                    btul.logging.trace(f"Locations loaded {len(locations)}")
 
                     # Sync the miners
-                    self.miners = await sync_miners(
+                    self.miners, self.moving_scores = await sync_miners(
                         settings=self.settings,
                         database=self.database,
                         neurons=neurons,
@@ -284,10 +263,29 @@ class Validator:
                         validator=self.neuron,
                         locations=locations,
                         min_stake=min_stake,
+                        moving_scores=self.moving_scores,
                     )
 
                     # Save in database
                     await self.database.update_miners(miners=self.miners)
+                    btul.logging.trace(f"Miners saved")
+
+                    # Save state
+                    save_state(
+                        path=self.config.neuron.full_path, weights=self.moving_scores
+                    )
+                    btul.logging.trace(f"State saved")
+
+                # Get the next block
+                current_block = await self.subtensor.get_current_block()
+                
+                # Ensure the subvortex metagraph has been synced within its mandatory interval
+                assert last_updated >= (
+                    current_block - self.settings.metagraph_sync_interval
+                ), (
+                    f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                    f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                )
 
                 # Wait until next step epoch.
                 current_block = get_next_block(
@@ -314,18 +312,8 @@ class Validator:
                     f"Should set weights at block #{current_block}? -> {must_set_weight}"
                 )
                 if must_set_weight:
-                    # Get the number of uids
-                    number_of_neurons = get_number_of_uids(
-                        subtensor=self.subtensor, netuid=self.settings.netuid
-                    )
-
-                    # Build the weights from the miners list
-                    weights = np.array(
-                        [
-                            get_miner_moving_score(self.miners, uid)
-                            for uid in range(number_of_neurons)
-                        ]
-                    )
+                    # Get the weights
+                    weights = self.moving_scores
                     btul.logging.debug(f"Setting weights {weights}")
 
                     # Set weights

@@ -25,6 +25,7 @@ from wandb.apis import public
 from typing import List
 from datetime import datetime
 from collections import Counter
+from numpy.typing import NDArray
 
 from subvortex.core.constants import TESTNET_SUBNET_UID, MAIN_SUBNET_UID
 
@@ -35,27 +36,28 @@ from subvortex.validator.neuron.src.models.miner import Miner
 THIS_SPEC_VERSION = to_spec_version(THIS_VERSION)
 
 
-def save_state(self):
+def save_state(path: str, moving_scores: NDArray):
     r"""Save hotkeys, neuron model and moving average scores to filesystem."""
     btul.logging.info("save_state()")
     try:
-        neuron_state_dict = {
-            "neuron_weights": self.moving_averaged_scores,
-        }
+        # Build the state
+        state = {"neuron_weights": moving_scores}
 
-        # Save the state using numpy's .npz format
-        np.savez(f"{self.config.neuron.full_path}/model.npz", **neuron_state_dict)
-        btul.logging.success(f"Saved model {self.config.neuron.full_path}/model.npz")
+        # Save the state
+        np.savez(f"{path}/model.npz", **state)
+        btul.logging.success(f"Saved model {path}/model.npz")
     except Exception as e:
         btul.logging.warning(f"Failed to save model with error: {e}")
 
 
-def load_state(self, number_of_neurons: int):
+def load_state(path: str, number_of_uids: int):
     r"""Load hotkeys and moving average scores from filesystem."""
     btul.logging.info("load_state()")
+
+    moving_scores = np.zeros(number_of_uids)
     try:
         # Load state_dict from a .npz file
-        state_file = f"{self.config.neuron.full_path}/model.npz"
+        state_file = f"{path}/model.npz"
         if not os.path.exists(state_file):
             raise FileNotFoundError(f"{state_file} does not exist.")
 
@@ -63,19 +65,22 @@ def load_state(self, number_of_neurons: int):
         neuron_weights = state_dict["neuron_weights"]
 
         # Check to ensure that the size of the neruon weights matches the metagraph size.
-        if neuron_weights.shape != (number_of_neurons,):
+        if neuron_weights.shape != (number_of_uids,):
             btul.logging.warning(
-                f"Neuron weights shape {neuron_weights.shape} does not match metagraph n {number_of_neurons}."
+                f"Neuron weights shape {neuron_weights.shape} does not match metagraph n {number_of_uids}."
                 " Populating new moving_averaged_scores IDs with zeros."
             )
-            self.moving_averaged_scores[: len(neuron_weights)] = neuron_weights
+            moving_scores[: len(neuron_weights)] = neuron_weights
         # Check for NaNs in saved state dict
         elif not np.isnan(neuron_weights).any():
-            self.moving_averaged_scores = neuron_weights
+            moving_scores = neuron_weights
 
-        btul.logging.success(f"Reloaded model {self.config.neuron.full_path}/model.npz")
+        btul.logging.success(f"Reloaded model {path}/model.npz")
+
     except Exception as e:
         btul.logging.warning(f"Failed to load model with error: {e}")
+
+    return moving_scores
 
 
 def log_miners_table(self, miners: List[Miner], commit=False):

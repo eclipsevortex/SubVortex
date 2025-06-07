@@ -17,6 +17,11 @@ from subvortex.validator.neuron.src.database import Database
 from subvortex.validator.neuron.src.settings import Settings
 
 
+from collections import Counter
+from typing import Dict, List, Tuple
+from numpy.typing import NDArray
+
+
 async def sync_miners(
     settings: Settings,
     database: Database,
@@ -25,9 +30,9 @@ async def sync_miners(
     validator: Neuron,
     locations: List[str],
     min_stake: int,
-) -> List[Miner]:
-    miners_updates: List[Miner] = []
-    reset_miners: List[Miner] = []
+    moving_scores: NDArray,
+) -> Tuple[List[Miner], NDArray]:
+    next_miners: List[Miner] = []
 
     # Resync the miners
     for hotkey, neuron in neurons.items():
@@ -39,55 +44,71 @@ async def sync_miners(
 
         if is_validator:
             # It is a validator
+            btul.logging.debug(
+                f"[{neuron.uid}] Skipping neuron — validator status detected "
+                f"(stake: {neuron.stake}, trust: {neuron.validator_trust})"
+            )
+
+            # Reset moving score
+            moving_scores[neuron.uid] = 0
+
             continue
 
         # Get the associated miner
         current_miner = next((x for x in miners if x.uid == neuron.uid), None)
 
-        # Check if the miner is a new one (happen when there are still empty uids)
+        # Check if the miner is a new one (happens when there are still empty uids)
         if current_miner is None:
             # Create the new miner
-            current_miner = Miner.create_new_miner(
-                uid=neuron.uid,
-            )
+            current_miner = Miner.create_new_miner(uid=neuron.uid)
+
+            # Reset moving score
+            moving_scores[current_miner.uid] = 0
 
             # Log the success
             btul.logging.info(
-                f"[{current_miner.uid}] New miner discovered (hotkey: {hotkey}, country: {neuron.country}, IP: {neuron.ip}). Miner added to sync list."
+                f"[{current_miner.uid}] New miner discovered — hotkey: {hotkey}, "
+                f"country: {neuron.country}, IP: {neuron.ip}. Miner added to sync list."
             )
 
         # Check if the miner has changed its hotkey
         elif current_miner.hotkey != hotkey:
             btul.logging.info(
-                f"[{current_miner.uid}] Hotkey change detected: old={current_miner.hotkey}, new={hotkey}. This may indicate key rotation or a new node replacing the old one."
+                f"[{current_miner.uid}] Hotkey change detected — old: {current_miner.hotkey}, "
+                f"new: {hotkey}. Resetting miner state (possible key rotation or replacement)."
             )
 
             # Reset the updated miner
-            current_miner.reset(reset_moving_score=True)
+            current_miner.reset()
 
-            # Add the miner in the reset list
-            reset_miners.append(current_miner)
+            # Reset moving score
+            moving_scores[current_miner.uid] = 0
 
             # Log the success
             btul.logging.debug(
                 f"[{current_miner.uid}] Miner replaced due to hotkey change. State reset for syncing."
             )
 
-        # Check if the miner has changed its ip
+        # Check if the miner has changed its IP
         elif current_miner.ip != neuron.ip:
             has_country_changed = current_miner.country != neuron.country
 
             btul.logging.info(
-                f"[{current_miner.uid}] IP address changed from {current_miner.ip} to {neuron.ip}"
+                f"[{current_miner.uid}] IP change detected — old: {current_miner.ip}, new: {neuron.ip}. "
                 + (
-                    f" Country changed: {current_miner.country} → {neuron.country}. Miner will be reset."
+                    f"Country changed: {current_miner.country} → {neuron.country}. Miner will be reset."
                     if has_country_changed
-                    else " Country unchanged. Miner will not be reset."
+                    else "Country unchanged. Miner will not be reset."
                 )
             )
 
             # Reset the updated miner
-            current_miner.reset(reset_moving_score=has_country_changed)
+            current_miner.reset()
+
+            # Check if country has changed
+            if has_country_changed:
+                # Reset moving score
+                moving_scores[current_miner.uid] = 0
 
             # Optional: keep or remove this debug log
             btul.logging.debug(
@@ -109,26 +130,32 @@ async def sync_miners(
         miner.placeholder2 = neuron.placeholder2
 
         # Add the updated miner in the list
-        miners_updates.append(miner)
+        next_miners.append(miner)
 
     # Remove stale miners not in the updated list
-    updated_uids = {m.uid for m in miners_updates}
+    next_uids = {m.uid for m in next_miners}
     previous_uids = {m.uid for m in miners}
-    stale_uids = previous_uids - updated_uids
+    stale_uids = previous_uids - next_uids
 
     for uid in stale_uids:
         stale_miner = next((m for m in miners if m.uid == uid), None)
         if stale_miner:
             btul.logging.info(
-                f"[{stale_miner.uid}] Miner removed (hotkey: {stale_miner.hotkey}, IP: {stale_miner.ip}) — no longer eligible for sync."
+                f"[{stale_miner.uid}] Miner removed — hotkey: {stale_miner.hotkey}, "
+                f"IP: {stale_miner.ip}. No longer eligible for sync."
             )
+
+            # Remove the miner in the database
             await database.remove_miner(miner=stale_miner)
 
-    # Define the ip occurences
+            # Reset its moving score
+            moving_scores[uid] = 0
+
+    # Define the IP occurrences
     ip_occurrences = Counter(neuron.ip for neuron in neurons.values())
 
-    # Recompute the miners scores
-    for miner in miners_updates:
+    # Recompute the miners' scores
+    for miner in next_miners:
         has_ip_conflicts = ip_occurrences.get(miner.ip, 0) > 1
 
         # Recalculate scores
@@ -145,11 +172,17 @@ async def sync_miners(
         miner.distribution_score = new_distribution
         miner.score = new_score
 
+        btul.logging.debug(
+            f"[{miner.uid}] Scores updated — availability: {new_availability:.3f}, "
+            f"latency: {new_latency:.3f}, distribution: {new_distribution:.3f}, "
+            f"final score: {new_score:.3f}"
+        )
+
     btul.logging.info(
-        f"✅ sync_miners complete: {len(miners_updates)} miners synced from {len(neurons)} live neurons."
+        f"✅ sync_miners complete — {len(next_miners)} miners synced from {len(neurons)} live neurons."
     )
 
-    return miners_updates
+    return next_miners, moving_scores
 
 
 async def reset_reliability_score(database: Database, miners: List[Miner]):
@@ -160,19 +193,3 @@ async def reset_reliability_score(database: Database, miners: List[Miner]):
         miner.challenge_successes = 0
 
     await database.update_miners(miners=miners)
-
-
-def get_miner_moving_score(miners: List[Miner], uid: int):
-    miner: Miner = next((x for x in miners if x.uid == uid), None)
-    return 0 if not miner else miner.moving_score
-
-
-def update_miners_with_moving_scores(miners: List[Miner], moving_scores: NDArray):
-    """
-    Updates each miner object with its current moving average score
-    from self.moving_averaged_scores using the miner's UID.
-    """
-    for miner in miners:
-        uid = miner.uid
-        if 0 <= uid < len(moving_scores):
-            miner.moving_score = moving_scores[uid].item()

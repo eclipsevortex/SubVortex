@@ -296,6 +296,17 @@ class Miner:
                     # Update the firewall is enabled
                     self.firewall and await self._update_firewall()
 
+                # Get the next block
+                current_block = await self.subtensor.get_current_block()
+
+                # Ensure the subvortex metagraph has been synced within its mandatory interval
+                assert last_updated >= (
+                    current_block - self.settings.metagraph_sync_interval
+                ), (
+                    f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                    f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                )
+
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception in main loop: {ex}")
                 btul.logging.debug(traceback.format_exc())

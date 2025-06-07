@@ -170,9 +170,9 @@ def get_next_block(subtensor: btcs.Subtensor, block: int = 0):
     return current_block
 
 
-def get_number_of_neurons(subtensor: btcs.Subtensor, netuid: int):
+def get_number_of_uids(subtensor: btcs.Subtensor, netuid: int):
     """
-    Return the number of registration done in the current interval
+    Return the number of UIDs in the network
     """
     # Get the number of registration during the current adjustment
     number_of_neurons = subtensor.substrate.query(

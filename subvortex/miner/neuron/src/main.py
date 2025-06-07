@@ -247,9 +247,6 @@ class Miner:
             await self._update_firewall()
 
     async def _main_loop(self):
-        # Initialize the check sync task
-        asyncio.create_task(self._check_sync_periodically())
-
         while not self.should_exit.is_set():
             try:
                 # Wait for the next block
@@ -302,36 +299,20 @@ class Miner:
                 # Get the next block
                 current_block = await self.subtensor.get_current_block()
 
+                # Ensure the subvortex metagraph has been synced within its mandatory interval
+                assert last_updated >= (
+                    current_block - self.settings.metagraph_sync_interval
+                ), (
+                    f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                    f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                )
+
             except AssertionError:
                 # We already display a log, so need to do more here
                 pass
 
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception in main loop: {ex}")
-                btul.logging.debug(traceback.format_exc())
-
-    async def _check_sync_periodically(self):
-        while not self.should_exit.is_set():
-            try:
-                await asyncio.sleep(self.settings.metagraph_sync_interval)
-
-                # Get the last updated
-                last_updated = await self.database.get_neuron_last_updated()
-
-                # Get the current block
-                current_block = await self.subtensor.get_current_block()
-
-                # Check if the sync if recent
-                if last_updated < current_block - self.settings.metagraph_sync_interval:
-                    btul.logging.warning(
-                        f"⚠️ Metagraph may be out of sync! Last update at block {last_updated}, "
-                        f"current block is {current_block}."
-                    )
-
-            except Exception as ex:
-                btul.logging.error(
-                    f"[SyncChecker] Error while checking metagraph sync: {ex}"
-                )
                 btul.logging.debug(traceback.format_exc())
 
     async def _update_firewall(self):

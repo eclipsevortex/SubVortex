@@ -21,12 +21,18 @@ from subvortex.core.core_bittensor.synapse import Synapse
 
 class Score(Synapse):
     validator_uid: typing.Optional[int] = None
+    block: typing.Optional[int] = None
+    rank: typing.Optional[int] = None
     availability: float
     latency: float
     reliability: float
     distribution: float
     score: float
+    moving_score: typing.Optional[float] = 0
     count: typing.Optional[int] = 0
+    penalty_factor: typing.Optional[float] = None
+    reason: typing.Optional[str] = None
+    detail: typing.Optional[str] = None
 
     # Returns
     version: typing.Optional[str] = None

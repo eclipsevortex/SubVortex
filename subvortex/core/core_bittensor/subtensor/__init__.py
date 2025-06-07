@@ -5,9 +5,11 @@ from .subtensor import (
     wait_for_block,
     get_block_seed,
     process_weights_for_netuid,
-    get_number_of_neurons,
+    get_number_of_uids,
     get_next_block,
     get_hyperparameter_value,
+    get_number_of_uids,
+    RetryAsyncSubstrate,
 )
 
 from .subtensor_settings import Settings
@@ -20,7 +22,9 @@ __all__ = [
     "wait_for_block",
     "get_block_seed",
     "process_weights_for_netuid",
-    "get_number_of_neurons",
+    "get_number_of_uids",
     "get_next_block",
     "get_hyperparameter_value",
+    "get_number_of_uids",
+    "RetryAsyncSubstrate",
 ]

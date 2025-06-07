@@ -40,7 +40,7 @@ def test_default_settings():
     update_config(settings, config, parser)
 
     # Assert config reflects env vars
-    assert settings.logging_name == "Metagraph"
+    assert settings.logging_name == "Neuron"
     assert settings.key_prefix == "sv"
     assert settings.netuid == 7
     assert settings.database_host == "localhost"
@@ -85,7 +85,7 @@ def test_readonly_settings():
     update_config(settings, config, parser)
 
     # Assert config reflects env vars
-    assert settings.logging_name == "Metagraph"
+    assert settings.logging_name == "Neuron"
     assert settings.key_prefix == "sv"
 
 

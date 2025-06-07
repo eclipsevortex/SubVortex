@@ -79,12 +79,12 @@ async def test_notify_if_not_needed(observer):
 
 
 @pytest.mark.asyncio
-async def test_has_new_neuron_registered_same_count(observer):
+async def test_detects_first_neuron_registration(observer):
     observer.subtensor = AsyncMock()
     with (
         patch(
             "subvortex.core.core_bittensor.subtensor.get_number_of_registration",
-            return_value=5,
+            return_value=1,
         ),
         patch(
             "subvortex.core.core_bittensor.subtensor.get_next_adjustment_block",
@@ -93,20 +93,20 @@ async def test_has_new_neuron_registered_same_count(observer):
     ):
 
         # Action
-        result, count = await observer._has_new_neuron_registered(5, 99)
+        result, count = await observer._has_new_neuron_registered(0)
 
         # Assert
-        assert result is False
-        assert count == 5
+        assert result is True
+        assert count == 1
 
 
 @pytest.mark.asyncio
-async def test_has_new_neuron_registered_reset(observer):
+async def test_detects_additional_neuron_registration(observer):
     observer.subtensor = AsyncMock()
     with (
         patch(
             "subvortex.core.core_bittensor.subtensor.get_number_of_registration",
-            return_value=5,
+            return_value=3,
         ),
         patch(
             "subvortex.core.core_bittensor.subtensor.get_next_adjustment_block",
@@ -115,27 +115,43 @@ async def test_has_new_neuron_registered_reset(observer):
     ):
 
         # Action
-        result, count = await observer._has_new_neuron_registered(5, 100)
+        result, count = await observer._has_new_neuron_registered(2)
 
         # Assert
+        assert result is True
+        assert count == 3
+
+
+@pytest.mark.asyncio
+async def test_registration_reset_at_new_adjustment_block(observer):
+    """Does not detect new registration if count resets to 0 at adjustment block start."""
+    observer.subtensor = AsyncMock()
+    with (
+        patch(
+            "subvortex.core.core_bittensor.subtensor.get_number_of_registration",
+            return_value=0,
+        ),
+        patch(
+            "subvortex.core.core_bittensor.subtensor.get_next_adjustment_block",
+            return_value=101,
+        ),
+    ):
+        result, count = await observer._has_new_neuron_registered(3)
+
         assert result is False
         assert count == 0
 
 
 @pytest.mark.asyncio
-async def test_has_new_neuron_registered_new(observer):
+async def test_no_registration_yet(observer):
     observer.subtensor = AsyncMock()
     with patch(
         "subvortex.core.core_bittensor.subtensor.get_number_of_registration",
-        return_value=6,
+        return_value=0,
     ):
-
-        # Action
-        result, count = await observer._has_new_neuron_registered(5, 101)
-
-        # Assert
-        assert result is True
-        assert count == 6
+        result, count = await observer._has_new_neuron_registered(0)
+        assert result is False
+        assert count == 0
 
 
 @pytest.mark.asyncio
@@ -235,7 +251,7 @@ async def test_start_and_stop(observer):
         await asyncio.wait_for(task, timeout=1.0)
 
     # Assertions
-    assert observer.finished.is_set()
+    assert observer.run_complete.is_set()
     observer._resync.assert_called_once()
     observer._notify_if_needed.assert_called_once()
     observer._has_new_neuron_registered.assert_called_once()

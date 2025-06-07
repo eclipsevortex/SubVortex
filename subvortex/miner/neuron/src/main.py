@@ -253,8 +253,6 @@ class Miner:
                 if not await wait_for_block(subtensor=self.subtensor):
                     continue
 
-                self.subtensor.wait_for_block
-
                 # Get the current block
                 current_block = await self.subtensor.get_current_block()
                 btul.logging.debug(f"Block #{current_block}")

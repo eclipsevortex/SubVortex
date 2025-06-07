@@ -59,14 +59,13 @@ def main():
 
         rank = sorted_indices.index(args.uid)  # 0-based
         print("\n🏆 UID Ranking by Weight (Descending) + UID (Ascending on ties):")
-        print(f"{rank:>3}. UID {args.uid:>3} → Weight: {weights[args.uid]:.6f}")
+        print(f"{rank:>3}. UID {args.uid:>3} → Weight: {weights[args.uid]}")
         return
 
     # Otherwise, display all rankings
     print("\n🏆 UID Ranking by Weight (Descending) + UID (Ascending on ties):")
     for rank, uid in enumerate(sorted_indices):
-        print(f"{rank:>3}. UID {uid:>3} → Weight: {weights[uid]:.6f}")
-
+        print(f"{rank:>3}. UID {uid:>3} → Weight: {weights[uid]}")
 
 if __name__ == "__main__":
     main()

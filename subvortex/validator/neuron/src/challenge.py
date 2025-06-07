@@ -407,7 +407,7 @@ async def challenge_data(self, block: int):
     btul.logging.trace(f"[{CHALLENGE_NAME}] Miners saved")
 
     # Save state
-    save_state(path=self.config.neuron.full_path, weights=self.moving_scores)
+    save_state(path=self.config.neuron.full_path, moving_scores=self.moving_scores)
     btul.logging.trace(f"[{CHALLENGE_NAME}] State saved")
 
     # Create a sorted list of miner

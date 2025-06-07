@@ -272,7 +272,7 @@ class Validator:
 
                     # Save state
                     save_state(
-                        path=self.config.neuron.full_path, weights=self.moving_scores
+                        path=self.config.neuron.full_path, moving_scores=self.moving_scores
                     )
                     btul.logging.trace(f"State saved")
 

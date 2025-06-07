@@ -158,25 +158,50 @@ async def sync_miners(
     for miner in next_miners:
         has_ip_conflicts = ip_occurrences.get(miner.ip, 0) > 1
 
+        # Keep old values
+        old_values = {
+            "availability_score": miner.availability_score,
+            "latency_score": miner.latency_score,
+            "distribution_score": miner.distribution_score,
+            "reliability_score": miner.reliability_score,
+            "score": miner.score,
+        }
+
         # Recalculate scores
-        new_availability = compute_availability_score(miner, has_ip_conflicts)
-        new_latency = compute_latency_score(
+        miner.availability_score = compute_availability_score(miner, has_ip_conflicts)
+        miner.latency_score = compute_latency_score(
             validator.country, miner, miners, locations, has_ip_conflicts
         )
-        new_distribution = compute_distribution_score(miner, miners, ip_occurrences)
-        new_score = compute_final_score(miner)
+        miner.distribution_score = compute_distribution_score(miner, miners, ip_occurrences)
+        miner.score = compute_final_score(miner)
 
-        # Apply new scores
-        miner.availability_score = new_availability
-        miner.latency_score = new_latency
-        miner.distribution_score = new_distribution
-        miner.score = new_score
+        # Compare values and build diff log
+        updated_fields = []
+        if miner.availability_score != old_values["availability_score"]:
+            updated_fields.append(
+                f"availability: {old_values['availability_score']:.3f} → {miner.availability_score:.3f}"
+            )
+        if miner.latency_score != old_values["latency_score"]:
+            updated_fields.append(
+                f"latency: {old_values['latency_score']:.3f} → {miner.latency_score:.3f}"
+            )
+        if miner.distribution_score != old_values["distribution_score"]:
+            updated_fields.append(
+                f"distribution: {old_values['distribution_score']:.3f} → {miner.distribution_score:.3f}"
+            )
+        if miner.reliability_score != old_values["reliability_score"]:
+            updated_fields.append(
+                f"reliability: {old_values['reliability_score']:.3f} → {miner.reliability_score:.3f}"
+            )
+        if miner.score != old_values["score"]:
+            updated_fields.append(
+                f"final: {old_values['score']:.3f} → {miner.score:.3f}"
+            )
 
-        btul.logging.debug(
-            f"[{miner.uid}] Scores updated — availability: {new_availability:.3f}, "
-            f"latency: {new_latency:.3f}, distribution: {new_distribution:.3f}, "
-            f"final score: {new_score:.3f}"
-        )
+        if updated_fields:
+            btul.logging.debug(
+                f"[{miner.uid}] Scores updated — " + ", ".join(updated_fields)
+            )
 
     btul.logging.info(
         f"✅ sync_miners complete — {len(next_miners)} miners synced from {len(neurons)} live neurons."

@@ -153,7 +153,7 @@ class Validator:
         self.number_of_uids = get_number_of_uids(
             subtensor=self.subtensor, netuid=self.settings.netuid
         )
-        btul.logging.debug(f"# of neurons: {self.number_of_neurons}")
+        btul.logging.debug(f"# of neurons: {self.number_of_uids}")
 
         # Dendrite pool for querying the network.
         btul.logging.debug("loading dendrite_pool")
@@ -203,7 +203,7 @@ class Validator:
         # Load state
         self.moving_scores = load_state(
             path=self.config.neuron.full_path,
-            number_of_neurons=self.number_of_uids,
+            number_of_uids=self.number_of_uids,
         )
         btul.logging.debug(f"State loaded {self.moving_scores}")
 

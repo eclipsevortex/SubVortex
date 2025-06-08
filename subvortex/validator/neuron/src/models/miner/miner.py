@@ -79,11 +79,11 @@ class Miner:
         }
 
     @staticmethod
-    def from_dict(data: Dict[str, str]) -> "Miner":
+    def from_dict(data: Dict[str, str], hotkey: str) -> "Miner":
         return Miner(
             uid=int(data.get("uid", -1)),
             rank=int(data.get("rank", -1)),
-            hotkey=data.get("hotkey", None),
+            hotkey=data.get("hotkey", hotkey),
             ip=data.get("ip", "0.0.0.0"),
             country=data.get("country", None),
             version=data.get("version", "0.0.0"),

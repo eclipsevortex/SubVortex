@@ -1,6 +1,6 @@
 from typing import List, Dict
-from collections import Counter
 from numpy.typing import NDArray
+from collections import Counter, defaultdict
 
 import bittensor.utils.btlogging as btul
 
@@ -28,6 +28,11 @@ async def sync_miners(
 
     # Compute number of occurences per uid to detect any stale miners
     miner_counter = Counter([x.uid for x in miners])
+
+    # Build UID → hotkeys mapping for later duplication check
+    uid_to_hotkeys = defaultdict(list)
+    for miner in miners:
+        uid_to_hotkeys[miner.uid].append(miner.hotkey)
 
     # Resync the miners
     for hotkey, neuron in neurons.items():
@@ -139,17 +144,20 @@ async def sync_miners(
         if match:
             continue
 
-        btul.logging.info(
-            f"[{miner.uid}] Miner removed — hotkey: {miner.hotkey}, "
-            f"IP: {miner.ip}. No longer eligible for sync."
-        )
-
         # Remove the miner in the database
         await database.remove_miner(miner=miner)
+        is_last_with_uid = miner_counter.get(miner.uid) == 1
 
-        # Reset its moving score
-        moving_scores[miner.uid] = (
-            0 if miner_counter.get(miner.uid) == 1 else moving_scores[miner.uid]
+        if is_last_with_uid:
+            moving_scores[miner.uid] = 0
+            msg_suffix = "Moving score reset to 0."
+        else:
+            # Get all hotkeys with the same UID
+            hotkeys_with_same_uid = uid_to_hotkeys.get(miner.uid, [])
+            msg_suffix = f"Moving score preserved (UID shared by other hotkeys: {hotkeys_with_same_uid})."
+
+        btul.logging.info(
+            f"[{miner.uid}] Miner removed — hotkey: {miner.hotkey}, IP: {miner.ip}. {msg_suffix}"
         )
 
     btul.logging.info(

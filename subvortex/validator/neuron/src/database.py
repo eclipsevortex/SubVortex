@@ -4,7 +4,6 @@ import traceback
 import bittensor.utils.btlogging as btul
 
 from subvortex.core.metagraph.database import NeuronReadOnlyDatabase
-from subvortex.core.database.database_utils import decode_value
 from subvortex.validator.neuron.src.models.selection import (
     SelectionModel200,
     SelectionModel210,
@@ -248,6 +247,28 @@ class Database(NeuronReadOnlyDatabase):
                 )
                 btul.logging.debug(
                     f"[remove_miner] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                    prefix=self.settings.logging_name,
+                )
+
+        return None
+
+    async def remove_miners(self, miners: List[Miner]):
+        """
+        Remove a single miner entry from all available versions.
+        """
+        await self.ensure_connection()
+
+        for version, model in self.models["miner"].items():
+            try:
+                await model.delete_all(self.database, miners)
+
+            except Exception as ex:
+                btul.logging.error(
+                    f"[{version}] Remove miners failed: {ex}",
+                    prefix=self.settings.logging_name,
+                )
+                btul.logging.debug(
+                    f"[remove_miners] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
                     prefix=self.settings.logging_name,
                 )
 

@@ -17,6 +17,7 @@
 import signal
 import asyncio
 import traceback
+import numpy as np
 import bittensor.core.config as btcc
 import bittensor.core.subtensor as btcs
 import bittensor.core.metagraph as btcm
@@ -52,6 +53,7 @@ from subvortex.validator.neuron.src.state import (
     init_wandb,
     finish_wandb,
     should_reinit_wandb,
+    log_event,
 )
 from subvortex.validator.neuron.src.weights import (
     set_weights,
@@ -257,7 +259,7 @@ class Validator:
                     )
 
                     # Sync the miners
-                    self.miners, self.moving_scores = await sync_miners(
+                    self.miners, moving_scores = await sync_miners(
                         settings=self.settings,
                         database=self.database,
                         neurons=neurons,
@@ -270,6 +272,16 @@ class Validator:
                     # Save in database
                     await self.database.update_miners(miners=self.miners)
                     btul.logging.debug(f"Saved miners #{len(self.miners)}")
+
+                    # Log event that have been reset
+                    uids_reset = np.where(
+                        (self.moving_scores != 0) & (moving_scores == 0)
+                    )[0]
+                    log_event(self, uids_reset)
+                    btul.logging.debug(f"Uids reset {uids_reset.item()}")
+
+                    # Save the new moving scores
+                    self.moving_scores = moving_scores
 
                     # Save state
                     save_state(

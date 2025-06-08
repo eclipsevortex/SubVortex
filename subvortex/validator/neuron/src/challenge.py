@@ -313,8 +313,6 @@ async def challenge_data(self, block: int):
 
     # Select the miners
     uids = await get_next_uids(self, val_hotkey)
-    # TODO: REMOVE IT!!!!
-    uids = uids[:-1] + [60] if 60 not in uids else uids
     btul.logging.debug(f"[{CHALLENGE_NAME}] Available uids {uids}")
 
     # Get the misbehavior miners

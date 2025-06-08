@@ -31,7 +31,10 @@ import bittensor_wallet.utils as btwu
 
 from subvortex.core.protocol import Score
 from subvortex.core.shared.neuron import wait_until_registered
-from subvortex.core.shared.substrate import get_weights_min_stake_async
+from subvortex.core.shared.substrate import (
+    get_weights_min_stake_async,
+    get_owner_hotkey,
+)
 from subvortex.core.shared.mock import MockSubtensor, MockAxon
 from subvortex.core.version import get_version
 
@@ -189,7 +192,9 @@ class Miner:
         btul.logging.info(f"Loaded {len(self.neurons)} neurons from the database.")
 
         # Get the miner
-        self.neuron = self.neurons.get(self.wallet.hotkey.ss58_address, Neuron.create_empty())
+        self.neuron = self.neurons.get(
+            self.wallet.hotkey.ss58_address, Neuron.create_empty()
+        )
         btul.logging.info(
             f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
         )
@@ -276,7 +281,9 @@ class Miner:
                     )
 
                     # Get the miner
-                    self.neuron = self.neurons.get(self.wallet.hotkey.ss58_address, Neuron.create_empty())
+                    self.neuron = self.neurons.get(
+                        self.wallet.hotkey.ss58_address, Neuron.create_empty()
+                    )
                     btul.logging.info(
                         f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})"
                     )
@@ -379,6 +386,11 @@ class Miner:
         caller = synapse.dendrite.hotkey
         caller_version = synapse.dendrite.neuron_version or 0
         synapse_type = type(synapse).__name__
+
+        # Whitelist the subnet owner hotkey
+        owner_hotkey = get_owner_hotkey(self.subtensor.substrate, self.config.netuid)
+        if caller == owner_hotkey:
+            return False, "Hotkey recognized!"
 
         # Get the list of all validators
         validators = get_validators(neurons=self.neurons.values())

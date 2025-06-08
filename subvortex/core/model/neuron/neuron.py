@@ -113,7 +113,7 @@ class Neuron:
         )
 
     def create_empty() -> "Neuron":
-        return Neuron(country="GB")
+        return Neuron()
 
     def update_from_proto(self, neuron) -> None:
         """Update this instance using a cbc.NeuronInfo object."""

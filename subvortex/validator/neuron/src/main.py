@@ -241,7 +241,7 @@ class Validator:
 
                     # Get the neurons
                     neurons = await self.database.get_neurons()
-                    btul.logging.trace(f"Neurons loaded {len(neurons)}")
+                    btul.logging.debug(f"Neurons loaded {len(neurons)}")
 
                     # Refresh the validator neuron
                     self.neuron = neurons.get(self.neuron.hotkey)
@@ -269,14 +269,13 @@ class Validator:
 
                     # Save in database
                     await self.database.update_miners(miners=self.miners)
-                    btul.logging.trace(f"Miners saved")
+                    btul.logging.debug(f"Saved miners #{len(self.miners)}")
 
                     # Save state
                     save_state(
                         path=self.config.neuron.full_path,
                         moving_scores=self.moving_scores,
                     )
-                    btul.logging.trace(f"State saved")
 
                 # Get the next block
                 current_block = self.subtensor.get_current_block()

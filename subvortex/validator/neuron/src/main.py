@@ -266,7 +266,7 @@ class Validator:
                         miners=self.miners,
                         validator=self.neuron,
                         min_stake=min_stake,
-                        moving_scores=self.moving_scores,
+                        moving_scores=self.moving_scores.copy(),
                     )
 
                     # Log event that have been reset if there are any

@@ -248,7 +248,7 @@ async def get_axons(
 async def wait_for_block(
     subtensor: btcas.AsyncSubtensor,
     block: typing.Optional[int] = None,
-    timeout: int = 60,
+    timeout: int = 24, # Avg time of 2 blocks (1 block == 12 seconds)
 ):
     """
     Waits until the blockchain reaches the specified block number.
@@ -326,7 +326,8 @@ async def wait_for_block(
             await subtensor.substrate._reinstantiate_substrate()
 
             if attempt > 0:
-                await asyncio.sleep(1)
+                # Wait avg time of a block
+                await asyncio.sleep(12)
 
             attempt += 1
 

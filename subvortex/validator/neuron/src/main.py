@@ -269,14 +269,22 @@ class Validator:
                         moving_scores=self.moving_scores.copy(),
                     )
 
-                    # Log event that have been reset if there are any
-                    uids_reset = np.flatnonzero((self.moving_scores != 0) & (moving_scores == 0))
-                    if uids_reset.size > 0:
-                        log_event(self, uids_reset)
-                        btul.logging.debug(f"UIDs reset: {uids_reset.tolist()}")
+                    # Build the list of uids reset
+                    uids_reset = np.flatnonzero(
+                        (self.moving_scores != 0) & (moving_scores == 0)
+                    )
 
                     # Save the new moving scores
                     self.moving_scores = moving_scores
+
+                    # Save in database
+                    await self.database.update_miners(miners=self.miners)
+                    btul.logging.debug(f"Saved miners #{len(self.miners)}")
+
+                    # Log event that have been reset if there are any
+                    if uids_reset.size > 0:
+                        log_event(self, uids_reset)
+                        btul.logging.debug(f"UIDs reset: {uids_reset.tolist()}")
 
                     # Save in database
                     await self.database.update_miners(miners=self.miners)

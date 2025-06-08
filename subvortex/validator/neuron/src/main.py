@@ -284,7 +284,19 @@ class Validator:
                     # Log event that have been reset if there are any
                     if uids_reset.size > 0:
                         log_event(self, uids_reset)
-                        btul.logging.debug(f"UIDs reset: {uids_reset.tolist()}")
+
+                        reset_info = []
+                        for uid in uids_reset:
+                            miner = next((m for m in self.miners if m.uid == uid), None)
+                            if miner:
+                                score = self.moving_scores[uid]
+                                reset_info.append(
+                                    f"UID {uid} → Miner {miner}, Score: {score:.4f}"
+                                )
+                            else:
+                                reset_info.append(f"UID {uid} → Miner not found")
+
+                        btul.logging.debug(f"UIDs reset:\n" + "\n".join(reset_info))
 
                     # Save in database
                     await self.database.update_miners(miners=self.miners)

@@ -34,6 +34,9 @@ def should_set_weights(
     block: int,
     min_stake: int,
 ):
+    if settings.dry_run:
+        return
+
     has_enough_stake = neuron.stake >= min_stake
     if has_enough_stake == False:
         btul.logging.warning(

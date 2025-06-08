@@ -50,6 +50,11 @@ class Settings:
     Number of attempts to set weights on the chain
     """
 
+    dry_run: bool = False
+    """
+    If True, simulates the operation without executing it on-chain.
+    """
+
     @property
     def is_test(self):
         return self.netuid == 92

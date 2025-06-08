@@ -32,6 +32,7 @@ from subvortex.core.file.file_monitor import FileMonitor
 from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.mock import MockDendrite, MockSubtensor
 from subvortex.core.shared.substrate import get_weights_min_stake
+from subvortex.core.model.neuron.neuron import Neuron
 from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.dendrite import SubVortexDendrite, close_dendrite
 from subvortex.core.core_bittensor.subtensor import (
@@ -186,7 +187,7 @@ class Validator:
         self.country_service.wait()
 
         # Get the neuron
-        self.neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
+        self.neuron = (await self.database.get_neuron(self.wallet.hotkey.ss58_address)) or Neuron.create_empty()
         btul.logging.info(
             f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
         )
@@ -239,17 +240,18 @@ class Validator:
                     btul.logging.trace(f"Neurons loaded {len(neurons)}")
 
                     # Refresh the validator neuron
-                    self.neuron = neurons.get(self.neuron.hotkey)
+                    self.neuron = neurons.get(self.neuron.hotkey, Neuron.create_empty())
                     btul.logging.trace(
                         f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
                     )
 
-                    # Check registration
-                    btul.logging.debug("Checking registration...")
-                    await wait_until_registered(
-                        database=self.database,
-                        hotkey=self.wallet.hotkey.ss58_address,
-                    )
+                    if not self.settings.dry_run:
+                        # Check registration
+                        btul.logging.debug("Checking registration...")
+                        await wait_until_registered(
+                            database=self.database,
+                            hotkey=self.wallet.hotkey.ss58_address,
+                        )
 
                     # Get the locations
                     locations = self.country_service.get_locations()

@@ -48,6 +48,11 @@ class Settings:
     Password of the redis instance
     """
 
+    dry_run: bool = False
+    """
+    If True, simulates the operation without executing it on-chain.
+    """
+
     @classmethod
     def create(cls) -> "Settings":
         return scsu.create_settings_instance(cls)

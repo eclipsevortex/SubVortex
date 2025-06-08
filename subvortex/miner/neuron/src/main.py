@@ -40,7 +40,7 @@ from subvortex.core.core_bittensor.metagraph import SubVortexMetagraph
 from subvortex.core.core_bittensor.axon import SubVortexAxon
 from subvortex.core.core_bittensor.synapse import Synapse
 from subvortex.core.core_bittensor.subtensor import wait_for_block, RetryAsyncSubstrate
-
+from subvortex.core.model.neuron.neuron import Neuron
 from subvortex.core.sse.sse_thread import SSEThread
 
 from subvortex.core.file.file_monitor import FileMonitor
@@ -158,11 +158,12 @@ class Miner:
         self.wallet.create_if_non_existent()
         btul.logging.info(f"Wallet initialized: {self.wallet}")
 
+        network = "finney" if self.settings.dry_run else "local"
         self.subtensor = (
             MockSubtensor(self.config.netuid, wallet=self.wallet)
             if self.config.miner.mock_subtensor
             else btcas.AsyncSubtensor(
-                config=self.config, network="local", retry_forever=True
+                config=self.config, network=network, retry_forever=True
             )
         )
         # TODO: remove once OTF patched it
@@ -188,7 +189,7 @@ class Miner:
         btul.logging.info(f"Loaded {len(self.neurons)} neurons from the database.")
 
         # Get the miner
-        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
+        self.neuron = self.neurons.get(self.wallet.hotkey.ss58_address, Neuron.create_empty())
         btul.logging.info(
             f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
         )
@@ -238,9 +239,10 @@ class Miner:
         )
         self.axon.attach(forward_fn=self._score, blacklist_fn=self._blacklist_score)
 
-        # Start the axon
-        await self.subtensor.serve_axon(netuid=self.config.netuid, axon=self.axon)
-        self.axon.start()
+        if not self.settings.dry_run:
+            # Start the axon
+            await self.subtensor.serve_axon(netuid=self.config.netuid, axon=self.axon)
+            self.axon.start()
 
         # Update the firewall if enable
         if self.firewall:
@@ -274,22 +276,23 @@ class Miner:
                     )
 
                     # Get the miner
-                    self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
+                    self.neuron = self.neurons.get(self.wallet.hotkey.ss58_address, Neuron.create_empty())
                     btul.logging.info(
                         f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})"
                     )
 
-                    # Wait until there is only one neuron for the current ip
-                    # Ensure we have only one ip per miner
-                    await wait_until_no_multiple_occurrences(
-                        self.database, self.neuron.ip
-                    )
+                    if not self.settings.dry_run:
+                        # Wait until there is only one neuron for the current ip
+                        # Ensure we have only one ip per miner
+                        await wait_until_no_multiple_occurrences(
+                            self.database, self.neuron.ip
+                        )
 
-                    # Wait until the miner is registered
-                    # Ensure the miner is registered
-                    await wait_until_registered(
-                        self.database, self.wallet.hotkey.ss58_address
-                    )
+                        # Wait until the miner is registered
+                        # Ensure the miner is registered
+                        await wait_until_registered(
+                            self.database, self.wallet.hotkey.ss58_address
+                        )
 
                     # Update the firewall is enabled
                     self.firewall and await self._update_firewall()

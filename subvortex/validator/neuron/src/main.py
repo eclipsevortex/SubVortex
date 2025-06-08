@@ -187,10 +187,14 @@ class Validator:
         self.country_service.wait()
 
         # Get the neuron
-        self.neuron = (await self.database.get_neuron(self.wallet.hotkey.ss58_address)) or Neuron.create_empty()
+        self.neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
         btul.logging.info(
             f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
         )
+
+        # Get the country
+        self.country = self.country_service.get_country(self.dendrite.external_ip)
+        btul.logging.debug(f"Validator based in {self.country}")
 
         # Init wandb.
         if not self.config.wandb.off:
@@ -240,22 +244,17 @@ class Validator:
                     btul.logging.trace(f"Neurons loaded {len(neurons)}")
 
                     # Refresh the validator neuron
-                    self.neuron = neurons.get(self.neuron.hotkey, Neuron.create_empty())
+                    self.neuron = neurons.get(self.neuron.hotkey)
                     btul.logging.trace(
                         f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
                     )
 
-                    if not self.settings.dry_run:
-                        # Check registration
-                        btul.logging.debug("Checking registration...")
-                        await wait_until_registered(
-                            database=self.database,
-                            hotkey=self.wallet.hotkey.ss58_address,
-                        )
-
-                    # Get the locations
-                    locations = self.country_service.get_locations()
-                    btul.logging.trace(f"Locations loaded {len(locations)}")
+                    # Check registration
+                    btul.logging.debug("Checking registration...")
+                    await wait_until_registered(
+                        database=self.database,
+                        hotkey=self.wallet.hotkey.ss58_address,
+                    )
 
                     # Sync the miners
                     self.miners, self.moving_scores = await sync_miners(
@@ -264,7 +263,6 @@ class Validator:
                         neurons=neurons,
                         miners=self.miners,
                         validator=self.neuron,
-                        locations=locations,
                         min_stake=min_stake,
                         moving_scores=self.moving_scores,
                     )

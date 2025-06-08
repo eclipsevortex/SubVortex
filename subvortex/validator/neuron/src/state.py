@@ -270,7 +270,7 @@ def init_wandb(self):
             THIS_VERSION,
             str(THIS_SPEC_VERSION),
             f"netuid_{self.settings.netuid}",
-            self.neuron.country,
+            self.country,
         ]
 
         if self.config.mock:

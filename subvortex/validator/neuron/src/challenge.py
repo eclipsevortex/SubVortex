@@ -380,7 +380,7 @@ async def challenge_data(self, block: int):
 
         # Compute score for latency
         miner.latency_score = compute_latency_score(
-            self.neuron.country, miner, self.miners, locations, has_ip_conflicts
+            self.country, miner, self.miners, locations, has_ip_conflicts
         )
 
         # Compute score for reliability

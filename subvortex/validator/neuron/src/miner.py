@@ -4,13 +4,6 @@ from numpy.typing import NDArray
 
 import bittensor.utils.btlogging as btul
 
-from subvortex.validator.neuron.src.score import (
-    compute_distribution_score,
-    compute_availability_score,
-    compute_latency_score,
-    compute_final_score,
-)
-
 from subvortex.core.model.neuron import Neuron
 from subvortex.validator.neuron.src.models.miner import Miner
 from subvortex.validator.neuron.src.database import Database
@@ -28,11 +21,13 @@ async def sync_miners(
     neurons: Dict[str, Neuron],
     miners: List[Miner],
     validator: Neuron,
-    locations: List[str],
     min_stake: int,
     moving_scores: NDArray,
 ) -> Tuple[List[Miner], NDArray]:
     next_miners: List[Miner] = []
+
+    # Compute number of occurences per uid to detect any stale miners
+    miner_counter = Counter([x.uid for x in miners])
 
     # Resync the miners
     for hotkey, neuron in neurons.items():
@@ -44,7 +39,7 @@ async def sync_miners(
 
         if is_validator:
             # It is a validator
-            btul.logging.debug(
+            btul.logging.trace(
                 f"[{neuron.uid}] Skipping neuron — validator status detected "
                 f"(stake: {neuron.stake}, trust: {neuron.validator_trust})"
             )
@@ -55,7 +50,10 @@ async def sync_miners(
             continue
 
         # Get the associated miner
-        current_miner = next((x for x in miners if x.uid == neuron.uid), None)
+        current_miner = next(
+            (x for x in miners if x.uid == neuron.uid or x.hotkey == neuron.hotkey),
+            None,
+        )
 
         # Check if the miner is a new one (happens when there are still empty uids)
         if current_miner is None:
@@ -133,75 +131,26 @@ async def sync_miners(
         next_miners.append(miner)
 
     # Remove stale miners not in the updated list
-    next_uids = {m.uid for m in next_miners}
-    previous_uids = {m.uid for m in miners}
-    stale_uids = previous_uids - next_uids
-
-    for uid in stale_uids:
-        stale_miner = next((m for m in miners if m.uid == uid), None)
-        if stale_miner:
-            btul.logging.info(
-                f"[{stale_miner.uid}] Miner removed — hotkey: {stale_miner.hotkey}, "
-                f"IP: {stale_miner.ip}. No longer eligible for sync."
-            )
-
-            # Remove the miner in the database
-            await database.remove_miner(miner=stale_miner)
-
-            # Reset its moving score
-            moving_scores[uid] = 0
-
-    # Define the IP occurrences
-    ip_occurrences = Counter(neuron.ip for neuron in neurons.values())
-
-    # Recompute the miners' scores
-    for miner in next_miners:
-        has_ip_conflicts = ip_occurrences.get(miner.ip, 0) > 1
-
-        # Keep old values
-        old_values = {
-            "availability_score": miner.availability_score,
-            "latency_score": miner.latency_score,
-            "distribution_score": miner.distribution_score,
-            "reliability_score": miner.reliability_score,
-            "score": miner.score,
-        }
-
-        # Recalculate scores
-        miner.availability_score = compute_availability_score(miner, has_ip_conflicts)
-        miner.latency_score = compute_latency_score(
-            validator.country, miner, miners, locations, has_ip_conflicts
+    for miner in miners:
+        match = next(
+            (m for m in next_miners if m.uid == miner.uid and m.hotkey == miner.hotkey),
+            None,
         )
-        miner.distribution_score = compute_distribution_score(miner, miners, ip_occurrences)
-        miner.score = compute_final_score(miner)
+        if match:
+            continue
 
-        # Compare values and build diff log
-        updated_fields = []
-        if miner.availability_score != old_values["availability_score"]:
-            updated_fields.append(
-                f"availability: {old_values['availability_score']:.3f} → {miner.availability_score:.3f}"
-            )
-        if miner.latency_score != old_values["latency_score"]:
-            updated_fields.append(
-                f"latency: {old_values['latency_score']:.3f} → {miner.latency_score:.3f}"
-            )
-        if miner.distribution_score != old_values["distribution_score"]:
-            updated_fields.append(
-                f"distribution: {old_values['distribution_score']:.3f} → {miner.distribution_score:.3f}"
-            )
-        if miner.reliability_score != old_values["reliability_score"]:
-            updated_fields.append(
-                f"reliability: {old_values['reliability_score']:.3f} → {miner.reliability_score:.3f}"
-            )
-        if miner.score != old_values["score"]:
-            updated_fields.append(
-                f"final: {old_values['score']:.3f} → {miner.score:.3f}"
-            )
+        btul.logging.info(
+            f"[{miner.uid}] Miner removed — hotkey: {miner.hotkey}, "
+            f"IP: {miner.ip}. No longer eligible for sync."
+        )
 
-        if updated_fields:
-            btul.logging.debug(
-                f"[{miner.uid}] Scores updated — " + ", ".join(updated_fields)
-            )
+        # Remove the miner in the database
+        await database.remove_miner(miner=miner)
+
+        # Reset its moving score
+        moving_scores[miner.uid] = (
+            0 if miner_counter.get(miner.uid) == 1 else moving_scores[miner.uid]
+        )
 
     btul.logging.info(
         f"✅ sync_miners complete — {len(next_miners)} miners synced from {len(neurons)} live neurons."

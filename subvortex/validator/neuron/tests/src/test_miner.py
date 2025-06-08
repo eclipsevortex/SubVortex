@@ -12,12 +12,6 @@ from subvortex.core.model.neuron import Neuron
 from subvortex.validator.neuron.src.settings import Settings
 
 
-LOCATIONS = {
-    "US": {"country": "United States", "latitude": 37.09024, "longitude": -95.712891},
-    "CA": {"country": "Canada", "latitude": 56.130366, "longitude": -106.346771},
-}
-
-
 def fake_neuron(
     uid: int,
     hotkey: str = "hk",
@@ -55,6 +49,7 @@ async def test_sync_miners_on_new_miners(monkeypatch):
     validator = fake_neuron(999, country="US")
 
     logs = []
+
     def mock_log(msg):
         logs.append(msg)
 
@@ -66,7 +61,6 @@ async def test_sync_miners_on_new_miners(monkeypatch):
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=moving_scores,
     )
@@ -110,6 +104,7 @@ async def test_sync_miners_multiple_new_miners(monkeypatch):
     moving_scores = np.ones(256)
 
     logs = []
+
     def mock_log(msg):
         logs.append(msg)
 
@@ -121,7 +116,6 @@ async def test_sync_miners_multiple_new_miners(monkeypatch):
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=moving_scores,
     )
@@ -182,6 +176,7 @@ async def test_sync_miners_on_hotkey_change(monkeypatch):
     moving_scores = np.ones(256)
 
     logs = []
+
     def mock_log(msg):
         logs.append(msg)
 
@@ -193,13 +188,12 @@ async def test_sync_miners_on_hotkey_change(monkeypatch):
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=moving_scores,
     )
 
     assert any("Hotkey change detected" in log for log in logs)
-    db.remove_miner.assert_not_called()
+    db.remove_miner.assert_called_once_with(miner=miner)
     assert result_miners[0].rank == -1
     assert result_miners[0].version == "0.0.0"
     assert result_miners[0].verified == False
@@ -255,7 +249,6 @@ async def test_sync_miners_on_ip_change_with_same_country(monkeypatch):
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=moving_scores,
     )
@@ -320,7 +313,6 @@ async def test_sync_miners_on_ip_and_country_change(monkeypatch):
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=moving_scores,
     )
@@ -378,7 +370,6 @@ async def test_sync_miners_skips_unchanged_miners():
         {"hk1": neuron},
         miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=moving_scores,
     )
@@ -407,71 +398,6 @@ async def test_sync_miners_skips_unchanged_miners():
 
 
 @pytest.mark.asyncio
-async def test_sync_miners_ip_conflict_affects_all_scores():
-    db = AsyncMock()
-
-    neuron1 = fake_neuron(uid=1, hotkey="hk1", ip="1.1.1.1")
-    neuron2 = fake_neuron(uid=2, hotkey="hk2", ip="1.1.1.2")
-
-    miner1 = fake_miner(uid=1, hotkey="hk1", ip="1.1.1.3")
-    miner2 = fake_miner(uid=2, hotkey="hk2", ip="1.1.1.4")
-
-    validator = fake_neuron(uid=999, country="US")
-
-    with (
-        patch(
-            "subvortex.validator.neuron.src.miner.compute_availability_score",
-            side_effect=[0.11, 0.11],
-        ) as mock_avail,
-        patch(
-            "subvortex.validator.neuron.src.miner.compute_latency_score",
-            side_effect=[0.22, 0.22],
-        ) as mock_latency,
-        patch(
-            "subvortex.validator.neuron.src.miner.compute_distribution_score",
-            side_effect=[0.33, 0.33],
-        ) as mock_dist,
-        patch(
-            "subvortex.validator.neuron.src.miner.compute_final_score",
-            side_effect=[0.44, 0.44],
-        ) as mock_final,
-    ):
-
-        result, _ = await sync_miners(
-            Settings(),
-            db,
-            {"hk1": neuron1, "hk2": neuron2},
-            [miner1, miner2],
-            validator,
-            LOCATIONS,
-            min_stake=1000,
-            moving_scores=np.ones(256),
-        )
-
-        assert result[0].ip == "1.1.1.1"
-        assert result[1].ip == "1.1.1.2"
-
-        # Check each score explicitly
-        assert result[0].availability_score == 0.11
-        assert result[1].availability_score == 0.11
-
-        assert result[0].latency_score == 0.22
-        assert result[1].latency_score == 0.22
-
-        assert result[0].distribution_score == 0.33
-        assert result[1].distribution_score == 0.33
-
-        assert result[0].score == 0.44
-        assert result[1].score == 0.44
-
-        # Ensure the scoring functions were called with conflict
-        mock_avail.assert_called()
-        mock_latency.assert_called()
-        mock_dist.assert_called()
-        mock_final.assert_called()
-
-
-@pytest.mark.asyncio
 async def test_sync_miners_removes_stale_miners():
     db = AsyncMock()
     neuron = fake_neuron(uid=1, hotkey="hk1")
@@ -486,7 +412,6 @@ async def test_sync_miners_removes_stale_miners():
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=moving_scores,
     )
@@ -517,7 +442,6 @@ async def test_sync_miners_removes_multiple_stale_miners():
         neurons,
         stale_miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=moving_scores,
     )
@@ -546,7 +470,6 @@ async def test_sync_miners_does_not_remove_valid_miners():
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=1000,
         moving_scores=np.ones(256),
     )
@@ -576,7 +499,6 @@ async def test_sync_miners_skips_neuron_above_min_stake():
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=100,
         moving_scores=moving_scores,
     )
@@ -606,7 +528,6 @@ async def test_sync_miners_skips_neuron_with_validator_trust():
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=100,
         moving_scores=moving_scores,
     )
@@ -633,7 +554,6 @@ async def test_sync_miners_skips_neuron_being_the_current_validator():
         neurons,
         miners,
         neuron,
-        LOCATIONS,
         min_stake=100,
         moving_scores=moving_scores,
     )
@@ -663,7 +583,6 @@ async def test_sync_miners_includes_neuron_not_considered_a_validator():
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=100,
         moving_scores=moving_scores,
     )
@@ -684,7 +603,6 @@ async def test_sync_miners_empty_inputs():
         neurons={},
         miners=[],
         validator=fake_neuron(999),
-        locations=[],
         min_stake=1000,
         moving_scores=moving_scores,
     )
@@ -713,7 +631,6 @@ async def test_sync_miners_respects_is_test_flag():
         neurons,
         miners,
         validator,
-        LOCATIONS,
         min_stake=100_000,
         moving_scores=np.ones(256),
     )

@@ -35,7 +35,7 @@ def should_set_weights(
     min_stake: int,
 ):
     if settings.dry_run:
-        return
+        return False
 
     has_enough_stake = neuron.stake >= min_stake
     if has_enough_stake == False:

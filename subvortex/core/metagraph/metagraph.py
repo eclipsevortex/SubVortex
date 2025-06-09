@@ -70,11 +70,7 @@ class MetagraphObserver:
                     )
 
                     # Detect if any neuron IP has changed
-                    has_axons_changed, new_axons = (
-                        await self._has_neuron_ip_changed(axons)
-                        if axons
-                        else (False, {})
-                    )
+                    has_axons_changed, new_axons = await self._has_neuron_ip_changed(axons)
 
                     # Determine whether a resync is needed
                     time_to_resync = block - last_synced_block >= sync_interval
@@ -111,8 +107,14 @@ class MetagraphObserver:
 
                     # Sync from chain and update Redis
                     axons, has_missing_country = await self._resync()
+
+                    # Store the sync block 
                     last_synced_block = block
+
+                    # Notify listener the metagraph is ready
                     ready = await self._notify_if_needed(ready)
+
+                    # Store the new axons
                     axons = new_axons
 
                 except Exception as e:
@@ -352,9 +354,6 @@ class MetagraphObserver:
     async def _has_neuron_ip_changed(
         self, axons: dict[str, str]
     ) -> tuple[bool, dict[str, str]]:
-        if not axons:
-            return False, {}
-
         latest_axons = await scbs.get_axons(
             subtensor=self.subtensor,
             netuid=self.settings.netuid,
@@ -377,12 +376,8 @@ class MetagraphObserver:
                 f"📈 {len(changed_axons)} neurons with changed IPs: {list(changed_axons.keys())}",
                 prefix=self.settings.logging_name,
             )
-            return True, changed_axons
+            return True, latest_axons
 
-        btul.logging.debug(
-            "✅ No IP changes detected among tracked axons",
-            prefix=self.settings.logging_name,
-        )
         return False, latest_axons
 
     def _get_details_changed(self, new_neuron, current_neuron):

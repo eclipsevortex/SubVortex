@@ -60,6 +60,7 @@ from subvortex.miner.neuron.src.config import (
 from subvortex.miner.neuron.src.utils import load_request_log
 from subvortex.miner.neuron.src.settings import Settings
 from subvortex.miner.neuron.src.database import Database
+from subvortex.miner.neuron.src.score import save_scores
 from subvortex.miner.neuron.src.neuron import (
     wait_until_no_multiple_occurrences,
     get_validators,
@@ -426,7 +427,7 @@ class Miner:
         btul.logging.trace(f"Not Blacklisting recognized hotkey {caller}")
         return False, "Hotkey recognized!"
 
-    def _score(self, synapse: Score) -> Score:
+    async def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
         # Display the block of the challenge
@@ -468,6 +469,14 @@ class Miner:
 
         # Update the version
         synapse.version = self.version
+
+        # Save the scores
+        await save_scores(
+            settings=self.settings,
+            database=self.database,
+            synapse=synapse,
+            path=self.config.miner.full_path,
+        )
 
         return synapse
 

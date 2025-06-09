@@ -1,9 +1,9 @@
 {
   "id": "miner-redis",
   "name": "subvortex-miner-redis",
-  "version": "3.1.4",
-  "miner.version": "3.1.4",
-  "miner.redis.version": "3.1.4",
+  "version": "3.1.5-alpha.2",
+  "miner.version": "3.1.5-alpha.2",
+  "miner.redis.version": "3.1.5-alpha.2",
   "migration_type": "redis",
   "migration": "./migrations/versions",
   "depends_on": []

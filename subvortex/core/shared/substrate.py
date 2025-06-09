@@ -52,10 +52,21 @@ async def get_weights_min_stake_async(substrate: AsyncSubstrateInterface):
     )
 
     weight_min_stake = result.value if result is not None else 0
-    btul.logging.debug(f"get_weights_min_stake() {weight_min_stake}")
 
     # Convert Rao to Tao
     return int(float(weight_min_stake) * 10**-9)
+
+
+async def get_owner_hotkey(substrate: AsyncSubstrateInterface, netuid: int):
+    """
+    Return the hotkey of the subnet owner
+    """
+    # WeightsMinStake has been renamed StakeThreshold
+    result = await substrate.query(
+        module="SubtensorModule", storage_function="SubnetOwnerHotkey", params=[netuid]
+    )
+
+    return result.value
 
 
 def get_weights_min_stake(substrate: SubstrateInterface):

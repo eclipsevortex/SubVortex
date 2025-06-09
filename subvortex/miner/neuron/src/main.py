@@ -14,12 +14,10 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import time
 import typing
+import signal
 import asyncio
-import threading
 import traceback
-import websockets
 import bittensor.core.config as btcc
 import bittensor.core.async_subtensor as btcas
 import bittensor.utils.btlogging as btul
@@ -28,9 +26,15 @@ import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
 from dotenv import load_dotenv
 
+import bittensor.core.settings as btcs
+import bittensor_wallet.utils as btwu
+
 from subvortex.core.protocol import Score
 from subvortex.core.shared.neuron import wait_until_registered
-from subvortex.core.shared.substrate import get_weights_min_stake_async
+from subvortex.core.shared.substrate import (
+    get_weights_min_stake_async,
+    get_owner_hotkey,
+)
 from subvortex.core.shared.mock import MockSubtensor, MockAxon
 from subvortex.core.version import get_version
 
@@ -38,8 +42,8 @@ from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.metagraph import SubVortexMetagraph
 from subvortex.core.core_bittensor.axon import SubVortexAxon
 from subvortex.core.core_bittensor.synapse import Synapse
-from subvortex.core.core_bittensor.subtensor import wait_for_block
-
+from subvortex.core.core_bittensor.subtensor import wait_for_block, RetryAsyncSubstrate
+from subvortex.core.model.neuron.neuron import Neuron
 from subvortex.core.sse.sse_thread import SSEThread
 
 from subvortex.core.file.file_monitor import FileMonitor
@@ -124,39 +128,29 @@ class Miner:
         btul.logging._stream_formatter.set_trace(self.config.logging.trace)
         btul.logging.info(str(self.config))
 
-        # Init the event loop.
-        self.loop = asyncio.get_event_loop()
-
         # Instantiate runners
-        self.should_exit: bool = False
-        self.is_running: bool = False
-        self.thread: threading.Thread = None
-        self.lock = asyncio.Lock()
-        self.request_timestamps: typing.Dict = {}
-        self.previous_last_updates = []
         self.previous_last_updated = None
-        self.block_queue = asyncio.Queue()
+        self.should_exit = asyncio.Event()
+        self.run_complete = asyncio.Event()
 
         self.step = 0
 
         self.request_log = load_request_log(self.config.miner.request_log_path)
 
     async def run(self):
-        try:
-            # Display the settings
-            btul.logging.info(f"Settings: {self.settings}")
+        # Display the settings
+        btul.logging.info(f"Settings: {self.settings}")
 
-            # Show miner version
-            self.version = get_version()
-            btul.logging.debug(f"Version: {self.version}")
+        # Show miner version
+        self.version = get_version()
+        btul.logging.debug(f"Version: {self.version}")
 
-            await self._initialize()
-            await self._serve()
-            await self._main_loop()
-        except KeyboardInterrupt:
-            btul.logging.info("Keyboard interrupt detected, exiting.")
-        finally:
-            await self._shutdown()
+        await self._initialize()
+        await self._serve()
+        await self._main_loop()
+
+        # Signal the neuron has finished
+        self.run_complete.set()
 
     async def _initialize(self):
         self.wallet = (
@@ -167,12 +161,25 @@ class Miner:
         self.wallet.create_if_non_existent()
         btul.logging.info(f"Wallet initialized: {self.wallet}")
 
+        network = "finney" if self.settings.dry_run else "local"
         self.subtensor = (
             MockSubtensor(self.config.netuid, wallet=self.wallet)
             if self.config.miner.mock_subtensor
-            else btcas.AsyncSubtensor(config=self.config, network="local")
+            else btcas.AsyncSubtensor(
+                config=self.config, network=network, retry_forever=True
+            )
         )
-        await self._retry_initialize_subtensor()
+        # TODO: remove once OTF patched it
+        self.subtensor.substrate = RetryAsyncSubstrate(
+            url=self.subtensor.chain_endpoint,
+            ss58_format=btwu.SS58_FORMAT,
+            type_registry=btcs.TYPE_REGISTRY,
+            retry_forever=True,
+            use_remote_preset=True,
+            chain_name="Bittensor",
+            _mock=False,
+        )
+        await self.subtensor.initialize()
 
         # Initialize database
         btul.logging.info("Waiting for database readiness...")
@@ -185,11 +192,13 @@ class Miner:
         btul.logging.info(f"Loaded {len(self.neurons)} neurons from the database.")
 
         # Get the miner
-        self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
+        self.neuron = self.neurons.get(
+            self.wallet.hotkey.ss58_address, Neuron.create_empty()
+        )
         btul.logging.info(
             f"Neuron details — Hotkey: {self.neuron.hotkey}, UID: {self.neuron.uid}, IP: {self.neuron.ip}"
         )
-        
+
         btul.logging.success("Initialization complete.")
 
     async def _serve(self):
@@ -235,29 +244,20 @@ class Miner:
         )
         self.axon.attach(forward_fn=self._score, blacklist_fn=self._blacklist_score)
 
-        # Start the axon
-        await self.subtensor.serve_axon(netuid=self.config.netuid, axon=self.axon)
-        self.axon.start()
+        if not self.settings.dry_run:
+            # Start the axon
+            await self.subtensor.serve_axon(netuid=self.config.netuid, axon=self.axon)
+            self.axon.start()
 
         # Update the firewall if enable
         if self.firewall:
             await self._update_firewall()
 
     async def _main_loop(self):
-        must_init_subtensor = False
-        while not self.should_exit:
+        while not self.should_exit.is_set():
             try:
-                # Re-initialize the subtensor if needed
-                if must_init_subtensor:
-                    btul.logging.warning(
-                        "Reinitializing subtensor due to previous failure..."
-                    )
-                    await self._retry_initialize_subtensor()
-                    must_init_subtensor = False
-
                 # Wait for the next block
-                result = await wait_for_block(subtensor=self.subtensor)
-                if not result:
+                if not await wait_for_block(subtensor=self.subtensor):
                     continue
 
                 # Get the current block
@@ -281,56 +281,48 @@ class Miner:
                     )
 
                     # Get the miner
-                    self.neuron = self.neurons[self.wallet.hotkey.ss58_address]
+                    self.neuron = self.neurons.get(
+                        self.wallet.hotkey.ss58_address, Neuron.create_empty()
+                    )
                     btul.logging.info(
                         f"Local miner neuron: {self.neuron.hotkey} (UID: {self.neuron.uid}, IP: {self.neuron.ip})"
                     )
 
-                    # Wait until there is only one neuron for the current ip
-                    # Ensure we have only one ip per miner
-                    await wait_until_no_multiple_occurrences(
-                        self.database, self.neuron.ip
-                    )
+                    if not self.settings.dry_run:
+                        # Wait until there is only one neuron for the current ip
+                        # Ensure we have only one ip per miner
+                        await wait_until_no_multiple_occurrences(
+                            self.database, self.neuron.ip
+                        )
 
-                    # Wait until the miner is registered
-                    # Ensure the miner is registered
-                    await wait_until_registered(
-                        self.database, self.wallet.hotkey.ss58_address
-                    )
+                        # Wait until the miner is registered
+                        # Ensure the miner is registered
+                        await wait_until_registered(
+                            self.database, self.wallet.hotkey.ss58_address
+                        )
 
                     # Update the firewall is enabled
                     self.firewall and await self._update_firewall()
 
-            except (
-                BrokenPipeError,
-                ConnectionError,
-                TimeoutError,
-                websockets.exceptions.ConnectionClosedError,
-            ) as e:
-                btul.logging.error(f"Connection issue in main loop: {e}")
-                btul.logging.debug(traceback.format_exc())
-                must_init_subtensor = True
-                await asyncio.sleep(5)
+                # Get the next block
+                current_block = await self.subtensor.get_current_block()
+
+                # Ensure the subvortex metagraph has been synced within its mandatory interval
+                # We add a buffer of 5 minutes to ensure metagraph has time to sync
+                assert last_updated >= (
+                    current_block - (self.settings.metagraph_sync_interval + 25)
+                ), (
+                    f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                    f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                )
+
+            except AssertionError:
+                # We already display a log, so need to do more here
+                pass
 
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception in main loop: {ex}")
                 btul.logging.debug(traceback.format_exc())
-                await asyncio.sleep(5)
-
-    async def _retry_initialize_subtensor(self, max_attempts: int = 5):
-        backoff = 2
-        for attempt in range(max_attempts):
-            try:
-                btul.logging.info(f"Initializing subtensor (attempt {attempt + 1})...")
-                await self.subtensor.initialize()
-                btul.logging.success("Subtensor initialized.")
-                return
-            except Exception as e:
-                btul.logging.error(f"Subtensor init failed: {e}")
-                await asyncio.sleep(backoff)
-                backoff = min(backoff * 2, 30)
-
-        raise RuntimeError("Failed to initialize subtensor after retries.")
 
     async def _update_firewall(self):
         # Get version and min stake
@@ -363,23 +355,42 @@ class Miner:
         btul.logging.debug("Firewall updated")
 
     async def _shutdown(self):
-        btul.logging.info("Shutting down miner services...")
-        self.sse and self.sse.stop()
-        self.firewall and self.firewall.stop()
-        self.file_monitor and self.file_monitor.stop()
-        self.axon and self.axon.stop()
+        btul.logging.info("Shutting down miner...")
 
-        if not self.loop.is_closed():
-            await self.loop.shutdown_asyncgens()
-            self.loop.close()
+        # Notify the miner to stop
+        self.should_exit.set()
 
-        if hasattr(self, "subtensor"):
+        # Wait the neuron to stop
+        await self.run_complete.wait()
+
+        if getattr(self, "axon", None):
+            self.axon.stop()
+            btul.logging.debug("Axon stopped")
+
+        if getattr(self, "subtensor", None):
             await self.subtensor.close()
+            btul.logging.debug("Subtensor stopped")
+
+        if getattr(self, "sse", None):
+            self.sse.stop()
+
+        if getattr(self, "firewall", None):
+            self.firewall.stop()
+
+        if getattr(self, "file_monitor", None):
+            self.file_monitor.stop()
+
+        btul.logging.info("Shutting down miner completed")
 
     async def _blacklist(self, synapse: Synapse) -> typing.Tuple[bool, str]:
         caller = synapse.dendrite.hotkey
         caller_version = synapse.dendrite.neuron_version or 0
         synapse_type = type(synapse).__name__
+
+        # Whitelist the subnet owner hotkey
+        owner_hotkey = get_owner_hotkey(self.subtensor.substrate, self.config.netuid)
+        if caller == owner_hotkey:
+            return False, "Hotkey recognized!"
 
         # Get the list of all validators
         validators = get_validators(neurons=self.neurons.values())
@@ -418,21 +429,44 @@ class Miner:
     def _score(self, synapse: Score) -> Score:
         validator_uid = synapse.validator_uid
 
+        # Display the block of the challenge
+        btul.logging.info(f"[{validator_uid}] Challenge at block #{synapse.block}")
+
+        # Display error if there are more than 1 miner running on this machine
         if synapse.count > 1:
             btul.logging.error(
                 f"[{validator_uid}] {synapse.count} miners are running on this machine"
             )
 
-        btul.logging.info(
+        # Display the penalty factor
+        if synapse.penalty_factor:
+            btul.logging.warning(
+                f"[{validator_uid}] Penalty factor {synapse.penalty_factor}"
+            )
+        else:
+            btul.logging.debug(f"[{validator_uid}] No penalty factor")
+
+        # Display reason
+        if synapse.reason and synapse.reason.strip():
+            detail = synapse.detail.strip() if synapse.detail else ""
+            btul.logging.debug(
+                f"[{validator_uid}] Reason: {synapse.reason.strip()}, Detail: {detail}"
+            )
+
+        # Display scores
+        btul.logging.debug(
             f"[{validator_uid}] Availability score {synapse.availability}"
         )
-        btul.logging.info(f"[{validator_uid}] Latency score {synapse.latency}")
-        btul.logging.info(f"[{validator_uid}] Reliability score {synapse.reliability}")
-        btul.logging.info(
+        btul.logging.debug(f"[{validator_uid}] Latency score {synapse.latency}")
+        btul.logging.debug(f"[{validator_uid}] Reliability score {synapse.reliability}")
+        btul.logging.debug(
             f"[{validator_uid}] Distribution score {synapse.distribution}"
         )
-        btul.logging.success(f"[{validator_uid}] Score {synapse.score}")
+        btul.logging.info(f"[{validator_uid}] Score {synapse.score}")
+        btul.logging.info(f"[{validator_uid}] Moving score {synapse.moving_score}")
+        btul.logging.success(f"[{validator_uid}] Rank {synapse.rank}")
 
+        # Update the version
         synapse.version = self.version
 
         return synapse
@@ -442,4 +476,27 @@ class Miner:
 
 
 if __name__ == "__main__":
-    asyncio.run(Miner().run())
+    miner = Miner()
+
+    def _handle_signal(sig, frame):
+        loop.call_soon_threadsafe(lambda: asyncio.create_task(miner._shutdown()))
+
+    # Create and set a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Register signal handlers (in main thread)
+    signal.signal(signal.SIGINT, _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
+
+    try:
+        # Run the miner
+        loop.run_until_complete(miner.run())
+
+    except Exception as e:
+        btul.logging.error(f"Unhandled exception: {e}")
+        btul.logging.debug(traceback.format_exc())
+    finally:
+        # Cleanup async generators and close loop
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()

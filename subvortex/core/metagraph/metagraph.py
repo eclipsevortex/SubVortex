@@ -32,7 +32,7 @@ class MetagraphObserver:
         self.metagraph = metagraph
 
         self.should_exit = asyncio.Event()
-        self.finished = asyncio.Event()
+        self.run_complete = asyncio.Event()
 
     async def start(self):
         """
@@ -66,15 +66,11 @@ class MetagraphObserver:
 
                     # Detect any new neuron registration
                     has_new_registration, registration_count = (
-                        await self._has_new_neuron_registered(registration_count, block)
+                        await self._has_new_neuron_registered(registration_count)
                     )
 
                     # Detect if any neuron IP has changed
-                    has_axons_changed, new_axons = (
-                        await self._has_neuron_ip_changed(axons)
-                        if axons
-                        else (False, {})
-                    )
+                    has_axons_changed, new_axons = await self._has_neuron_ip_changed(axons)
 
                     # Determine whether a resync is needed
                     time_to_resync = block - last_synced_block >= sync_interval
@@ -111,8 +107,14 @@ class MetagraphObserver:
 
                     # Sync from chain and update Redis
                     axons, has_missing_country = await self._resync()
+
+                    # Store the sync block 
                     last_synced_block = block
+
+                    # Notify listener the metagraph is ready
                     ready = await self._notify_if_needed(ready)
+
+                    # Store the new axons
                     axons = new_axons
 
                 except Exception as e:
@@ -125,7 +127,7 @@ class MetagraphObserver:
                     )
 
         finally:
-            self.finished.set()
+            self.run_complete.set()
             btul.logging.info(
                 "🛑 MetagraphObserver service exiting...",
                 prefix=self.settings.logging_name,
@@ -135,8 +137,12 @@ class MetagraphObserver:
         """
         Signals the observer to stop and waits for the loop to exit cleanly.
         """
+        # Signal the service to exit
         self.should_exit.set()
-        await self.finished.wait()
+
+        # Wait until service has finished
+        await self.run_complete.wait()
+
         btul.logging.info(
             f"✅ MetagraphObserver service stopped", prefix=self.settings.logging_name
         )
@@ -331,42 +337,23 @@ class MetagraphObserver:
 
         return True
 
-    async def _has_new_neuron_registered(
-        self, registration_count, block
-    ) -> tuple[bool, int]:
+    async def _has_new_neuron_registered(self, registration_count) -> tuple[bool, int]:
         new_count = await scbs.get_number_of_registration(
             subtensor=self.subtensor, netuid=self.settings.netuid
         )
 
         if new_count == registration_count:
-            if registration_count == 0:
-                return False, registration_count
-
-            next_block = await scbs.get_next_adjustment_block(
-                subtensor=self.subtensor, netuid=self.settings.netuid
-            )
-
-            if block == next_block:
-                btul.logging.debug(
-                    f"🔄 Adjustment block #{block}; reset registration count",
-                    prefix=self.settings.logging_name,
-                )
-                return False, 0
-
             return False, registration_count
 
         btul.logging.debug(
             f"🆕 Neuron registration count changed: {registration_count} -> {new_count}",
             prefix=self.settings.logging_name,
         )
-        return True, new_count
+        return new_count > 0, new_count
 
     async def _has_neuron_ip_changed(
         self, axons: dict[str, str]
     ) -> tuple[bool, dict[str, str]]:
-        if not axons:
-            return False, {}
-
         latest_axons = await scbs.get_axons(
             subtensor=self.subtensor,
             netuid=self.settings.netuid,
@@ -389,12 +376,8 @@ class MetagraphObserver:
                 f"📈 {len(changed_axons)} neurons with changed IPs: {list(changed_axons.keys())}",
                 prefix=self.settings.logging_name,
             )
-            return True, changed_axons
+            return True, latest_axons
 
-        btul.logging.debug(
-            "✅ No IP changes detected among tracked axons",
-            prefix=self.settings.logging_name,
-        )
         return False, latest_axons
 
     def _get_details_changed(self, new_neuron, current_neuron):

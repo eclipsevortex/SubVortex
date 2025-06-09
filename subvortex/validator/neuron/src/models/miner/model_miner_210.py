@@ -28,7 +28,7 @@ class MinerModel:
             return None
 
         data = decode_hash(raw)
-        return Miner.from_dict(data)
+        return Miner.from_dict(data, ss58_address)
 
     async def read_all(self, redis: Redis) -> dict[str, Miner]:
         """
@@ -46,7 +46,7 @@ class MinerModel:
                 continue
 
             data = decode_hash(raw)
-            miners[ss58_address] = Miner.from_dict(data)
+            miners[ss58_address] = Miner.from_dict(data, ss58_address)
 
         return miners
 
@@ -79,3 +79,15 @@ class MinerModel:
         """
         key = self._key(miner.hotkey)
         await redis.delete(key)
+
+    async def delete_all(self, redis: Redis, miners: list[Miner]):
+        """
+        Delete the statistics entry for a given hotkey.
+        """
+        pipe = redis.pipeline()
+
+        for miner in miners:
+            key = self._key(miner.hotkey)
+            pipe.delete(key)
+
+        await pipe.execute()

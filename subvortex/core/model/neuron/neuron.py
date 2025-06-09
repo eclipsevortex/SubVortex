@@ -112,6 +112,9 @@ class Neuron:
             is_serving=neuron.axon_info.is_serving,
         )
 
+    def create_empty() -> "Neuron":
+        return Neuron()
+
     def update_from_proto(self, neuron) -> None:
         """Update this instance using a cbc.NeuronInfo object."""
         self.__dict__.update(Neuron.from_proto(neuron).__dict__)

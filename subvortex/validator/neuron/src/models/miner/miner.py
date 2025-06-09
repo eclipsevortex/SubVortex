@@ -8,6 +8,7 @@ from bittensor.core.axon import AxonInfo
 @dataclass
 class Miner:
     uid: int = -1
+    rank: int = -1
     coldkey: str = None
     hotkey: str = None
     ip: str = "0.0.0.0"
@@ -61,6 +62,7 @@ class Miner:
     def to_dict(self) -> Dict[str, str]:
         return {
             "uid": self.uid,
+            "rank": self.rank,
             "hotkey": self.hotkey,
             "ip": self.ip or "0.0.0.0",
             "country": self.country or "",
@@ -77,10 +79,11 @@ class Miner:
         }
 
     @staticmethod
-    def from_dict(data: Dict[str, str]) -> "Miner":
+    def from_dict(data: Dict[str, str], hotkey: str) -> "Miner":
         return Miner(
             uid=int(data.get("uid", -1)),
-            hotkey=data.get("hotkey", None),
+            rank=int(data.get("rank", -1)),
+            hotkey=data.get("hotkey", hotkey),
             ip=data.get("ip", "0.0.0.0"),
             country=data.get("country", None),
             version=data.get("version", "0.0.0"),
@@ -96,6 +99,7 @@ class Miner:
         )
 
     def reset(self):
+        self.rank = -1
         self.version = "0.0.0"
         self.verified = False
         self.sync = False

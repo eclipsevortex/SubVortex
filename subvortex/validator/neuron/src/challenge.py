@@ -18,21 +18,18 @@ import time
 import random
 import asyncio
 import traceback
-import numpy as np
 import bittensor.core.chain_data as btccd
 import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
 import bittensor.utils.btlogging as btul
+from typing import Dict
 from collections import Counter
 
 from subvortex.core.constants import DEFAULT_PROCESS_TIME
 from subvortex.core.protocol import Synapse
 from subvortex.validator.neuron.src.miner import Miner
 from subvortex.validator.neuron.src.synapse import send_scope
-from subvortex.validator.neuron.src.security import (
-    is_miner_suspicious,
-    deregister_suspicious_uid,
-)
+from subvortex.validator.neuron.src.security import is_miner_suspicious
 from subvortex.validator.neuron.src.selection import get_next_uids
 from subvortex.validator.neuron.src.state import log_event
 from subvortex.validator.neuron.src.score import (
@@ -42,6 +39,7 @@ from subvortex.validator.neuron.src.score import (
     compute_distribution_score,
     compute_final_score,
 )
+from subvortex.validator.neuron.src.state import save_state
 
 CHALLENGE_NAME = "Challenge"
 
@@ -136,6 +134,7 @@ async def challenge_miner(self, miner: Miner):
     """
     verified = False
     reason = None
+    details = None
 
     try:
         response = await self.dendrite(
@@ -151,11 +150,12 @@ async def challenge_miner(self, miner: Miner):
         verified = status_code == 200
         reason = status_message
 
-        return (verified, reason)
-    except Exception as e:
-        reason = f"Unexpected error occurred: {e}"
+        return (verified, reason, None)
+    except Exception as ex:
+        reason = "Unexpected exception"
+        details = str(ex)
 
-    return (verified, reason)
+    return (verified, reason, details)
 
 
 def challenge_subtensor(miner: Miner, challenge):
@@ -165,6 +165,7 @@ def challenge_subtensor(miner: Miner, challenge):
     substrate = None
     verified = False
     reason = None
+    details = None
     process_time = None
 
     try:
@@ -181,9 +182,9 @@ def challenge_subtensor(miner: Miner, challenge):
                 url=f"ws://{miner.ip}:9944",
             )
 
-        except Exception:
+        except Exception as ex:
             reason = "Failed to connect to Subtensor node at the given IP."
-            return (verified, reason, process_time)
+            return (verified, reason, str(ex), process_time)
 
         # Set the socket timeout
         substrate.ws.socket.settimeout(DEFAULT_PROCESS_TIME)
@@ -203,22 +204,22 @@ def challenge_subtensor(miner: Miner, challenge):
 
             # Convert to a neuron entity
             neuron = btccd.NeuronInfoLite.from_dict(result.value)
-        except KeyError:
+        except KeyError as ex:
             reason = "Invalid netuid or uid provided."
-            return (verified, reason, process_time)
-        except ValueError:
+            return (verified, reason, str(ex), process_time)
+        except ValueError as ex:
             reason = "Invalid or unavailable block number."
-            return (verified, reason, process_time)
-        except (Exception, BaseException):
+            return (verified, reason, str(ex), process_time)
+        except (Exception, BaseException) as ex:
             reason = "Failed to retrieve neuron details."
-            return (verified, reason, process_time)
+            return (verified, reason, str(ex), process_time)
 
         # Access the specified property
         try:
             miner_value = getattr(neuron, neuron_property)
-        except AttributeError:
+        except AttributeError as ex:
             reason = "Property not found in the neuron."
-            return (verified, reason, process_time)
+            return (verified, reason, str(ex), process_time)
 
         # Compute the process time
         process_time = time.time() - start_time
@@ -226,13 +227,15 @@ def challenge_subtensor(miner: Miner, challenge):
         # Verify the challenge
         verified = expected_value == miner_value
 
-    except Exception as err:
-        reason = f"An unexpected error occurred: {str(err)}"
+    except Exception as ex:
+        reason = "Unexpected exception"
+        details = str(ex)
+
     finally:
         if substrate:
             substrate.close()
 
-    return (verified, reason, process_time)
+    return (verified, reason, details, process_time)
 
 
 async def handle_challenge(self, uid: int, challenge):
@@ -241,12 +244,15 @@ async def handle_challenge(self, uid: int, challenge):
     # Get the miner
     miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
 
+    # Inrement the number of challenge
+    miner.challenge_attempts = miner.challenge_attempts + 1
+
     # Set the process time by default
     process_time: float = DEFAULT_CHALLENGE_PROCESS_TIME
 
     # Challenge Miner - Ping time
     btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging miner")
-    miner_verified, miner_reason = await challenge_miner(self, miner)
+    miner_verified, miner_reason, miner_details = await challenge_miner(self, miner)
     if miner_verified:
         btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
     else:
@@ -255,12 +261,12 @@ async def handle_challenge(self, uid: int, challenge):
         )
 
     # Challenge Subtensor if the miner is verified
-    subtensor_verified, subtensor_reason = (False, None)
+    subtensor_verified, subtensor_reason, subtensor_details = (False, None, None)
     if miner_verified:
         # Challenge Subtensor - Process time + check the challenge
         btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging subtensor")
-        subtensor_verified, subtensor_reason, subtensor_time = challenge_subtensor(
-            miner, challenge
+        subtensor_verified, subtensor_reason, subtensor_details, subtensor_time = (
+            challenge_subtensor(miner, challenge)
         )
         if subtensor_verified:
             btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
@@ -280,10 +286,16 @@ async def handle_challenge(self, uid: int, challenge):
         else (miner.process_time + process_time) / 2
     )
 
-    return miner_reason if not miner_verified else subtensor_reason
+    # Increment the number of successful challenge
+    miner.challenge_successes = miner.challenge_successes + int(miner.verified)
+
+    reason = miner_reason if not miner_verified else subtensor_reason
+    details = miner_details if not miner_verified else subtensor_details
+
+    return reason, details
 
 
-async def challenge_data(self):
+async def challenge_data(self, block: int):
     # Get the hotkey of the validator
     val_hotkey = self.neuron.hotkey
 
@@ -316,36 +328,44 @@ async def challenge_data(self):
     # Execute the challenges
     tasks = []
     reasons = []
+    details = []
     for uid in uids:
         # Send the challenge to the miner
         tasks.append(asyncio.create_task(handle_challenge(self, uid, challenge)))
-        reasons = await asyncio.gather(*tasks)
-
-    # Initialise the rewards object
-    rewards = np.zeros(len(uids), dtype=np.float32)
+        results = await asyncio.gather(*tasks)
+        reasons, details = zip(*results)
 
     btul.logging.info(f"[{CHALLENGE_NAME}] Starting evaluation")
 
-    # Compute the score
+    # Update moving_averaged_scores with rewards produced by this step.
+    # alpha of 0.1 means that each new score replaces 5% of the weight of the previous weights
+    alpha: float = 0.1
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Moving score alpha: {alpha}")
+
+    # Create mapping uid -> miner
+    uid_to_miner: Dict[int, Miner] = {miner.uid: miner for miner in self.miners}
+
+    # Compute the scores
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Computing miners scores...")
+    miners = []
     for idx, (uid) in enumerate(uids):
         # Get the miner
-        miner: Miner = next((miner for miner in self.miners if miner.uid == uid), None)
+        miner: Miner = uid_to_miner[uid]
         miner_ip_occurences = ip_occurrences.get(miner.ip, 0)
-
-        btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Computing score...")
-        btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Country {miner.country}")
 
         # Check if the miner is suspicious
         miner.suspicious, miner.penalty_factor = is_miner_suspicious(
             miner, suspicious_uids
         )
         if miner.suspicious:
-            btul.logging.warning(f"[{CHALLENGE_NAME}][{miner.uid}] Miner is suspicious")
+            btul.logging.warning(
+                f"[{CHALLENGE_NAME}][{miner.uid}] Miner is suspicious, apply penalty factor {miner.penalty_factor}"
+            )
 
         # Check if the miner/subtensor are verified
         if not miner.verified:  # or not miner.sync:
             btul.logging.warning(
-                f"[{CHALLENGE_NAME}][{miner.uid}] Not verified: {reasons[idx]}"
+                f"[{CHALLENGE_NAME}][{miner.uid}] Not verified: {reasons[idx]} - {details[idx]}"
             )
 
         # Check the miner's ip is not used by multiple miners (1 miner = 1 ip)
@@ -357,67 +377,98 @@ async def challenge_data(self):
 
         # Compute score for availability
         miner.availability_score = compute_availability_score(miner, has_ip_conflicts)
-        btul.logging.debug(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Availability score {miner.availability_score}"
-        )
 
         # Compute score for latency
         miner.latency_score = compute_latency_score(
-            self.neuron.country, miner, self.miners, locations, has_ip_conflicts
-        )
-        btul.logging.debug(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Latency score {miner.latency_score}"
+            self.country, miner, self.miners, locations, has_ip_conflicts
         )
 
         # Compute score for reliability
-        miner.reliability_score = await compute_reliability_score(miner, has_ip_conflicts)
-        btul.logging.debug(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Reliability score {miner.reliability_score}"
+        miner.reliability_score = await compute_reliability_score(
+            miner, has_ip_conflicts
         )
 
         # Compute score for distribution
-        miner.distribution_score = compute_distribution_score(miner, self.miners, ip_occurrences)
-        btul.logging.debug(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Distribution score {miner.distribution_score}"
+        miner.distribution_score = compute_distribution_score(
+            miner, self.miners, ip_occurrences
         )
 
         # Compute final score
         miner.score = compute_final_score(miner)
-        rewards[idx] = miner.score
+
+        # Compute moving score
+        self.moving_scores[uid] = (
+            alpha * miner.score + (1 - alpha) * self.moving_scores[uid]
+            if not miner.suspicious
+            else self.moving_scores[uid] * miner.penalty_factor
+        )
+
+        # Add the miner to the list
+        miners.append(miner)
+
+        # Display end of computation
+        btul.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] Scores computed")
+
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Miners scores computed")
+
+    # Save data in database
+    await self.database.update_miners(miners=miners)
+    btul.logging.trace(f"[{CHALLENGE_NAME}] Miners saved")
+
+    # Save state
+    save_state(path=self.config.neuron.full_path, moving_scores=self.moving_scores)
+    btul.logging.trace(f"[{CHALLENGE_NAME}] State saved")
+
+    # Create a sorted list of miner
+    sorted_miners = sorted(
+        self.miners, key=lambda m: (self.moving_scores[m.uid], -m.uid), reverse=True
+    )
+
+    # Compute the rank, display the scores details and save in database
+    for idx, (uid) in enumerate(uids):
+        # Get the miner
+        miner: Miner = uid_to_miner[uid]
+        miner_ip_occurences = ip_occurrences.get(miner.ip, 0)
+
+        # Compute the rank of the miner
+        miner.rank = next((i for i, x in enumerate(sorted_miners) if x.uid == uid), -1)
+
+        # Display miner details
+        btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Country {miner.country}")
+
+        # Display challenge details
+        btul.logging.debug(
+            f"[{CHALLENGE_NAME}][{miner.uid}] Availability score {miner.availability_score}"
+        )
+        btul.logging.debug(
+            f"[{CHALLENGE_NAME}][{miner.uid}] Latency score {miner.latency_score}"
+        )
+        btul.logging.debug(
+            f"[{CHALLENGE_NAME}][{miner.uid}] Reliability score {miner.reliability_score}"
+        )
+        btul.logging.debug(
+            f"[{CHALLENGE_NAME}][{miner.uid}] Distribution score {miner.distribution_score}"
+        )
         btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Final score {miner.score}")
+        btul.logging.info(
+            f"[{CHALLENGE_NAME}][{miner.uid}] Moving score {self.moving_scores[uid]:.6f}"
+        )
+        btul.logging.info(f"[{CHALLENGE_NAME}][{miner.uid}] Rank {miner.rank}")
 
         # Send the score details to the miner
-        miner.version = await send_scope(self, miner, miner_ip_occurences)
-
-        # Save miner snapshot in database
-        await self.database.update_miner(miner=miner)
-
-    btul.logging.trace(f"[{CHALLENGE_NAME}] Rewards: {rewards}")
-
-    # Compute forward pass rewards
-    scattered_rewards = self.moving_averaged_scores.copy()
-    np.put(scattered_rewards, uids, rewards)
-    btul.logging.trace(f"[{CHALLENGE_NAME}] Scattered rewards: {scattered_rewards}")
-
-    # Update moving_averaged_scores with rewards produced by this step.
-    # alpha of 0.05 means that each new score replaces 5% of the weight of the previous weights
-    alpha: float = 0.1
-    self.moving_averaged_scores = (
-        alpha * scattered_rewards + (1 - alpha) * self.moving_averaged_scores
-    )
-    btul.logging.trace(
-        f"[{CHALLENGE_NAME}] Updated moving avg scores: {self.moving_averaged_scores}"
-    )
-
-    # Suspicious miners - moving weight to 0 for deregistration
-    deregister_suspicious_uid(self.miners, self.moving_averaged_scores)
-    btul.logging.trace(
-        f"[{CHALLENGE_NAME}] Deregistered moving avg scores: {self.moving_averaged_scores}"
-    )
+        miner.version = await send_scope(
+            self,
+            miner,
+            miner_ip_occurences,
+            block,
+            reasons[idx],
+            details[idx],
+            self.moving_scores[miner.uid].item(),
+        )
 
     # Display step time
     forward_time = time.time() - start_time
-    btul.logging.debug(f"[{CHALLENGE_NAME}] Step finished in {forward_time:.2f}s")
+    btul.logging.debug(f"[{CHALLENGE_NAME}] Challenge finished in {forward_time:.2f}s")
 
     # Log event
     log_event(self, uids, forward_time)

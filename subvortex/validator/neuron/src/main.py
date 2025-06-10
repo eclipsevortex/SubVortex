@@ -269,6 +269,10 @@ class Validator:
                         moving_scores=self.moving_scores.copy(),
                     )
 
+                    # Get the miners with no ips
+                    miners_not_serving = [x.uid for x in self.miners if x.ip == "0.0.0.0"]
+                    btul.logging.debug(f"Miners not serving (not selectable): {miners_not_serving}")
+
                     # Build the list of uids reset
                     uids_reset = np.flatnonzero(
                         (self.moving_scores != 0) & (moving_scores == 0)
@@ -279,7 +283,7 @@ class Validator:
 
                     # Save in database
                     await self.database.update_miners(miners=self.miners)
-                    btul.logging.debug(f"Saved miners #{len(self.miners)}")
+                    btul.logging.debug(f"Saved miners: {len(self.miners)}")
 
                     # Log event that have been reset if there are any
                     if uids_reset.size > 0:

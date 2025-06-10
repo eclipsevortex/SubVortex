@@ -217,29 +217,19 @@ async def get_next_adjustment_block(subtensor: btcas.AsyncSubtensor, netuid: int
     return last_adjustment_block + adjustment_interval
 
 
-async def get_axons(
-    subtensor: btcas.AsyncSubtensor, netuid: int, hotkeys: typing.List[str]
-):
+async def get_axons(subtensor: btcas.AsyncSubtensor, netuid: int):
     """
     Return the list of axons
     """
-    # Build the storate key for each hotkeys
-    storage_keys = [
-        await subtensor.substrate.create_storage_key(
-            "SubtensorModule", "Axons", [netuid, hotkey]
-        )
-        for hotkey in hotkeys
-    ]
-
     # Get the last adjustment interval
-    response = await subtensor.substrate.query_multi(
-        storage_keys=storage_keys,
-    )
+    metagraph = await subtensor.get_metagraph_info(netuid=netuid)
 
     axons = {}
-    for data in response:
-        hotkey = data[0].params[1]
-        ip = str(netaddr.IPAddress(data[1]["ip"])) if data[1] is not None else "0.0.0.0"
+    for idx, (axon) in enumerate(metagraph.axons):
+        axon_ip = axon.get("ip", 0)
+        ip = str(netaddr.IPAddress(axon_ip)) if axon_ip != 0 else "0.0.0.0"
+
+        hotkey = metagraph.hotkeys[idx]
         axons[hotkey] = ip
 
     return axons
@@ -248,7 +238,7 @@ async def get_axons(
 async def wait_for_block(
     subtensor: btcas.AsyncSubtensor,
     block: typing.Optional[int] = None,
-    timeout: int = 24, # Avg time of 2 blocks (1 block == 12 seconds)
+    timeout: int = 24,  # Avg time of 2 blocks (1 block == 12 seconds)
 ):
     """
     Waits until the blockchain reaches the specified block number.

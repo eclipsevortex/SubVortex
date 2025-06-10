@@ -59,7 +59,7 @@ class NeuronReadOnlyDatabase(BaseDatabase):
 
         return None
 
-    async def get_neurons(self) -> typing.List[scmm.Neuron]:
+    async def get_neurons(self) -> typing.Dict[str, scmm.Neuron]:
         # Ensure the connection is up and running
         await self.ensure_connection()
 

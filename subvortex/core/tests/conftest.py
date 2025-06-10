@@ -19,26 +19,30 @@ from hashlib import sha256
 from typing import Optional
 
 
+import subvortex.core.core_bittensor.wallet as scbtw
+import subvortex.core.shared.mock as scsm
+
+
 def get_block_hash(block: Optional[int] = None) -> str:
     return "0x" + sha256(str(block).encode()).hexdigest()[:64]
 
 
-# def make_async(method):
-#     """Wraps a mock's return value in an async function."""
+def make_async(method):
+    """Wraps a mock's return value in an async function."""
 
-#     async def async_wrapper(*args, **kwargs):
-#         return method(*args, **kwargs)
+    async def async_wrapper(*args, **kwargs):
+        return method(*args, **kwargs)
 
-#     return async_wrapper
+    return async_wrapper
 
 
-# @pytest.fixture(scope="session", autouse=False)
-# def subtensor():
-#     wallet = cbw.get_mock_wallet()
-#     subtensor = cbm.MockSubtensor(netuid=1, wallet=wallet)
+@pytest.fixture(scope="session", autouse=False)
+def subtensor():
+    wallet = scbtw.get_mock_wallet()
+    subtensor = scsm.MockSubtensor(netuid=1, wallet=wallet)
 
-#     # Make some sync method async
-#     subtensor.get_block_hash = make_async(subtensor.get_block_hash)
-#     subtensor.substrate.get_block_hash = make_async(get_block_hash)
+    # Make some sync method async
+    subtensor.get_block_hash = make_async(subtensor.get_block_hash)
+    subtensor.substrate.get_block_hash = make_async(get_block_hash)
 
-#     yield subtensor
+    yield subtensor

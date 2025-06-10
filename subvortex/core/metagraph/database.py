@@ -26,7 +26,9 @@ class NeuronReadOnlyDatabase(BaseDatabase):
     of modifying it.
     """
 
-    def setup_neuron_models(self):
+    def __init__(self, settings):
+        super().__init__(settings)
+        
         # Register neuron models keyed by their version
         self.models["neuron"] = {x.version: x for x in [NeuronModel210(), NeuronModel211()]}
 
@@ -127,7 +129,6 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
 
     def __init__(self, settings):
         super().__init__(settings=settings)
-        self.setup_neuron_models()
 
     async def update_neurons(self, neurons: typing.List[scmm.Neuron]):
         # Ensure the connection is up and running

@@ -15,6 +15,9 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import time
+import zlib
+import json
+import base64
 import typing
 import random
 import socket
@@ -461,3 +464,28 @@ def get_number_of_uids(subtensor: btcs.Subtensor, netuid: int):
     )
 
     return int(result.value or 0)
+
+
+async def get_identities(subtensor: btcas.AsyncSubtensor, netuid: int):
+    commitment = await subtensor.get_all_commitments(netuid=netuid)
+    if not commitment:
+        return []
+
+    identities = {}
+
+    for hotkey, data in commitment.items():
+        try:
+            # Decode data
+            compressed = base64.b64decode(data)
+
+            # Decompress data
+            json_str = zlib.decompress(compressed).decode()
+
+            identity = json.loads(json_str)
+        except Exception:
+            continue
+
+        # Add the identity
+        identities[hotkey] = identity
+
+    return identities

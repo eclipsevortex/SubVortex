@@ -18,5 +18,3 @@ class Database(NeuronReadOnlyDatabase):
 
     def __init__(self, settings):
         super().__init__(settings=settings)
-
-        self.setup_neuron_models()

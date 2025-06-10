@@ -85,6 +85,22 @@ def get_weights_min_stake(substrate: SubstrateInterface):
     return int(float(weight_min_stake) * 10**-9)
 
 
+async def get_weights_min_stake_async(substrate: AsyncSubstrateInterface):
+    """
+    Return the minimum of TAO a validator need to have the set weight
+    """
+    # WeightsMinStake has been renamed StakeThreshold
+    result = weight_min_stake = await substrate.query(
+        module="SubtensorModule", storage_function="StakeThreshold", params=[]
+    )
+
+    weight_min_stake = result.value if result is not None else 0
+    btul.logging.debug(f"get_weights_min_stake() {weight_min_stake}")
+
+    # Convert Rao to Tao
+    return int(float(weight_min_stake) * 10**-9)
+
+
 def get_neuron_for_uid_lite(
     substrate: SubstrateInterface, netuid: int, uid: int, block: int = None
 ):

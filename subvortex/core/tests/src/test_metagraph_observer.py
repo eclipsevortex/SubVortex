@@ -224,6 +224,12 @@ async def test_resync_updates_neurons(observer):
 
 @pytest.mark.asyncio
 async def test_start_and_stop(observer):
+    # Arrange: provide a dummy neuron with required attributes
+    mock_neuron = MagicMock()
+    mock_neuron.hotkey = "hk_test"
+    mock_neuron.ip = "1.2.3.4"
+    observer.database.get_neurons = AsyncMock(return_value={"hk_test": mock_neuron})
+    
     # Mock all internal behavior
     observer._resync = AsyncMock(return_value=({"hk": "1.1.1.1"}, False))
     observer._notify_if_needed = AsyncMock(return_value=True)

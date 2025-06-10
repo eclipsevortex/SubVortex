@@ -1,9 +1,9 @@
 {
   "id": "miner-neuron",
   "name": "subvortex-miner-neuron",
-  "version": "3.1.6-alpha.1",
-  "miner.version": "3.1.6-alpha.1",
-  "miner.neuron.version": "3.1.6-alpha.1",
+  "version": "3.1.6-alpha.2",
+  "miner.version": "3.1.6-alpha.2",
+  "miner.neuron.version": "3.1.6-alpha.2",
   "depends_on": [
     "miner-redis",
     "miner-metagraph"

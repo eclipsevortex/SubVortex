@@ -52,6 +52,12 @@ class MetagraphObserver:
         )
         btul.logging.debug(f"Settings: {self.settings}")
 
+        # Load the neurons
+        neurons = await self.database.get_neurons()
+
+        # Build the current axons
+        axons = {x.hotkey: x.ip for x in neurons.values()}
+
         try:
             while not self.should_exit.is_set():
                 try:
@@ -372,14 +378,7 @@ class MetagraphObserver:
                     prefix=self.settings.logging_name,
                 )
 
-        if changed_axons:
-            btul.logging.info(
-                f"📈 {len(changed_axons)} neurons with changed IPs: {list(changed_axons.keys())}",
-                prefix=self.settings.logging_name,
-            )
-            return True, latest_axons
-
-        return False, latest_axons
+        return len(changed_axons.keys()) > 0, latest_axons
 
     def _get_details_changed(self, new_neuron, current_neuron):
         mismatches = []

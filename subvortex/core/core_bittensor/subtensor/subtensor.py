@@ -225,13 +225,12 @@ async def get_axons(subtensor: btcas.AsyncSubtensor, netuid: int):
     metagraph = await subtensor.get_metagraph_info(netuid=netuid)
 
     axons = {}
-    for axon in metagraph.axons:
-        ip = (
-            str(netaddr.IPAddress(axon.ip))
-            if axon.ip is not None and axon.ip != 0
-            else "0.0.0.0"
-        )
-        axons[axon.hotkey] = ip
+    for idx, (axon) in enumerate(metagraph.axons):
+        axon_ip = axon.get("ip", 0)
+        ip = str(netaddr.IPAddress(axon_ip)) if axon_ip != 0 else "0.0.0.0"
+
+        hotkey = metagraph.hotkeys[idx]
+        axons[hotkey] = ip
 
     return axons
 

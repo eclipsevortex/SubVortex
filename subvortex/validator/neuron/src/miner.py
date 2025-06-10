@@ -121,6 +121,7 @@ async def sync_miners(
 
         # Create an updated miner
         miner = current_miner.clone()
+        miner.uid = neuron.uid
         miner.ip = neuron.ip
         miner.port = neuron.port
         miner.coldkey = neuron.coldkey

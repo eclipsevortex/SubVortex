@@ -73,7 +73,7 @@ class Runner:
             )
 
             # Initialize the subtensor
-            self.subtensor = btcas.AsyncSubtensor(config=config, retry_forever=True)
+            self.subtensor = btcas.AsyncSubtensor(config=config)
 
             # TODO: remove once OTF patched it
             self.subtensor.substrate = sccs.RetryAsyncSubstrate(

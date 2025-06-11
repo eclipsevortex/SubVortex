@@ -166,9 +166,7 @@ class Miner:
         self.subtensor = (
             MockSubtensor(self.config.netuid, wallet=self.wallet)
             if self.config.miner.mock_subtensor
-            else btcas.AsyncSubtensor(
-                config=self.config, network=network, retry_forever=True
-            )
+            else btcas.AsyncSubtensor(config=self.config, network=network)
         )
         # TODO: remove once OTF patched it
         self.subtensor.substrate = RetryAsyncSubstrate(

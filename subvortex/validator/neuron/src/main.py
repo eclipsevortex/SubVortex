@@ -172,7 +172,9 @@ class Validator:
         await check_redis_connection(port=self.settings.database_port)
 
         # Wait until the metagraph is ready
+        btul.logging.info("Waiting for metagraph readiness...")
         await self.database.wait_until_ready("metagraph")
+        btul.logging.info("Metagraph is ready.")
 
         # File monitor
         self.file_monitor = FileMonitor()
@@ -218,6 +220,10 @@ class Validator:
         current_block = 0
         while not self.should_exit.is_set():
             try:
+                # Ensure the metagraph is ready
+                btul.logging.debug("Ensure metagraph readiness")
+                await self.database.wait_until_ready("metagraph")
+
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
                 if last_updated == 0:
@@ -270,8 +276,12 @@ class Validator:
                     )
 
                     # Get the miners with no ips
-                    miners_not_serving = [x.uid for x in self.miners if x.ip == "0.0.0.0"]
-                    btul.logging.debug(f"Miners not serving (not selectable): {miners_not_serving}")
+                    miners_not_serving = [
+                        x.uid for x in self.miners if x.ip == "0.0.0.0"
+                    ]
+                    btul.logging.debug(
+                        f"Miners not serving (not selectable): {miners_not_serving}"
+                    )
 
                     # Build the list of uids reset
                     uids_reset = np.flatnonzero(

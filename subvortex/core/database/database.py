@@ -50,14 +50,14 @@ class Database:
             # Step 1: check the message key first
             snapshot = await self.database.get(message_key)
             if snapshot and snapshot.decode() == "ready":
-                btul.logging.info(
+                btul.logging.trace(
                     f"{name} is already ready (via message key)",
                     prefix=self.settings.logging_name,
                 )
                 return
 
             # Step 2: wait for stream messages
-            btul.logging.debug(
+            btul.logging.trace(
                 f"Waiting on stream: {stream_key}", prefix=self.settings.logging_name
             )
             while True:
@@ -66,14 +66,14 @@ class Database:
                     continue
 
                 for stream_key, messages in entries:
-                    btul.logging.debug(
+                    btul.logging.trace(
                         f"Received stream message: {messages}",
                         prefix=self.settings.logging_name,
                     )
                     for msg_id, fields in messages:
                         state = fields.get("state".encode(), b"").decode()
                         if state == "ready":
-                            btul.logging.info(
+                            btul.logging.trace(
                                 f"{name} is now ready (via stream)",
                                 prefix=self.settings.logging_name,
                             )

@@ -135,6 +135,12 @@ class MetagraphObserver:
                     )
 
         finally:
+            # Flag metagraph as unready and notify
+            if not self.settings.dry_run:
+                await self.database.mark_as_unready()
+                await self.database.notify_state()
+
+            # Signal run completed
             self.run_complete.set()
             btul.logging.info(
                 "🛑 MetagraphObserver service exiting...",
@@ -329,6 +335,21 @@ class MetagraphObserver:
             )
 
         return new_axons, has_missing_country
+
+    async def _notify_if_needed(self, ready):
+        if ready:
+            return ready
+
+        btul.logging.debug(
+            "🔔 Metagraph marked ready", prefix=self.settings.logging_name
+        )
+        not self.settings.dry_run and await self.database.mark_as_ready()
+        btul.logging.debug(
+            "📣 Broadcasting metagraph ready state", prefix=self.settings.logging_name
+        )
+        not self.settings.dry_run and await self.database.notify_state()
+
+        return True
 
     async def _notify_if_needed(self, ready):
         if ready:

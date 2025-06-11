@@ -181,10 +181,10 @@ class Miner:
         await self.subtensor.initialize()
 
         # Initialize database
-        btul.logging.info("Waiting for database readiness...")
+        btul.logging.info("Waiting for metagraph readiness...")
         self.database = Database(settings=self.settings)
         await self.database.wait_until_ready("metagraph")
-        btul.logging.info("Database is ready.")
+        btul.logging.info("Metagraph is ready.")
 
         # Get the list of neurons
         self.neurons = await self.database.get_neurons()
@@ -262,6 +262,10 @@ class Miner:
                 # Get the current block
                 current_block = await self.subtensor.get_current_block()
                 btul.logging.debug(f"Block #{current_block}")
+
+                # Ensure the metagraph is ready
+                btul.logging.debug("Ensure metagraph readiness")
+                await self.database.wait_until_ready("metagraph")
 
                 # Get the last time the neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()

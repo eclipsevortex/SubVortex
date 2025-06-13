@@ -67,6 +67,8 @@ from subvortex.validator.neuron.src.weights import should_set_weights
 # Load the environment variables for the whole process
 load_dotenv(override=True)
 
+# An asyncio event to signal when shutdown is complete
+shutdown_complete = asyncio.Event()
 
 class Validator:
     """
@@ -172,7 +174,9 @@ class Validator:
         await check_redis_connection(port=self.settings.database_port)
 
         # Wait until the metagraph is ready
+        btul.logging.info("Waiting for metagraph readiness...")
         await self.database.wait_until_ready("metagraph")
+        btul.logging.info("Metagraph is ready.")
 
         # File monitor
         self.file_monitor = FileMonitor()
@@ -218,6 +222,10 @@ class Validator:
         current_block = 0
         while not self.should_exit.is_set():
             try:
+                # Ensure the metagraph is ready
+                btul.logging.debug("Ensure metagraph readiness")
+                await self.database.wait_until_ready("metagraph")
+
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
                 if last_updated == 0:
@@ -270,8 +278,12 @@ class Validator:
                     )
 
                     # Get the miners with no ips
-                    miners_not_serving = [x.uid for x in self.miners if x.ip == "0.0.0.0"]
-                    btul.logging.debug(f"Miners not serving (not selectable): {miners_not_serving}")
+                    miners_not_serving = [
+                        x.uid for x in self.miners if x.ip == "0.0.0.0"
+                    ]
+                    btul.logging.debug(
+                        f"Miners not serving (not selectable): {miners_not_serving}"
+                    )
 
                     # Build the list of uids reset
                     uids_reset = np.flatnonzero(
@@ -394,28 +406,43 @@ class Validator:
         btul.logging.info("✅ Shutting down validator completed")
 
 
-if __name__ == "__main__":
+async def main():
+    # Initialize miner
     validator = Validator()
 
-    def _handle_signal(sig, frame):
-        loop.call_soon_threadsafe(lambda: asyncio.create_task(validator._shutdown()))
+    # Get the current asyncio event loop
+    loop = asyncio.get_running_loop()
 
-    # Create and set a new event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Define a signal handler that schedules the shutdown coroutine
+    def _signal_handler():
+        # Schedule graceful shutdown without blocking the signal handler
+        loop.create_task(_shutdown(validator))
 
-    # Register signal handlers (in main thread)
-    signal.signal(signal.SIGINT, _handle_signal)
-    signal.signal(signal.SIGTERM, _handle_signal)
+    # Register signal handlers for SIGINT (Ctrl+C) and SIGTERM (kill command)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, _signal_handler)
 
+    # Start the main service logic
+    await validator.run()
+
+    # Block here until shutdown is signaled and completed
+    await shutdown_complete.wait()
+
+
+async def _shutdown(validator: Validator):
+    # Gracefully shut down the service
+    await validator.shutdown()
+
+    # Notify the main function that shutdown is complete
+    shutdown_complete.set()
+
+
+if __name__ == "__main__":
     try:
-        # Run the miner
-        loop.run_until_complete(validator.run())
+        # Start the main asyncio loop
+        asyncio.run(main())
 
     except Exception as e:
+        # Log any unexpected exceptions that bubble up
         btul.logging.error(f"Unhandled exception: {e}")
         btul.logging.debug(traceback.format_exc())
-    finally:
-        # Cleanup async generators and close loop
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.close()

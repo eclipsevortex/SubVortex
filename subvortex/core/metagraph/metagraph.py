@@ -50,7 +50,9 @@ class MetagraphObserver:
             "🚀 MetagraphObserver service starting...",
             prefix=self.settings.logging_name,
         )
-        btul.logging.debug(f"Settings: {self.settings}")
+        btul.logging.debug(
+            f"Settings: {self.settings}", prefix=self.settings.logging_name
+        )
 
         # Load the neurons
         neurons = await self.database.get_neurons()
@@ -61,13 +63,36 @@ class MetagraphObserver:
         try:
             while not self.should_exit.is_set():
                 try:
-                    # Wait for next block to proceed
-                    if not await scbs.wait_for_block(subtensor=self.subtensor):
+
+                    # Wait for either a new block OR a shutdown signal, whichever comes first.
+                    done, _ = await asyncio.wait(
+                        [
+                            self.subtensor.wait_for_block(),
+                            self.should_exit.wait(),
+                        ],
+                        timeout=24,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+
+                    # Timeout, no tasks completed
+                    if not done:
+                        btul.logging.warning(
+                            "⏲️ No new block retrieved within 24 seconds. Retrying..."
+                        )
+                        continue
+
+                    # If shutdown signal is received, break the loop immediately
+                    if self.should_exit.is_set():
+                        break
+
+                    # If no new block was produced (e.g., shutdown happened or something failed), skip this round
+                    # This guards against the case where wait_for_block() returned None or False
+                    if not any(task.result() for task in done if not task.cancelled()):
                         continue
 
                     block = await self.subtensor.get_current_block()
                     btul.logging.info(
-                        f"📦 Block #{block} detected", prefix=self.settings.logging_name
+                        f"📦 Block #{block}", prefix=self.settings.logging_name
                     )
 
                     # Detect any new neuron registration
@@ -125,6 +150,10 @@ class MetagraphObserver:
                     # Store the new axons
                     axons = new_axons
 
+                except ConnectionRefusedError as e:
+                    btul.logging.error(f"Connection refused: {e}")
+                    await asyncio.sleep(1)
+
                 except Exception as e:
                     btul.logging.error(
                         f"❌ Unhandled error in loop: {e}",
@@ -135,7 +164,17 @@ class MetagraphObserver:
                     )
 
         finally:
+            # Ensure the metagraph is state as unready!
+            if not self.settings.dry_run:
+                btul.logging.debug(
+                    f"  Metagraph marked unready", prefix=self.settings.logging_name
+                )
+                await self.database.mark_as_unready()
+                await self.database.notify_state()
+
+            # Signal the run is completed
             self.run_complete.set()
+
             btul.logging.info(
                 "🛑 MetagraphObserver service exiting...",
                 prefix=self.settings.logging_name,
@@ -145,6 +184,10 @@ class MetagraphObserver:
         """
         Signals the observer to stop and waits for the loop to exit cleanly.
         """
+        btul.logging.info(
+            f"MetagraphObserver stopping...", prefix=self.settings.logging_name
+        )
+
         # Signal the service to exit
         self.should_exit.set()
 
@@ -329,6 +372,21 @@ class MetagraphObserver:
             )
 
         return new_axons, has_missing_country
+
+    async def _notify_if_needed(self, ready):
+        if ready:
+            return ready
+
+        btul.logging.debug(
+            "🔔 Metagraph marked ready", prefix=self.settings.logging_name
+        )
+        not self.settings.dry_run and await self.database.mark_as_ready()
+        btul.logging.debug(
+            "📣 Broadcasting metagraph ready state", prefix=self.settings.logging_name
+        )
+        not self.settings.dry_run and await self.database.notify_state()
+
+        return True
 
     async def _notify_if_needed(self, ready):
         if ready:

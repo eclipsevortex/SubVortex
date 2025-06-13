@@ -53,6 +53,26 @@ class Settings:
     If True, simulates the operation without executing it on-chain.
     """
 
+    score_saving_enabled: bool = False
+    """
+    Whether to save the scores returned by the forward method
+    """
+
+    score_max_entries: int = 100
+    """
+    Maximum number of scores to keep (in file or Redis)
+    """
+
+    score_saving_target: str = "json"
+    """
+    Where to save the scores — options are 'json' or 'redis'
+    """
+
+    score_saving_json_path: str = None
+    """
+    Path to save the scores if using json
+    """
+
     @classmethod
     def create(cls) -> "Settings":
         return scsu.create_settings_instance(cls)

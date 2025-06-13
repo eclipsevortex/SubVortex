@@ -1,8 +1,9 @@
+import asyncio
 from redis import asyncio as aioredis
 from packaging.version import parse as parse_version
+from weakref import WeakKeyDictionary
 
 import bittensor.utils.btlogging as btul
-
 from subvortex.core.database.database_utils import decode_value
 
 
@@ -10,75 +11,96 @@ class Database:
     def __init__(self, settings):
         self.models = {}
         self.settings = settings
-        self.database = None
+        self._clients = WeakKeyDictionary()  # Cache clients per event loop
 
-    async def connect(self):
-        self.database = aioredis.StrictRedis(
+    def _new_client(self):
+        return aioredis.StrictRedis(
             host=self.settings.database_host,
             port=self.settings.database_port,
             db=self.settings.database_index,
             password=self.settings.database_password,
         )
 
-        btul.logging.info("Connected to Redis", prefix=self.settings.logging_name)
+    def _get_loop(self):
+        return asyncio.get_running_loop()
+
+    async def get_client(self):
+        loop = self._get_loop()
+
+        if loop in self._clients:
+            return self._clients[loop]
+
+        client = self._new_client()
+        self._clients[loop] = client
+
+        btul.logging.info(
+            "Created new Redis client for event loop", prefix=self.settings.logging_name
+        )
+        return client
 
     async def is_connection_alive(self) -> bool:
+        client = await self.get_client()
+
         try:
-            pong = await self.database.ping()
+            pong = await client.ping()
             return pong is True
         except Exception as e:
-            btul.logging.warning(f"Redis connection check failed: {e}")
+            btul.logging.warning(
+                f"Redis connection check failed: {e}", prefix=self.settings.logging_name
+            )
             return False
 
     async def ensure_connection(self):
-        if self.database is None or not await self.is_connection_alive():
+        client = await self.get_client()
+
+        if not await self.is_connection_alive():
             btul.logging.warning(
-                "Reconnecting to Redis...",
+                "Redis ping failed, but client will be reused",
                 prefix=self.settings.logging_name,
             )
-            await self.connect()
+            # You may optionally recreate here if needed
 
     async def wait_until_ready(self, name: str):
-        # Ensure the connection is ip and running
         await self.ensure_connection()
+
+        client = await self.get_client()
 
         message_key = self._key(f"state:{name}")
         stream_key = self._key(f"state:{name}:stream")
         last_id = "$"
 
         try:
-            # Step 1: check the message key first
-            snapshot = await self.database.get(message_key)
+            snapshot = await client.get(message_key)
             if snapshot and snapshot.decode() == "ready":
-                btul.logging.info(
+                btul.logging.trace(
                     f"{name} is already ready (via message key)",
                     prefix=self.settings.logging_name,
                 )
                 return
 
             # Step 2: wait for stream messages
-            btul.logging.debug(
+            btul.logging.trace(
                 f"Waiting on stream: {stream_key}", prefix=self.settings.logging_name
             )
             while True:
-                entries = await self.database.xread({stream_key: last_id}, block=0)
+                entries = await client.xread({stream_key: last_id}, block=0)
                 if not entries:
                     continue
 
                 for stream_key, messages in entries:
-                    btul.logging.debug(
+                    btul.logging.trace(
                         f"Received stream message: {messages}",
                         prefix=self.settings.logging_name,
                     )
                     for msg_id, fields in messages:
-                        state = fields.get("state".encode(), b"").decode()
+                        state = fields.get(b"state", b"").decode()
                         if state == "ready":
-                            btul.logging.info(
+                            btul.logging.trace(
                                 f"{name} is now ready (via stream)",
                                 prefix=self.settings.logging_name,
                             )
                             return
-                        last_id = msg_id  # move forward
+                        last_id = msg_id
         except Exception as err:
             btul.logging.warning(
                 f"Failed to read the state of {name}: {err}",
@@ -86,14 +108,9 @@ class Database:
             )
 
     async def _get_migration_status(self, model_name: str):
-        """
-        Returns:
-            - latest_version: the 'new' version
-            - active_versions: versions marked 'dual' or 'new',
-            or fallback to latest if none are active.
-        """
-        # Ensure the connection is ip and running
         await self.ensure_connection()
+        
+        client = await self.get_client()
 
         latest = None
         active = []
@@ -101,7 +118,7 @@ class Database:
         all_versions = sorted(self.models[model_name].keys(), key=parse_version)
 
         for version in all_versions:
-            mode = await self.database.get(f"migration_mode:{version}")
+            mode = await client.get(f"migration_mode:{version}")
             mode = decode_value(mode)
 
             if mode == "new":

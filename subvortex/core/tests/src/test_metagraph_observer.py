@@ -237,30 +237,30 @@ async def test_start_and_stop(observer):
     observer._has_neuron_ip_changed = AsyncMock(return_value=(False, {}))
     observer.subtensor.get_current_block = AsyncMock(return_value=123)
 
+    # ✅ Patch self.subtensor.wait_for_block directly instead of global patch
+    observer.subtensor.wait_for_block = AsyncMock()
+
     # Force exit after one loop using `should_exit.set()` inside the loop
     # Patch wait_for_block so it returns immediately
-    with patch(
-        "subvortex.core.core_bittensor.subtensor.wait_for_block", new_callable=AsyncMock
-    ) as mock_wait:
-
-        async def wait_for_block_mock(*args, **kwargs):
-            await asyncio.sleep(0.1)
-            return True
-
-        mock_wait.side_effect = wait_for_block_mock
-
-        task = asyncio.create_task(observer.start())
+    async def wait_for_block_mock(*args, **kwargs):
         await asyncio.sleep(0.1)
-        await observer.stop()
+        return True
+    
+    observer.subtensor.wait_for_block.side_effect = wait_for_block_mock
 
-        # Await the start task to finish gracefully
-        await asyncio.wait_for(task, timeout=1.0)
+    task = asyncio.create_task(observer.start())
+    await asyncio.sleep(0.2)
+    await observer.stop()
+
+    # Await the start task to finish gracefully
+    await asyncio.wait_for(task, timeout=1.0)
 
     # Assertions
     assert observer.run_complete.is_set()
     observer._resync.assert_called_once()
     observer._notify_if_needed.assert_called_once()
     observer._has_new_neuron_registered.assert_called_once()
+    observer._has_neuron_ip_changed.assert_called_once()
 
 
 @pytest.mark.asyncio

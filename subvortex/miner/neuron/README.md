@@ -14,6 +14,7 @@ This document provides a comprehensive guide on how to set up and run the SubVor
   - [As process](#uninstall-as-process)
   - [As service](#uninstall-as-service)
   - [As docker container](#uninstall-as-container)
+- [Querier](#querier)
 
 ---
 
@@ -233,3 +234,152 @@ docker ps
 ```
 
 You should not see any container named `subvortex-miner-neuron`.
+
+<br />
+
+# Querier
+
+The **Querier** is a CLI tool to inspect and analyze the current state of Redis-synced neurons or scores. It supports filters, sorting, column selection, and pagination to help navigate large datasets efficiently.
+
+To run the Querier, use:
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh --namespace=<neuron|score> [options]
+```
+
+---
+
+### ✅ Basic Usage
+
+Query all neurons:
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh --namespace=neuron
+```
+
+Query all scores:
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh --namespace=score
+```
+
+---
+
+### 🎯 Filtering Data
+
+You can filter neurons or scores using various operators:
+
+| Operator    | Example                                  | Description                           |
+| ----------- | ---------------------------------------- | ------------------------------------- |
+| `=` or `==` | `--filter uid=42`                        | Equals                                |
+| `!=`        | `--filter hotkey!=abcd`                  | Not equals                            |
+| `>` / `<`   | `--filter stake>100`                     | Greater or less than (numeric only)   |
+| `>=` / `<=` | `--filter trust>=0.5`                    | Greater or equal / less or equal      |
+| `in`        | `--filter "country in FR,DE,US"`         | Field is one of the listed values     |
+| `not in`    | `--filter "ip not in 0.0.0.0,127.0.0.1"` | Field is not one of the listed values |
+
+You can use `--filter` multiple times to apply multiple conditions.
+
+---
+
+### 🧾 Selecting Fields
+
+By default, Querier displays all available fields that fit in your terminal. To manually select which fields to show:
+
+```bash
+--fields=uid,ip,country,stake
+```
+
+Example:
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh --namespace=neuron --fields=uid,stake,hotkey
+```
+
+---
+
+### 📊 Sorting
+
+Sort results by any numeric or string field. Use a minus `-` prefix to sort in descending order:
+
+```bash
+--sort=stake        # Ascending
+--sort=-stake       # Descending
+```
+
+Example:
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh  --namespace=neuron --sort=-uid
+```
+
+---
+
+### 📃 Pagination
+
+The Querier paginates results by default. To customize the number of rows per page:
+
+```bash
+--page-size=50
+```
+
+Press `Enter` to continue to the next page.
+
+---
+
+### 🛠️ Common Use Cases
+
+#### Show my neuron
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh \
+  --namespace=neuron \
+  --filter uid=60
+```
+
+#### Show all neurons from a country or multiple country
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh \
+  --namespace=neuron \
+  --filter country=FR \
+  --fields uid,hotkey,registered_at,ip,is_serving,version
+```
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh \
+  --namespace=neuron \
+  --filter "country in FR,ES" \
+  --fields uid,hotkey,registered_at,ip,is_serving,version
+```
+
+#### Show top 10 miners
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh \
+  --namespace=neuron \
+  --sort=-rank \
+  --page-size 10 \
+  --fields uid,hotkey,country,incentive
+```
+
+#### Show validators
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh \
+  --namespace=neuron \
+  --sort=-dividends \
+  --page-size 10 \
+  --fields uid,hotkey,country,dividends \
+  --filter "validator_trust>0" \
+  --filter "stake>1000"
+```
+
+#### Show last 10 scores
+
+```bash
+./subvortex/miner/neuron/scripts/neuron_querier.sh \
+  --namespace=score \
+  --sort=-block \
+  --page-size 10
+```

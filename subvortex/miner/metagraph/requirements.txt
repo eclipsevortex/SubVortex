@@ -1,4 +1,4 @@
-bittensor==9.6.0
+bittensor==9.7.0
 bittensor-wallet==3.0.10
 loguru==0.7.0
 numpy==2.0.1

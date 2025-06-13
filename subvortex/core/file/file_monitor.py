@@ -16,11 +16,10 @@
 # DEALINGS IN THE SOFTWARE.
 import asyncio
 import threading
-import bittensor.utils.btlogging as btul
 from enum import Enum
 
+import bittensor.utils.btlogging as btul
 from subvortex.core.file.file_provider import FileProvider
-
 
 LOGGER_NAME = "File Monitoring"
 
@@ -32,21 +31,34 @@ class FileType(Enum):
 
 class FileMonitor(threading.Thread):
     def __init__(self):
-        super().__init__()
+        super().__init__(daemon=True)
         self.stop_flag = threading.Event()
+        self.loop_ready = threading.Event()
         self.last_error_shown = None
         self.coroutines = []
-        self.loop = asyncio.new_event_loop()
+        self.loop = None
+        self._lock = threading.Lock()
 
     def add_file_provider(self, file_provider: FileProvider):
-        task = self.loop.create_task(self._check_file(file_provider))
-        self.coroutines.append(task)
+        # Wait indefinitely until the loop is ready
+        self.loop_ready.wait()
+
+        with self._lock:
+            if self.loop and not self.loop.is_closed():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._check_file(file_provider), self.loop
+                )
+                self.coroutines.append(future)
+            else:
+                btul.logging.error(f"[{LOGGER_NAME}] Cannot add file provider, loop closed")
+
 
     async def _check_file(self, file: FileProvider):
-        while not self.stop_flag.is_set():
-            try:
-                # Wait a specific time before starting
+        try:
+            while not self.stop_flag.is_set():
                 await asyncio.sleep(file.check_interval)
+                if self.stop_flag.is_set():
+                    break
 
                 btul.logging.debug(
                     f"[{LOGGER_NAME}][{file.logger_name}] Checking file..."
@@ -70,45 +82,39 @@ class FileMonitor(threading.Thread):
 
                 # Reset the last error shown
                 self.last_error_shown = None
-            except Exception as err:
-                error_message = f"[{LOGGER_NAME}][{file.logger_name}] Failed processing file: {err} {type(err)}"
-                if error_message != self.last_error_shown:
-                    btul.logging.error(error_message)
-                    self.last_error_shown = error_message
 
-    async def _run_async(self):
-        while not self.stop_flag.is_set():
-            try:
-                # Sleep for a second before gathering tasks
-                await asyncio.sleep(1)
-
-                if self.stop_flag.is_set():
-                    # Time to stop the file monitoring
-                    # We wait until all the tasks are finished
-                    await asyncio.gather(*self.coroutines)
-            except Exception as err:
-                error_message = (
-                    f"[{LOGGER_NAME}] Failed checking files: {err} {type(err)}"
-                )
-                if error_message != self.last_error_shown:
-                    btul.logging.error(error_message)
-                    self.last_error_shown = error_message
+        except Exception as err:
+            error_message = f"[{LOGGER_NAME}][{file.logger_name}] Failed processing file: {err} {type(err)}"
+            if error_message != self.last_error_shown:
+                btul.logging.error(error_message)
+                self.last_error_shown = error_message
 
     def run(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.loop_ready.set()
+
+        async def monitor():
+            while not self.stop_flag.is_set():
+                # Short sleep to yield to other tasks
+                await asyncio.sleep(0.1)
+
         try:
-            self.loop.run_until_complete(self._run_async())
+            self.loop.run_until_complete(monitor())
+        except Exception as err:
+            btul.logging.error(f"[{LOGGER_NAME}] Loop error: {err}")
         finally:
-            self.loop.stop()
-            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            pending = asyncio.all_tasks(loop=self.loop)
+            for task in pending:
+                task.cancel()
+            self.loop.run_until_complete(
+                asyncio.gather(*pending, return_exceptions=True)
+            )
             self.loop.close()
-
-        btul.logging.debug(f"[{LOGGER_NAME}] run ended")
-
-    def start(self):
-        super().start()
-        btul.logging.debug(f"[{LOGGER_NAME}] started")
+            btul.logging.debug(f"[{LOGGER_NAME}] Event loop closed")
 
     def stop(self):
+        btul.logging.info(f"[{LOGGER_NAME}] FileMonitor stopping")
         self.stop_flag.set()
-        super().join()
-        btul.logging.debug(f"[{LOGGER_NAME}] stopped")
+        self.join()
+        btul.logging.info(f"[{LOGGER_NAME}] FileMonitor stopped")

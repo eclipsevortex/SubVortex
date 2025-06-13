@@ -15,8 +15,3 @@ class Database(NeuronReadOnlyDatabase):
     It builds upon NeuronReadOnlyDatabase and adds write access and multi-model support
     for 'selection' and 'miner' domains.
     """
-
-    def __init__(self, settings):
-        super().__init__(settings=settings)
-
-        self.setup_neuron_models()

@@ -314,11 +314,6 @@ class Validator:
                     f"but current block is {current_block}. Ensure your metagraph is syncing properly."
                 )
 
-                # Wait until next step epoch.
-                current_block = get_next_block(
-                    subtensor=self.subtensor, block=current_block
-                )
-
                 # Run multiple forwards.
                 coroutines = [forward(self)]
                 await asyncio.gather(*coroutines)
@@ -326,6 +321,9 @@ class Validator:
                 # Check if stop has been requested
                 if self.should_exit.is_set():
                     break
+
+                # Get the next block
+                current_block = self.subtensor.get_current_block()
 
                 # Set weights if time for it and enough stake
                 must_set_weight = should_set_weights(
@@ -368,6 +366,10 @@ class Validator:
             except AssertionError:
                 # We already display a log, so need to do more here
                 pass
+
+            except ConnectionRefusedError as e:
+                btul.logging.error(f"Connection refused: {e}")
+                await asyncio.sleep(1)
 
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception: {ex}")

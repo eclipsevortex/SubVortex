@@ -34,7 +34,6 @@ class Database(NeuronReadOnlyDatabase):
     def __init__(self, settings):
         super().__init__(settings=settings)
 
-        self.setup_neuron_models()
         self.models["selection"] = {
             x.version: x
             for x in [SelectionModel200(), SelectionModel210(), SelectionModel211()]
@@ -47,11 +46,13 @@ class Database(NeuronReadOnlyDatabase):
         """
         Return selected uids for a hotkey using versioned selection models.
         """
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
+        # Get currently active versions of the "selection" schema to use during read.
         _, active = await self._get_migration_status("selection")
 
         for version in reversed(active):  # Prefer latest version
@@ -79,11 +80,13 @@ class Database(NeuronReadOnlyDatabase):
         """
         Store selected miner UIDs in all active selection model versions.
         """
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
+        # Get currently active versions of the "selection" schema to use during read.
         _, active = await self._get_migration_status("selection")
 
         for version in active:
@@ -106,12 +109,13 @@ class Database(NeuronReadOnlyDatabase):
         return None
 
     async def get_miner(self, hotkey: str) -> Miner:
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
+        # Get currently active versions of the "miner" schema to use during read.
         _, active = await self._get_migration_status("miner")
 
         for version in reversed(active):
@@ -136,12 +140,13 @@ class Database(NeuronReadOnlyDatabase):
         return None
 
     async def get_miners(self) -> dict[str, Miner]:
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
+        # Get currently active versions of the "miner" schema to use during read.
         _, active = await self._get_migration_status("miner")
 
         for version in reversed(active):
@@ -169,11 +174,13 @@ class Database(NeuronReadOnlyDatabase):
         """
         Add a new miner record to all active versions of the miner schema.
         """
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
+        # Get currently active versions of the "miner" schema to use during read.
         _, active = await self._get_migration_status("miner")
 
         for version in active:
@@ -200,11 +207,13 @@ class Database(NeuronReadOnlyDatabase):
         """
         Update an existing miner record.
         """
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
+        # Get currently active versions of the "miner" schema to use during read.
         _, active = await self._get_migration_status("miner")
 
         for version in reversed(active):
@@ -231,11 +240,13 @@ class Database(NeuronReadOnlyDatabase):
         """
         Bulk update for a list of miners using active model versions.
         """
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
+        # Get currently active versions of the "miner" schema to use during read.
         _, active = await self._get_migration_status("miner")
 
         for version in reversed(active):
@@ -262,9 +273,10 @@ class Database(NeuronReadOnlyDatabase):
         """
         Remove a single miner entry from all available versions.
         """
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
         for version, model in self.models["miner"].items():
@@ -287,9 +299,10 @@ class Database(NeuronReadOnlyDatabase):
         """
         Remove a single miner entry from all available versions.
         """
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
         for version, model in self.models["miner"].items():

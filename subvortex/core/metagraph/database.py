@@ -26,18 +26,22 @@ class NeuronReadOnlyDatabase(BaseDatabase):
     of modifying it.
     """
 
-    def setup_neuron_models(self):
+    def __init__(self, settings):
+        super().__init__(settings=settings)
+
         # Register neuron models keyed by their version
-        self.models["neuron"] = {x.version: x for x in [NeuronModel210(), NeuronModel211()]}
+        self.models["neuron"] = {
+            x.version: x for x in [NeuronModel210(), NeuronModel211()]
+        }
 
     async def get_neuron(self, hotkey: str) -> scmm.Neuron:
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
-        # Get the active versions
+        # Get currently active versions of the "neuron" schema to use during read.
         _, active = await self._get_migration_status("neuron")
 
         for version in reversed(active):
@@ -63,13 +67,13 @@ class NeuronReadOnlyDatabase(BaseDatabase):
         return None
 
     async def get_neurons(self) -> typing.Dict[str, scmm.Neuron]:
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
-        # Get the active versions
+        # Get currently active versions of the "neuron" schema to use during read.
         _, active = await self._get_migration_status("neuron")
 
         for version in reversed(active):
@@ -98,10 +102,10 @@ class NeuronReadOnlyDatabase(BaseDatabase):
         """
         Get the block of the last time the metagraph has been updated
         """
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
         try:
@@ -134,18 +138,14 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
     Use this class in components responsible for managing or syncing neuron state.
     """
 
-    def __init__(self, settings):
-        super().__init__(settings=settings)
-        self.setup_neuron_models()
-
     async def update_neurons(self, neurons: typing.List[scmm.Neuron]):
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
-        # Get the active versions
+        # Get currently active versions of the "neuron" schema to use during read.
         _, active = await self._get_migration_status("neuron")
 
         for version in reversed(active):
@@ -170,10 +170,10 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         return None
 
     async def remove_neurons(self, neurons: list[Neuron]):
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
         for version, model in self.models["neuron"].items():
@@ -197,10 +197,10 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         """
         Set the block of the last time the metagraph has been updated
         """
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
         try:
@@ -225,10 +225,10 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         await self._set_state(state="unready")
 
     async def notify_state(self):
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
         try:
@@ -236,9 +236,7 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
             state = await client.get(self._key("state:metagraph"))
 
             # Notify downstream via Redis stream
-            await client.xadd(
-                self._key("state:metagraph:stream"), {"state": state}
-            )
+            await client.xadd(self._key("state:metagraph:stream"), {"state": state})
 
         except Exception as ex:
             btul.logging.error(
@@ -255,10 +253,10 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         return f"{self.settings.key_prefix}:{key}"
 
     async def _set_state(self, state: str):
-        # Ensure the connection is up and running
+        # Ensure Redis connection is established before any operation.
         await self.ensure_connection()
 
-        # Get a client
+        # Get a connected Redis client, configured with the correct DB index and prefix.
         client = await self.get_client()
 
         try:

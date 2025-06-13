@@ -12,15 +12,19 @@ from subvortex.validator.neuron.src.database import Database
 class DummySettings:
     key_prefix = "sv"
     logging_name = "test"
-    redis_url = "redis://localhost:6379/0"
+    database_host="localhost"
+    database_port=6379
+    database_index=0
+    database_password=None
 
 
 @pytest_asyncio.fixture
 async def db():
     db = Database(DummySettings())
     db.ensure_connection = AsyncMock()
-    db.database = AsyncMock()
-    db.client = AsyncMock()
+    db.get_client = AsyncMock()
+    client = AsyncMock()
+    db.get_client.return_value = client
     return db
 
 
@@ -49,7 +53,7 @@ async def test_set_selection_miners_calls_write(db):
     await db.set_selection_miners("hotkey2", uids)
 
     db.models["selection"][version].write.assert_called_once_with(
-        db.database, "hotkey2", uids
+        db.get_client.return_value, "hotkey2", uids
     )
 
 
@@ -114,7 +118,7 @@ async def test_add_miner_calls_write(db):
     db.models["miner"][version].write = AsyncMock()
 
     await db.add_miner(miner)
-    db.models["miner"][version].write.assert_called_once_with(db.database, miner)
+    db.models["miner"][version].write.assert_called_once_with(db.get_client.return_value, miner)
 
 
 @pytest.mark.asyncio
@@ -126,7 +130,7 @@ async def test_update_miners_batch_success(db):
     db.models["miner"][version].write_all = AsyncMock()
 
     await db.update_miners(miners)
-    db.models["miner"][version].write_all.assert_called_once_with(db.database, miners)
+    db.models["miner"][version].write_all.assert_called_once_with(db.get_client.return_value, miners)
 
 
 @pytest.mark.asyncio
@@ -138,12 +142,12 @@ async def test_remove_miner_calls_delete(db):
     db.models["miner"][version].delete = AsyncMock()
 
     await db.remove_miner(miner)
-    db.models["miner"][version].delete.assert_called_once_with(db.database, miner)
+    db.models["miner"][version].delete.assert_called_once_with(db.get_client.return_value, miner)
 
 
 @pytest.mark.asyncio
 async def test_get_last_update_success(db):
-    db.database.get = AsyncMock(return_value=b"1000")
+    db.get_client.return_value.get = AsyncMock(return_value=b"1000")
 
     result = await db.get_neuron_last_updated()
     assert result == 1000
@@ -152,12 +156,12 @@ async def test_get_last_update_success(db):
 @pytest.mark.asyncio
 async def test_get_migration_status_returns_active_versions(db):
     db.models["selection"] = {"2.0.0": SelectionModel200()}
-    db.database.get = AsyncMock(return_value=b"new")
+    db.get_client.return_value.get = AsyncMock(return_value=b"new")
 
     latest, active = await db._get_migration_status("selection")
     assert latest == "2.0.0"
     assert active == ["2.0.0"]
-    db.database.get.assert_called_once_with("migration_mode:2.0.0")
+    db.get_client.return_value.get.assert_called_once_with("migration_mode:2.0.0")
 
 
 @pytest.mark.asyncio
@@ -166,7 +170,7 @@ async def test_get_migration_status_fallback(db):
         "2.0.0": SelectionModel200(),
         "2.1.0": SelectionModel200(),
     }
-    db.database.get = AsyncMock(return_value=None)
+    db.get_client.return_value.get = AsyncMock(return_value=None)
 
     latest, active = await db._get_migration_status("selection")
     assert latest == "2.1.0"

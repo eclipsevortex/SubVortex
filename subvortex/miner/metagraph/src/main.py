@@ -9,17 +9,17 @@ import bittensor.utils.btlogging as btul
 import bittensor.core.config as btcc
 import bittensor.core.async_subtensor as btcas
 import bittensor.core.metagraph as btcm
-import bittensor.core.settings as btcs
-import bittensor_wallet.utils as btwu
 
 import subvortex.core.core_bittensor.config.config_utils as scccu
-import subvortex.core.core_bittensor.subtensor as sccs
 import subvortex.core.metagraph.metagraph as scmm
 import subvortex.core.metagraph.database as scmms
 import subvortex.core.version as scv
 import subvortex.miner.metagraph.src.settings as smme
 
 load_dotenv(override=True)
+
+# An asyncio event to signal when shutdown is complete
+shutdown_complete = asyncio.Event()
 
 
 class Runner:
@@ -74,17 +74,6 @@ class Runner:
 
             # Initialize the subtensor
             self.subtensor = btcas.AsyncSubtensor(config=config, retry_forever=True)
-
-            # TODO: remove once OTF patched it
-            self.subtensor.substrate = sccs.RetryAsyncSubstrate(
-                url=self.subtensor.chain_endpoint,
-                ss58_format=btwu.SS58_FORMAT,
-                type_registry=btcs.TYPE_REGISTRY,
-                retry_forever=True,
-                use_remote_preset=True,
-                chain_name="Bittensor",
-                _mock=False,
-            )
             await self.subtensor.initialize()
             btul.logging.info(str(self.subtensor))
 
@@ -123,28 +112,43 @@ class Runner:
         btul.logging.info("Shutting down completed")
 
 
-if __name__ == "__main__":
+async def main():
+    # Initialize runner
     runner = Runner()
 
-    def _handle_signal(sig, frame):
-        loop.call_soon_threadsafe(lambda: asyncio.create_task(runner.shutdown()))
+    # Get the current asyncio event loop
+    loop = asyncio.get_running_loop()
 
-    # Create and set a new event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Define a signal handler that schedules the shutdown coroutine
+    def _signal_handler():
+        # Schedule graceful shutdown without blocking the signal handler
+        loop.create_task(_shutdown(runner))
 
-    # Register signal handlers (in main thread)
-    signal.signal(signal.SIGINT, _handle_signal)
-    signal.signal(signal.SIGTERM, _handle_signal)
+    # Register signal handlers for SIGINT (Ctrl+C) and SIGTERM (kill command)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, _signal_handler)
 
+    # Start the main service logic
+    await runner.start()
+
+    # Block here until shutdown is signaled and completed
+    await shutdown_complete.wait()
+
+
+async def _shutdown(runner: Runner):
+    # Gracefully shut down the service
+    await runner.shutdown()
+
+    # Notify the main function that shutdown is complete
+    shutdown_complete.set()
+
+
+if __name__ == "__main__":
     try:
-        # Run the metagraph
-        loop.run_until_complete(runner.start())
+        # Start the main asyncio loop
+        asyncio.run(main())
 
     except Exception as e:
+        # Log any unexpected exceptions that bubble up
         btul.logging.error(f"Unhandled exception: {e}")
         btul.logging.debug(traceback.format_exc())
-
-    finally:
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.close()

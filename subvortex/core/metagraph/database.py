@@ -34,6 +34,9 @@ class NeuronReadOnlyDatabase(BaseDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         # Get the active versions
         _, active = await self._get_migration_status("neuron")
 
@@ -44,7 +47,7 @@ class NeuronReadOnlyDatabase(BaseDatabase):
 
             try:
                 # Attempt to read the neuron using the model
-                neuron = await model.read(self.database, hotkey)
+                neuron = await model.read(client, hotkey)
                 return neuron
 
             except Exception as ex:
@@ -63,6 +66,9 @@ class NeuronReadOnlyDatabase(BaseDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         # Get the active versions
         _, active = await self._get_migration_status("neuron")
 
@@ -73,7 +79,7 @@ class NeuronReadOnlyDatabase(BaseDatabase):
 
             try:
                 # Attempt to read all neurons using the model
-                neurons = await model.read_all(self.database)
+                neurons = await model.read_all(client)
                 return neurons
 
             except Exception as ex:
@@ -95,8 +101,11 @@ class NeuronReadOnlyDatabase(BaseDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         try:
-            raw = await self.database.get(self._key("state:neuron:last_updated"))
+            raw = await client.get(self._key("state:neuron:last_updated"))
             return int(decode_value(raw) or 0)
 
         except Exception as ex:
@@ -133,6 +142,9 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         # Get the active versions
         _, active = await self._get_migration_status("neuron")
 
@@ -143,7 +155,7 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
 
             try:
                 # Attempt to write all neurons to the database
-                await model.write_all(self.database, neurons)
+                await model.write_all(client, neurons)
 
             except Exception as ex:
                 btul.logging.warning(
@@ -161,10 +173,13 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         for version, model in self.models["neuron"].items():
             try:
                 # Attempt to delete all given neurons
-                await model.delete_all(self.database, neurons)
+                await model.delete_all(client, neurons)
 
             except Exception as ex:
                 btul.logging.error(
@@ -185,8 +200,11 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         try:
-            await self.database.set(self._key("state:neuron:last_updated"), str(block))
+            await client.set(self._key("state:neuron:last_updated"), str(block))
 
         except Exception as ex:
             btul.logging.error(
@@ -210,12 +228,15 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         try:
             # Get the current state of the metagraph
-            state = await self.database.get(self._key("state:metagraph"))
+            state = await client.get(self._key("state:metagraph"))
 
             # Notify downstream via Redis stream
-            await self.database.xadd(
+            await client.xadd(
                 self._key("state:metagraph:stream"), {"state": state}
             )
 
@@ -237,9 +258,12 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         try:
             # Set the current metagraph state
-            await self.database.set(self._key("state:metagraph"), state)
+            await client.set(self._key("state:metagraph"), state)
 
         except Exception as ex:
             btul.logging.error(

@@ -9,7 +9,6 @@ from .subtensor import (
     get_next_block,
     get_hyperparameter_value,
     get_number_of_uids,
-    RetryAsyncSubstrate,
 )
 
 from .subtensor_settings import Settings
@@ -26,5 +25,4 @@ __all__ = [
     "get_next_block",
     "get_hyperparameter_value",
     "get_number_of_uids",
-    "RetryAsyncSubstrate",
 ]

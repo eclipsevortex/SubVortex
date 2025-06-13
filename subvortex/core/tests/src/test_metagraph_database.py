@@ -43,6 +43,7 @@ def database():
     # Patch the database and connection
     s.database = mock_redis
     s.ensure_connection = AsyncMock()
+    s.get_client = AsyncMock(return_value=mock_redis)
 
     # Patch _get_migration_status to return mock version
     s._get_migration_status = AsyncMock(return_value=(None, ["2.1.0"]))
@@ -57,6 +58,7 @@ def database():
     mock_model.delete_all = AsyncMock()
     s.models["neuron"]["2.1.0"] = mock_model
     s._mock_model = mock_model  # optional for assertions
+    s._mock_redis = mock_redis
 
     return s
 
@@ -77,7 +79,7 @@ async def test_update_neurons(database):
     neurons = [scmm.Neuron(hotkey="hk1"), scmm.Neuron(hotkey="hk2")]
     await database.update_neurons(neurons)
 
-    database._mock_model.write_all.assert_awaited_once_with(database.database, neurons)
+    database._mock_model.write_all.assert_awaited_once_with(database._mock_redis, neurons)
 
 
 @pytest.mark.asyncio
@@ -85,7 +87,7 @@ async def test_get_neuron_found(database):
     neuron = await database.get_neuron("hk1")
     assert neuron is not None
     assert neuron.hotkey == "hk1"
-    database._mock_model.read.assert_awaited_once_with(database.database, "hk1")
+    database._mock_model.read.assert_awaited_once_with(database._mock_redis, "hk1")
 
 
 @pytest.mark.asyncio
@@ -101,7 +103,7 @@ async def test_get_neurons(database):
 async def test_remove_neurons(database):
     neurons = [scmm.Neuron(hotkey="hk1")]
     await database.remove_neurons(neurons)
-    database._mock_model.delete_all.assert_awaited_once_with(database.database, neurons)
+    database._mock_model.delete_all.assert_awaited_once_with(database._mock_redis, neurons)
 
 
 @pytest.mark.asyncio

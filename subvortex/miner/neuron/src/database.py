@@ -31,6 +31,9 @@ class Database(NeuronReadOnlyDatabase):
         # Ensure the connection is up and running
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         # Get the active versions
         _, active = await self._get_migration_status("score")
 
@@ -41,7 +44,7 @@ class Database(NeuronReadOnlyDatabase):
 
             try:
                 # Attempt to read all neurons using the model
-                neurons = await model.read_all(self.database)
+                neurons = await model.read_all(client)
                 return neurons
 
             except Exception as ex:
@@ -62,6 +65,9 @@ class Database(NeuronReadOnlyDatabase):
         """
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         _, active = await self._get_migration_status("score")
 
         for version in reversed(active):
@@ -70,7 +76,7 @@ class Database(NeuronReadOnlyDatabase):
                 continue
 
             try:
-                await model.write(self.database, score)
+                await model.write(client, score)
 
             except Exception as ex:
                 btul.logging.warning(
@@ -87,6 +93,9 @@ class Database(NeuronReadOnlyDatabase):
     async def prune_scores(self, max_entries: int):
         await self.ensure_connection()
 
+        # Get a client
+        client = await self.get_client()
+
         _, active = await self._get_migration_status("score")
 
         for version in reversed(active):
@@ -95,7 +104,7 @@ class Database(NeuronReadOnlyDatabase):
                 continue
 
             try:
-                await model.prune(self.database, max_entries)
+                await model.prune(client, max_entries)
 
             except Exception as ex:
                 btul.logging.warning(

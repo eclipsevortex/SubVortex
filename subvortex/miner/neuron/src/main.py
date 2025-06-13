@@ -26,9 +26,6 @@ import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
 from dotenv import load_dotenv
 
-import bittensor.core.settings as btcs
-import bittensor_wallet.utils as btwu
-
 from subvortex.core.protocol import Score
 from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.substrate import (
@@ -42,7 +39,6 @@ from subvortex.core.core_bittensor.config.config_utils import update_config
 from subvortex.core.core_bittensor.metagraph import SubVortexMetagraph
 from subvortex.core.core_bittensor.axon import SubVortexAxon
 from subvortex.core.core_bittensor.synapse import Synapse
-from subvortex.core.core_bittensor.subtensor import wait_for_block, RetryAsyncSubstrate
 from subvortex.core.model.neuron.neuron import Neuron
 from subvortex.core.sse.sse_thread import SSEThread
 
@@ -68,6 +64,9 @@ from subvortex.miner.neuron.src.neuron import (
 
 # Load the environment variables for the whole process
 load_dotenv(override=True)
+
+# An asyncio event to signal when shutdown is complete
+shutdown_complete = asyncio.Event()
 
 
 class Miner:
@@ -146,12 +145,42 @@ class Miner:
         self.version = get_version()
         btul.logging.debug(f"Version: {self.version}")
 
+        self.loop = asyncio.get_running_loop()
+
         await self._initialize()
         await self._serve()
         await self._main_loop()
 
         # Signal the neuron has finished
         self.run_complete.set()
+
+    async def shutdown(self):
+        btul.logging.info("Shutting down miner...")
+
+        # Notify the miner to stop
+        self.should_exit.set()
+
+        # Wait the neuron to stop
+        await self.run_complete.wait()
+
+        if getattr(self, "axon", None):
+            self.axon.stop()
+            btul.logging.debug("Axon stopped")
+
+        if getattr(self, "subtensor", None):
+            await self.subtensor.close()
+            btul.logging.debug("Subtensor stopped")
+
+        if getattr(self, "sse", None):
+            self.sse.stop()
+
+        if getattr(self, "firewall", None):
+            self.firewall.stop()
+
+        if getattr(self, "file_monitor", None):
+            self.file_monitor.stop()
+
+        btul.logging.info("Shutting down miner completed")
 
     async def _initialize(self):
         self.wallet = (
@@ -167,16 +196,6 @@ class Miner:
             MockSubtensor(self.config.netuid, wallet=self.wallet)
             if self.config.miner.mock_subtensor
             else btcas.AsyncSubtensor(config=self.config, network=network)
-        )
-        # TODO: remove once OTF patched it
-        self.subtensor.substrate = RetryAsyncSubstrate(
-            url=self.subtensor.chain_endpoint,
-            ss58_format=btwu.SS58_FORMAT,
-            type_registry=btcs.TYPE_REGISTRY,
-            retry_forever=True,
-            use_remote_preset=True,
-            chain_name="Bittensor",
-            _mock=False,
         )
         await self.subtensor.initialize()
 
@@ -231,17 +250,20 @@ class Miner:
                 wallet=self.wallet,
                 config=self.config,
                 external_ip=btun.get_external_ip(),
-                blacklist_fn=self._blacklist,
+                blacklist_fn=self._sync_blacklist_handler,
             )
             if self.config.mock
             else SubVortexAxon(
                 wallet=self.wallet,
                 config=self.config,
                 external_ip=btun.get_external_ip(),
-                blacklist_fn=self._blacklist,
+                blacklist_fn=self._sync_blacklist_handler,
             )
         )
-        self.axon.attach(forward_fn=self._score, blacklist_fn=self._blacklist_score)
+        self.axon.attach(
+            forward_fn=self._score,
+            blacklist_fn=self._sync_blacklist_score_handler,
+        )
 
         if not self.settings.dry_run:
             # Start the axon
@@ -255,13 +277,39 @@ class Miner:
     async def _main_loop(self):
         while not self.should_exit.is_set():
             try:
-                # Wait for the next block
-                if not await wait_for_block(subtensor=self.subtensor):
+                # Wait for either a new block OR a shutdown signal, whichever comes first.
+                done, _ = await asyncio.wait(
+                    [
+                        self.subtensor.wait_for_block(),
+                        self.should_exit.wait(),
+                    ],
+                    timeout=24,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+
+                # Timeout, no tasks completed
+                if not done:
+                    btul.logging.warning(
+                        "⏲️ No new block retrieved within 24 seconds. Retrying..."
+                    )
+                    continue
+
+                # If shutdown signal is received, break the loop immediately
+                if self.should_exit.is_set():
+                    break
+
+                # If no new block was produced (e.g., shutdown happened or something failed), skip this round
+                # This guards against the case where wait_for_block() returned None or False
+                if not any(task.result() for task in done if not task.cancelled()):
                     continue
 
                 # Get the current block
                 current_block = await self.subtensor.get_current_block()
-                btul.logging.debug(f"Block #{current_block}")
+                btul.logging.debug(f"📦 Block #{current_block}")
+
+                # Ensure the metagraph is ready
+                btul.logging.debug("Ensure metagraph readiness")
+                await self.database.wait_until_ready("metagraph")
 
                 # Ensure the metagraph is ready
                 btul.logging.debug("Ensure metagraph readiness")
@@ -323,6 +371,10 @@ class Miner:
                 # We already display a log, so need to do more here
                 pass
 
+            except ConnectionRefusedError as e:
+                btul.logging.error(f"Connection refused: {e}")
+                await asyncio.sleep(1)
+
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception in main loop: {ex}")
                 btul.logging.debug(traceback.format_exc())
@@ -356,34 +408,6 @@ class Miner:
             whitelist_hotkeys=valid_validators,
         )
         btul.logging.debug("Firewall updated")
-
-    async def _shutdown(self):
-        btul.logging.info("Shutting down miner...")
-
-        # Notify the miner to stop
-        self.should_exit.set()
-
-        # Wait the neuron to stop
-        await self.run_complete.wait()
-
-        if getattr(self, "axon", None):
-            self.axon.stop()
-            btul.logging.debug("Axon stopped")
-
-        if getattr(self, "subtensor", None):
-            await self.subtensor.close()
-            btul.logging.debug("Subtensor stopped")
-
-        if getattr(self, "sse", None):
-            self.sse.stop()
-
-        if getattr(self, "firewall", None):
-            self.firewall.stop()
-
-        if getattr(self, "file_monitor", None):
-            self.file_monitor.stop()
-
-        btul.logging.info("Shutting down miner completed")
 
     async def _blacklist(self, synapse: Synapse) -> typing.Tuple[bool, str]:
         caller = synapse.dendrite.hotkey
@@ -482,32 +506,65 @@ class Miner:
 
         return synapse
 
-    async def _blacklist_score(self, synapse: Score) -> typing.Tuple[bool, str]:
-        return await self._blacklist(synapse)
+    def _sync_blacklist_handler(self, synapse: Synapse) -> typing.Tuple[bool, str]:
+        result = self._run_safe(self._blacklist(synapse))
+        return result or (True, "Error during blacklist check")
+
+    def _sync_blacklist_score_handler(self, synapse: Score) -> typing.Tuple[bool, str]:
+        result = self._run_safe(self._blacklist(synapse))
+        return result or (True, "Error during blacklist check")
+
+    def _run_safe(self, coro: typing.Coroutine, timeout: float = 10):
+        try:
+            future = asyncio.run_coroutine_threadsafe(coro, self.loop)
+            return future.result(timeout=timeout)
+
+        except ConnectionRefusedError as e:
+            pass
+
+        except Exception as e:
+            btul.logging.error(f"Error in threaded Axon handler: {e}")
+            btul.logging.debug(traceback.format_exc())
+            return None
+
+
+async def main():
+    # Initialize miner
+    miner = Miner()
+
+    # Get the current asyncio event loop
+    loop = asyncio.get_running_loop()
+
+    # Define a signal handler that schedules the shutdown coroutine
+    def _signal_handler():
+        # Schedule graceful shutdown without blocking the signal handler
+        loop.create_task(_shutdown(miner))
+
+    # Register signal handlers for SIGINT (Ctrl+C) and SIGTERM (kill command)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, _signal_handler)
+
+    # Start the main service logic
+    await miner.run()
+
+    # Block here until shutdown is signaled and completed
+    await shutdown_complete.wait()
+
+
+async def _shutdown(miner: Miner):
+    # Gracefully shut down the service
+    await miner.shutdown()
+
+    # Notify the main function that shutdown is complete
+    shutdown_complete.set()
 
 
 if __name__ == "__main__":
-    miner = Miner()
-
-    def _handle_signal(sig, frame):
-        loop.call_soon_threadsafe(lambda: asyncio.create_task(miner._shutdown()))
-
-    # Create and set a new event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    # Register signal handlers (in main thread)
-    signal.signal(signal.SIGINT, _handle_signal)
-    signal.signal(signal.SIGTERM, _handle_signal)
-
     try:
-        # Run the miner
-        loop.run_until_complete(miner.run())
+        # Start the main asyncio loop
+        asyncio.run(main())
 
     except Exception as e:
+        # Log any unexpected exceptions that bubble up
         btul.logging.error(f"Unhandled exception: {e}")
         btul.logging.debug(traceback.format_exc())
-    finally:
-        # Cleanup async generators and close loop
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.close()

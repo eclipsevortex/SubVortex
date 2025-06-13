@@ -33,16 +33,25 @@ class FileMonitor(threading.Thread):
     def __init__(self):
         super().__init__(daemon=True)
         self.stop_flag = threading.Event()
+        self.loop_ready = threading.Event()
         self.last_error_shown = None
         self.coroutines = []
         self.loop = None
+        self._lock = threading.Lock()
 
     def add_file_provider(self, file_provider: FileProvider):
-        if self.loop:
-            task = asyncio.run_coroutine_threadsafe(
-                self._check_file(file_provider), self.loop
-            )
-            self.coroutines.append(task)
+        # Wait indefinitely until the loop is ready
+        self.loop_ready.wait()
+
+        with self._lock:
+            if self.loop and not self.loop.is_closed():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._check_file(file_provider), self.loop
+                )
+                self.coroutines.append(future)
+            else:
+                btul.logging.error(f"[{LOGGER_NAME}] Cannot add file provider, loop closed")
+
 
     async def _check_file(self, file: FileProvider):
         try:
@@ -83,6 +92,7 @@ class FileMonitor(threading.Thread):
     def run(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
+        self.loop_ready.set()
 
         async def monitor():
             while not self.stop_flag.is_set():

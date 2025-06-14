@@ -357,16 +357,15 @@ class Miner:
 
                 # Ensure the subvortex metagraph has been synced within its mandatory interval
                 # We add a buffer of 5 minutes to ensure metagraph has time to sync
-                assert last_updated >= (
-                    current_block - (self.settings.metagraph_sync_interval + 25)
-                ), (
-                    f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
-                    f"but current block is {current_block}. Ensure your metagraph is syncing properly."
-                )
-
-            except AssertionError:
-                # We already display a log, so need to do more here
-                pass
+                if last_updated < current_block - (
+                    self.settings.metagraph_sync_interval + 25
+                ):
+                    btul.logging.warning(
+                        f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                        f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                    )
+                    await asyncio.sleep(1)
+                    continue
 
             except ConnectionRefusedError as e:
                 btul.logging.error(f"Connection refused: {e}")

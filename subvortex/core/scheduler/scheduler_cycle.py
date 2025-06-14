@@ -1,11 +1,11 @@
 import typing
 
 import subvortex.core.scheduler.utils as scsu
-import subvortex.core.scheduler.models as scsm
+import subvortex.core.scheduler.settings as scss
 
 
 def get_next_cycle(
-    settings: scsm.Settings, netuid: int, block: int, counter: typing.Dict[str, int]
+    settings: scss.Settings, netuid: int, block: int, counter: typing.Dict[str, int]
 ) -> range:
     """
     Compute the next cycle from the block

@@ -362,18 +362,20 @@ test:
 			svc_path=subvortex/$$comp/$$svc; \
 			if [ -d "$$svc_path" ]; then \
 				echo "🔍 Testing $$svc_path..."; \
-				PYTHONPATH=. pytest "$$svc_path"|| test $$? -eq 5 || exit $$?; \
+				PYTHONPATH=. pytest "$$svc_path" || test $$? -eq 5 || exit $$?; \
 			else \
 				echo "⚠️ Warning: Path $$svc_path not found, skipping..."; \
-			fi \
-		done \
+			fi; \
+		done; \
 	done; \
-	if [ -d "subvortex/core" ]; then \
-		echo "🔍 Testing subvortex/core..."; \
-		PYTHONPATH=. pytest subvortex/core || test $$? -eq 5 || exit $$?; \
-	else \
-		echo "⚠️ Warning: subvortex/core not found, skipping..."; \
-	fi
+	for core in validator miner; do \
+		if [ -d "subvortex/$$core/core" ]; then \
+			echo "🔍 Testing subvortex/$$core/core..."; \
+			PYTHONPATH=. pytest subvortex/$$core/core || test $$? -eq 5 || exit $$?; \
+		else \
+			echo "⚠️ Warning: subvortex/$$core/core not found, skipping..."; \
+		fi; \
+	done
 
 
 # ==========

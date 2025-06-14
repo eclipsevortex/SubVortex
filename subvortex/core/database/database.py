@@ -51,8 +51,6 @@ class Database:
             return False
 
     async def ensure_connection(self):
-        client = await self.get_client()
-
         if not await self.is_connection_alive():
             btul.logging.warning(
                 "Redis ping failed, but client will be reused",
@@ -60,7 +58,7 @@ class Database:
             )
             # You may optionally recreate here if needed
 
-    async def wait_until_ready(self, name: str):
+    async def wait_until_ready(self, name: str, event: asyncio.Event = None):
         await self.ensure_connection()
 
         client = await self.get_client()
@@ -81,9 +79,10 @@ class Database:
             btul.logging.debug(
                 f"Waiting on stream: {stream_key}", prefix=self.settings.logging_name
             )
-            while True:
+            while event is None or not event.is_set():
                 entries = await client.xread({stream_key: last_id}, block=0)
                 if not entries:
+                    asyncio.sleep(1)
                     continue
 
                 for stream_key, messages in entries:
@@ -100,6 +99,7 @@ class Database:
                             )
                             return
                         last_id = msg_id
+
         except Exception as err:
             btul.logging.warning(
                 f"Failed to read the state of {name}: {err}",
@@ -108,7 +108,7 @@ class Database:
 
     async def _get_migration_status(self, model_name: str):
         await self.ensure_connection()
-        
+
         client = await self.get_client()
 
         latest = None

@@ -70,6 +70,7 @@ load_dotenv(override=True)
 # An asyncio event to signal when shutdown is complete
 shutdown_complete = asyncio.Event()
 
+
 class Validator:
     """
     A Neuron instance represents a node in the Bittensor network that performs validation tasks.
@@ -223,7 +224,7 @@ class Validator:
                 # Ensure the metagraph is ready
                 btul.logging.debug("Ensure metagraph readiness")
                 await self.database.wait_until_ready("metagraph")
-                
+
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
                 if last_updated == 0:
@@ -276,8 +277,12 @@ class Validator:
                     )
 
                     # Get the miners with no ips
-                    miners_not_serving = [x.uid for x in self.miners if x.ip == "0.0.0.0"]
-                    btul.logging.debug(f"Miners not serving (not selectable): {miners_not_serving}")
+                    miners_not_serving = [
+                        x.uid for x in self.miners if x.ip == "0.0.0.0"
+                    ]
+                    btul.logging.debug(
+                        f"Miners not serving (not selectable): {miners_not_serving}"
+                    )
 
                     # Build the list of uids reset
                     uids_reset = np.flatnonzero(
@@ -307,12 +312,15 @@ class Validator:
 
                 # Ensure the subvortex metagraph has been synced within its mandatory interval
                 # We add a buffer of 5 minutes to ensure metagraph has time to sync
-                assert last_updated >= (
-                    current_block - (self.settings.metagraph_sync_interval + 25)
-                ), (
-                    f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
-                    f"but current block is {current_block}. Ensure your metagraph is syncing properly."
-                )
+                if last_updated < current_block - (
+                    self.settings.metagraph_sync_interval + 25
+                ):
+                    btul.logging.warning(
+                        f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                        f"but current block is {current_block}. Ensure your metagraph is syncing properly."
+                    )
+                    await asyncio.sleep(1)
+                    continue
 
                 # Run multiple forwards.
                 coroutines = [forward(self)]
@@ -362,10 +370,6 @@ class Validator:
                     init_wandb(self)
 
                 self.step += 1
-
-            except AssertionError:
-                # We already display a log, so need to do more here
-                pass
 
             except ConnectionRefusedError as e:
                 btul.logging.error(f"Connection refused: {e}")

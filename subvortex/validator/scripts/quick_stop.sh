@@ -64,11 +64,13 @@ done
 check_required_args EXECUTION
 
 echo "🛑 Stopping validator components..."
+"$NEURON_WORKING_DIR/challenger/scripts/challenger_stop.sh" --execution $EXECUTION || true
 "$NEURON_WORKING_DIR/neuron/scripts/neuron_stop.sh" --execution $EXECUTION || true
 "$NEURON_WORKING_DIR/metagraph/scripts/metagraph_stop.sh" --execution $EXECUTION || true
 "$NEURON_WORKING_DIR/redis/scripts/redis_stop.sh" --execution $EXECUTION || true
 
 echo "🧹 Tearing down validator components..."
+"$NEURON_WORKING_DIR/challenger/scripts/challenger_teardown.sh" --execution $EXECUTION || true
 "$NEURON_WORKING_DIR/neuron/scripts/neuron_teardown.sh" --execution $EXECUTION || true
 "$NEURON_WORKING_DIR/metagraph/scripts/metagraph_teardown.sh" --execution $EXECUTION || true
 "$NEURON_WORKING_DIR/redis/scripts/redis_teardown.sh" --execution $EXECUTION || true

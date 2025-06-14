@@ -42,7 +42,7 @@ class ChallengeExecutor:
         step_index: int,
         challengees: typing.List[Miner],
         identities: typing.Dict[str, typing.List],
-        ip_counts: Counter,
+        ip_counter: Counter,
     ) -> typing.Tuple[typing.Dict[str, ChallengeResult], Challenge]:
         checks_result: typing.Dict[str, ChallengeResult] = {}
 
@@ -65,9 +65,9 @@ class ChallengeExecutor:
                 continue
 
             # Validate unique IP usage
-            if ip_counts[ip] > 1:
+            if ip_counter[ip] > 1:
                 checks_result[hotkey] = ChallengeResult.create_failed(
-                    reason=f"{ip_counts[ip]} miners share IP {ip}",
+                    reason=f"{ip_counter[ip]} miners share IP {ip}",
                     challenge_attempts=self.settings.default_challenge_max_iteration,
                     avg_process_time=self.settings.challenge_timeout,
                 )

@@ -1,0 +1,39 @@
+[Unit]
+Description=SubVortex Validator Challenger
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=<WORKING_DIR>/subvortex/validator/challenger/.env
+ExecStart=<WORKING_DIR>/subvortex/validator/challenger/venv/bin/python3 -m subvortex.validator.challenger.src.main
+Restart=on-failure
+RestartSec=10s
+User=root
+Group=root
+WorkingDirectory=<WORKING_DIR>/subvortex/validator/challenger
+StandardOutput=append:/var/log/subvortex-validator/subvortex-validator-challenger.log
+StandardError=append:/var/log/subvortex-validator/subvortex-validator-challenger-error.log
+
+UMask=007
+RuntimeDirectory=subvortex-validator
+RuntimeDirectoryMode=2755
+
+# Security
+PrivateDevices=yes
+ProtectSystem=full
+ReadWriteDirectories=-/var/log/subvortex-validator
+ReadWriteDirectories=-/run/subvortex-validator
+
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID CAP_SYS_RESOURCE
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryDenyWriteExecute=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+
+[Install]
+WantedBy=multi-user.target
+Alias=subvortex-validator-challenger.service

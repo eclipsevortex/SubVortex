@@ -27,6 +27,7 @@ import subvortex.core.shared.substrate as scss
 import subvortex.core.core_bittensor.subtensor as scbs
 
 from subvortex.core.model.schedule import Schedule
+from subvortex.core.model.neuron import Neuron
 from subvortex.core.scheduler import scheduler_planner as planner
 from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.validator.core.challenger.miner import sync_miners
@@ -69,17 +70,22 @@ class Challenger:
             "🚀 Challenger starting...", prefix=self.settings.logging_name
         )
 
-        current_cycle = None
         previous_last_update = 0
         challengees = challengers = []
         while not self.should_exit.is_set():
             try:
                 # Ensure the metagraph is ready
-                btul.logging.debug("Ensure metagraph readiness")
-                await self.database.wait_until_ready(self.should_exit, "metagraph")
+                btul.logging.debug(
+                    "Ensure metagraph readiness", prefix=self.settings.logging_name
+                )
+                await self.database.wait_until_ready(
+                    name="metagraph", event=self.should_exit
+                )
 
                 # Check registration
-                btul.logging.debug("Checking registration...")
+                btul.logging.debug(
+                    "Checking registration...", prefix=self.settings.logging_name
+                )
                 await wait_until_registered(database=self.database, hotkey=self.hotkey)
 
                 # Get the current block
@@ -90,10 +96,27 @@ class Challenger:
 
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
-                if last_updated == 0:
+                btul.logging.debug(
+                    f"Metagraph last update: {last_updated}",
+                    prefix=self.settings.logging_name,
+                )
+
+                # Compute the cutoff
+                sync_cutoff = last_updated + self.settings.metagraph_sync_interval + 25
+                btul.logging.debug(
+                    f"Metagraph sync cutoff: {sync_cutoff}",
+                    prefix=self.settings.logging_name,
+                )
+
+                # Check is metagraph has been updated within its sync interval
+                if current_block > sync_cutoff:
                     btul.logging.warning(
-                        f"Could not get the neuron last updated from redis. Pleaase check your metagraph."
+                        f"⚠️ Metagraph may be out of sync! Last update was at block {last_updated}, "
+                        f"but current block is {current_block}. Ensure your metagraph is syncing properly.",
+                        prefix=self.settings.logging_name,
                     )
+                    await asyncio.sleep(1)
+                    continue
 
                 # Resync data if metagraph has changed
                 if previous_last_update != last_updated:
@@ -108,40 +131,25 @@ class Challenger:
                     # Get the list of neurons
                     neurons = await self.database.get_neurons()
 
-                    # Refresh the validator neuron
-                    neuron = neurons.get(self.hotkey)
-                    btul.logging.trace(
-                        f"Neuron details — Hotkey: {neuron.hotkey}, UID: {neuron.uid}, IP: {neuron.ip}"
-                    )
-
                     # Get min stake to set weight
-                    min_stake = await scss.get_weights_min_stake_async(
-                        substrate=self.subtensor.substrate
+                    min_stake = await scbs.get_weights_min_stake(
+                        subtensor=self.subtensor
                     )
                     btul.logging.debug(f"Minimum stake to set weights: {min_stake}")
 
-                    # Sync miners
-                    miners = await sync_miners(
-                        settings=self.settings,
-                        database=self.database,
-                        neurons=neurons,
-                        miners=challengees,
-                        validator=neuron,
-                        min_stake=min_stake,
-                    )
-
                     # Get the list of challengees
-                    challengees = list(miners)
+                    challengees = self._get_challengees(
+                        neurons=neurons, hotkey=self.hotkey, min_stake=min_stake
+                    )
                     btul.logging.debug(
                         f"# of challengees: {len(challengees)}",
                         prefix=self.settings.logging_name,
                     )
 
                     # Get the list of challengers
-                    hotkeys = [x.hotkey for x in challengees]
-                    challengers = [
-                        n for n in neurons.values() if n.hotkey not in hotkeys
-                    ]
+                    challengers = await self._get_challengers(
+                        neurons=neurons, hotkey=self.hotkey, min_stake=min_stake
+                    )
                     btul.logging.debug(
                         f"# of challengers: {len(challengers)}",
                         prefix=self.settings.logging_name,
@@ -155,152 +163,81 @@ class Challenger:
                 )
 
                 # Create challengee ip counter
-                ip_counts = Counter(x.ip for x in challengees)
+                ip_counter = Counter(x.ip for x in challengees)
 
-                # Compute new cycle if none or cycle expired
-                if current_cycle is None or current_block >= current_cycle.stop:
-                    current_cycle = planner.get_next_cycle(
-                        settings=self.settings,
-                        netuid=self.settings.netuid,
-                        block=current_block,
-                        countries=countries,
-                    )
-                    btul.logging.info(
-                        f"Cycle #{current_cycle.start} - #{current_cycle.stop}",
-                        prefix=self.settings.logging_name,
-                    )
+                # Get the current block
+                current_block = await self.subtensor.get_current_block()
 
-                # Get challenge schedule for this cycle
-                schedule: List[Schedule] = await planner.get_schedule(
-                    substrate=self.subtensor.substrate,
+                # Get next schedule (step and country)
+                step, country = planner.get_next_step2(
                     settings=self.settings,
-                    cycle=current_cycle,
-                    validators=challengers,
-                    countries=countries,
-                    hotkey=self.hotkey,
-                    instance=self.instance,
-                )
-                btul.logging.info(
-                    f"Fetched schedule with {len(schedule)} steps for cycle #{current_cycle.start}-{current_cycle.stop}",
-                    prefix=self.settings.logging_name,
-                )
-
-                # Save the schedule in database
-                await self.database.add_schedule(schedule)
-                btul.logging.trace("Schedule stored", prefix=self.settings.logging_name)
-
-                # TODO: Notify neuron schedule created
-
-                # Determine the current step in the schedule
-                step_index, next_step_start = planner.get_next_step(
-                    settings=self.settings,
-                    cycle=current_cycle,
                     block=current_block,
-                    counter=countries,
+                    challengers=challengers,
+                    countries=countries,
                 )
 
-                # Waiting until the next step starts
+                # Waiting until the step starts
                 btul.logging.debug(
-                    f"Waiting for step {step_index} to start at block #{next_step_start}",
+                    f"Waiting for step {step.step_index} to start at block #{step.start}",
                     prefix=self.settings.logging_name,
                 )
-                await self.subtensor.wait_for_block(next_step_start)
+                await self.subtensor.wait_for_block(block=step.start)
 
-                # # Process each step in the schedule
-                for step in schedule:
-                    if step.step_index < step_index:
-                        btul.logging.debug(
-                            f"[{step.step_index}] Skipping step — already past current step_index {step_index}",
-                            prefix=self.settings.logging_name,
-                        )
-                        continue
+                # Get challengees for the current step
+                step_challengees = [m for m in challengees if m.country == step.country]
+                btul.logging.info(
+                    f"[{step.step_index}] Starting challenge for country: {step.country} with {len(step_challengees)} challengees",
+                    prefix=self.settings.logging_name,
+                )
 
-                    # Get challengees for the current country step
-                    current_challengees = [
-                        m for m in challengees if m.country == step.country
-                    ]
-                    btul.logging.info(
-                        f"[{step.step_index}] Starting challenge for country: {step.country} with {len(current_challengees)} miners",
+                # Check if there are no challengees, display a warning message
+                if not step_challengees:
+                    btul.logging.warning(
+                        f"[{step.step_index}] No miners to challenge in {step.country}",
                         prefix=self.settings.logging_name,
                     )
+                    continue
 
-                    if not current_challengees:
-                        btul.logging.warning(
-                            f"[{step.step_index}] No miners to challenge in {step.country}",
-                            prefix=self.settings.logging_name,
-                        )
-                        continue
+                # Load the challengees identity
+                identities = await sci.get_challengee_identities(
+                    subtensor=self.subtensor,
+                    netuid=self.settings.netuid,
+                )
 
-                    # Wait for next block
-                    await self.subtensor.wait_for_block()
+                # Challenge all the challengees
+                results, challenge = await self.executor.run(
+                    step_id=step.id,
+                    step_index=step.step_index,
+                    challengees=step_challengees,
+                    identities=identities,
+                    ip_counter=ip_counter,
+                )
+                btul.logging.debug(
+                    f"[{step.step_index}] Executed challenge: {len(results)} results returned",
+                    prefix=self.settings.logging_name,
+                )
 
-                    # Get the challengees identity
-                    identities = await sci.get_challengee_identities(
-                        subtensor=self.subtensor,
-                        netuid=self.settings.netuid,
-                    )
+                # Score all the challengees
+                await self.scorer.run(
+                    step_index=step.step_index,
+                    challengees=step_challengees,
+                    results=results,
+                )
+                btul.logging.debug(
+                    f"[{step.step_index}] Scoring completed for {len(step_challengees)} challengees",
+                    prefix=self.settings.logging_name,
+                )
 
-                    if not identities:
-                        btul.logging.warning(
-                            f"[{step.step_index}] No identities retrieved from subtensor for challenge",
-                            prefix=self.settings.logging_name,
-                        )
-                    elif len(identities) != len(current_challengees):
-                        btul.logging.warning(
-                            f"[{step.step_index}] Mismatch: {len(current_challengees)} challengees, {len(identities)} identities",
-                            prefix=self.settings.logging_name,
-                        )
+                # Save the challengees result
 
-                    # Execute challenge and collect result
-                    results, challenge = await self.executor.run(
-                        step_id=step.id,
-                        step_index=step.step_index,
-                        challengees=current_challengees,
-                        identities=identities,
-                        ip_counts=ip_counts,
-                    )
-                    btul.logging.debug(
-                        f"[{step.step_index}] Executed challenge: {len(results)} results returned",
-                        prefix=self.settings.logging_name,
-                    )
+                # Send the challengees result
 
-                    # Apply scoring to challenged miners
-                    await self.scorer.run(
-                        step_index=step.step_index,
-                        challengees=current_challengees,
-                        results=results,
-                    )
-                    btul.logging.debug(
-                        f"[{step.step_index}] Scoring completed for {len(current_challengees)} challengees",
-                        prefix=self.settings.logging_name,
-                    )
-
-                    # Save the miners in database
-                    await self.database.update_miners(miners=miners)
-                    btul.logging.trace(
-                        f"[{step.step_index}] Miners saved",
-                        prefix=self.settings.logging_name,
-                    )
-
-                    # Save the challenge in database
-                    await self.database.add_challenge(challenge)
-                    btul.logging.info(
-                        f"[{step.step_index}] Challenge saved",
-                        prefix=self.settings.logging_name,
-                    )
-
-                    # TODO: Notify neuron challenge completed
-
-                    # Wait until this step ends
-                    btul.logging.debug(
-                        f"Waiting for step {step_index} to finish at block #{next_step_start}",
-                        prefix=self.settings.logging_name,
-                    )
-                    await self.subtensor.wait_for_block(block=step.block_end)
-
-            except AssertionError:
-                # We already display a log, so need to do more here
-                pass
+                # Wait until the step ends
+                btul.logging.debug(
+                    f"Waiting for step {step.step_index} to finish at block #{step.stop}",
+                    prefix=self.settings.logging_name,
+                )
+                await self.subtensor.wait_for_block(block=step.stop)
 
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception: {ex}")
@@ -326,3 +263,44 @@ class Challenger:
         btul.logging.info(
             "✅ Challenger stopped successfully.", prefix=self.settings.logging_name
         )
+
+    async def _get_challengers(
+        self,
+        settings: Settings,
+        neurons: List[Neuron],
+        hotkey: str,
+        min_stake: int,
+    ):
+
+        # Get the maximum allowed validators
+        max_validators = await scbs.get_max_allowed_validators(
+            subtensor=self.subtensor, netuid=self.settings.netuid
+        )
+        btul.logging.trace(f"Max allowed validators: {max_validators}")
+
+        # Get the list of challengers sorted by stake
+        challengers = sorted(
+            {
+                x
+                for x in neurons
+                if x.validator_trust > 0
+                or x.hotkey == hotkey
+                or (not settings.is_test and x.stake >= min_stake)
+            },
+            key=lambda x: x.stake,
+            reverse=True,
+        )
+        btul.logging.trace(f"# of potential challengers: {len(challengers)}")
+
+        return challengers[:max_validators]
+
+    def _get_challengees(
+        self, settings: Settings, neurons: List[Neuron], hotkey: str, min_stake: int
+    ):
+        return [
+            x
+            for x in neurons
+            if x.validator_trust == 0
+            and x.hotkey != hotkey
+            and (settings.is_test or x.stake < min_stake)
+        ]

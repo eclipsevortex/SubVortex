@@ -82,5 +82,11 @@ if [[ "${RECREATE:-false}" == "true" || "${RECREATE:-false}" == "True" ]]; then
     CMD+=" --recreate"
 fi
 eval "$CMD"
+echo "🚀 Restarting challenger..."
+CMD="$NEURON_WORKING_DIR/challenger/scripts/challenger_start.sh --execution $EXECUTION"
+if [[ "${RECREATE:-false}" == "true" || "${RECREATE:-false}" == "True" ]]; then
+    CMD+=" --recreate"
+fi
+eval "$CMD"
 
 echo "✅ All components started."

@@ -68,7 +68,7 @@ async def test_all_valid_miners(settings, dummy_miners):
             step_index=0,
             challengees=dummy_miners[:2],
             identities=identities,
-            ip_counts=ip_counts,
+            ip_counter=ip_counts,
         )
 
         assert all(r.is_successful for r in results.values())
@@ -98,7 +98,7 @@ async def test_miner_missing_identity(settings, dummy_miners):
             step_index=1,
             challengees=dummy_miners[:2],
             identities=identities,
-            ip_counts=ip_counts,
+            ip_counter=ip_counts,
         )
 
         assert "hk2" in results
@@ -132,7 +132,7 @@ async def test_miner_with_duplicate_ip(settings, dummy_miners):
             step_index=2,
             challengees=dummy_miners,
             identities=identities,
-            ip_counts=ip_counts,
+            ip_counter=ip_counts,
         )
 
         assert not results["hk1"].is_successful
@@ -156,7 +156,7 @@ async def test_no_valid_miners(settings, dummy_miners):
             step_index=3,
             challengees=dummy_miners,
             identities=identities,
-            ip_counts=ip_counts,
+            ip_counter=ip_counts,
         )
 
         assert all(not r.is_successful for r in results.values())

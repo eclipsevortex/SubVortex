@@ -48,12 +48,12 @@ def get_next_block(subtensor: btcs.Subtensor, block: int = 0):
     return current_block
 
 
-def get_number_of_uids(subtensor: btcs.Subtensor, netuid: int):
+async def get_number_of_uids(subtensor: btcas.AsyncSubtensor, netuid: int):
     """
     Return the number of UIDs in the network
     """
     # Get the number of registration during the current adjustment
-    number_of_neurons = subtensor.substrate.query(
+    number_of_neurons = await subtensor.substrate.query(
         module="SubtensorModule",
         storage_function="SubnetworkN",
         params=[netuid],
@@ -74,6 +74,20 @@ async def get_number_of_registration(subtensor: btcas.AsyncSubtensor, netuid: in
     )
 
     return number_of_registration.value
+
+
+async def get_max_allowed_validators(subtensor: btcas.AsyncSubtensor, netuid: int):
+    """
+    Return the number of registration done in the current interval
+    """
+    # Get the number of registration during the current adjustment
+    result = await subtensor.substrate.query(
+        module="SubtensorModule",
+        storage_function="MaxAllowedValidators",
+        params=[netuid],
+    )
+
+    return int(result.value, 0)
 
 
 async def get_next_adjustment_block(subtensor: btcas.AsyncSubtensor, netuid: int):
@@ -330,11 +344,16 @@ def get_hyperparameter_value(subtensor: "btcs.Subtensor", param_name: str, netui
     return value
 
 
-def get_number_of_uids(subtensor: btcs.Subtensor, netuid: int):
-    result = subtensor.substrate.query(
-        module="SubtensorModule",
-        storage_function="SubnetworkN",
-        params=[netuid],
+async def get_weights_min_stake(subtensor: "btcas.AsyncSubtensor"):
+    """
+    Return the minimum of TAO a validator need to have the set weight
+    """
+    # WeightsMinStake has been renamed StakeThreshold
+    result = await subtensor.substrate.query(
+        module="SubtensorModule", storage_function="StakeThreshold", params=[]
     )
 
-    return int(result.value or 0)
+    weight_min_stake = result.value if result is not None else 0
+
+    # Convert Rao to Tao
+    return int(float(weight_min_stake) * 10**-9)

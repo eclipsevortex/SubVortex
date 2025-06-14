@@ -9,6 +9,8 @@ from .subtensor import (
     get_next_block,
     get_hyperparameter_value,
     get_number_of_uids,
+    get_weights_min_stake,
+    get_max_allowed_validators,
 )
 
 from .subtensor_settings import Settings
@@ -25,4 +27,6 @@ __all__ = [
     "get_next_block",
     "get_hyperparameter_value",
     "get_number_of_uids",
+    "get_weights_min_stake",
+    "get_max_allowed_validators"
 ]

@@ -1,0 +1,27 @@
+{
+  "id": "validator-challenger",
+  "name": "subvortex-validator-challenger",
+  "description": "SubVortex Validator Challenger",
+  "version": "3.1.8",
+  "validator.version": "3.1.8",
+  "validator.challenger.version": "3.1.8",
+  "type": "python",
+  "neuron": "validator",
+  "component": "challenger",
+  "common": {
+    "user": "root",
+    "group": "root"
+  },
+  "service": {
+    "environment": {
+      "PYTHONUNBUFFERED": 1
+    },
+    "restart": "on-failure",
+    "restart_sec": "10s",
+    "log_prefix": "subvortex-validator-challenger"
+  },
+  "depends_on": [
+    "validator-redis",
+    "validator-metagraph"
+  ]
+}

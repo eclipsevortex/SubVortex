@@ -118,6 +118,22 @@ async def get_schedule(
     return steps
 
 
+def get_next_step2(
+    settings: scss.Settings,
+    block: int,
+    challengers: typing.List[scmn.Neuron],
+    countries: typing.Dict[str, int],
+):
+    # Get the cycle
+    cycle = get_next_cycle(
+        settings=settings, netuid=settings.netuid, block=block, countries=countries
+    )
+
+    # TODO: J'en suis la!!!!!
+
+    return (None, None)
+
+
 def get_next_cycle(
     settings: scss.Settings, netuid: int, block: int, countries: typing.Dict[str, int]
 ) -> range:

@@ -281,8 +281,8 @@ class Miner:
                 # Wait for either a new block OR a shutdown signal, whichever comes first.
                 done, _ = await asyncio.wait(
                     [
-                        self.subtensor.wait_for_block(),
-                        self.should_exit.wait(),
+                        asyncio.create_task(self.subtensor.wait_for_block()),
+                        asyncio.create_task(self.should_exit.wait()),
                     ],
                     timeout=24,
                     return_when=asyncio.FIRST_COMPLETED,

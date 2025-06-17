@@ -157,35 +157,41 @@ async def test_no_registration_yet(observer):
 @pytest.mark.asyncio
 async def test_has_neuron_ip_changed(observer):
     observer.subtensor = AsyncMock()
-    old_axons = {"hk1": "1.1.1.1"}
+    old_metegraph_info = {"hk1": {"ip": "1.1.1.1", "registered_at": 200}}
 
     with patch(
         "subvortex.core.core_bittensor.subtensor.get_axons",
-        return_value={"hk1": "1.1.1.2"},
+        return_value={"hk1": {"ip": "1.1.1.2", "registered_at": 200}},
     ):
         # Action
-        changed, new_axons = await observer._has_neuron_ip_changed(old_axons)
+        changed, new_metagraph_info = await observer._has_neuron_ip_changed(
+            old_metegraph_info
+        )
 
         # Assert
         assert changed is True
-        assert new_axons["hk1"] == "1.1.1.2"
+        assert new_metagraph_info["hk1"]["ip"] == "1.1.1.2"
+        assert new_metagraph_info["hk1"]["registered_at"] == 200
 
 
 @pytest.mark.asyncio
 async def test_has_neuron_ip_unchanged(observer):
     observer.subtensor = AsyncMock()
-    old_axons = {"hk1": "1.1.1.1"}
+    old_metegraph_info = {"hk1": {"ip": "1.1.1.1", "registered_at": 200}}
 
     with patch(
         "subvortex.core.core_bittensor.subtensor.get_axons",
-        return_value={"hk1": "1.1.1.1"},
+        return_value={"hk1": {"ip": "1.1.1.1", "registered_at": 200}},
     ):
         # Action
-        changed, new_axons = await observer._has_neuron_ip_changed(old_axons)
+        changed, new_metagraph_info = await observer._has_neuron_ip_changed(
+            old_metegraph_info
+        )
 
         # Assert
         assert changed is False
-        assert new_axons["hk1"] == "1.1.1.1"
+        assert new_metagraph_info["hk1"]["ip"] == "1.1.1.1"
+        assert new_metagraph_info["hk1"]["registered_at"] == 200
 
 
 @pytest.mark.asyncio
@@ -198,11 +204,15 @@ async def test_resync_updates_neurons(observer):
     fake_proto.hotkey = "hotkey123"
     fake_proto.incentive = 0.1
 
-    new_neuron = Neuron.from_proto = MagicMock(
-        return_value=Neuron(
-            uid=1, ip="1.2.3.4", hotkey="hotkey123", country="US", incentive=0.2
-        )
+
+    new_neuron = Neuron(
+        uid=1, ip="1.2.3.4", hotkey="hotkey123", country="US", incentive=0.2, registered_at=200
     )
+    # new_neuron = Neuron.from_proto = MagicMock(
+    #     return_value=Neuron(
+    #         uid=1, ip="1.2.3.4", hotkey="hotkey123", country="US", incentive=0.2
+    #     )
+    # )
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
@@ -210,13 +220,15 @@ async def test_resync_updates_neurons(observer):
     observer.database.update_neurons = AsyncMock()
 
     with (
-        patch(
-            "subvortex.core.model.neuron.neuron.Neuron.from_proto",
-            return_value=new_neuron,
-        ),
+        # patch(
+        #     "subvortex.core.model.neuron.neuron.Neuron.from_proto",
+        #     return_value=new_neuron,
+        # ),
         patch("subvortex.core.country.country.get_country", return_value="US"),
     ):
-        axons, _ = await observer._resync()
+        axons, _ = await observer._resync(
+            {"hotkey123": {"ip": "1.2.3.4", "registered_at": 200}}
+        )
         assert "hotkey123" in axons
         observer.database.update_neurons.assert_called_once_with([new_neuron])
         assert axons["hotkey123"] == "1.2.3.4"
@@ -229,7 +241,7 @@ async def test_start_and_stop(observer):
     mock_neuron.hotkey = "hk_test"
     mock_neuron.ip = "1.2.3.4"
     observer.database.get_neurons = AsyncMock(return_value={"hk_test": mock_neuron})
-    
+
     # Mock all internal behavior
     observer._resync = AsyncMock(return_value=({"hk": "1.1.1.1"}, False))
     observer._notify_if_needed = AsyncMock(return_value=True)
@@ -245,7 +257,7 @@ async def test_start_and_stop(observer):
     async def wait_for_block_mock(*args, **kwargs):
         await asyncio.sleep(0.1)
         return True
-    
+
     observer.subtensor.wait_for_block.side_effect = wait_for_block_mock
 
     task = asyncio.create_task(observer.start())
@@ -270,7 +282,7 @@ async def test_resync_no_neuron_change(observer):
     fake_proto.axon_info.ip = "1.2.3.4"
     fake_proto.hotkey = "hotkey123"
 
-    stored_neuron = scmm.Neuron(uid=1, ip="1.2.3.4", hotkey="hotkey123", country="US")
+    stored_neuron = scmm.Neuron(uid=1, ip="1.2.3.4", hotkey="hotkey123", country="US", registered_at=200)
 
     observer.metagraph = AsyncMock()
     observer.metagraph.neurons = [fake_proto]
@@ -286,7 +298,7 @@ async def test_resync_no_neuron_change(observer):
         ),
         patch("subvortex.core.country.country.get_country", return_value="FR"),
     ):
-        axons, _ = await observer._resync()
+        axons, _ = await observer._resync({"hotkey123": {"ip": "1.2.3.4", "registered_at": 200}})
 
         observer.database.remove_neurons.assert_not_called()
         observer.database.update_neurons.assert_not_called()

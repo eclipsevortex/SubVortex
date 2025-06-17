@@ -95,22 +95,24 @@ async def get_next_adjustment_block(subtensor: btcas.AsyncSubtensor, netuid: int
     return last_adjustment_block + adjustment_interval
 
 
-async def get_axons(subtensor: btcas.AsyncSubtensor, netuid: int):
+async def get_axons(subtensor: btcas.AsyncSubtensor, netuid: int) -> dict:
     """
     Return the list of axons
     """
     # Get the last adjustment interval
     metagraph = await subtensor.get_metagraph_info(netuid=netuid)
 
-    axons = {}
+    metagraph_info = {}
     for idx, (axon) in enumerate(metagraph.axons):
         axon_ip = axon.get("ip", 0)
         ip = str(netaddr.IPAddress(axon_ip)) if axon_ip != 0 else "0.0.0.0"
 
         hotkey = metagraph.hotkeys[idx]
-        axons[hotkey] = ip
+        registered_at = metagraph.block_at_registration[idx]
 
-    return axons
+        metagraph_info[hotkey] = dict(ip=ip, registered_at=registered_at)
+
+    return metagraph_info
 
 
 async def wait_for_block(

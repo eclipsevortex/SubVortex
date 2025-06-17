@@ -31,6 +31,7 @@ class Neuron:
     placeholder2: int = 0
     is_serving: bool = False
     country: Optional[str] = None
+    registered_at: int = 0
 
     def to_dict(self) -> dict:
         """Convert Neuron instance to a dict with consistent types."""
@@ -79,11 +80,12 @@ class Neuron:
             placeholder1=int(data["placeholder1"]),
             placeholder2=int(data["placeholder2"]),
             is_serving=bool(int(data["is_serving"])),
+            registered_at=int(data["registered_at"], 0),
             country=country,
         )
 
     @staticmethod
-    def from_proto(neuron: btccd.NeuronInfo) -> "Neuron":
+    def from_proto(neuron: btccd.NeuronInfo, neuron_info: dict = {}) -> "Neuron":
         """Create a Neuron instance from a cbc.NeuronInfo object."""
         return Neuron(
             uid=neuron.uid,
@@ -110,6 +112,7 @@ class Neuron:
             placeholder1=neuron.axon_info.placeholder1,
             placeholder2=neuron.axon_info.placeholder2,
             is_serving=neuron.axon_info.is_serving,
+            registered_at=neuron_info["registered_at"],
         )
 
     def create_empty() -> "Neuron":

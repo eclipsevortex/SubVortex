@@ -9,6 +9,7 @@ from bittensor.core.axon import AxonInfo
 class Miner:
     uid: int = -1
     rank: int = -1
+    registered_at: int = 0
     coldkey: str = None
     hotkey: str = None
     ip: str = "0.0.0.0"
@@ -64,6 +65,7 @@ class Miner:
             "uid": self.uid,
             "rank": self.rank,
             "hotkey": self.hotkey,
+            "registered_at": self.registered_at,
             "ip": self.ip or "0.0.0.0",
             "country": self.country or "",
             "version": self.version,
@@ -84,6 +86,7 @@ class Miner:
             uid=int(data.get("uid", -1)),
             rank=int(data.get("rank", -1)),
             hotkey=data.get("hotkey", hotkey),
+            registered_at=int(data.get("registered_at", 0)),
             ip=data.get("ip", "0.0.0.0"),
             country=data.get("country", None),
             version=data.get("version", "0.0.0"),
@@ -102,6 +105,7 @@ class Miner:
         self.rank = -1
         self.version = "0.0.0"
         self.verified = False
+        self.registered_at = 0
         self.sync = False
         self.suspicious = False
         self.penalty_factor = None

@@ -58,7 +58,10 @@ class MetagraphObserver:
         neurons = await self.database.get_neurons()
 
         # Build the current axons
-        axons = {x.hotkey: x.ip for x in neurons.values()}
+        metgraph_info = {
+            x.hotkey: dict(ip=x.ip, registered_at=x.registered_at)
+            for x in neurons.values()
+        }
 
         try:
             while not self.should_exit.is_set():
@@ -101,8 +104,8 @@ class MetagraphObserver:
                     )
 
                     # Detect if any neuron IP has changed
-                    has_axons_changed, new_axons = await self._has_neuron_ip_changed(
-                        axons
+                    has_axons_changed, new_metagraph_info = (
+                        await self._has_neuron_ip_changed(metgraph_info)
                     )
 
                     # Determine whether a resync is needed
@@ -139,16 +142,13 @@ class MetagraphObserver:
                     )
 
                     # Sync from chain and update Redis
-                    axons, has_missing_country = await self._resync()
+                    metgraph_info, has_missing_country = await self._resync(new_metagraph_info)
 
                     # Store the sync block
                     last_synced_block = block
 
                     # Notify listener the metagraph is ready
                     ready = await self._notify_if_needed(ready)
-
-                    # Store the new axons
-                    axons = new_axons
 
                 except ConnectionRefusedError as e:
                     btul.logging.error(f"Connection refused: {e}")
@@ -198,13 +198,13 @@ class MetagraphObserver:
             f"✅ MetagraphObserver service stopped", prefix=self.settings.logging_name
         )
 
-    async def _resync(self) -> dict[str, str]:
+    async def _resync(self, metgraph_info: dict) -> dict[str, str]:
         await self.metagraph.sync(subtensor=self.subtensor, lite=False)
         btul.logging.debug(
             "📡 Full metagraph sync complete", prefix=self.settings.logging_name
         )
 
-        new_axons: dict[str, str] = {}
+        new_metgraph_info: dict[str, dict] = {}
         updated_neurons: list[scmm.Neuron] = []
         neurons_to_delete: list[str] = []
         has_missing_country = False
@@ -217,7 +217,10 @@ class MetagraphObserver:
 
         mhotkeys = set()
         for mneuron in self.metagraph.neurons:
-            new_axons[mneuron.hotkey] = mneuron.axon_info.ip
+            # Set the ip for the axons
+            new_metgraph_info[mneuron.hotkey] = dict(
+                ip=mneuron.axon_info.ip, registered_at=metgraph_info[mneuron.hotkey]
+            )
 
             # Get the current neuron
             current_neuron = next(
@@ -225,7 +228,7 @@ class MetagraphObserver:
             )
 
             # Create teh new neuron from the metagraph
-            new_neuron = scmm.Neuron.from_proto(mneuron)
+            new_neuron = scmm.Neuron.from_proto(mneuron, metgraph_info[mneuron.hotkey])
 
             # Set the country for the new neuron
             country = (
@@ -371,7 +374,7 @@ class MetagraphObserver:
                 prefix=self.settings.logging_name,
             )
 
-        return new_axons, has_missing_country
+        return new_metgraph_info, has_missing_country
 
     async def _notify_if_needed(self, ready):
         if ready:
@@ -403,25 +406,26 @@ class MetagraphObserver:
         return new_count > 0, new_count
 
     async def _has_neuron_ip_changed(
-        self, axons: dict[str, str]
+        self, metgraph_info: dict[str, str]
     ) -> tuple[bool, dict[str, str]]:
-        latest_axons = await scbs.get_axons(
+        new_metgraph_info = await scbs.get_axons(
             subtensor=self.subtensor,
             netuid=self.settings.netuid,
         )
 
         changed_axons = {}
 
-        for hotkey, latest_ip in latest_axons.items():
-            old_ip = axons.get(hotkey)
-            if old_ip != latest_ip:
-                changed_axons[hotkey] = latest_ip
+        for hotkey, info in new_metgraph_info.items():
+            old_ip = metgraph_info[hotkey]["ip"]
+            new_ip = info["ip"]
+            if old_ip != new_ip:
+                changed_axons[hotkey] = new_ip
                 btul.logging.debug(
-                    f"📡 IP changed for {hotkey}: {old_ip} -> {latest_ip}",
+                    f"📡 IP changed for {hotkey}: {old_ip} -> {new_ip}",
                     prefix=self.settings.logging_name,
                 )
 
-        return len(changed_axons.keys()) > 0, latest_axons
+        return len(changed_axons.keys()) > 0, new_metgraph_info
 
     def _get_details_changed(self, new_neuron, current_neuron):
         mismatches = []

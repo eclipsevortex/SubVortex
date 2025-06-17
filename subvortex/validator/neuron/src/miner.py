@@ -124,6 +124,7 @@ async def sync_miners(
         miner.uid = neuron.uid
         miner.ip = neuron.ip
         miner.port = neuron.port
+        miner.registered_at = neuron.registered_at
         miner.coldkey = neuron.coldkey
         miner.hotkey = neuron.hotkey
         miner.country = neuron.country

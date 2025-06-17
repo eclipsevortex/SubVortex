@@ -22,8 +22,8 @@ import bittensor.core.chain_data as btccd
 import bittensor.core.subtensor as btcs
 import bittensor.core.settings as btcse
 import bittensor.utils.btlogging as btul
-from typing import Dict
-from collections import Counter
+from typing import Dict, List
+from collections import Counter, defaultdict
 
 from subvortex.core.constants import DEFAULT_PROCESS_TIME
 from subvortex.core.protocol import Synapse
@@ -44,6 +44,7 @@ from subvortex.validator.neuron.src.state import save_state
 CHALLENGE_NAME = "Challenge"
 
 DEFAULT_CHALLENGE_PROCESS_TIME = 60
+MAX_MINERS_PER_COUNTRY = 10
 
 # Number of historic blocks a lite node has
 LITE_NODE_BLOCK_UPPER_LIMIT = 10
@@ -411,6 +412,12 @@ async def challenge_data(self, block: int):
 
     btul.logging.debug(f"[{CHALLENGE_NAME}] Miners scores computed")
 
+    # Enforce number of miners per country
+    enforce_country_miner_limit(miners=miners, moving_scores=self.moving_scores)
+    btul.logging.debug(
+        f"[{CHALLENGE_NAME}] Enforced country limit: max {MAX_MINERS_PER_COUNTRY} miners per country"
+    )
+
     # Save data in database
     await self.database.update_miners(miners=miners)
     btul.logging.trace(f"[{CHALLENGE_NAME}] Miners saved")
@@ -472,3 +479,24 @@ async def challenge_data(self, block: int):
 
     # Log event
     log_event(self, uids, forward_time)
+
+
+def enforce_country_miner_limit(miners: List[Miner], moving_scores):
+    # Group miners by country
+    country_to_miners = defaultdict(list)
+    for miner in miners:
+        country_to_miners[miner.country].append(miner)
+
+    # For countries exceeding the limit, sort by score and registered_at
+    for country, miners_in_country in country_to_miners.items():
+        if len(miners_in_country) > MAX_MINERS_PER_COUNTRY:
+            sorted_by_score = sorted(
+                miners_in_country,
+                key=lambda m: (-moving_scores[m.uid], m.registered_at),
+            )
+            for miner in sorted_by_score[MAX_MINERS_PER_COUNTRY:]:
+                btul.logging.warning(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] Country '{country}' over limit ({len(miners_in_country)} miners). Score set to 0."
+                )
+                miner.score = 0.0
+                moving_scores[miner.uid] = 0.0

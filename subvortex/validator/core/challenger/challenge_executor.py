@@ -19,8 +19,9 @@ from collections import Counter
 
 import bittensor.utils.btlogging as btul
 
+from subvortex.core.identity import Node
+from subvortex.core.model.neuron import Neuron
 from subvortex.core.model.challenge import Challenge
-from subvortex.validator.core.model.miner import Miner
 from subvortex.validator.core.challenger.settings import Settings
 from subvortex.validator.core.challenger.model import ChallengeResult
 from subvortex.validator.core.challenger.challenges.executor import execute_challenge
@@ -40,39 +41,36 @@ class ChallengeExecutor:
         self,
         step_id: str,
         step_index: int,
-        challengees: typing.List[Miner],
-        identities: typing.Dict[str, typing.List],
+        challengees: typing.List[Neuron],
+        challengees_nodes: typing.Dict[str, typing.List[Node]],
         ip_counter: Counter,
     ) -> typing.Tuple[typing.Dict[str, ChallengeResult], Challenge]:
-        checks_result: typing.Dict[str, ChallengeResult] = {}
+        checks_result: typing.Dict[str, typing.List[ChallengeResult]] = {}
 
         # --- Filter out invalid challengees ---
-        for miner in challengees:
-            hotkey = miner.hotkey
-            ip = miner.ip
-
+        for challengee in challengees:
             # Validate identity presence
-            if hotkey not in identities:
-                checks_result[hotkey] = ChallengeResult.create_failed(
+            if challengee.hotkey not in challengees_nodes:
+                checks_result[challengee.hotkey] = ChallengeResult.create_failed(
                     reason="Identity is not set",
                     challenge_attempts=self.settings.default_challenge_max_iteration,
                     avg_process_time=self.settings.challenge_timeout,
                 )
                 btul.logging.debug(
-                    f"[{step_index}][{miner.uid}] Skipped - identity not found",
+                    f"[{step_index}][{challengee.uid}] Skipped - identity not found",
                     prefix=self.settings.logging_name,
                 )
                 continue
 
             # Validate unique IP usage
-            if ip_counter[ip] > 1:
-                checks_result[hotkey] = ChallengeResult.create_failed(
-                    reason=f"{ip_counter[ip]} miners share IP {ip}",
+            if ip_counter[challengee.ip] > 1:
+                checks_result[challengee.hotkey] = ChallengeResult.create_failed(
+                    reason=f"{ip_counter[challengee.ip]} miners share IP {challengee.ip}",
                     challenge_attempts=self.settings.default_challenge_max_iteration,
                     avg_process_time=self.settings.challenge_timeout,
                 )
                 btul.logging.debug(
-                    f"[{step_index}][{miner.uid}] Skipped - IP conflict ({ip})",
+                    f"[{step_index}][{challengee.uid}] Skipped - IP conflict ({challengee.ip})",
                     prefix=self.settings.logging_name,
                 )
 
@@ -95,8 +93,8 @@ class ChallengeExecutor:
             step_id=step_id,
             settings=self.settings,
             subtensor=self.subtensor,
-            challengers=valid_challengees,
-            nodes=identities,
+            challengees=valid_challengees,
+            challengees_nodes=challengees_nodes,
         )
 
         # --- Merge filtered and executed results ---

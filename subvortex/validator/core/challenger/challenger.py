@@ -71,7 +71,8 @@ class Challenger:
         )
 
         previous_last_update = 0
-        challengees = challengers = []
+        challengees: List[Neuron] = []
+        challengers: List[Neuron] = []
         while not self.should_exit.is_set():
             try:
                 # Ensure the metagraph is ready
@@ -169,19 +170,21 @@ class Challenger:
                 current_block = await self.subtensor.get_current_block()
 
                 # Get next schedule (step and country)
-                step, country = planner.get_next_step2(
+                step = await planner.get_next_step2(
+                    subtensor=self.subtensor,
                     settings=self.settings,
-                    block=current_block,
                     challengers=challengers,
                     countries=countries,
+                    hotkey=self.hotkey,
+                    block=current_block,
                 )
 
                 # Waiting until the step starts
                 btul.logging.debug(
-                    f"Waiting for step {step.step_index} to start at block #{step.start}",
+                    f"Waiting for step {step.step_index} to start at block #{step.block_start}",
                     prefix=self.settings.logging_name,
                 )
-                await self.subtensor.wait_for_block(block=step.start)
+                await self.subtensor.wait_for_block(block=step.block_start)
 
                 # Get challengees for the current step
                 step_challengees = [m for m in challengees if m.country == step.country]
@@ -199,7 +202,7 @@ class Challenger:
                     continue
 
                 # Load the challengees identity
-                identities = await sci.get_challengee_identities(
+                challengees_nodes = await sci.get_challengees_nodes(
                     subtensor=self.subtensor,
                     netuid=self.settings.netuid,
                 )
@@ -209,7 +212,7 @@ class Challenger:
                     step_id=step.id,
                     step_index=step.step_index,
                     challengees=step_challengees,
-                    identities=identities,
+                    challengees_nodes=challengees_nodes,
                     ip_counter=ip_counter,
                 )
                 btul.logging.debug(
@@ -217,8 +220,16 @@ class Challenger:
                     prefix=self.settings.logging_name,
                 )
 
+                # Save the challenge
+                await self.database.add_challenge(challenge=challenge)
+                btul.logging.trace(
+                    f"[{step.step_index}] Challenge {challenge.id} stored",
+                    prefix=self.settings.logging_name,
+                )
+
                 # Score all the challengees
                 await self.scorer.run(
+                    database=self.database,
                     step_index=step.step_index,
                     challengees=step_challengees,
                     results=results,
@@ -228,16 +239,14 @@ class Challenger:
                     prefix=self.settings.logging_name,
                 )
 
-                # Save the challengees result
-
-                # Send the challengees result
+                # Send the scores
 
                 # Wait until the step ends
                 btul.logging.debug(
-                    f"Waiting for step {step.step_index} to finish at block #{step.stop}",
+                    f"Waiting for step {step.step_index} to finish at block #{step.block_stop}",
                     prefix=self.settings.logging_name,
                 )
-                await self.subtensor.wait_for_block(block=step.stop)
+                await self.subtensor.wait_for_block(block=step.block_stop)
 
             except Exception as ex:
                 btul.logging.error(f"Unhandled exception: {ex}")
@@ -270,7 +279,7 @@ class Challenger:
         neurons: List[Neuron],
         hotkey: str,
         min_stake: int,
-    ):
+    ) -> List[Neuron]:
 
         # Get the maximum allowed validators
         max_validators = await scbs.get_max_allowed_validators(
@@ -296,7 +305,7 @@ class Challenger:
 
     def _get_challengees(
         self, settings: Settings, neurons: List[Neuron], hotkey: str, min_stake: int
-    ):
+    ) -> List[Neuron]:
         return [
             x
             for x in neurons

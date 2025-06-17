@@ -32,6 +32,9 @@ class TaskResult:
 
 @dataclass
 class ChallengeResult:
+    # Id of the node
+    id: str
+
     # Name of the blockchain of the node
     chain: str
 
@@ -65,8 +68,9 @@ class ChallengeResult:
 
     @staticmethod
     def create_default(
-        chain=None,
-        type=None,
+        id: str,
+        chain: str,
+        type: str,
         is_available=False,
         is_reliable=False,
         reason="",
@@ -75,6 +79,7 @@ class ChallengeResult:
         avg_process_time=0,
     ):
         return ChallengeResult(
+            id=id,
             chain=chain,
             type=type,
             is_available=is_available,

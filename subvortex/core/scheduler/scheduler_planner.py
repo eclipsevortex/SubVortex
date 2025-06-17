@@ -4,6 +4,7 @@ import typing
 import hashlib
 from async_substrate_interface import AsyncSubstrateInterface
 
+import bittensor.core.async_subtensor as btcas
 import bittensor.utils.btlogging as btul
 
 import subvortex.core.model.neuron as scmn
@@ -118,20 +119,31 @@ async def get_schedule(
     return steps
 
 
-def get_next_step2(
+async def get_next_step2(
     settings: scss.Settings,
-    block: int,
+    subtensor: btcas.AsyncSubtensor,
     challengers: typing.List[scmn.Neuron],
     countries: typing.Dict[str, int],
-):
+    hotkey: str,
+    block: int,
+) -> scms.Schedule:
     # Get the cycle
     cycle = get_next_cycle(
         settings=settings, netuid=settings.netuid, block=block, countries=countries
     )
 
-    # TODO: J'en suis la!!!!!
+    # Get the scheduler
+    schedule = await get_schedule(
+        substrate=subtensor.substrate,
+        settings=settings,
+        cycle=cycle,
+        challengers=challengers,
+        countries=countries,
+        hotkey=hotkey,
+        instance=0,
+    )
 
-    return (None, None)
+    return schedule
 
 
 def get_next_cycle(

@@ -9,7 +9,7 @@ class Schedule:
     cycle_start: int
     cycle_end: int
     block_start: int
-    block_end: int
+    block_stop: int
     country: str
 
     def __init__(
@@ -27,13 +27,13 @@ class Schedule:
         self.cycle_start = cycle_start
         self.cycle_end = cycle_end
         self.block_start = block_start
-        self.block_end = block_end
+        self.block_stop = block_end
         self.country = country
 
     @property
     def id(self):
         return (
-            f"{self.instance}:{self.cycle_start}:{self.cycle_end}:{self.block_start}:{self.block_end}"
+            f"{self.instance}:{self.cycle_start}:{self.cycle_end}:{self.block_start}:{self.block_stop}"
         )
 
     @property
@@ -85,7 +85,7 @@ class Schedule:
             "cycle_start": self.cycle_start,
             "cycle_end": self.cycle_end,
             "block_start": self.block_start,
-            "block_end": self.block_end,
+            "block_end": self.block_stop,
             "country": self.country,
         }
 

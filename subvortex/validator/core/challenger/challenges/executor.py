@@ -7,6 +7,7 @@ import bittensor.core.async_subtensor as btcas
 import bittensor.utils.btlogging as btul
 
 import subvortex.core.identity as cci
+import subvortex.core.model.neuron as cmn
 import subvortex.core.model.challenge as cmc
 import subvortex.validator.core.model.miner as cmm
 import subvortex.validator.core.challenger.settings as ccs
@@ -18,20 +19,20 @@ async def execute_challenge(
     step_id: str,
     settings: ccs.Settings,
     subtensor: btcas.AsyncSubtensor,
-    challengers: typing.List[cmm.Miner],
-    nodes: typing.Dict[str, typing.List],
+    challengees: typing.List[cmn.Neuron],
+    challengees_nodes: typing.Dict[str, typing.List[cci.Node]],
 ) -> typing.Tuple[typing.Dict[str, ccm.ChallengeResult], cmc.Challenge]:
     tasks = []
 
-    # Get the nodes of all the challengers
-    challengers_nodes = list(
+    # Get the nodes of all the challengees
+    nodes = list(
         chain.from_iterable(
-            [nodes.get(x.hotkey, cci.DEFAULT_NODE) for x in challengers]
+            [challengees_nodes.get(x.hotkey, cci.DEFAULT_NODE) for x in challengees]
         )
     )
 
     # Get all the unique chain of the nodes
-    node_chains = list(set([x.get("chain") for x in challengers_nodes]))
+    node_chains = list(set([x.get("chain") for x in nodes]))
     btul.logging.debug(f"# of chains: {len(node_chains)}", prefix=settings.logging_name)
 
     # Select the chain node to challenge
@@ -40,15 +41,9 @@ async def execute_challenge(
         f"Chain selected: {node_chain_selected}", prefix=settings.logging_name
     )
 
-    # Get all the unique chain of the nodes
+    # Get all the node types of the selected chain
     node_types = list(
-        set(
-            [
-                x.get("type")
-                for x in challengers_nodes
-                if x.get("chain") == node_chain_selected
-            ]
-        )
+        set([x.get("type") for x in nodes if x.get("chain") == node_chain_selected])
     )
     btul.logging.debug(
         f"# of chain types: {len(node_types)}", prefix=settings.logging_name
@@ -69,7 +64,7 @@ async def execute_challenge(
             if node["chain"] == node_chain_selected
             and node["type"] == node_type_selected
         ]
-        for hotkey, nodes in nodes.items()
+        for hotkey, nodes in challengees_nodes.items()
         if any(node["chain"] == node_chain_selected for node in nodes)
     }
     btul.logging.debug(f"Node selected: {nodes_selected}", prefix=settings.logging_name)
@@ -105,12 +100,12 @@ async def execute_challenge(
 
     btul.logging.info(f"Executing challenge", prefix=settings.logging_name)
     for i in range(max_connection):
-        for challenger in challengers:
-            challenger_nodes = list(nodes_selected.get(challenger.hotkey, []))
-            for node in challenger_nodes:
+        for challengee in challengees:
+            challengee_nodes = list(nodes_selected.get(challengee.hotkey, []))
+            for challengee_node in challengee_nodes:
                 # Check if the node has less connection than the current iteration
                 max_node_connection = max(
-                    node.get("max-connection", 0),
+                    challengee_node.get("max-connection", 0),
                     settings.default_challenge_max_iteration,
                 )
 
@@ -118,15 +113,18 @@ async def execute_challenge(
                     # Reached the max connection for that node
                     continue
 
+                # Create and execute the task
                 task = asyncio.create_task(
                     execute_challenge(
                         settings=settings,
-                        ip=challenger.ip,
-                        port=node.get("port"),
+                        ip=challengee.ip,
+                        port=challengee_node.get("port"),
                         challenge=challenge,
                     ),
-                    name=f"{node.get('chain')}-{node.get('type')}-{challenger.hotkey}-{i + 1}",
+                    name=f"{challengee.hotkey}-{challengee_node.id}",
                 )
+
+                # Add the task in the list
                 tasks.append(task)
 
     # Wait until finished or timedout
@@ -143,34 +141,36 @@ async def execute_challenge(
     btul.logging.debug(f"Challente completed", prefix=settings.logging_name)
 
     # Build the result
-    result = _aggregate_results(done | pending)
+    result = _aggregate_results(nodes, done | pending)
 
     return result, challenge
 
 
-def _aggregate_results(tasks):
-    challenges_result: typing.Dict[str, ccm.ChallengeResult] = {}
+def _aggregate_results(
+    nodes: typing.List[cci.Node], tasks
+) -> typing.Dict[str, typing.List[ccm.ChallengeResult]]:
+    challenges_result: typing.Dict[str, typing.List[ccm.ChallengeResult]] = {}
 
     for task in tasks:
         # Get the task details
         task_details = task.get_name().split("-")
 
-        # Get the ip of the task
-        chain = task_details[0]
-        type = task_details[1]
-        hotkey = task_details[2]
+        # Get information
+        hotkey = task_details[0]
+        node_id = task_details[1]
 
-        # Get the challenge result
-        challenge_result = challenges_result.get(hotkey)
-        if challenge_result is None:
-            challenge_result = challenges_result[hotkey] = (
-                # Set is_reliable True because the node will be consider reliable if all its tasks are available/reliable
-                ccm.ChallengeResult.create_default(
-                    chain=chain,
-                    type=type,
-                    is_reliable=True,
-                )
-            )
+        # Get the node
+        node = next((x for x in nodes if x.id == node_id), None)
+        if node is None:
+            continue
+
+        # Create a default challenge result for this node
+        challenge_result = ccm.ChallengeResult.create_default(
+            id=node.id,
+            chain=node.chain,
+            type=node.type,
+            is_reliable=True,
+        )
 
         # Increment the number of attempts
         challenge_result.challenge_attempts += 1
@@ -182,10 +182,10 @@ def _aggregate_results(tasks):
         task_result: ccm.TaskResult = task.result()
 
         # Will be true if at least one task is available
-        challenge_result.is_available |= task_result.is_available
+        challenge_result.is_available = task_result.is_available
 
-        # Will be true if all tasks are reliable
-        challenge_result.is_reliable &= (
+        # Will be true if the task is reliable
+        challenge_result.is_reliable = (
             task_result.is_available and task_result.is_reliable
         )
 
@@ -195,21 +195,26 @@ def _aggregate_results(tasks):
         # Join unique reason
         challenge_result.reason = (
             ",".join(
-                set(challenge_result.reason.split(",") + [task_result.reason.strip()])
+                set(filter(None, [challenge_result.reason, task_result.reason.strip()]))
             )
         ).strip()
 
-        # Compute the average process time
-        challenge_result.avg_process_time = (
-            challenge_result.avg_process_time + task_result.process_time
-        ) / 2
+        # Store the average process time (just the task's time for this single task result)
+        challenge_result.avg_process_time = task_result.process_time
 
-    for result in challenges_result.values():
-        if (
-            result.reason == ""
-            and result.challenge_attempts != result.challenge_successes
-        ):
-            result.reason = f"{result.challenge_attempts - result.challenge_successes} task(s) have been cancelled or not completed"
-            continue
+        # Append result to list for this hotkey
+        challenges_result.setdefault(hotkey, []).append(challenge_result)
+
+    # Post-process: fill in reason if it's still empty but some attempts failed
+    for result_list in challenges_result.values():
+        for result in result_list:
+            if (
+                result.reason == ""
+                and result.challenge_attempts != result.challenge_successes
+            ):
+                result.reason = (
+                    f"{result.challenge_attempts - result.challenge_successes} task(s) "
+                    "have been cancelled or not completed"
+                )
 
     return challenges_result

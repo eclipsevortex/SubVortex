@@ -14,10 +14,12 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import zlib
 import time
+import json
+import base64
 import typing
 import random
-import socket
 import netaddr
 import asyncio
 import numpy as np
@@ -357,3 +359,27 @@ async def get_weights_min_stake(subtensor: "btcas.AsyncSubtensor"):
 
     # Convert Rao to Tao
     return int(float(weight_min_stake) * 10**-9)
+
+async def get_identities(subtensor: btcas.AsyncSubtensor, netuid: int):
+    commitment = await subtensor.get_all_commitments(netuid=netuid)
+    if not commitment:
+        return []
+
+    identities = {}
+
+    for hotkey, data in commitment.items():
+        try:
+            # Decode data
+            compressed = base64.b64decode(data)
+
+            # Decompress data
+            json_str = zlib.decompress(compressed).decode()
+
+            identity = json.loads(json_str)
+        except Exception:
+            continue
+
+        # Add the identity
+        identities[hotkey] = identity
+
+    return identities

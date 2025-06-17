@@ -67,7 +67,7 @@ async def test_all_valid_miners(settings, dummy_miners):
             step_id=1,
             step_index=0,
             challengees=dummy_miners[:2],
-            identities=identities,
+            challengees_nodes=identities,
             ip_counter=ip_counts,
         )
 
@@ -97,7 +97,7 @@ async def test_miner_missing_identity(settings, dummy_miners):
             step_id=1,
             step_index=1,
             challengees=dummy_miners[:2],
-            identities=identities,
+            challengees_nodes=identities,
             ip_counter=ip_counts,
         )
 
@@ -131,7 +131,7 @@ async def test_miner_with_duplicate_ip(settings, dummy_miners):
             step_id=1,
             step_index=2,
             challengees=dummy_miners,
-            identities=identities,
+            challengees_nodes=identities,
             ip_counter=ip_counts,
         )
 
@@ -155,7 +155,7 @@ async def test_no_valid_miners(settings, dummy_miners):
             step_id=1,
             step_index=3,
             challengees=dummy_miners,
-            identities=identities,
+            challengees_nodes=identities,
             ip_counter=ip_counts,
         )
 

@@ -124,16 +124,22 @@ class ChallengeScorer:
                     settings=self.settings, result=nodes_result, score=score
                 )
 
-                # Compute availability and reliability scores
+                # Compute availability score
                 score.availability_score = score_utils.compute_availability_score(score)
+
+                # Compute reliability score
                 score.reliability_score = score_utils.compute_reliability_score(score)
 
             # Compute collective scores
             for node_result in nodes_result:
                 score = scores_by_node_id[node_result.id]
+
+                # Compute latency score
                 score.latency_score = score_utils.compute_latency_score(
                     scores_by_node_id, score
                 )
+
+                # Compute performance score
                 score.performance_score = score_utils.compute_performance_score(
                     scores_by_node_id, score
                 )
@@ -141,9 +147,13 @@ class ChallengeScorer:
             # Compute global scores
             for node_result in nodes_result:
                 score = scores_by_node_id[node_result.id]
+
+                # Compute distribution score
                 score.distribution_score = score_utils.compute_distribution_score(
                     self.settings, scores_by_node_id, score
                 )
+
+                # Compute final score
                 score.score = score_utils.compute_final_score(self.settings, challengee)
 
         # Save scores in the database

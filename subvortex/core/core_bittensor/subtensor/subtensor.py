@@ -360,7 +360,7 @@ async def get_weights_min_stake(subtensor: "btcas.AsyncSubtensor"):
     # Convert Rao to Tao
     return int(float(weight_min_stake) * 10**-9)
 
-async def get_identities(subtensor: btcas.AsyncSubtensor, netuid: int):
+async def get_subnet_commitments(subtensor: btcas.AsyncSubtensor, netuid: int):
     commitment = await subtensor.get_all_commitments(netuid=netuid)
     if not commitment:
         return []

@@ -42,13 +42,21 @@ class Node:
     def id(self) -> str:
         data = f"{self.chain}:{self.type}:{self.port}"
         return base64.urlsafe_b64encode(data.encode()).decode()
+    
+
+async def get_nodes(subtensor: btcas.AsyncSubtensor, netuid: int, inclusion: typing.List[str] = []):
+    # Get the identities
+    subnet_commitments: dict = await scbtss.get_subnet_commitments(subtensor=subtensor, netuid=netuid)
+
+    for hotkey, commitments in subnet_commitments.items():
+        pass
 
 
 async def get_challengees_nodes(
     subtensor: btcas.AsyncSubtensor, netuid: int, inclusion: typing.List[str] = []
 ) -> typing.Dict[str, typing.List[Node]]:
     # Get the identities
-    identities: dict = await scbtss.get_identities(subtensor=subtensor, netuid=netuid)
+    identities: dict = await scbtss.get_subnet_commitments(subtensor=subtensor, netuid=netuid)
 
     nodes = {}
 

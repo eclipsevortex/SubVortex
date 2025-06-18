@@ -27,6 +27,7 @@ import bittensor_wallet.wallet as btw
 import bittensor_wallet.mock as btwm
 from dotenv import load_dotenv
 
+from subvortex.core.identity import get_challengees_nodes
 from subvortex.core.version import get_version
 from subvortex.core.shared.mock import MockSubtensor
 from subvortex.core.shared.neuron import wait_until_registered
@@ -186,13 +187,15 @@ class Validator:
                 min_stake = await get_weights_min_stake(subtensor=self.subtensor)
                 btul.logging.debug(f"Minimum stake to set weights: {min_stake}")
 
-                # Get the neuron
-                neuron = await self.database.get_neuron(
-                    hotkey=self.wallet.hotkey.ss58_address
+                # TODO: Maintain nodes based on commitment  
+                # Get all the nodes of the subnet
+                nodes = await get_challengees_nodes(
+                    subtensor=self.subtensor,
+                    netuid=self.settings.netuid,
                 )
 
-                # TODO: Clean prune miners!!
-                # TODO: Reset miners that have changed country?
+
+                # TODO: Prune nodes and miners
 
                 # Set weights if time for it and enough stake
                 must_set_weight = should_set_weights(

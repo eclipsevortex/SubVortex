@@ -239,7 +239,9 @@ class Challenger:
                     prefix=self.settings.logging_name,
                 )
 
-                # Send the scores
+                # TODO: Save scores and miners
+
+                # TODO: Send analytics or notify a service to send them
 
                 # Wait until the step ends
                 btul.logging.debug(

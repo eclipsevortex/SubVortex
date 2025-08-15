@@ -1,5 +1,5 @@
-bittensor==9.7.0
-bittensor-wallet==3.0.10
+bittensor==9.9.0
+bittensor-wallet==4.0.0
 loguru==0.7.0
 netfilterqueue==1.1.0; sys_platform == 'linux'
 numpy==2.0.1

@@ -1,0 +1,41 @@
+@startuml
+title Shared Access Flow
+
+actor "User" as User #E0ECF8
+participant "Validator HAProxy" as VHAProxy
+participant "Validator API" as VAPI
+participant "Validator Redis" as Redis
+participant "Node" as Node #E0ECF8
+
+User -> VHAProxy : Request
+VHAProxy -> VAPI : Forward Request
+
+VAPI -> VAPI : Validate JWT Access Token (cached JWKS)
+note right of VAPI
+JWT validated using cached JWKS
+
+JWKS initially fetched from:
+GET https://api.subvortex.ai/.well-known/jwks.json
+and cached locally (with TTL)
+end note
+
+VAPI -> Redis : Validate API Key (linked to user/org)
+VAPI -> Redis : Check credit
+
+alt Has credit
+    VAPI -> Node : Forward to optimal shared node
+    Node --> VAPI : Response
+    VAPI -> Redis : Deduct credit
+    VAPI --> User : Return response
+else No credit
+    VAPI -> Redis : Check rate limit
+    alt Within free-tier rate
+        VAPI -> Node : Forward to non-optimal shared node
+        Node --> VAPI : Response
+        VAPI --> User : Return response
+    else Exceeded rate limit
+        VAPI --> User : Reject (403 / quota exceeded)
+    end
+end
+
+@enduml

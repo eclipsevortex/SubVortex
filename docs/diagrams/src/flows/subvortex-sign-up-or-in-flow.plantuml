@@ -1,0 +1,71 @@
+@startuml
+title SubVortex Console – User Auth Flow (Email, Google, GitHub)
+
+actor "User" as User #E0ECF8
+participant "SubVortex Console" as Console
+participant "SubVortex API" as API
+participant "Redis" as Redis
+participant "Google OAuth" as Google
+participant "GitHub OAuth" as GitHub
+
+== User Sign Up (Email/Password) ==
+
+User -> Console : Fill registration form (email, password)
+Console -> API : Send registration data
+API -> Redis : Check if user already exists
+alt New user
+    API -> Redis : Store new user credentials
+    API --> Console : Registration successful
+    Console --> User : Redirect to dashboard
+else Email already used
+    API --> Console : Reject (account exists)
+    Console --> User : Show error
+end
+
+== User Sign In (Email/Password) ==
+
+User -> Console : Enter email + password
+Console -> API : Send login credentials
+API -> Redis : Validate credentials
+alt Valid credentials
+    API --> Console : Login success (session token)
+    Console --> User : Redirect to dashboard
+else Invalid credentials
+    API --> Console : Reject
+    Console --> User : Show error
+end
+
+== Sign In / Sign Up via Google ==
+
+User -> Console : Click "Sign in with Google"
+Console -> Google : Redirect for OAuth consent
+User -> Google : Grant access (email/profile)
+Google --> Console : Return access token + user info
+Console -> API : Send Google user info
+API -> Redis : Check if user exists
+alt New user
+    API -> Redis : Store user info from Google
+    API --> Console : Login success (new account)
+    Console --> User : Redirect to dashboard
+else Existing user
+    API --> Console : Login success
+    Console --> User : Redirect to dashboard
+end
+
+== Sign In / Sign Up via GitHub ==
+
+User -> Console : Click "Sign in with GitHub"
+Console -> GitHub : Redirect for OAuth consent
+User -> GitHub : Authorize application
+GitHub --> Console : Return access token + user info
+Console -> API : Send GitHub user info
+API -> Redis : Check if user exists
+alt New user
+    API -> Redis : Store user info from GitHub
+    API --> Console : Login success (new account)
+    Console --> User : Redirect to dashboard
+else Existing user
+    API --> Console : Login success
+    Console --> User : Redirect to dashboard
+end
+@enduml

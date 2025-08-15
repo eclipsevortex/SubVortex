@@ -1,0 +1,83 @@
+@startuml
+title Node Ownership & Specification Validation Flow (Deterministic Sync Cycle)
+
+participant "Validator" as Validator
+participant "Miner" as Miner
+participant "Node" as Node
+participant "Redis" as Redis
+participant "Challenger" as Challenger
+
+== At Scheduled Block Interval ==
+note right of Validator
+This process is repeated every N blocks,
+ensuring node metadata remains fresh and verified.
+end note
+
+' STEP 1: Miner submits node list
+Validator -> Miner : Request /nodes
+note right of Miner
+Miner returns a signed list of IP:Port entries,
+with a timestamp to avoid replay attacks.
+end note
+
+Miner -> Validator : Return signed node list + timestamp
+Validator -> Validator : Verify miner's signature
+Validator -> Validator : Check timestamp freshness
+
+alt Signature is valid and recent
+    ' STEP 2: Verify live node & ownership
+    Validator -> Node : Request /ownership (includes nonce)
+    note right of Node
+    Node signs nonce using miner’s private key and returns it.
+    end note
+
+    Node -> Validator : Return signed nonce
+    Validator -> Validator : Verify signature using miner’s public key
+
+    alt Ownership verified
+        ' STEP 3: Fetch node specification
+        Validator -> Node : Request /specification
+        Node -> Validator : Return signed specification + timestamp
+
+        note right of Node
+        Specification includes blockchain, protocols,
+        capacity, etc., signed by miner.
+        Validators rely on it to route and schedule challenges.
+        end note
+
+        Validator -> Validator : Verify signature
+        Validator -> Validator : Check timestamp freshness
+
+        alt Specification is valid and fresh
+            Validator -> Redis : Save validated node spec
+            Validator -> Miner : Notify success
+            Validator -> Challenger : Mark node as selectable
+        else Specification is valid but stale
+            Validator -> Redis : Mark node as desynced
+            Validator -> Miner : Notify: spec expired — refresh required
+            note left of Validator
+            The node may still be valid, but the specification
+            does not reflect its actual state.
+            The miner must refresh the metadata for revalidation.
+            end note
+        else Signature invalid
+            Validator -> Redis : Mark node as invalid
+            Validator -> Miner : Notify: invalid spec signature
+        end
+    else Ownership failed
+        Validator -> Redis : Mark node as invalid
+        Validator -> Miner : Notify: ownership verification failed
+    end
+else Signature invalid or timestamp stale
+    Validator -> Redis : Mark node as invalid
+    Validator -> Miner : Notify: node list signature/timestamp invalid
+end
+
+== End of Sync Cycle ==
+note right of Validator
+This validation process repeats periodically
+(e.g., every 50 blocks), ensuring nodes remain
+valid, fresh, and under miner control.
+end note
+
+@enduml

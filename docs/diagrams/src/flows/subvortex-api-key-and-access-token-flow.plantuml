@@ -1,0 +1,40 @@
+@startuml
+title SubVortex Console – Credential Issuance Flow
+
+actor "User" as User #E0ECF8
+participant "SubVortex Console" as Console
+participant "SubVortex API" as API
+participant "Redis" as Redis
+
+== Precondition: User is Signed In ==
+
+User -> Console : Access Dashboard (session active)
+note right of Console
+User must be authenticated to access
+API Key and Access Token features.
+end note
+
+== API Key Generation ==
+
+User -> Console : Click "Create New API Key"
+Console -> API : Request new API key
+API -> API : Generate API key
+API -> Redis : Store API key (hashed or encrypted)
+API --> Console : Return API key
+Console --> User : Display API key (one-time view)
+
+== Access Token Generation ==
+
+User -> Console : Click "Generate Access Token"
+Console -> API : Send API key + optional scopes
+API -> Redis : Validate API key
+alt Valid key
+    API -> API : Generate & sign JWT access token
+    API -> Redis : Store token metadata (optional)
+    API --> Console : Return access token
+    Console --> User : Display access token
+else Invalid or expired key
+    API --> Console : Reject
+    Console --> User : Show error
+end
+@enduml

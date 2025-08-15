@@ -1,0 +1,58 @@
+@startuml
+title Gate Proxy – Unified Access Control
+
+actor "SubVortex UI" as UI
+participant "SubVortex API" as CentralAPI
+participant "Gate Orchestrator" as Orchestrator
+participant "Redis" as Redis
+database "Access Control Map" as AccessMap
+participant "Gate (SPOA)" as Gate
+participant "Proxy" as Proxy
+
+== User Updates Subscription or Plan ==
+
+UI -> CentralAPI : Update plan / credits / fallback / dedicated node
+
+note right of CentralAPI
+Triggers a webhook or marks user/node/validator
+as "dirty" for the next orchestrator sync.
+end note
+
+== Background Sync & Coordination ==
+
+loop Every N seconds or via webhook
+    Orchestrator -> CentralAPI : Fetch updated subscriptions & metadata
+    CentralAPI --> Orchestrator : Return updated data (credits, fallback, scores, etc.)
+
+    Orchestrator -> Redis : Refresh user credit, rate limit, fallback info
+end
+
+== Access Control Map Management ==
+
+loop Every challenge window
+    Orchestrator -> CentralAPI : Determine eligible validators
+    Orchestrator -> AccessMap : Update map with allowed IPs / identities
+end
+
+== Runtime Request Flow ==
+
+actor "User or Validator" as Actor
+
+Actor -> Proxy : Request blockchain data (HTTP/gRPC/WebSocket)
+
+Proxy -> Gate : Invoke SPOA for access control
+
+Gate -> Redis : Lookup user credit, plan, rate limit, node scores
+Gate -> AccessMap : Check if request source is allowed
+Redis --> Gate : Return user & node info
+AccessMap --> Gate : Return allow/deny decision
+
+Gate --> Proxy : Access decision
+
+note right of Proxy
+Proxy (HAProxy) receives all external traffic.
+It delegates auth, credit, and whitelist checks
+to the Gate (SPOA) before forwarding.
+end note
+
+@enduml

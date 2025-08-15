@@ -1,0 +1,27 @@
+@startuml
+title 🧩 Validator Architecture
+skinparam componentStyle rectangle
+skinparam dpi 180
+skinparam wrapWidth 200
+skinparam linetype ortho
+skinparam nodesep 100
+skinparam ranksep 50
+
+actor User #E0ECF8
+[Proxy] as Proxy
+[API] as API
+[Redis] as RV
+[Data Aggregator] as DAV
+[Neuron] as NV
+[SubVortex API] as SubAPI
+[Node] as Node #E0ECF8
+
+User --> Proxy : Incoming Request
+Proxy -r-> RV: Check
+Proxy --> API : Forward Request
+DAV --> RV: Sync
+NV --> RV : Store
+NV --> SubAPI : Push
+API --> Node : Forward Request
+
+@enduml

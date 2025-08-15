@@ -1,0 +1,47 @@
+@startuml
+title Miner Flow
+skinparam dpi 180
+skinparam wrapWidth 200
+
+participant "Data Aggregator" as DAM
+participant "Redis" as RM
+participant "Proxy" as Proxy
+participant "Neuron" as NM
+participant "Validator" as NV #E0ECF8
+
+== Node List Request ==
+NV -> Proxy : Request Nodes List
+Proxy -> Proxy : Check Rate Limit
+alt Rate Limit Exceeded
+    Proxy --> NV : Reject Nodes List
+else Allowed
+    Proxy -> Proxy : Verify Signature
+    alt Verification Failed
+        Proxy --> NV : Reject Nodes List
+    else Verification Succeeded
+        Proxy -> NM : Forward Nodes List
+        NM -> NM : Nodes List + Signature
+        NM --> NV : Return Nodes List
+    end
+end
+
+== Score Reception ==
+NV -> Proxy : Send Score
+Proxy -> Proxy : Check Rate Limit
+alt Rate Limit Exceeded
+    Proxy --> NV : Reject Score
+else Allowed
+    Proxy -> NM : Forward Score
+    NM -> NM : Display Score
+    alt Redis Storage Enabled
+        NM -> RM : Store Score
+    end
+    NM --> NV : Return Miner Version
+end
+
+== Sync ==
+note over DAM, RM
+Data Aggregator listens to configured sources (Bittensor Metagraph) and syncs updates to Redis independently of the main flow.
+end note
+
+@enduml

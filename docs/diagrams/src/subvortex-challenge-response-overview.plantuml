@@ -1,0 +1,49 @@
+@startuml
+title Challenger – Challenge Execution & Scoring Flow
+
+participant "Challenger" as Challenger
+participant "Node[n]" as Node
+participant "Redis" as Redis
+
+' Step 1: Compute the next group to challenge
+Challenger -> Challenger : Determine next challenge group\n(chain, node type, country)
+
+' Step 2: Select nodes belonging to the group
+Challenger -> Redis : Fetch nodes of selected group
+Redis -> Challenger : Return node list
+
+' Step 3: Create challenge payload
+Challenger -> Challenger : Generate challenge (chain-specific\nparameters, RPC, query, etc.)
+
+' Step 4: Launch concurrent challenges
+loop For each node in the group
+    Challenger -> Node : Send challenge (N times)\n(e.g., 64 concurrent requests)
+end
+
+note right of Challenger
+Challenge concurrency is based on node specification.
+If node claims 64 capacity, send 64 parallel requests.
+end note
+
+' Step 5: Receive challenge responses
+loop For each node
+    Node -> Challenger : Return challenge responses (success/failure, timing, result)
+end
+
+Challenger -> Challenger : Structure responses into challenge result format
+
+' Step 6: Compute node scores (MMA)
+Challenger -> Challenger : Evaluate node metrics (availability, reliability, etc.)
+
+note right of Challenger
+Each metric is updated using MMA (e.g., MMA-50).
+Old scores decay naturally over time to avoid punishing rare failures.
+end note
+
+' Step 7: Aggregate scores per miner
+Challenger -> Challenger : Group node scores by miner\nCompute aggregate miner score
+
+' Step 8: Save scores
+Challenger -> Redis : Store updated scores (nodes + miners)
+
+@enduml

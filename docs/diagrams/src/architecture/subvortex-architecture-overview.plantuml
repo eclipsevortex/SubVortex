@@ -1,0 +1,205 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam dpi 180
+skinparam wrapWidth 200
+skinparam defaultFontSize 12
+skinparam nodesep 30
+skinparam ranksep 50
+skinparam ArrowFontSize 12
+skinparam ArrowThickness 1
+skinparam linetype ortho
+
+' === LEGEND ===
+legend right
+  <color:#17becf>→</color> User Request (Anonymous / Free / Shared)
+  <color:#1f77b4>→</color> User Request (Dedicated)
+  <color:#2ca02c>→</color> Console Access
+  <color:#ff7f0e>→</color> Forward User Request
+  <color:#9467bd>→</color> External Data Pull
+  <color:#00bfff>→</color> Data Save
+  <color:#e377c2>→</color> Challenge
+  <color:#8c564b>→</color> Control Access
+  <color:#d62728>→</color> Node Execution
+  <color:#bcbd22>→</color> Metrics Push to API
+  <color:#ff1493>→</color> Node Ownership
+endlegend
+
+' === USER ===
+actor "User" as U
+
+' === SubVortex LAYER ===
+package "SubVortex Layer" {
+    rectangle "API" as API
+    rectangle "Console" as CONSOLE
+}
+
+' === VALIDATOR LAYER ===
+package "Validator Layer" {
+    together {
+        rectangle "Proxy" as HAV
+        rectangle "API" as APIV
+    }
+    rectangle "Neuron" as NV
+    together {
+        rectangle "Data Aggregator" as MV
+        rectangle "Redis" as RV
+    }
+}
+
+' === CHALLENGER LAYER ===
+package "Challenger 1 Layer" {
+    rectangle "Challenger" as C1
+    together {
+        rectangle "Data Aggregator" as MC1
+        rectangle "Redis" as RC1
+    }
+}
+
+package "Challenger N Layer" {
+    rectangle "Challenger" as Cn
+    together {
+        rectangle "Data Aggregator" as MCn
+        rectangle "Redis" as RCn
+    }
+}
+
+' === MINER LAYER ===
+package "Miner Layer" {
+    rectangle "Neuron" as NM
+    together {
+        rectangle "Data Aggregator" as MM
+        rectangle "Redis" as RM
+    }
+}
+
+' === NODE LAYER ===
+package "Node Subtensor Layer" {
+        rectangle "API" as APIS
+    rectangle "Proxy" as HAS
+    rectangle "Node: Subtensor" as NS
+    together {
+        rectangle "Data Aggregator" as MS
+        rectangle "Redis" as RS
+    }
+}
+package "Node Ethereum Layer" {
+    rectangle "API" as APIE
+    rectangle "Proxy" as HAE
+    rectangle "Node: Ethereum" as NE
+    together {
+        rectangle "Data Aggregator" as ME
+        rectangle "Redis" as RE
+    }
+}
+package "Node Polkadot Layer" {
+    rectangle "API" as APIP
+    rectangle "Proxy" as HAP
+    rectangle "Node: Polkadot" as NP
+    together {
+        rectangle "Data Aggregator" as MP
+        rectangle "Redis" as RP
+    }
+}
+
+' === CONNECTIONS ===
+' User outbound connections
+U -[#17becf,thickness=2]-> HAV
+U -[#1f77b4,thickness=2]-> HAS
+U -[#1f77b4,thickness=2]-> HAE
+U -[#1f77b4,thickness=2]-> HAP
+U -[#2ca02c,thickness=2]-> CONSOLE
+
+' Validator connections
+'   Proxy connections
+HAV -[#ff7f0e,thickness=2]-> APIV
+HAV -[#8c564b]-> RV
+
+'   Api connections
+APIV -[#ff7f0e,thickness=2]-> HAS
+APIV -[#ff7f0e,thickness=2]-> HAE
+APIV -[#ff7f0e,thickness=2]-> HAP
+
+'   Neuron connections
+NV -[#bcbd22,thickness=2]-> API
+NV -[#ff1493,thickness=2]-> NM
+NV -[#ff1493,thickness=2]-> HAS
+NV -[#ff1493,thickness=2]-> HAE
+NV -[#ff1493,thickness=2]-> HAP
+NV -[#00bfff]-> RV
+
+'   Data Aggregator connections
+MV -[#9467bd]-> API
+MV -[#00bfff]-> RV
+MV -[#9467bd]-> RC1
+MV -[#9467bd]-> RCn
+
+
+' Challenger connections
+'   Challenger conections
+C1 -[#e377c2]-> HAS
+C1 -[#e377c2]-> HAE
+C1 -[#e377c2]-> HAP
+C1 -[#00bfff]-> RC1
+Cn -[#e377c2]-> HAS
+Cn -[#e377c2]-> HAE
+Cn -[#e377c2]-> HAP
+Cn -[#00bfff]-> RCn
+
+'   Data Aggregator connections
+MC1 -[#9467bd]-> RV
+MC1 -[#00bfff]-> RC1
+MCn -[#9467bd]-> RV
+MCn -[#00bfff]-> RCn
+
+
+' Miner connections
+'   Neuron connections
+NM -[#00bfff]-> RM
+
+'   Data Aggregator connections
+MM -[#00bfff]-> RM
+
+
+' Node connections
+'   Data Aggregator connections
+MS -[#9467bd]-> API
+MS -[#00bfff]-> RS
+ME -[#9467bd]-> API
+ME -[#00bfff]-> RE
+MP -[#9467bd]-> API
+MP -[#00bfff]-> RP
+
+'   Proxy connections
+HAS --> APIS
+APIS -[#d62728]-> NS
+APIS -[#8c564b]-> RS
+HAE --> APIE
+APIE -[#d62728]-> NE
+APIE -[#8c564b]-> RE
+HAP --> APIP
+APIP -[#d62728]-> NP
+APIP -[#8c564b]-> RP
+
+
+API -[#d62728]-> CONSOLE
+
+' === FORCE VERTICAL ALIGNMENT ===
+NM -[hidden]-----> C1
+NM -[hidden]-----> MC1
+NM -[hidden]-----> RC1
+NM -[hidden]-----> Cn
+NM -[hidden]-----> MCn
+NM -[hidden]-----> RCn
+NV -[hidden]-----> C1
+NV -[hidden]-----> MC1
+NV -[hidden]-----> RC1
+NV -[hidden]-----> Cn
+NV -[hidden]-----> MCn
+NV -[hidden]-----> RCn
+C1 -[hidden]---> HAS
+C1 -[hidden]---> HAE
+C1 -[hidden]---> HAP
+Cn -[hidden]-----> HAS
+Cn -[hidden]-----> HAE
+Cn -[hidden]-----> HAP
+@enduml

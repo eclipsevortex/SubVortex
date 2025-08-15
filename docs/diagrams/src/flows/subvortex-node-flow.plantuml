@@ -1,0 +1,113 @@
+@startuml
+title Node Flow
+skinparam dpi 180
+skinparam wrapWidth 200
+
+actor User #E0ECF8
+participant "Proxy" as Proxy
+participant "Api" as Api
+participant "Node" as Node
+participant "Redis" as RN
+participant "Data Aggregator" as DAN
+participant "Challenger" as CV #E0ECF8
+participant "Validator" as VAL #E0ECF8
+
+== Direct User Request ==
+User -> Proxy : Request
+Proxy -> Api : Forward request
+
+note right of Proxy
+Pure L7 forwarding.
+No business logic.
+Keep-alive and retry enabled.
+end note
+
+Api -> Api : Validate policy
+note right of Api
+Includes:
+- JWT signature & expiry check
+- API key validation
+- Plan verification
+- Rate limit check
+- Abuse detection
+end note
+
+alt Policy valid
+    Api -> Node : Forward Request
+    Node -> Node : Process Request
+    Node --> Api : Response
+    Api --> User : Return Result
+else Policy invalid
+    Api --> User : 401 Unauthorized / 429 Rate Limit / Blocked
+end
+
+== Validator-Forwarded Request ==
+VAL -> Proxy : Request
+Proxy -> Api : Forward request
+
+note right of Proxy
+Pure L7 forwarding.
+No business logic.
+Keep-alive and retry enabled.
+end note
+
+Api -> Api : Lightweight revalidation
+note right of Api
+Validator already checked policy, but:
+- We reverify signature and timestamp
+- We check abuse rules (IP, request frequency)
+- We do **not** re-debit credit or rate limits
+end note
+
+alt Revalidation passed
+    Api -> Node : Forward Request
+    Node -> Node : Process Request
+    Node --> Api : Response
+    Api --> VAL : Return Result
+else Revalidation failed
+    Api --> VAL : 401 Unauthorized / 429 Blocked
+end
+
+
+== Node Specification Request ==
+VAL -> Proxy : Request Node Specification
+Proxy -> Api : Forward request
+
+note right of Proxy
+Pure L7 forwarding.
+No business logic.
+Keep-alive and retry enabled.
+end note
+
+Api -> Api : Verify Signature
+alt Verification Failed
+    Api --> VAL : Reject Node Specification
+else Verification Succeeded
+    Api --> VAL : Return Node Specification
+end
+
+== Challenge Handling ==
+CV -> Proxy : Challenge Request
+Proxy -> Api : Forward request
+
+note right of Proxy
+Pure L7 forwarding.
+No business logic.
+Keep-alive and retry enabled.
+end note
+
+Api -> Api : Check Challenge Window for Challenger
+alt Not in Allowed Window
+    Api --> CV : Reject Challenge
+else In Allowed Window
+    Api -> Node : Forward Challenge
+    Node -> Node : Process Challenge
+    Node --> Api : Return Challenge Response
+    Api --> CV: Return Challenge Response
+end
+
+== Sync ==
+note over DAN, RN
+Data Aggregator listens to configured sources (Bittensor Metagraph, SubVortex API) and syncs updates to Redis independently of the main flow.
+end note
+@enduml

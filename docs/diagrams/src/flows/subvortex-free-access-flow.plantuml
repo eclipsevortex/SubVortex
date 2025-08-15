@@ -1,0 +1,23 @@
+@startuml
+title Free Access Flow
+skinparam dpi 180
+skinparam wrapWidth 200
+
+actor "User (Free)" as User #E0ECF8
+participant "Proxy" as Proxy
+participant "Validator API" as Api
+participant "Redis" as Redis
+participant "Node" as Node #E0ECF8
+
+User -> Proxy : Request (No API key / token)
+Proxy -> Api : Forward request
+
+Api -> Redis : Check rate limit for anonymous IP
+alt Within free-tier rate
+    Api -> Node : Forward to non-optimal shared node
+    Node --> Api : Response
+    Api --> User : Return data
+else Exceeded rate limit
+    Api --> User : 429 Too Many Requests
+end
+@enduml

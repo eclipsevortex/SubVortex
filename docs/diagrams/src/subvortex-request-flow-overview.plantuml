@@ -1,0 +1,81 @@
+@startuml
+title Universal API – Decentralized Request Handling
+
+actor "User" as User
+participant "Validator API" as ValidatorAPI
+participant "Node API" as NodeAPI
+participant "Redis" as Redis
+participant "Node" as Node
+
+== Anonymous User ==
+
+User -> ValidatorAPI : Request blockchain data (anonymous)
+ValidatorAPI -> Redis : Check rate limit
+alt Within rate limit
+    ValidatorAPI -> Node : Forward to non-optimal shared node
+    Node --> ValidatorAPI : Return data
+    ValidatorAPI --> User : Return data
+else Exceeds rate limit
+    ValidatorAPI --> User : Reject (rate limit exceeded)
+end
+
+== Authenticated User (No Dedicated Node) ==
+
+User -> ValidatorAPI : Request blockchain data (authenticated)
+ValidatorAPI -> Redis : Check credit
+alt Has credit
+    ValidatorAPI -> Node : Forward to optimal shared node
+    Node --> ValidatorAPI : Return data
+    ValidatorAPI --> User : Return data
+    ValidatorAPI -> Redis : Deduct credit
+else No credit
+    ValidatorAPI -> Redis : Check rate limit
+    alt Within rate limit
+        ValidatorAPI -> Node : Forward to non-optimal shared node
+        Node --> ValidatorAPI : Return data
+        ValidatorAPI --> User : Return data
+    else Exceeds rate limit
+        ValidatorAPI --> User : Reject (no credit / rate limit exceeded)
+    end
+end
+
+== Authenticated User (Dedicated Node) ==
+
+User -> NodeAPI : Request blockchain data (authenticated + dedicated)
+NodeAPI -> Redis : Check subscription ownership
+alt Subscribed
+    NodeAPI -> Redis : Check credit
+    alt Has credit
+        NodeAPI -> Node : Forward to dedicated node
+        Node --> NodeAPI : Return data
+        NodeAPI --> User : Return data
+        NodeAPI -> Redis : Deduct credit
+    else No credit
+        NodeAPI -> Redis : Check rate limit
+        alt Within rate limit
+            NodeAPI -> Node : Forward to non-optimal shared node
+            Node --> NodeAPI : Return data
+            NodeAPI --> User : Return data
+        else Exceeds rate limit
+            NodeAPI --> User : Reject (no credit / rate limit exceeded)
+        end
+    end
+else Not subscribed
+    NodeAPI -> Redis : Check credit
+    alt Has credit
+        NodeAPI -> Node : Forward to optimal shared node
+        Node --> NodeAPI : Return data
+        NodeAPI --> User : Return data
+        NodeAPI -> Redis : Deduct credit
+    else No credit
+        NodeAPI -> Redis : Check rate limit
+        alt Within rate limit
+            NodeAPI -> Node : Forward to non-optimal shared node
+            Node --> NodeAPI : Return data
+            NodeAPI --> User : Return data
+        else Exceeds rate limit
+            NodeAPI --> User : Reject (no credit / rate limit exceeded)
+        end
+    end
+end
+@enduml

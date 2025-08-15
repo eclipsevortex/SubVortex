@@ -1,0 +1,87 @@
+@startuml
+title Validator Flow
+skinparam dpi 180
+skinparam wrapWidth 200
+
+actor User #E0ECF8
+participant "Proxy" as Proxy #LightGray
+participant "Api" as Api
+participant "Redis" as RV
+participant "Node Router" as Router
+participant "Data Aggregator" as DAV
+participant "Neuron" as NV
+participant "Miner" as Miner #E0ECF8
+participant "Node" as Node #E0ECF8
+
+== Request Handling ==
+User -> Proxy : Request (anonymous / free / shared / dedicated)
+Proxy -> Api : Forward request
+
+note right of Proxy
+Pure L7 forwarding.
+No business logic.
+Keep-alive and retry enabled.
+end note
+
+Api -> Redis : Load access context (plan, credit, scores, rate window)
+Api -> Api : Validate policy
+note right of Api
+Includes:
+- JWT signature & expiry check
+- API key validation
+- Plan verification
+- Rate limit check
+- Abuse detection
+end note
+
+alt Policy valid
+    Api -> Trace : Log request metadata (request ID, plan, region)
+
+    Api -> Router : Get sorted node list for plan
+    note right of Router
+    Node pool is:
+    - Precomputed by plan, region, score
+    - Latency-aware
+    - Health-verified
+    - Stored in Redis or memory
+    end note
+
+    Api -> Node : Forward to **first** eligible node
+    alt Node successful
+        Node --> Api : Response
+        Api -> Redis : Async credit adjustment
+        Api --> User : Return data
+    else Node failure
+        Api -> Router : Get fallback node list
+        alt Fallback node exists
+            Api -> Node : Forward to **first** fallback node
+            alt Fallback node successful
+                Node --> Api : Response
+                Api -> Redis : Async credit adjustment
+                Api --> User : Return data
+            else Fallback failed
+                Api --> User : 503 No available nodes
+            end
+        else No fallback configured
+            Api --> User : 503 No available nodes
+        end
+    end
+else Policy invalid
+    Api --> User : 401 Unauthorized / 429 Rate Limit / Blocked
+end
+
+== Periodic Nodes Discovery ==
+note over NV, RV
+Validator periodically retrieves the latest list of nodes (see: subvortex-node-spec-verification-flow.plantuml) and stores the verified list in Redis.
+end note
+
+== Periodic Set Weights ==
+note over NV, RV
+Validator periodically sets weights on-chain based on the latest miner scores stored in Redis.
+end note
+
+== Sync ==
+note over DAV, RV
+Data Aggregator listens to configured sources (Bittensor Metagraph, SubVortex Api, Challengers) and syncs updates to Redis independently of the main flow.
+end note
+@enduml

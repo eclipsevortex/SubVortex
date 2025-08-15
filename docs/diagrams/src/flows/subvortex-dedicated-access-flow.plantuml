@@ -1,0 +1,40 @@
+@startuml
+title Dedicated Access Flow
+
+actor "User" as User #E0ECF8
+participant "Node HAProxy" as NHAProxy
+participant "Node API" as NAPI
+participant "Node Redis" as NRedis
+participant "Node" as Node #E0ECF8
+
+User -> NHAProxy : Request
+NHAProxy -> NAPI : Forward Requesst
+
+NAPI -> NAPI : Validate JWT Access Token (cached JWKS)
+note right of NAPI
+JWT validated using cached JWKS
+
+JWKS initially fetched from:
+GET https://api.subvortex.ai/.well-known/jwks.json
+and cached locally (with TTL)
+end note
+
+NAPI -> NRedis : Validate API Key (linked to user/org)
+NAPI -> NRedis : Check credit
+
+alt Has credit
+    NAPI -> Node : Forward to optimal shared node
+    Node --> NAPI : Response
+    NAPI -> NRedis : Deduct credit
+    NAPI --> User : Return response
+else No credit
+    NAPI -> NRedis : Check rate limit
+    alt Within free-tier rate
+        NAPI -> Node : Forward to non-optimal shared node
+        Node --> NAPI : Response
+        NAPI --> User : Return response
+    else Exceeded rate limit
+        NAPI --> User : Reject (403 / quota exceeded)
+    end
+end
+@enduml

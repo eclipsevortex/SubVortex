@@ -1,0 +1,28 @@
+@startuml
+title Validator – Weight Calculation & Emission
+
+participant "Validator" as Validator
+participant "Redis" as Redis
+participant "Yuma Consensus" as Yuma
+participant "SubVortex API" as API
+
+' Step 1: Load latest miner scores
+Validator -> Redis : Read all miner scores
+
+' Step 2: Compute smoothed weight
+Validator -> Validator : For each miner:\nnew_weight = 0.9 * previous + 0.1 * current_score
+
+' Step 3: Store new weights
+Validator -> Redis : Save updated weights
+
+' Step 4: Submit weights to chain
+Validator -> Yuma : Submit weights to consensus
+
+note right of Yuma
+Yuma aggregates weights across validators to determine\nfinal emissions for each miner.
+end note
+
+' Step 5: Publish weights to SubVortex API
+Validator -> API : Push miner weights for analytics, visibility,\nand frontend integrations
+
+@enduml

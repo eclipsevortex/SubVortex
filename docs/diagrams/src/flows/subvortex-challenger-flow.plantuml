@@ -1,0 +1,45 @@
+@startuml
+title Challenger Flow
+skinparam dpi 180
+skinparam wrapWidth 200
+
+participant "Challenger" as CV
+participant "Redis" as RC
+participant "Node" as Node
+participant "Data Aggregator" as DAC
+participant "Source of Truth" as SOT
+
+loop Challenge Cycle
+    == Initialization ==
+    CV -> RC : Load Neurons
+    CV -> CV : Create Challenge Group (based on block height, validator UID)
+    CV -> CV : Create Challenge
+    CV -> RC : Store Challenge
+    CV -> SOT : Send Challenge
+    SOT --> CV : Return Response
+
+    == Challenge Execution ==
+    loop For each node in challenge group
+    CV -> Node : Send same Challenge (X parallel requests)
+    note right of Node
+    X = declared node capacity
+    e.g., 64 concurrent requests if capacity = 64
+    end note
+    Node --> CV : Return Response
+    CV -> CV : Compare with Expected Response
+    CV -> CV : Build Challenge Result
+    end loop
+    CV -> CV : Aggregate Challenge Results by Miner Hotkey
+
+    == Scoring ==
+    CV -> CV : Compute Nodes Scores
+    CV -> RC : Store Nodes Scores
+    CV -> CV : Compute Miner Score by aggregating Nodes scores
+    CV -> RC : Store Miners Score
+
+    == Sync ==
+    note over DAC, RC
+    Data Aggregator listens to configured sources (Bittensor Metagraph, Validator) and syncs updates to Redis independently of the main flow.
+    end note
+end loop
+@enduml

@@ -1,0 +1,34 @@
+@startuml
+title Node Specification Sync Flow
+skinparam dpi 180
+skinparam wrapWidth 200
+
+participant "Validator" as VAL #E0ECF8
+participant "Miner" as Miner
+participant "Node" as Node
+participant "Redis" as RV
+participant "Data Aggregator" as DAN
+
+== Node List ==
+VAL -> Miner : Request Node List
+Miner -> Miner : Node List + Signature
+Miner --> VAL : Return Signed Node List
+
+== Node Specification ==
+loop For each Node in List
+    VAL -> Node : Request Node Specification with Signature
+    Node -> Node : Verify Signature
+    alt Verification Failed
+        Node --> VAL : Reject Node Specification Request
+        VAL -> RV : Remove Node
+    else Verification Succeeded
+        Node --> VAL : Return Node Specification
+        VAL -> RV : Store Node Specification + Flag as Available
+    end
+end loop
+
+== Sync ==
+note over DAN, RV
+Data Aggregator listens to configured sources (Bittensor Metagraph) and syncs updates to Redis independently of the main flow.
+end note
+@enduml

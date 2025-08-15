@@ -288,16 +288,13 @@ def compute_distribution_score(
         reverse=True,
     )
 
-    # Take the top X miners
-    top_challenger = sorted_challengers[: sccc.TOP_X_MINERS]
-
     # Find the inder of the miner
     challenger_rank = next(
-        (i for i, x in enumerate(top_challenger) if x.hotkey == score.hotkey), -1
+        (i for i, x in enumerate(sorted_challengers) if x.hotkey == score.hotkey), -1
     )
     if challenger_rank == -1:
         return sccc.DISTRIBUTION_FAILURE_REWARD
-
+  
     # Compute the score using a exponential decay formula
     # which is used in scoring systems to assign diminishing values to items based on their rank
     score = compute_score(challenger_rank)

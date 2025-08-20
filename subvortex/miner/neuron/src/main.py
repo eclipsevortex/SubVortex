@@ -301,7 +301,11 @@ class Miner:
 
                 # If no new block was produced (e.g., shutdown happened or something failed), skip this round
                 # This guards against the case where wait_for_block() returned None or False
-                if not any(task.result() for task in done if not task.cancelled()):
+                if not any(
+                    task.result()
+                    for task in done
+                    if not task.cancelled() and not task.exception()
+                ):
                     continue
 
                 # Get the current block

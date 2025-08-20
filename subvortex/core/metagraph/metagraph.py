@@ -87,7 +87,11 @@ class MetagraphObserver:
 
                     # If no new block was produced (e.g., shutdown happened or something failed), skip this round
                     # This guards against the case where wait_for_block() returned None or False
-                    if not any(task.result() for task in done if not task.cancelled()):
+                    if not any(
+                        task.result()
+                        for task in done
+                        if not task.cancelled() and not task.exception()
+                    ):
                         continue
 
                     block = await self.subtensor.get_current_block()
@@ -227,20 +231,57 @@ class MetagraphObserver:
             # Create teh new neuron from the metagraph
             new_neuron = scmm.Neuron.from_proto(mneuron)
 
-            # Set the country for the new neuron
-            country = (
-                current_neuron.country
-                # The is a country for an ip that has not changed
-                if current_neuron
-                and current_neuron.ip == new_neuron.ip
-                and current_neuron.country is not None
-                else (
-                    # Get the country for the ip if provided
-                    sccc.get_country(new_neuron.ip)
-                    if new_neuron.ip != "0.0.0.0" and scsu.is_valid_ipv4(new_neuron.ip)
-                    else None
+            try:
+                # Set the country for the new neuron
+                country = (
+                    current_neuron.country
+                    # The is a country for an ip that has not changed
+                    if current_neuron
+                    and current_neuron.ip == new_neuron.ip
+                    and current_neuron.country is not None
+                    else (
+                        # Get the country for the ip if provided
+                        sccc.get_country(new_neuron.ip)
+                        if new_neuron.ip != "0.0.0.0"
+                        and scsu.is_valid_ipv4(new_neuron.ip)
+                        else None
+                    )
                 )
-            )
+                
+            except sccc.CountryApiException as e:
+                btul.logging.error(f"🚨 Country API failure: {e}")
+                btul.logging.warning(
+                    "⏸️ Pausing metagraph updates until APIs recover..."
+                )
+
+                # Wait for the longest rate limit to expire (ensures all APIs are available)
+                if e.rate_limited:
+                    max_wait = max(e.rate_limited.values())
+                    btul.logging.info(f"⏰ Waiting {max_wait:.0f}s for all APIs to recover...")
+                    await asyncio.sleep(max_wait)
+                else:
+                    await asyncio.sleep(60)  # Default wait if no rate limit info
+
+                # Keep retrying until APIs recover or user stops the program
+                while not self.should_exit.is_set():
+                    try:
+                        test_country = (
+                            sccc.get_country(new_neuron.ip)
+                            if new_neuron.ip != "0.0.0.0"
+                            else None
+                        )
+                        btul.logging.info(
+                            "✅ Country APIs recovered, resuming metagraph updates"
+                        )
+                        country = test_country
+                        break
+
+                    except sccc.CountryApiException:
+                        btul.logging.warning(
+                            "❌ APIs still failing - waiting 30s before retry..."
+                        )
+                        await asyncio.sleep(30)
+
             new_neuron.country = country
 
             # Add the hotkey of the neuron

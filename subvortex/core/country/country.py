@@ -63,7 +63,7 @@ def get_country(ip: str):
         (_get_country_by_ipinfo_io, "ipinfo"),        # Highest accuracy (~99%)
         (_get_country_by_ip_api, "ip_api"),           # Very high accuracy (~98%)  
         (_get_country_by_country_is, "country_is"),   # Good accuracy (~95%)
-        (_get_country_by_subvortex_api, "subvortex"), # Custom API
+        # (_get_country_by_subvortex_api, "subvortex"), # Custom API - Not ready yet
         # (_get_country_by_my_api, "my_api"),         # Down
     ]
 

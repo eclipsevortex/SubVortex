@@ -66,7 +66,7 @@ async def get_owner_hotkey(substrate: AsyncSubstrateInterface, netuid: int):
         module="SubtensorModule", storage_function="SubnetOwnerHotkey", params=[netuid]
     )
 
-    return result.value
+    return result.value if hasattr(result, "value") else result
 
 
 def get_weights_min_stake(substrate: SubstrateInterface):

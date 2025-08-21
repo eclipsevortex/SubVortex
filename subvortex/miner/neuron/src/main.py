@@ -415,7 +415,7 @@ class Miner:
         synapse_type = type(synapse).__name__
 
         # Whitelist the subnet owner hotkey
-        owner_hotkey = get_owner_hotkey(self.subtensor.substrate, self.config.netuid)
+        owner_hotkey = await get_owner_hotkey(self.subtensor.substrate, self.config.netuid)
         if caller == owner_hotkey:
             return False, "Hotkey recognized!"
 

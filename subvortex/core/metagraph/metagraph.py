@@ -109,6 +109,9 @@ class MetagraphObserver:
                         axons
                     )
 
+                    # Get the last udpate
+                    last_update = await self.database.get_neuron_last_updated()
+
                     # Determine whether a resync is needed
                     time_to_resync = block - last_synced_block >= sync_interval
                     must_resync = (
@@ -117,6 +120,7 @@ class MetagraphObserver:
                         or has_axons_changed
                         or has_missing_country
                         or time_to_resync
+                        or last_update is None
                     )
 
                     if not must_resync:
@@ -124,8 +128,12 @@ class MetagraphObserver:
                             "No changes detected; skipping sync.",
                             prefix=self.settings.logging_name,
                         )
-                        continue
+                        
+                        # Notify listener the metagraph is ready
+                        ready = await self._notify_if_needed(ready)
 
+                        continue
+                  
                     if has_axons_changed:
                         reason = "hotkey/IP changes detected"
                     elif has_missing_country:
@@ -143,7 +151,9 @@ class MetagraphObserver:
                     )
 
                     # Sync from chain and update Redis
-                    axons, has_missing_country = await self._resync()
+                    axons, has_missing_country = await self._resync(
+                        last_update=last_update
+                    )
 
                     # Store the sync block
                     last_synced_block = block
@@ -202,7 +212,7 @@ class MetagraphObserver:
             f"✅ MetagraphObserver service stopped", prefix=self.settings.logging_name
         )
 
-    async def _resync(self) -> dict[str, str]:
+    async def _resync(self, last_update: bool) -> dict[str, str]:
         await self.metagraph.sync(subtensor=self.subtensor, lite=False)
         btul.logging.debug(
             "📡 Full metagraph sync complete", prefix=self.settings.logging_name
@@ -247,7 +257,7 @@ class MetagraphObserver:
                         else None
                     )
                 )
-                
+
             except sccc.CountryApiException as e:
                 btul.logging.error(f"🚨 Country API failure: {e}")
                 btul.logging.warning(
@@ -257,7 +267,9 @@ class MetagraphObserver:
                 # Wait for the longest rate limit to expire (ensures all APIs are available)
                 if e.rate_limited:
                     max_wait = max(e.rate_limited.values())
-                    btul.logging.info(f"⏰ Waiting {max_wait:.0f}s for all APIs to recover...")
+                    btul.logging.info(
+                        f"⏰ Waiting {max_wait:.0f}s for all APIs to recover..."
+                    )
                     await asyncio.sleep(max_wait)
                 else:
                     await asyncio.sleep(60)  # Default wait if no rate limit info
@@ -399,7 +411,7 @@ class MetagraphObserver:
                 updated_neurons
             )
 
-        if updated_neurons or neurons_to_delete:
+        if last_update is None or updated_neurons or neurons_to_delete:
             block = await self.subtensor.get_current_block()
             not self.settings.dry_run and await self.database.set_last_updated(block)
             btul.logging.debug(

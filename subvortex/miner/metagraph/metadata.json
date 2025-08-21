@@ -1,9 +1,9 @@
 {
   "id": "miner-metagraph",
   "name": "subvortex-miner-metagraph",
-  "version": "3.1.8",
-  "miner.version": "3.1.8",
-  "miner.metagraph.version": "3.1.8",
+  "version": "3.1.9-alpha.2",
+  "miner.version": "3.1.9-alpha.2",
+  "miner.metagraph.version": "3.1.9-alpha.2",
   "depends_on": [
     "miner-redis"
   ]

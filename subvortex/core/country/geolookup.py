@@ -292,7 +292,7 @@ class IntervalTree:
         """Find geoname_id for IP address."""
         return self._search(self.root, ip)
 
-    def _search(self, node: IntervalTreeNode, ip: str):
+    def _search(self, node: IntervalTreeNode, ip: int):
         if not node:
             return None
 
@@ -325,6 +325,9 @@ class UltraFastGeoLookup:
     def __init__(self, output_dir: str = "/var/tmp", license_key: Optional[str] = None):
         self.output_dir = output_dir
         self.license_key = license_key
+        
+        # Ensure output directory exists
+        os.makedirs(self.output_dir, exist_ok=True)
         self.locations_file = os.path.join(
             self.output_dir, "GeoLite2-Country-Locations-en.csv"
         )
@@ -335,13 +338,15 @@ class UltraFastGeoLookup:
         # Thread-safe data structures
         self._lock = RLock()
         self._country_map: Dict[int, str] = {}
-        self._interval_tree = IntervalTree()
+        self._ip_ranges = []  # Sorted list of (start_ip, end_ip, geoname_id)
 
         # File monitoring
         self._locations_mtime = 0
         self._blocks_mtime = 0
         self._loaded = False
         self._load_start_time = 0
+        self._ready = None  # Will be created in start()
+        self._initial_load_complete = False
 
         # Performance cache - much larger for metagraph use
         self._cache: Dict[str, str] = {}
@@ -356,6 +361,8 @@ class UltraFastGeoLookup:
         """Start the geo lookup service with preloading and background updates."""
         btul.logging.info("🚀 Starting UltraFastGeoLookup service...")
 
+        # Create the ready event in async context
+        self._ready = asyncio.Event()
         self._running = True
 
         # Preload data at startup
@@ -386,9 +393,11 @@ class UltraFastGeoLookup:
             self._load_start_time = start_time
 
             # Check for updates first
+            btul.logging.debug("Checking for updates...")
             await self._updater.check_and_download_updates()
 
             # Load the data
+            btul.logging.debug("Loading data internal...")
             self._load_data_internal()
 
             load_time = time.time() - start_time
@@ -396,9 +405,20 @@ class UltraFastGeoLookup:
                 f"✅ GeoLite2 data preloaded in {load_time:.2f}s: "
                 f"{len(self._country_map)} countries, interval tree ready"
             )
+            
+            # Mark as ready for consumers
+            self._initial_load_complete = True
+            if self._ready:
+                self._ready.set()
 
         except Exception as e:
             btul.logging.error(f"❌ Failed to preload GeoLite2 data: {e}")
+            import traceback
+            btul.logging.error(f"Traceback: {traceback.format_exc()}")
+            # Even on error, mark as "ready" to avoid blocking consumers indefinitely
+            # They will fall back to API lookups
+            if self._ready:
+                self._ready.set()
 
     def _start_background_updates(self):
         """Start background task for periodic CSV updates."""
@@ -424,7 +444,20 @@ class UltraFastGeoLookup:
 
                 if updated:
                     btul.logging.info("🔄 GeoLite2 files updated, reloading data...")
-                    self._load_data_internal()
+                    try:
+                        # Temporarily mark as not ready during reload to prevent exceptions
+                        if self._ready:
+                            self._ready.clear()
+                        self._load_data_internal()
+                        # Mark as ready again after successful reload
+                        if self._ready:
+                            self._ready.set()
+                        btul.logging.info("✅ GeoLite2 data reloaded successfully")
+                    except Exception as e:
+                        btul.logging.error(f"❌ Failed to reload GeoLite2 data: {e}")
+                        # Re-mark as ready to continue operations (will use cache or fallback)
+                        if self._ready:
+                            self._ready.set()
 
                 # Sleep for 6 hours before next check
                 await asyncio.sleep(6 * 3600)
@@ -470,14 +503,23 @@ class UltraFastGeoLookup:
     def _load_data_internal(self):
         """Internal data loading with maximum performance."""
         with self._lock:
-            if not self._check_file_changes() and self._loaded:
-                return
+            # Always update file times first to prevent infinite recursion
+            self._locations_mtime = (
+                os.path.getmtime(self.locations_file)
+                if os.path.exists(self.locations_file)
+                else 0
+            )
+            self._blocks_mtime = (
+                os.path.getmtime(self.blocks_file)
+                if os.path.exists(self.blocks_file)
+                else 0
+            )
 
-            btul.logging.debug("📊 Reloading GeoLite2 data due to file changes...")
+            btul.logging.debug("📊 Loading GeoLite2 data...")
 
             # Clear previous data
             self._country_map.clear()
-            self._interval_tree = IntervalTree()
+            self._ip_ranges.clear()
             self._cache.clear()
 
             # Load country mappings with memory-mapped file for large files
@@ -486,6 +528,7 @@ class UltraFastGeoLookup:
 
             # Load IP blocks and build interval tree
             if os.path.exists(self.blocks_file):
+                btul.logging.debug("Loading blocks file...")
                 self._load_blocks_optimized()
 
             self._loaded = True
@@ -503,13 +546,15 @@ class UltraFastGeoLookup:
     def _load_blocks_optimized(self):
         """Load IP blocks and build interval tree with progress."""
         processed = 0
+        blocks_data = []
 
+        # First pass: collect all data
         with open(self.blocks_file, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
 
             for row in reader:
                 network = row.get("network")
-                geoname_id = row.get("geoname_id")
+                geoname_id = row.get("geoname_id") or row.get("registered_country_geoname_id")
 
                 if network and geoname_id:
                     try:
@@ -518,25 +563,55 @@ class UltraFastGeoLookup:
                         start_ip = int(net.network_address)
                         end_ip = int(net.broadcast_address)
 
-                        # Insert into interval tree
-                        self._interval_tree.insert(start_ip, end_ip, int(geoname_id))
+                        blocks_data.append((start_ip, end_ip, int(geoname_id)))
                         processed += 1
 
                         # Progress indicator for large datasets
                         if processed % 50000 == 0:
                             elapsed = time.time() - self._load_start_time
                             btul.logging.debug(
-                                f"📈 Processed {processed:,} IP ranges in {elapsed:.1f}s"
+                                f"📈 Collected {processed:,} IP ranges in {elapsed:.1f}s"
                             )
 
                     except (ValueError, ipaddress.AddressValueError):
                         continue
+
+        # Sort IP ranges for binary search
+        btul.logging.debug(f"Sorting {len(blocks_data)} IP blocks for binary search...")
+        blocks_data.sort(key=lambda x: x[0])  # Sort by start IP
+        
+        # Store sorted ranges
+        self._ip_ranges = blocks_data
+        btul.logging.debug(f"✅ Stored {len(self._ip_ranges)} IP ranges for ultra-fast lookups")
+
+    async def wait_for_ready(self, timeout: Optional[float] = 30.0):
+        """Wait for the geo lookup service to be ready for use."""
+        if self._ready is None:
+            btul.logging.warning("⚠️ GeoLookup service not started yet")
+            return
+            
+        if timeout:
+            try:
+                await asyncio.wait_for(self._ready.wait(), timeout=timeout)
+            except asyncio.TimeoutError:
+                btul.logging.warning(f"⚠️ GeoLite2 data loading timed out after {timeout}s - continuing with API fallback")
+        else:
+            await self._ready.wait()
+    
+    def is_ready(self) -> bool:
+        """Check if the geo lookup service is ready for use."""
+        return self._ready is not None and self._ready.is_set() and self._initial_load_complete
 
     def lookup_country(self, ip_str: str) -> Optional[str]:
         """
         Ultra-fast IP to country lookup with automatic reloading.
         Returns country code (e.g., 'US', 'DE') or None if not found.
         """
+        # If data is not ready yet, return None to trigger API fallback
+        if self._ready is None or not self._ready.is_set():
+            btul.logging.debug(f"GeoLite2 data not ready yet for {ip_str} - will use API fallback")
+            return None
+            
         # Check cache first (fastest path)
         cached = self._cache.get(ip_str)
         if cached is not None:
@@ -544,14 +619,28 @@ class UltraFastGeoLookup:
 
         # Hot reload if files changed
         if self._check_file_changes():
-            self._load_data_internal()
+            try:
+                # Temporarily mark as not ready during reload to prevent race conditions
+                if self._ready:
+                    self._ready.clear()
+                self._load_data_internal()
+                # Mark as ready again after successful reload
+                if self._ready:
+                    self._ready.set()
+            except Exception as e:
+                btul.logging.error(f"❌ Failed to hot reload GeoLite2 data: {e}")
+                # Re-mark as ready to continue operations
+                if self._ready:
+                    self._ready.set()
+                # Return None to trigger API fallback for this lookup
+                return None
 
         try:
-            # Convert IP to integer for ultra-fast tree search
+            # Convert IP to integer for binary search
             ip_int = int(ipaddress.IPv4Address(ip_str))
 
-            # Search interval tree - O(log n)
-            geoname_id = self._interval_tree.search(ip_int)
+            # Binary search through sorted IP ranges - O(log n)
+            geoname_id = self._binary_search_ip_ranges(ip_int)
             if geoname_id is None:
                 # Cache negative result
                 self._cache_result(ip_str, None)
@@ -565,6 +654,26 @@ class UltraFastGeoLookup:
         except (ValueError, ipaddress.AddressValueError):
             self._cache_result(ip_str, None)
             return None
+
+    def _binary_search_ip_ranges(self, ip_int: int) -> Optional[int]:
+        """Binary search to find the geoname_id for an IP address."""
+        if not self._ip_ranges:
+            return None
+        
+        left, right = 0, len(self._ip_ranges) - 1
+        
+        while left <= right:
+            mid = (left + right) // 2
+            start_ip, end_ip, geoname_id = self._ip_ranges[mid]
+            
+            if start_ip <= ip_int <= end_ip:
+                return geoname_id
+            elif ip_int < start_ip:
+                right = mid - 1
+            else:
+                left = mid + 1
+        
+        return None
 
     def _cache_result(self, ip_str: str, country: Optional[str]):
         """Cache result with LRU-style eviction."""

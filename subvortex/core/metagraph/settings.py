@@ -30,14 +30,14 @@ class Settings:
     Run the metagraph in dry mode
     """
 
-    maxmind_license_key: str = None
+    geo_license_key: str = None
     """
-    MaxMind GeoLite2 license key for automated CSV downloads
+    License key for geo database provider (e.g., MaxMind GeoLite2) for automated downloads
     """
 
-    maxmind_output_dir: str = None
+    geo_output_dir: str = None
     """
-    Output directory for MaxMind GeoLite2 CSV files storage
+    Output directory for geo database files storage
     """
 
     @classmethod

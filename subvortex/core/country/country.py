@@ -29,8 +29,8 @@ IPINFO_IO_BASE_URL = "https://ipinfo.io"
 # Per-API rate limits (seconds between calls)
 API_RATE_LIMITS = {
     "subvortex": 60,  # SubVortex API - conservative
-    "ipinfo": 86.4,  # Free tier: 1000 req/day = 86400s/1000 = 86.4s between calls - Highest accuracy (~99%)
-    "ip_api": 1.5,  # Free tier: 45 req/min = 1.33s between calls, use 1.5s for safety (https://ip-api.com/docs/unban) - Very high accuracy (~98%)
+    "ipinfo": 90,  # Free tier: 1000 req/day = 86400s/1000 = 86.4s between calls - Highest accuracy (~99%)
+    "ip_api": 5,  # Free tier: 45 req/min = 1.33s between calls, use 1.5s for safety (https://ip-api.com/docs/unban) - Very high accuracy (~98%)
     "country_is": 10,  # Free tier: 1 req/10 seconds per IP (https://country.is/) - Good accuracy (~95%)
     "my_api": 0,  # Custom API - Down!
 }
@@ -80,12 +80,18 @@ def get_country(ip: str):
 
         try:
             _last_call_time[api_name] = now
+
             country, reason = api_func(ip_ipv4)
             if country:
                 return country
+            
             if reason:
                 errors.append(f"{api_name}: {reason}")
 
+        except requests.HTTPError as e:
+            status_code = getattr(e.response, 'status_code', 'unknown')
+            errors.append(f"{api_name} ({status_code}): {e}")
+            
         except Exception as e:
             errors.append(f"{api_name}: {e}")
 
@@ -93,8 +99,9 @@ def get_country(ip: str):
     all_errors = errors + [
         f"{api}: {remaining:.0f}s cooldown" for api, remaining in rate_limited.items()
     ]
+
     raise CountryApiException(
-        f"All APIs failed for {ip_ipv4}: {'; '.join(all_errors)}", rate_limited
+        f"All APIs failed for {ip_ipv4} - {'; '.join(all_errors)}", rate_limited
     )
 
 

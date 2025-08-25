@@ -248,6 +248,32 @@ class NeuronDatabase(NeuronReadOnlyDatabase):
                 prefix=self.settings.logging_name,
             )
 
+    async def get_state(self):
+        """
+        Get the block of the last time the metagraph has been updated
+        """
+        # Ensure Redis connection is established before any operation.
+        await self.ensure_connection()
+
+        # Get a connected Redis client, configured with the correct DB index and prefix.
+        client = await self.get_client()
+
+        try:
+            raw = await client.get(self._key("state:metagraph"))
+            return raw
+
+        except Exception as ex:
+            btul.logging.error(
+                f"[get_last_updated] Failed to read last updated block: {ex}",
+                prefix=self.settings.logging_name,
+            )
+            btul.logging.debug(
+                f"[get_last_updated] Exception type: {type(ex).__name__}, Traceback:\n{traceback.format_exc()}",
+                prefix=self.settings.logging_name,
+            )
+
+        return 0
+    
     def _key(self, key: str):
         # Prefixes keys to namespace them under this service
         return f"{self.settings.key_prefix}:{key}"

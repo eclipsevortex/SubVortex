@@ -41,7 +41,6 @@ class MetagraphObserver:
         """
         registration_count = 0
         axons = {}
-        ready = False
         last_synced_block = 0
         sync_interval = self.settings.sync_interval
         has_missing_country = False
@@ -112,11 +111,13 @@ class MetagraphObserver:
                     # Get the last udpate
                     last_update = await self.database.get_neuron_last_updated()
 
+                    # Get the current state of the metagraph
+                    state = await self.database.get_state()
+
                     # Determine whether a resync is needed
                     time_to_resync = block - last_synced_block >= sync_interval
                     must_resync = (
-                        not ready
-                        or has_new_registration
+                        has_new_registration
                         or has_axons_changed
                         or has_missing_country
                         or time_to_resync
@@ -128,12 +129,12 @@ class MetagraphObserver:
                             "No changes detected; skipping sync.",
                             prefix=self.settings.logging_name,
                         )
-                        
+
                         # Notify listener the metagraph is ready
-                        ready = await self._notify_if_needed(ready)
+                        ready = await self._notify_if_needed(state == "ready")
 
                         continue
-                  
+
                     if has_axons_changed:
                         reason = "hotkey/IP changes detected"
                     elif has_missing_country:
@@ -271,6 +272,7 @@ class MetagraphObserver:
                         f"⏰ Waiting {max_wait:.0f}s for all APIs to recover..."
                     )
                     await asyncio.sleep(max_wait)
+
                 else:
                     await asyncio.sleep(60)  # Default wait if no rate limit info
 

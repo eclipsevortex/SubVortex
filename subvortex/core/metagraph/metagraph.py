@@ -6,6 +6,7 @@ import bittensor.core.metagraph as btcm
 import bittensor.core.async_subtensor as btcas
 
 import subvortex.core.country.country as sccc
+import subvortex.core.country.geolookup as scgl
 import subvortex.core.core_bittensor.subtensor as scbs
 import subvortex.core.model.neuron.neuron as scmm
 import subvortex.core.metagraph.database as scmd
@@ -34,6 +35,16 @@ class MetagraphObserver:
         self.should_exit = asyncio.Event()
         self.run_complete = asyncio.Event()
 
+        # Initialize ultra-fast geo lookup service if license key provided
+        self.geo_lookup = (
+            scgl.UltraFastGeoLookup(
+                output_dir=settings.maxmind_output_dir,
+                license_key=settings.maxmind_license_key,
+            )
+            if settings.maxmind_license_key
+            else None
+        )
+
     async def start(self):
         """
         Starts the metagraph observer loop.
@@ -52,6 +63,15 @@ class MetagraphObserver:
         btul.logging.debug(
             f"Settings: {self.settings}", prefix=self.settings.logging_name
         )
+
+        # Start the geo lookup service if available
+        if self.geo_lookup:
+            await self.geo_lookup.start()
+        else:
+            btul.logging.info(
+                "💡 No MaxMind license key provided - using API fallback for country lookups",
+                prefix=self.settings.logging_name,
+            )
 
         # Load the neurons
         neurons = await self.database.get_neurons()
@@ -179,6 +199,10 @@ class MetagraphObserver:
                     )
 
         finally:
+            # Stop the geo lookup service if it was started
+            if self.geo_lookup:
+                await self.geo_lookup.stop()
+
             # Ensure the metagraph is state as unready!
             if not self.settings.dry_run:
                 btul.logging.debug(
@@ -251,8 +275,12 @@ class MetagraphObserver:
                     and current_neuron.ip == new_neuron.ip
                     and current_neuron.country is not None
                     else (
-                        # Get the country for the ip if provided
-                        sccc.get_country(new_neuron.ip)
+                        # Get the country for the ip - use ultra-fast lookup if available, otherwise API fallback
+                        (
+                            self.geo_lookup.lookup_country(new_neuron.ip)
+                            if self.settings.maxmind_license_key
+                            else sccc.get_country(new_neuron.ip)
+                        )
                         if new_neuron.ip != "0.0.0.0"
                         and scsu.is_valid_ipv4(new_neuron.ip)
                         else None
@@ -260,41 +288,55 @@ class MetagraphObserver:
                 )
 
             except sccc.CountryApiException as e:
-                btul.logging.error(f"🚨 Country API failure: {e}")
-                btul.logging.warning(
-                    "⏸️ Pausing metagraph updates until APIs recover..."
-                )
-
-                # Wait for the longest rate limit to expire (ensures all APIs are available)
-                if e.rate_limited:
-                    max_wait = max(e.rate_limited.values())
-                    btul.logging.info(
-                        f"⏰ Waiting {max_wait:.0f}s for all APIs to recover..."
+                # Handle API failures when using fallback
+                if not self.settings.maxmind_license_key:
+                    btul.logging.error(f"🚨 Country API failure: {e}")
+                    btul.logging.warning(
+                        "⏸️ Pausing metagraph updates until APIs recover..."
                     )
-                    await asyncio.sleep(max_wait)
 
-                else:
-                    await asyncio.sleep(60)  # Default wait if no rate limit info
-
-                # Keep retrying until APIs recover or user stops the program
-                while not self.should_exit.is_set():
-                    try:
-                        test_country = (
-                            sccc.get_country(new_neuron.ip)
-                            if new_neuron.ip != "0.0.0.0"
-                            else None
-                        )
+                    # Wait for the longest rate limit to expire (ensures all APIs are available)
+                    if e.rate_limited:
+                        max_wait = max(e.rate_limited.values())
                         btul.logging.info(
-                            "✅ Country APIs recovered, resuming metagraph updates"
+                            f"⏰ Waiting {max_wait:.0f}s for all APIs to recover..."
                         )
-                        country = test_country
-                        break
+                        await asyncio.sleep(max_wait)
+                    else:
+                        await asyncio.sleep(60)  # Default wait if no rate limit info
 
-                    except sccc.CountryApiException:
-                        btul.logging.warning(
-                            "❌ APIs still failing - waiting 30s before retry..."
-                        )
-                        await asyncio.sleep(30)
+                    # Keep retrying until APIs recover or user stops the program
+                    while not self.should_exit.is_set():
+                        try:
+                            test_country = (
+                                sccc.get_country(new_neuron.ip)
+                                if new_neuron.ip != "0.0.0.0"
+                                else None
+                            )
+                            btul.logging.info(
+                                "✅ Country APIs recovered, resuming metagraph updates"
+                            )
+                            country = test_country
+                            break
+
+                        except sccc.CountryApiException:
+                            btul.logging.warning(
+                                "❌ APIs still failing - waiting 30s before retry..."
+                            )
+                            await asyncio.sleep(30)
+                else:
+                    # Ultra-fast lookup failed, set to None
+                    btul.logging.warning(
+                        f"⚠️ Ultra-fast geo lookup failed for {new_neuron.ip}: {e}"
+                    )
+                    country = None
+
+            except Exception as e:
+                btul.logging.warning(
+                    f"⚠️ Country lookup failed for {new_neuron.ip}: {e}"
+                )
+                # Use None country for this neuron and continue processing
+                country = None
 
             new_neuron.country = country
 

@@ -30,6 +30,16 @@ class Settings:
     Run the metagraph in dry mode
     """
 
+    maxmind_license_key: str = None
+    """
+    MaxMind GeoLite2 license key for automated CSV downloads
+    """
+
+    maxmind_output_dir: str = None
+    """
+    Output directory for MaxMind GeoLite2 CSV files storage
+    """
+
     @classmethod
     def create(cls) -> "Settings":
         return scsu.create_settings_instance(cls)

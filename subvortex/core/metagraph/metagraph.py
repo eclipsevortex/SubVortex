@@ -166,10 +166,18 @@ class MetagraphObserver:
                             prefix=self.settings.logging_name,
                         )
 
-                        # Notify listener the metagraph is ready
-                        await self._notify_if_needed(state == "ready")
-
-                        continue
+                        # Notify listener the metagraph is ready with retry logic
+                        notification_success = await self._notify_with_retry(state == "ready")
+                        
+                        # If notification failed after retries, force a resync
+                        if not notification_success and state != "ready":
+                            btul.logging.warning(
+                                "🔄 Forcing resync due to persistent data consistency failure",
+                                prefix=self.settings.logging_name,
+                            )
+                            # Don't continue - let it fall through to resync logic
+                        else:
+                            continue
 
                     if has_axons_changed:
                         reason = "hotkey/IP changes detected"
@@ -195,8 +203,8 @@ class MetagraphObserver:
                     # Store the sync block
                     last_synced_block = block
 
-                    # Notify listener the metagraph is ready
-                    await self._notify_if_needed(state == "ready")
+                    # Notify listener the metagraph is ready with retry logic
+                    await self._notify_with_retry(state == "ready")
 
                     # Store the new axons
                     axons = new_axons
@@ -463,6 +471,7 @@ class MetagraphObserver:
                 f"📅 Last updated block recorded: #{block}",
                 prefix=self.settings.logging_name,
             )
+            
         else:
             btul.logging.info(
                 "✅ Metagraph is in sync with Redis — no changes detected.",
@@ -473,7 +482,17 @@ class MetagraphObserver:
 
     async def _notify_if_needed(self, ready):
         if ready:
-            return ready
+            return True  # Already ready, no need to notify
+
+        # Verify data consistency before marking as ready
+        if not self.settings.dry_run:
+            consistency_verified = await self._verify_data_consistency()
+            if not consistency_verified:
+                btul.logging.warning(
+                    "❌ Data consistency check failed - will not mark as ready",
+                    prefix=self.settings.logging_name,
+                )
+                return False
 
         btul.logging.debug(
             "🔔 Metagraph marked ready", prefix=self.settings.logging_name
@@ -485,6 +504,84 @@ class MetagraphObserver:
         not self.settings.dry_run and await self.database.notify_state()
 
         return True
+
+    async def _notify_with_retry(self, ready) -> bool:
+        """
+        Notify with retry logic using adaptive delays based on actual Redis response times.
+        Returns True if successful, False if failed after all retries.
+        """
+        # If already ready, skip all checks
+        if ready:
+            return True
+            
+        max_retries = 3
+        base_delay = 0.01  # Start with 10ms base
+        
+        for attempt in range(max_retries):
+            # Measure how long the consistency check takes
+            start_time = asyncio.get_event_loop().time()
+            success = await self._notify_if_needed(ready)
+            check_duration = asyncio.get_event_loop().time() - start_time
+            
+            if success:
+                if attempt > 0:  # Only log if we actually retried
+                    btul.logging.info(
+                        f"✅ Data consistency verified on retry {attempt + 1} (took {check_duration*1000:.1f}ms)",
+                        prefix=self.settings.logging_name,
+                    )
+                return True
+                
+            if attempt < max_retries - 1:  # Don't delay on last attempt
+                # Adaptive delay: wait 2-5x the time it took for the check
+                # This accounts for Redis load, network latency, etc.
+                adaptive_delay = max(base_delay, check_duration * (2 + attempt * 1.5))
+                
+                btul.logging.debug(
+                    f"🔄 Retry {attempt + 1}/{max_retries}: check took {check_duration*1000:.1f}ms, "
+                    f"waiting {adaptive_delay*1000:.1f}ms...",
+                    prefix=self.settings.logging_name,
+                )
+                await asyncio.sleep(adaptive_delay)
+            else:
+                btul.logging.error(
+                    f"❌ Failed to verify data consistency after {max_retries} attempts "
+                    f"(last check took {check_duration*1000:.1f}ms)",
+                    prefix=self.settings.logging_name,
+                )
+        
+        return False
+
+    async def _verify_data_consistency(self) -> bool:
+        """
+        Verify that the number of neurons in Redis matches the metagraph.
+        Uses the existing get_neurons() method for simplicity and reliability.
+        Returns True if consistent, False otherwise.
+        """
+        try:
+            # Get expected count from metagraph (we already have this in memory)
+            expected_count = len(self.metagraph.neurons)
+            
+            # Get actual neurons from Redis using existing method
+            neurons = await self.database.get_neurons()
+            actual_count = len(neurons)
+            
+            # Only log when there's a mismatch to reduce noise
+            if actual_count != expected_count:
+                btul.logging.warning(
+                    f"⚠️ Data inconsistency: expected {expected_count} neurons, found {actual_count} in Redis",
+                    prefix=self.settings.logging_name,
+                )
+                return False
+            
+            return True
+                
+        except Exception as e:
+            btul.logging.error(
+                f"❌ Error during consistency check: {e}",
+                prefix=self.settings.logging_name,
+            )
+            # On error, assume inconsistent to be safe
+            return False
 
     async def _has_new_neuron_registered(self, registration_count) -> tuple[bool, int]:
         new_count = await scbs.get_number_of_registration(

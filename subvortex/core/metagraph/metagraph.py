@@ -492,6 +492,16 @@ class MetagraphObserver:
                     "❌ Data consistency check failed - will not mark as ready",
                     prefix=self.settings.logging_name,
                 )
+
+                btul.logging.debug(
+                    "🔔 Metagraph marked unready", prefix=self.settings.logging_name
+                )
+                not self.settings.dry_run and await self.database.mark_as_unready()
+                btul.logging.debug(
+                    "📣 Broadcasting metagraph unready state", prefix=self.settings.logging_name
+                )
+                not self.settings.dry_run and await self.database.notify_state()
+
                 return False
 
         btul.logging.debug(

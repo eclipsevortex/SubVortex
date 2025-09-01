@@ -36,6 +36,7 @@ class Database:
         btul.logging.info(
             "Created new Redis client for event loop", prefix=self.settings.logging_name
         )
+        
         return client
 
     async def is_connection_alive(self) -> bool:
@@ -51,14 +52,52 @@ class Database:
             return False
 
     async def ensure_connection(self):
-        client = await self.get_client()
-
-        if not await self.is_connection_alive():
-            btul.logging.warning(
-                "Redis ping failed, but client will be reused",
-                prefix=self.settings.logging_name,
-            )
-            # You may optionally recreate here if needed
+        retry_delay = 1.0  # Start with 1 second
+        attempt = 0
+        
+        while True:
+            attempt += 1
+            
+            if await self.is_connection_alive():
+                # Connection is working
+                if attempt > 1:
+                    btul.logging.info(
+                        f"✅ Redis connection restored after {attempt - 1} attempts",
+                        prefix=self.settings.logging_name,
+                    )
+                return
+                
+            # Connection failed
+            if attempt == 1:
+                btul.logging.warning(
+                    "🔄 Redis connection lost, will keep trying until restored...",
+                    prefix=self.settings.logging_name,
+                )
+            
+            # Remove broken client from cache
+            loop = self._get_loop()
+            if loop in self._clients:
+                try:
+                    await self._clients[loop].close()
+                except:
+                    pass  # Ignore errors when closing broken client
+                del self._clients[loop]
+            
+            # Log every 10 attempts to avoid spam
+            if attempt % 10 == 0:
+                btul.logging.warning(
+                    f"🔄 Redis still unreachable after {attempt} attempts, continuing...",
+                    prefix=self.settings.logging_name,
+                )
+            else:
+                btul.logging.debug(
+                    f"🔄 Redis reconnection attempt {attempt} failed, retrying in {retry_delay}s...",
+                    prefix=self.settings.logging_name,
+                )
+                
+            await asyncio.sleep(retry_delay)
+            # Exponential backoff with cap
+            retry_delay = min(retry_delay * 1.2, 30.0)  # Cap at 30 seconds
 
     async def wait_until_ready(self, name: str):
         await self.ensure_connection()
@@ -108,7 +147,7 @@ class Database:
 
     async def _get_migration_status(self, model_name: str):
         await self.ensure_connection()
-        
+
         client = await self.get_client()
 
         latest = None

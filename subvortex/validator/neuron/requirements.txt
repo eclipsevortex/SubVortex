@@ -1,5 +1,5 @@
 aioredis==2.0.1
-bittensor==9.9.0
+bittensor==9.10.0
 bittensor-wallet==4.0.0
 loguru==0.7.0
 numpy==2.0.1

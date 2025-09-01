@@ -1,4 +1,4 @@
-bittensor==9.9.0
+bittensor==9.10.0
 bittensor-wallet==4.0.0
 loguru==0.7.0
 netfilterqueue==1.1.0; sys_platform == 'linux'

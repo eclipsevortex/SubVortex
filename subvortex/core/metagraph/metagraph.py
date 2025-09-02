@@ -198,21 +198,33 @@ class MetagraphObserver:
                     )
 
                     # Sync from chain and update Redis
-                    axons, has_missing_country = await self._resync(
-                        last_update=last_update
-                    )
+                    try:
+                        axons, has_missing_country = await self._resync(
+                            last_update=last_update
+                        )
 
-                    # Store the sync block
-                    last_synced_block = block
+                        # Store the sync block
+                        last_synced_block = block
 
-                    # Notify listener the metagraph is ready with retry logic
-                    await self._notify_with_retry(state == "ready")
+                        # Notify listener the metagraph is ready with retry logic
+                        await self._notify_with_retry(state == "ready")
+                        
+                    except Exception as resync_error:
+                        btul.logging.error(
+                            f"❌ Resync failed: {resync_error}",
+                            prefix=self.settings.logging_name,
+                        )
+                        # Mark metagraph as unready due to resync failure
+                        await self._mark_unready_on_error(f"Resync failed: {resync_error}")
+                        # Continue loop to retry
 
                     # Store the new axons
                     axons = new_axons
 
                 except ConnectionRefusedError as e:
                     btul.logging.error(f"Connection refused: {e}")
+                    # Mark metagraph as unready due to connection issues
+                    await self._mark_unready_on_error("Connection refused")
                     await asyncio.sleep(1)
 
                 except Exception as e:
@@ -223,6 +235,8 @@ class MetagraphObserver:
                     btul.logging.debug(
                         traceback.format_exc(), prefix=self.settings.logging_name
                     )
+                    # Mark metagraph as unready due to unhandled error
+                    await self._mark_unready_on_error(f"Unhandled error: {e}")
 
         finally:
             # Stop the geo lookup service if it was started
@@ -278,11 +292,18 @@ class MetagraphObserver:
         old_ips_to_cleanup: list[str] = []
         has_missing_country = False
 
-        stored_neurons = await self.database.get_neurons()
-        btul.logging.debug(
-            f"💾 Neurons loaded from Redis: {len(stored_neurons)}",
-            prefix=self.settings.logging_name,
-        )
+        try:
+            stored_neurons = await self.database.get_neurons()
+            btul.logging.debug(
+                f"💾 Neurons loaded from Redis: {len(stored_neurons)}",
+                prefix=self.settings.logging_name,
+            )
+        except Exception as e:
+            btul.logging.error(
+                f"❌ Failed to load neurons from Redis: {e}",
+                prefix=self.settings.logging_name,
+            )
+            raise  # Re-raise to trigger resync failure handling
 
         mhotkeys = set()
 
@@ -416,9 +437,16 @@ class MetagraphObserver:
             if stale_ips:
                 sccc.cleanup_rate_limits_for_ips(stale_ips)
 
-            not self.settings.dry_run and await self.database.remove_neurons(
-                stale_neurons
-            )
+            try:
+                not self.settings.dry_run and await self.database.remove_neurons(
+                    stale_neurons
+                )
+            except Exception as e:
+                btul.logging.error(
+                    f"❌ Failed to remove stale neurons from Redis: {e}",
+                    prefix=self.settings.logging_name,
+                )
+                raise  # Re-raise to trigger resync failure handling
 
         if neurons_to_delete:
             btul.logging.debug(
@@ -431,9 +459,16 @@ class MetagraphObserver:
             )
 
             # Remove the neurons
-            not self.settings.dry_run and await self.database.remove_neurons(
-                neurons_to_delete
-            )
+            try:
+                not self.settings.dry_run and await self.database.remove_neurons(
+                    neurons_to_delete
+                )
+            except Exception as e:
+                btul.logging.error(
+                    f"❌ Failed to remove deleted neurons from Redis: {e}",
+                    prefix=self.settings.logging_name,
+                )
+                raise  # Re-raise to trigger resync failure handling
 
             # Clean up rate limit data for deleted neuron IPs
             deleted_ips = [
@@ -451,9 +486,16 @@ class MetagraphObserver:
                 f"🧠 Neurons updated: {[n.hotkey for n in updated_neurons]}",
                 prefix=self.settings.logging_name,
             )
-            not self.settings.dry_run and await self.database.update_neurons(
-                updated_neurons
-            )
+            try:
+                not self.settings.dry_run and await self.database.update_neurons(
+                    updated_neurons
+                )
+            except Exception as e:
+                btul.logging.error(
+                    f"❌ Failed to update neurons in Redis: {e}",
+                    prefix=self.settings.logging_name,
+                )
+                raise  # Re-raise to trigger resync failure handling
 
         # Clean up rate limit data for old IPs when neurons changed IP
         if old_ips_to_cleanup:
@@ -465,11 +507,18 @@ class MetagraphObserver:
 
         if last_update is None or updated_neurons or neurons_to_delete:
             block = await self.subtensor.get_current_block()
-            not self.settings.dry_run and await self.database.set_last_updated(block)
-            btul.logging.debug(
-                f"📅 Last updated block recorded: #{block}",
-                prefix=self.settings.logging_name,
-            )
+            try:
+                not self.settings.dry_run and await self.database.set_last_updated(block)
+                btul.logging.debug(
+                    f"📅 Last updated block recorded: #{block}",
+                    prefix=self.settings.logging_name,
+                )
+            except Exception as e:
+                btul.logging.error(
+                    f"❌ Failed to set last updated block in Redis: {e}",
+                    prefix=self.settings.logging_name,
+                )
+                raise  # Re-raise to trigger resync failure handling
 
         else:
             btul.logging.info(
@@ -519,6 +568,7 @@ class MetagraphObserver:
         """
         Notify with retry logic using adaptive delays based on actual Redis response times.
         Returns True if successful, False if failed after all retries.
+        Marks metagraph as unready if Redis operations fail.
         """
         # If already ready, skip all checks
         if ready:
@@ -528,36 +578,50 @@ class MetagraphObserver:
         base_delay = 0.01  # Start with 10ms base
 
         for attempt in range(max_retries):
-            # Measure how long the consistency check takes
-            start_time = asyncio.get_event_loop().time()
-            success = await self._notify_if_needed(ready)
-            check_duration = asyncio.get_event_loop().time() - start_time
+            try:
+                # Measure how long the consistency check takes
+                start_time = asyncio.get_event_loop().time()
+                success = await self._notify_if_needed(ready)
+                check_duration = asyncio.get_event_loop().time() - start_time
 
-            if success:
-                if attempt > 0:  # Only log if we actually retried
-                    btul.logging.info(
-                        f"✅ Data consistency verified on retry {attempt + 1} (took {check_duration*1000:.1f}ms)",
+                if success:
+                    if attempt > 0:  # Only log if we actually retried
+                        btul.logging.info(
+                            f"✅ Data consistency verified on retry {attempt + 1} (took {check_duration*1000:.1f}ms)",
+                            prefix=self.settings.logging_name,
+                        )
+                    return True
+
+                if attempt < max_retries - 1:  # Don't delay on last attempt
+                    # Adaptive delay: wait 2-5x the time it took for the check
+                    # This accounts for Redis load, network latency, etc.
+                    adaptive_delay = max(base_delay, check_duration * (2 + attempt * 1.5))
+
+                    btul.logging.debug(
+                        f"🔄 Retry {attempt + 1}/{max_retries}: check took {check_duration*1000:.1f}ms, "
+                        f"waiting {adaptive_delay*1000:.1f}ms...",
                         prefix=self.settings.logging_name,
                     )
-                return True
+                    await asyncio.sleep(adaptive_delay)
+                else:
+                    btul.logging.error(
+                        f"❌ Failed to verify data consistency after {max_retries} attempts "
+                        f"(last check took {check_duration*1000:.1f}ms)",
+                        prefix=self.settings.logging_name,
+                    )
+                    # Mark as unready due to consistency failure
+                    await self._mark_unready_on_error("Data consistency verification failed")
 
-            if attempt < max_retries - 1:  # Don't delay on last attempt
-                # Adaptive delay: wait 2-5x the time it took for the check
-                # This accounts for Redis load, network latency, etc.
-                adaptive_delay = max(base_delay, check_duration * (2 + attempt * 1.5))
-
-                btul.logging.debug(
-                    f"🔄 Retry {attempt + 1}/{max_retries}: check took {check_duration*1000:.1f}ms, "
-                    f"waiting {adaptive_delay*1000:.1f}ms...",
-                    prefix=self.settings.logging_name,
-                )
-                await asyncio.sleep(adaptive_delay)
-            else:
+            except Exception as e:
                 btul.logging.error(
-                    f"❌ Failed to verify data consistency after {max_retries} attempts "
-                    f"(last check took {check_duration*1000:.1f}ms)",
+                    f"❌ Redis operation failed during notify retry (attempt {attempt + 1}): {e}",
                     prefix=self.settings.logging_name,
                 )
+                # Mark as unready due to Redis failure
+                await self._mark_unready_on_error(f"Redis operation failed: {e}")
+                
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (attempt + 1))
 
         return False
 
@@ -780,3 +844,23 @@ class MetagraphObserver:
 
         # Fall back to API lookup
         return sccc.get_country(ip)
+
+    async def _mark_unready_on_error(self, error_reason: str):
+        """
+        Mark metagraph as unready when errors occur and notify listeners.
+        This ensures downstream services know the metagraph is in a problematic state.
+        """
+        try:
+            if not self.settings.dry_run:
+                await self.database.mark_as_unready()
+                await self.database.notify_state()
+                btul.logging.warning(
+                    f"🚫 Metagraph marked as unready due to: {error_reason}",
+                    prefix=self.settings.logging_name,
+                )
+        except Exception as notify_error:
+            # Even if we can't mark as unready (e.g., Redis down), log the attempt
+            btul.logging.error(
+                f"❌ Failed to mark metagraph as unready (reason: {error_reason}): {notify_error}",
+                prefix=self.settings.logging_name,
+            )

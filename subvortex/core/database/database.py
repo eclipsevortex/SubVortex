@@ -96,8 +96,9 @@ class Database:
                 )
                 
             await asyncio.sleep(retry_delay)
-            # Exponential backoff with cap
-            retry_delay = min(retry_delay * 1.2, 30.0)  # Cap at 30 seconds
+
+            # Exponential backoff with cap at 30 seconds
+            retry_delay = min(retry_delay * 1.2, 30.0)
 
     async def wait_until_ready(self, name: str):
         await self.ensure_connection()

@@ -36,8 +36,8 @@ API_RATE_LIMITS = {
 }
 
 
-# Simple tracking
-_last_call_time = {}
+# Per-IP per-API rate limit tracking: {ip: {api_name: last_call_time}}
+_per_ip_rate_limits = {}
 
 countries = {}
 
@@ -52,35 +52,38 @@ class CountryApiException(Exception):
 
 def get_country(ip: str):
     """
-    Get the country code of the ip
+    Get the country code of the ip with aggressive API calling until rate limited.
+    Single pass through APIs - infinite retry is handled by caller.
     """
     ip_ipv4 = get_ipv4(ip)
-    errors = []
-    rate_limited = {}
 
     # APIs ordered by accuracy (highest to lowest)
     apis = [
-        (_get_country_by_ipinfo_io, "ipinfo"),        # Highest accuracy (~99%)
-        (_get_country_by_ip_api, "ip_api"),           # Very high accuracy (~98%)  
-        (_get_country_by_country_is, "country_is"),   # Good accuracy (~95%)
+        (_get_country_by_ipinfo_io, "ipinfo"),  # Highest accuracy (~99%)
+        (_get_country_by_ip_api, "ip_api"),  # Very high accuracy (~98%)
+        (_get_country_by_country_is, "country_is"),  # Good accuracy (~95%)
         # (_get_country_by_subvortex_api, "subvortex"), # Custom API - Not ready yet
         # (_get_country_by_my_api, "my_api"),         # Down
     ]
 
-    for api_func, api_name in apis:
-        # Check if this API is still in cooldown
-        now = time.time()
-        last_call = _last_call_time.get(api_name, 0)
-        cooldown = API_RATE_LIMITS[api_name]
+    # Initialize per-IP tracking if not exists
+    if ip_ipv4 not in _per_ip_rate_limits:
+        _per_ip_rate_limits[ip_ipv4] = {}
 
-        if now - last_call < cooldown:
-            remaining = cooldown - (now - last_call)
-            rate_limited[api_name] = remaining
-            continue
+    errors = []
+    rate_limited = {}
+    
+    for api_func, api_name in apis:
+        # Check if this API is still in rate limit cooldown for this specific IP
+        now = time.time()
+        if api_name in _per_ip_rate_limits[ip_ipv4]:
+            rate_limit_end = _per_ip_rate_limits[ip_ipv4][api_name]
+            if now < rate_limit_end:
+                remaining = rate_limit_end - now
+                rate_limited[api_name] = remaining
+                continue
 
         try:
-            _last_call_time[api_name] = now
-
             country, reason = api_func(ip_ipv4)
             if country:
                 return country
@@ -89,20 +92,104 @@ def get_country(ip: str):
                 errors.append(f"{api_name}: {reason}")
 
         except requests.HTTPError as e:
-            status_code = getattr(e.response, 'status_code', 'unknown')
-            errors.append(f"{api_name} ({status_code}): {e}")
+            status_code = getattr(e.response, "status_code", "unknown")
             
-        except Exception as e:
-            errors.append(f"{api_name}: {e}")
+            # Check for rate limit status codes
+            if status_code in [429, 403]:  # Common rate limit codes
+                rate_limit_duration = _extract_rate_limit_from_response(e.response, api_name)
+                rate_limit_end = now + rate_limit_duration
+                _per_ip_rate_limits[ip_ipv4][api_name] = rate_limit_end
+                
+                btul.logging.warning(
+                    f"🚫 {api_name} rate limited for {ip_ipv4} (HTTP {status_code}). "
+                    f"Will retry after {rate_limit_duration}s"
+                )
+                rate_limited[api_name] = rate_limit_duration
+                
+            else:
+                errors.append(f"{api_name} ({status_code}): {e}")
 
-    # Build error message with rate limit info
+        except Exception as e:
+            # Check if error message indicates rate limiting
+            error_msg = str(e).lower()
+            if any(phrase in error_msg for phrase in ['rate limit', 'too many requests', 'quota exceeded']):
+                # Apply default rate limit if we detect rate limiting but no HTTP status
+                rate_limit_duration = API_RATE_LIMITS.get(api_name, 60)  # Default to 60s
+                rate_limit_end = now + rate_limit_duration
+                _per_ip_rate_limits[ip_ipv4][api_name] = rate_limit_end
+                
+                btul.logging.warning(
+                    f"🚫 {api_name} rate limited for {ip_ipv4} (detected from error). "
+                    f"Will retry after {rate_limit_duration}s"
+                )
+                rate_limited[api_name] = rate_limit_duration
+
+            else:
+                errors.append(f"{api_name}: {e}")
+
+    # Combine all errors and rate limits
     all_errors = errors + [
         f"{api}: {remaining:.0f}s cooldown" for api, remaining in rate_limited.items()
     ]
 
+    if all_errors:
+        raise CountryApiException(
+            f"All APIs failed for {ip_ipv4} - {'; '.join(all_errors)}", rate_limited
+        )
+    
+    # This should not happen, but safety fallback
     raise CountryApiException(
-        f"All APIs failed for {ip_ipv4} - {'; '.join(all_errors)}", rate_limited
+        f"No APIs available for {ip_ipv4}", rate_limited
     )
+
+
+def _extract_rate_limit_from_response(response, api_name: str) -> float:
+    """
+    Extract rate limit duration from HTTP response headers.
+    Returns duration in seconds to wait before retrying.
+    """
+    try:
+        # Try common rate limit headers
+        headers_to_check = [
+            'retry-after',           # Standard header
+            'x-ratelimit-reset',     # Unix timestamp
+            'x-rate-limit-reset',    # Unix timestamp  
+            'x-ratelimit-retry-after', # Seconds
+            'rate-limit-reset',      # Seconds
+        ]
+        
+        for header in headers_to_check:
+            if header in response.headers:
+                value = response.headers[header]
+                
+                # Handle different formats
+                if header in ['x-ratelimit-reset', 'x-rate-limit-reset']:
+                    # Unix timestamp - calculate difference from now
+                    try:
+                        reset_time = int(value)
+                        current_time = int(time.time())
+                        duration = max(reset_time - current_time, 1)  # At least 1 second
+                        btul.logging.debug(f"Extracted rate limit from {header}: {duration}s")
+                        return float(duration)
+                    except (ValueError, TypeError):
+                        continue
+                else:
+                    # Direct seconds value
+                    try:
+                        duration = float(value)
+                        btul.logging.debug(f"Extracted rate limit from {header}: {duration}s")
+                        return max(duration, 1)  # At least 1 second
+                    except (ValueError, TypeError):
+                        continue
+        
+        # If no headers found, use the official API rate limits
+        duration = API_RATE_LIMITS.get(api_name, 60)  # Default to 60s
+        btul.logging.debug(f"No rate limit headers found, using default for {api_name}: {duration}s")
+        return float(duration)
+        
+    except Exception as e:
+        btul.logging.warning(f"Error extracting rate limit from response: {e}")
+        return 60.0  # Safe default
 
 
 def _get_country_by_subvortex_api(ip: str):
@@ -199,3 +286,61 @@ def get_ipv4(ip):
         pass
 
     return ip
+
+
+def cleanup_rate_limits_for_ips(ips: list[str]):
+    """
+    Clean up rate limit tracking for specific IPs.
+    Call this when neurons with these IPs are deleted from the metagraph.
+
+    Args:
+        ips: List of IP addresses to clean up
+    """
+    cleaned_count = 0
+    for ip in ips:
+        ip_ipv4 = get_ipv4(ip)
+        if ip_ipv4 in _per_ip_rate_limits:
+            del _per_ip_rate_limits[ip_ipv4]
+            cleaned_count += 1
+
+    if cleaned_count > 0:
+        btul.logging.debug(f"🧹 Cleaned up rate limit data for {cleaned_count} IPs")
+
+    return cleaned_count
+
+
+def cleanup_rate_limits_for_api(api_name: str):
+    """
+    Clean up rate limit tracking for a specific API across all IPs.
+    Call this if an API is permanently disabled or changed.
+
+    Args:
+        api_name: Name of the API to clean up ("ipinfo", "ip_api", "country_is", etc.)
+    """
+    cleaned_count = 0
+    for ip_dict in _per_ip_rate_limits.values():
+        if api_name in ip_dict:
+            del ip_dict[api_name]
+            cleaned_count += 1
+
+    if cleaned_count > 0:
+        btul.logging.debug(
+            f"🧹 Cleaned up {api_name} rate limit data for {cleaned_count} IPs"
+        )
+
+    return cleaned_count
+
+
+def cleanup_all_rate_limits():
+    """
+    Clean up all rate limit tracking data.
+    Call this for complete reset or during shutdown.
+    """
+    global _per_ip_rate_limits
+    count = len(_per_ip_rate_limits)
+    _per_ip_rate_limits.clear()
+
+    if count > 0:
+        btul.logging.info(f"🧹 Cleaned up all rate limit data ({count} IPs)")
+
+    return count

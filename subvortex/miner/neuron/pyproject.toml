@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subvortex-miner-neuron"
-version = "3.1.8"
+version = "3.1.9-alpha.5"
 description = "SubVortex Miner Neuron"
 authors = [{ name = "Eclipse Vortex", email = "subvortex.bt@gmail.com" }]
 readme = "README.md"

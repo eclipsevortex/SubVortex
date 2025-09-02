@@ -595,7 +595,8 @@ class MetagraphObserver:
                 if attempt < max_retries - 1:  # Don't delay on last attempt
                     # Adaptive delay: wait 2-5x the time it took for the check
                     # This accounts for Redis load, network latency, etc.
-                    adaptive_delay = max(base_delay, check_duration * (2 + attempt * 1.5))
+                    # Cap at 30 seconds to avoid excessive waits during Redis recovery
+                    adaptive_delay = min(max(base_delay, check_duration * (2 + attempt * 1.5)), 30.0)
 
                     btul.logging.debug(
                         f"🔄 Retry {attempt + 1}/{max_retries}: check took {check_duration*1000:.1f}ms, "

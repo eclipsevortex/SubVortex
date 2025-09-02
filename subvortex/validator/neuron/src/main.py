@@ -223,7 +223,7 @@ class Validator:
             try:
                 # Ensure the metagraph is ready
                 btul.logging.debug("Ensure metagraph readiness")
-                await self.database.wait_until_ready("metagraph")
+                await self.database.wait_until_ready("metagraph", self.should_exit)
 
                 # Get the last time neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()

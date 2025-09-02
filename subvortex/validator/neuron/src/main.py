@@ -385,7 +385,7 @@ class Validator:
         # Signal the neuron has finished
         self.run_complete.set()
 
-    async def _shutdown(self):
+    async def shutdown(self):
         btul.logging.info("Waiting validator to complete its work...")
 
         # Wait the neuron to stop

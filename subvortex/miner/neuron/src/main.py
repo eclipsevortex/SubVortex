@@ -314,7 +314,7 @@ class Miner:
 
                 # Ensure the metagraph is ready
                 btul.logging.debug("Ensure metagraph readiness")
-                await self.database.wait_until_ready("metagraph")
+                await self.database.wait_until_ready("metagraph", self.should_exit)
 
                 # Get the last time the neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
@@ -415,7 +415,9 @@ class Miner:
         synapse_type = type(synapse).__name__
 
         # Whitelist the subnet owner hotkey
-        owner_hotkey = await get_owner_hotkey(self.subtensor.substrate, self.config.netuid)
+        owner_hotkey = await get_owner_hotkey(
+            self.subtensor.substrate, self.config.netuid
+        )
         if caller == owner_hotkey:
             return False, "Hotkey recognized!"
 

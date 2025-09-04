@@ -28,7 +28,7 @@ from typing import List
 from dotenv import load_dotenv
 
 from subvortex.core.monitor.monitor import Monitor
-from subvortex.core.country.country_service import CountryService
+from subvortex.core.country.country import get_country
 from subvortex.core.file.file_monitor import FileMonitor
 from subvortex.core.shared.neuron import wait_until_registered
 from subvortex.core.shared.mock import MockDendrite, MockSubtensor
@@ -186,11 +186,6 @@ class Validator:
         self.file_monitor.add_file_provider(self.monitor.provider)
         self.monitor.wait()
 
-        # Country service
-        self.country_service = CountryService(self.config.netuid)
-        self.file_monitor.add_file_provider(self.country_service.provider)
-        self.country_service.wait()
-
         # Get the neuron
         self.neuron = await self.database.get_neuron(self.wallet.hotkey.ss58_address)
         btul.logging.info(
@@ -198,7 +193,7 @@ class Validator:
         )
 
         # Get the country
-        self.country = self.country_service.get_country(self.dendrite.external_ip)
+        self.country = get_country(self.dendrite.external_ip)
         btul.logging.debug(f"Validator based in {self.country}")
 
         # Init wandb.

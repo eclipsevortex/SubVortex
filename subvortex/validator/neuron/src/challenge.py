@@ -183,7 +183,7 @@ def challenge_subtensor(miner: Miner, challenge):
             )
 
         except Exception as ex:
-            reason = "Failed to connect to Subtensor node at the given IP."
+            reason = f"Failed to connect to Subtensor node at the given IP {miner.ip}."
             return (verified, reason, str(ex), process_time)
 
         # Set the socket timeout
@@ -218,14 +218,14 @@ def challenge_subtensor(miner: Miner, challenge):
         try:
             miner_value = getattr(neuron, neuron_property)
         except AttributeError as ex:
-            reason = "Property not found in the neuron."
+            reason = f"Property {neuron_property} not found in the neuron."
             return (verified, reason, str(ex), process_time)
 
         # Compute the process time
         process_time = time.time() - start_time
 
         # Verify the challenge
-        verified = expected_value == miner_value
+        verified = str(expected_value) == str(miner_value)
 
     except Exception as ex:
         reason = "Unexpected exception"

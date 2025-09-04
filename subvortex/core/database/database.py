@@ -36,6 +36,7 @@ class Database:
         btul.logging.info(
             "Created new Redis client for event loop", prefix=self.settings.logging_name
         )
+
         return client
 
     async def is_connection_alive(self) -> bool:
@@ -51,64 +52,107 @@ class Database:
             return False
 
     async def ensure_connection(self):
-        client = await self.get_client()
+        retry_delay = 1.0  # Start with 1 second
+        attempt = 0
 
-        if not await self.is_connection_alive():
-            btul.logging.warning(
-                "Redis ping failed, but client will be reused",
-                prefix=self.settings.logging_name,
-            )
-            # You may optionally recreate here if needed
+        while True:
+            attempt += 1
 
-    async def wait_until_ready(self, name: str):
-        await self.ensure_connection()
-
-        client = await self.get_client()
-
-        message_key = self._key(f"state:{name}")
-        stream_key = self._key(f"state:{name}:stream")
-        last_id = "$"
-
-        try:
-            snapshot = await client.get(message_key)
-            if snapshot and snapshot.decode() == "ready":
-                btul.logging.debug(
-                    f"{name} is already ready (via message key)",
-                    prefix=self.settings.logging_name,
-                )
-                return
-
-            btul.logging.debug(
-                f"Waiting on stream: {stream_key}", prefix=self.settings.logging_name
-            )
-            while True:
-                entries = await client.xread({stream_key: last_id}, block=0)
-                if not entries:
-                    continue
-
-                for stream_key, messages in entries:
-                    btul.logging.debug(
-                        f"Received stream message: {messages}",
+            if await self.is_connection_alive():
+                # Connection is working
+                if attempt > 1:
+                    btul.logging.info(
+                        f"✅ Redis connection restored after {attempt - 1} attempts",
                         prefix=self.settings.logging_name,
                     )
-                    for msg_id, fields in messages:
-                        state = fields.get(b"state", b"").decode()
-                        if state == "ready":
-                            btul.logging.debug(
-                                f"{name} is now ready (via stream)",
-                                prefix=self.settings.logging_name,
-                            )
-                            return
-                        last_id = msg_id
-        except Exception as err:
-            btul.logging.warning(
-                f"Failed to read the state of {name}: {err}",
-                prefix=self.settings.logging_name,
-            )
+                return
+
+            # Connection failed
+            if attempt == 1:
+                btul.logging.warning(
+                    "🔄 Redis connection lost, will keep trying until restored...",
+                    prefix=self.settings.logging_name,
+                )
+
+            # Remove broken client from cache
+            loop = self._get_loop()
+            if loop in self._clients:
+                try:
+                    await self._clients[loop].close()
+                except:
+                    pass  # Ignore errors when closing broken client
+                del self._clients[loop]
+
+            # Log every 10 attempts to avoid spam
+            if attempt % 10 == 0:
+                btul.logging.warning(
+                    f"🔄 Redis still unreachable after {attempt} attempts, continuing...",
+                    prefix=self.settings.logging_name,
+                )
+            else:
+                btul.logging.debug(
+                    f"🔄 Redis reconnection attempt {attempt} failed, retrying in {retry_delay}s...",
+                    prefix=self.settings.logging_name,
+                )
+
+            await asyncio.sleep(retry_delay)
+
+            # Exponential backoff with cap at 30 seconds
+            retry_delay = min(retry_delay * 1.2, 30.0)
+
+    async def wait_until_ready(self, name: str, should_exit: asyncio.Event = None):
+        message_key = self._key(f"state:{name}")
+        stream_key = self._key(f"state:{name}:stream")
+
+        while should_exit is None or not should_exit.is_set():
+
+            try:
+                await self.ensure_connection()
+                client = await self.get_client()
+
+                # Check current state first
+                snapshot = await client.get(message_key)
+                if snapshot and snapshot.decode() == "ready":
+                    btul.logging.debug(
+                        f"{name} is already ready (via message key)",
+                        prefix=self.settings.logging_name,
+                    )
+                    return
+
+                # Wait on stream
+                last_id = "$"
+                btul.logging.debug(
+                    f"Waiting on stream: {stream_key}",
+                    prefix=self.settings.logging_name,
+                )
+
+                while should_exit is None or not should_exit.is_set():
+                    # Use timeout on xread to allow periodic shutdown checks (5s timeou)
+                    entries = await client.xread({stream_key: last_id}, block=5000)
+                    if not entries:
+                        continue
+
+                    for stream_key, messages in entries:
+                        for msg_id, fields in messages:
+                            state = fields.get(b"state", b"").decode()
+                            if state == "ready":
+                                btul.logging.debug(
+                                    f"{name} is now ready (via stream)",
+                                    prefix=self.settings.logging_name,
+                                )
+                                return
+                            last_id = msg_id
+
+            except Exception as e:
+                btul.logging.warning(
+                    f"Stream reading interrupted for {name}: {e} - will reconnect and retry...",
+                    prefix=self.settings.logging_name,
+                )
+                await asyncio.sleep(1)
 
     async def _get_migration_status(self, model_name: str):
         await self.ensure_connection()
-        
+
         client = await self.get_client()
 
         latest = None

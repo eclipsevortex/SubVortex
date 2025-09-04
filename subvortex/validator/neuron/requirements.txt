@@ -1,6 +1,6 @@
 aioredis==2.0.1
-bittensor==9.7.0
-bittensor-wallet==3.0.10
+bittensor==9.10.0
+bittensor-wallet==4.0.0
 loguru==0.7.0
 numpy==2.0.1
 pydantic==2.8.2

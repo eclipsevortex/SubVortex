@@ -301,7 +301,11 @@ class Miner:
 
                 # If no new block was produced (e.g., shutdown happened or something failed), skip this round
                 # This guards against the case where wait_for_block() returned None or False
-                if not any(task.result() for task in done if not task.cancelled()):
+                if not any(
+                    task.result()
+                    for task in done
+                    if not task.cancelled() and not task.exception()
+                ):
                     continue
 
                 # Get the current block
@@ -310,7 +314,7 @@ class Miner:
 
                 # Ensure the metagraph is ready
                 btul.logging.debug("Ensure metagraph readiness")
-                await self.database.wait_until_ready("metagraph")
+                await self.database.wait_until_ready("metagraph", self.should_exit)
 
                 # Get the last time the neurons have been updated
                 last_updated = await self.database.get_neuron_last_updated()
@@ -411,7 +415,9 @@ class Miner:
         synapse_type = type(synapse).__name__
 
         # Whitelist the subnet owner hotkey
-        owner_hotkey = get_owner_hotkey(self.subtensor.substrate, self.config.netuid)
+        owner_hotkey = await get_owner_hotkey(
+            self.subtensor.substrate, self.config.netuid
+        )
         if caller == owner_hotkey:
             return False, "Hotkey recognized!"
 

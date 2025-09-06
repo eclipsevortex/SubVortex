@@ -201,7 +201,7 @@ async def challenge_miner(self, miner: Miner):
             miner.axon,
             Synapse(),
             deserialize=False,
-            timeout=5,
+            timeout=10,
         )
 
         status_code = response.dendrite.status_code

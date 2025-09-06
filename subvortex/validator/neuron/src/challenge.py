@@ -219,7 +219,7 @@ async def challenge_miner(self, miner: Miner):
     return (verified, reason, details)
 
 
-async def challenge_subtensor(miner: Miner, challenge):
+async def challenge_subtensor(miner: Miner, challenge, max_retries=3):
     """
     Challenge the subtensor by requesting the value of a property of a specific neuron in a specific subnet at a certain block
     """
@@ -228,116 +228,129 @@ async def challenge_subtensor(miner: Miner, challenge):
     details = None
     process_time = None
 
-    try:
-        # Get the details of the challenge
-        block_hash, params, value = challenge
-
-        ws = None
+    # Retry logic for geographic connectivity issues
+    for attempt in range(max_retries):
         try:
-            ws = await websockets.connect(f"ws://{miner.ip}:9944")
+            # Get the details of the challenge
+            block_hash, params, value = challenge
+            
+            # Add small delay between retries
+            if attempt > 0:
+                await asyncio.sleep(attempt * 1.0)  # 1s, 2s, 3s delays
+                btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Retry attempt {attempt + 1}/{max_retries}")
 
-        except asyncio.TimeoutError as ex:
-            return (verified, "WebSocket connection timed out", str(ex), process_time)
-
-        except (InvalidURI, OSError) as ex:
-            return (
-                verified,
-                f"Invalid WebSocket URI ws://{miner.ip}:9944",
-                str(ex),
-                process_time,
-            )
-        except InvalidHandshake as ex:
-            return (verified, "WebSocket handshake failed", str(ex), process_time)
-
-        except WebSocketException as ex:
-            return (verified, "Websocket exception", str(ex), process_time)
-        
-        # Set start time
-        start_time = time.time()
-
-        # Prepare data payload
-        data = json.dumps(
-            {
-                "id": "state_call0",
-                "jsonrpc": "2.0",
-                "method": "state_call",
-                "params": [
-                    "NeuronInfoRuntimeApi_get_neuron_lite",
-                    params,
-                    block_hash,
-                ],
-            }
-        )
-
-        try:
-            # Send request
-            await ws.send(data)
-
-        except ConnectionClosed as ex:
-            return (
-                verified,
-                "WebSocket closed before sending data",
-                str(ex),
-                process_time,
+            ws = None
+            try:
+                # Increase connection timeout for international connections
+                ws = await websockets.connect(
+                f"ws://{miner.ip}:9944",
+                ping_timeout=None,  # Disable ping timeout
+                ping_interval=None,  # Disable ping
+                close_timeout=10,  # 10s close timeout
+                open_timeout=15,  # 15s connection timeout
+                additional_headers={
+                    "Connection": "keep-alive",
+                },
             )
 
-        try:
-            # Receive response
-            response = await ws.recv()
+            except InvalidURI as ex:
+                # Invalid URI - don't retry, fail immediately
+                reason = f"Invalid WebSocket URI ws://{miner.ip}:9944"
+                details = str(ex)
+                break
+                
+            except (asyncio.TimeoutError, OSError, InvalidHandshake, WebSocketException) as ex:
+                # These are connection errors - let retry logic handle them
+                raise ex
 
-        except asyncio.TimeoutError as ex:
-            return (verified, "WebSocket receive timed out", str(ex), process_time)
 
-        except ConnectionClosed as ex:
-            return (
-                verified,
-                "WebSocket closed before receiving response",
-                str(ex),
-                process_time,
+            # Set start time
+            start_time = time.time()
+
+            # Prepare data payload
+            data = json.dumps(
+                {
+                    "id": "state_call0",
+                    "jsonrpc": "2.0",
+                    "method": "state_call",
+                    "params": [
+                        "NeuronInfoRuntimeApi_get_neuron_lite",
+                        params,
+                        block_hash,
+                    ],
+                }
             )
 
-        # Calculate process time
-        process_time = time.time() - start_time
+            try:
+                # Send request
+                await ws.send(data)
 
-        # Load the response
-        try:
-            response = json.loads(response)
+            except ConnectionClosed as ex:
+                # Connection error - let retry logic handle
+                raise ex
 
-        except json.JSONDecodeError as ex:
-            return (verified, "Received malformed JSON response", str(ex), process_time)
+            try:
+                # Receive response with timeout for international connections
+                response = await asyncio.wait_for(ws.recv(), timeout=20.0)
 
-        if "error" in response:
-            return (
-                verified,
-                f"Error in response: {response['error'].get('message', 'Unknown error')}",
-                "",
-                process_time,
+            except (asyncio.TimeoutError, ConnectionClosed) as ex:
+                # Connection error - let retry logic handle
+                raise ex
+
+            # Calculate process time
+            process_time = time.time() - start_time
+
+            # Load the response
+            try:
+                response = json.loads(response)
+
+            except json.JSONDecodeError as ex:
+                reason = "Received malformed JSON response"
+                details = str(ex)
+                break
+
+            if "error" in response:
+                reason = f"Error in response: {response['error'].get('message', 'Unknown error')}"
+                details = ""
+                break
+
+            if "result" not in response:
+                reason = "Response does not contain a 'result' field"
+                details = ""
+                break
+
+            # Verify the challenge
+            verified = response["result"] == value
+
+            # Log total process time breakdown
+            total_time = time.time() - start_time
+            btul.logging.trace(
+                f"[{CHALLENGE_NAME}][{miner.uid}] Total challenge time: {total_time:.2f}s"
             )
+            
+            # Success - break retry loop
+            break
 
-        if "result" not in response:
-            return (
-                verified,
-                f"Response does not contain a 'result' field",
-                "",
-                process_time,
-            )
+        except (ConnectionClosed, WebSocketException, asyncio.TimeoutError) as ex:
+            # These are retryable errors - continue to next attempt
+            reason = f"Connection error on attempt {attempt + 1}/{max_retries}"
+            details = str(ex)
+            btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] {reason}: {details}")
+            
+            if attempt == max_retries - 1:  # Last attempt
+                reason = "WebSocket connection failed after retries"
+                break
 
-        # Verify the challenge
-        verified = response["result"] == value
+        except Exception as ex:
+            # Non-retryable error - break immediately
+            reason = "Unexpected exception"
+            details = str(ex)
+            break
 
-        # Log total process time breakdown
-        total_time = time.time() - start_time
-        btul.logging.trace(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Total challenge time: {total_time:.2f}s"
-        )
-
-    except Exception as ex:
-        reason = "Unexpected exception"
-        details = str(ex)
-
-    finally:
-        if ws:
-            await ws.close()
+        finally:
+            if ws:
+                await ws.close()
+                ws = None
 
     return (verified, reason, details, process_time)
 

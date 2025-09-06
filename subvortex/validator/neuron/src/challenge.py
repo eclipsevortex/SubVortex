@@ -232,9 +232,6 @@ async def challenge_subtensor(miner: Miner, challenge):
         # Get the details of the challenge
         block_hash, params, value = challenge
 
-        # Set start time
-        start_time = time.time()
-
         ws = None
         try:
             ws = await websockets.connect(f"ws://{miner.ip}:9944")
@@ -254,6 +251,9 @@ async def challenge_subtensor(miner: Miner, challenge):
 
         except WebSocketException as ex:
             return (verified, "Websocket exception", str(ex), process_time)
+        
+        # Set start time
+        start_time = time.time()
 
         # Prepare data payload
         data = json.dumps(

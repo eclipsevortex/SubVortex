@@ -18,10 +18,13 @@ import json
 import time
 import random
 import asyncio
+import string
 import traceback
 import websockets
 import bittensor.core.subtensor as btcs
 import bittensor.utils.btlogging as btul
+from itertools import cycle
+from websockets.sync.client import connect, ClientConnection
 from typing import Dict
 from collections import Counter
 from websockets.exceptions import (
@@ -75,6 +78,19 @@ VALIDATOR_PROPERTIES = [
     "dividends",
     "last_update",
 ]
+
+id_cycle = cycle(range(1, 999))
+
+rng = random.Random()
+
+
+def get_next_id() -> str:
+    """
+    Generates a pseudo-random ID by returning the next int of a range from 1-998 prepended with
+    two random ascii characters.
+    """
+    random_letters = "".join(rng.choices(string.ascii_letters, k=2))
+    return f"{random_letters}{next(id_cycle)}"
 
 
 def get_runtime_call_definition(
@@ -219,7 +235,7 @@ async def challenge_miner(self, miner: Miner):
     return (verified, reason, details)
 
 
-async def challenge_subtensor(miner: Miner, challenge, max_retries=3):
+def challenge_subtensor(miner: Miner, challenge, max_retries=3):
     """
     Challenge the subtensor by requesting the value of a property of a specific neuron in a specific subnet at a certain block
     """
@@ -229,48 +245,52 @@ async def challenge_subtensor(miner: Miner, challenge, max_retries=3):
     process_time = None
 
     # Retry logic for geographic connectivity issues
+    ws: ClientConnection = None
     for attempt in range(max_retries):
         try:
             # Get the details of the challenge
             block_hash, params, value = challenge
-            
+
             # Add small delay between retries
             if attempt > 0:
-                await asyncio.sleep(attempt * 1.0)  # 1s, 2s, 3s delays
-                btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Retry attempt {attempt + 1}/{max_retries}")
+                btul.logging.trace(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] Retry attempt {attempt + 1}/{max_retries}"
+                )
 
-            ws = None
             try:
                 # Increase connection timeout for international connections
-                ws = await websockets.connect(
-                f"ws://{miner.ip}:9944",
-                ping_timeout=None,  # Disable ping timeout
-                ping_interval=None,  # Disable ping
-                close_timeout=10,  # 10s close timeout
-                open_timeout=15,  # 15s connection timeout
-                additional_headers={
-                    "Connection": "keep-alive",
-                },
-            )
+                ws = (
+                    connect(
+                        f"ws://{miner.ip}:9944",
+                        max_size=2**32,
+                    )
+                    if not ws or ws.close_code
+                    else ws
+                )
 
             except InvalidURI as ex:
                 # Invalid URI - don't retry, fail immediately
                 reason = f"Invalid WebSocket URI ws://{miner.ip}:9944"
                 details = str(ex)
                 break
-                
-            except (asyncio.TimeoutError, OSError, InvalidHandshake, WebSocketException) as ex:
+
+            except (
+                asyncio.TimeoutError,
+                OSError,
+                InvalidHandshake,
+                WebSocketException,
+            ) as ex:
                 # These are connection errors - let retry logic handle them
                 raise ex
-
 
             # Set start time
             start_time = time.time()
 
             # Prepare data payload
+            item_id = get_next_id()
             data = json.dumps(
                 {
-                    "id": "state_call0",
+                    "id": item_id,
                     "jsonrpc": "2.0",
                     "method": "state_call",
                     "params": [
@@ -283,18 +303,30 @@ async def challenge_subtensor(miner: Miner, challenge, max_retries=3):
 
             try:
                 # Send request
-                await ws.send(data)
+                ws.send(data)
 
             except ConnectionClosed as ex:
                 # Connection error - let retry logic handle
+                btul.logging.trace(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] WebSocket closed during send: {ex}"
+                )
                 raise ex
 
             try:
                 # Receive response with timeout for international connections
-                response = await asyncio.wait_for(ws.recv(), timeout=20.0)
+                response = ws.recv(decode=False, timeout=60.0)
 
-            except (asyncio.TimeoutError, ConnectionClosed) as ex:
+            except asyncio.TimeoutError as ex:
+                btul.logging.trace(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] WebSocket receive timeout: {ex}"
+                )
+                raise ex
+
+            except ConnectionClosed as ex:
                 # Connection error - let retry logic handle
+                btul.logging.trace(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] WebSocket closed during receive: {ex}"
+                )
                 raise ex
 
             # Calculate process time
@@ -327,7 +359,7 @@ async def challenge_subtensor(miner: Miner, challenge, max_retries=3):
             btul.logging.trace(
                 f"[{CHALLENGE_NAME}][{miner.uid}] Total challenge time: {total_time:.2f}s"
             )
-            
+
             # Success - break retry loop
             break
 
@@ -335,10 +367,10 @@ async def challenge_subtensor(miner: Miner, challenge, max_retries=3):
             # These are retryable errors - continue to next attempt
             reason = f"Connection error on attempt {attempt + 1}/{max_retries}"
             details = str(ex)
-            btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] {reason}: {details}")
-            
+            btul.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] {reason}: {details}")
+
             if attempt == max_retries - 1:  # Last attempt
-                reason = "WebSocket connection failed after retries"
+                reason = f"WebSocket connection failed after {max_retries} retries: {str(ex)}"
                 break
 
         except Exception as ex:
@@ -349,7 +381,7 @@ async def challenge_subtensor(miner: Miner, challenge, max_retries=3):
 
         finally:
             if ws:
-                await ws.close()
+                ws.close()
                 ws = None
 
     return (verified, reason, details, process_time)
@@ -383,7 +415,7 @@ async def handle_challenge(self, uid: int, challenge):
         # Challenge Subtensor - Process time + check the challenge
         btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging subtensor")
         subtensor_verified, subtensor_reason, subtensor_details, subtensor_time = (
-            await challenge_subtensor(miner, challenge)
+            challenge_subtensor(miner, challenge)
         )
         if subtensor_verified:
             btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")

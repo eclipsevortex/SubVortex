@@ -217,7 +217,7 @@ async def challenge_miner(self, miner: Miner):
             miner.axon,
             Synapse(),
             deserialize=False,
-            timeout=10,
+            timeout=5,
         )
 
         status_code = response.dendrite.status_code
@@ -341,6 +341,11 @@ def challenge_subtensor(miner: Miner, challenge, max_retries=3):
                 details = str(ex)
                 break
 
+            if "id" not in response:
+                reason = "Response ID is missing"
+                details = ""
+                break
+
             if "error" in response:
                 reason = f"Error in response: {response['error'].get('message', 'Unknown error')}"
                 details = ""
@@ -348,6 +353,11 @@ def challenge_subtensor(miner: Miner, challenge, max_retries=3):
 
             if "result" not in response:
                 reason = "Response does not contain a 'result' field"
+                details = ""
+                break
+
+            if response['id'] != item_id:
+                reason = f"Response ID mismatch: expected '{item_id}', got '{response['id']}'"
                 details = ""
                 break
 
@@ -405,8 +415,11 @@ async def handle_challenge(self, uid: int, challenge):
     if miner_verified:
         btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
     else:
+        message = (
+            ", ".join(filter(None, [miner_reason, miner_details])) or "Unknown reason"
+        )
         btul.logging.warning(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Miner not verified - {miner_reason}"
+            f"[{CHALLENGE_NAME}][{miner.uid}] Miner not verified - {message}"
         )
 
     # Challenge Subtensor if the miner is verified
@@ -421,8 +434,12 @@ async def handle_challenge(self, uid: int, challenge):
             btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
             process_time = subtensor_time
         else:
+            message = (
+                ", ".join(filter(None, [subtensor_reason, subtensor_details]))
+                or "Unknown reason"
+            )
             btul.logging.warning(
-                f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor not verified - {subtensor_reason}"
+                f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor not verified - {message}"
             )
 
     # Flag the miner as verified or not

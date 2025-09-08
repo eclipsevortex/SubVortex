@@ -250,27 +250,13 @@ async def create_subtensor_challenge(subtensor: btcs.Subtensor):
             params=[f"NeuronInfoRuntimeApi_get_neuron_lite", params, block_hash],
         )
 
-        # Get the result
-        value = response.get("result")
-
         # Decode the result
-        try:
-            result = decode(substrate=subtensor.substrate, result=response.get("result"))
-        except Exception as ex:
-            btul.logging.error(f"Failed to decode challenge creation result: {ex}")
-            return None
+        result = decode(substrate=subtensor.substrate, result=response.get("result"))
 
         # Get the property value
-        try:
-            property_value = result.get(property_name)
-            if property_value is None:
-                btul.logging.error(f"Property '{property_name}' not found in result. Available: {list(result.keys())}")
-                return None
-        except Exception as ex:
-            btul.logging.error(f"Failed to extract property '{property_name}': {ex}")
-            return None
+        propert_value = result.get(property_name)
 
-        return (block_hash, params, value, property_name, property_value, result)
+        return (block_hash, params, property_name, propert_value)
 
     except Exception as err:
         btul.logging.warning(f"Could not create the challenge: {err}")
@@ -326,9 +312,7 @@ def challenge_subtensor(
     for attempt in range(max_retries):
         try:
             # Get the details of the challenge
-            block_hash, params, value, property_name, property_value, final_value = (
-                challenge
-            )
+            block_hash, params, property_name, property_value = challenge
 
             # Add small delay between retries
             if attempt > 0:
@@ -379,7 +363,7 @@ def challenge_subtensor(
                     ],
                 }
             )
-           
+
             try:
                 # Send request
                 ws.send(data)
@@ -561,7 +545,7 @@ async def challenge_data(self, block: int):
         return
 
     btul.logging.debug(
-        f"[{CHALLENGE_NAME}] Challenge created - Block: {challenge[0]}, Params: {challenge[1]}, Value: {challenge[2]}"
+        f"[{CHALLENGE_NAME}] Challenge created - Block: {challenge[0]}, Params: {challenge[1]}, Name: {challenge[2]}, Value: {challenge[3]}"
     )
 
     # Select the miners

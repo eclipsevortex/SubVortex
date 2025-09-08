@@ -323,8 +323,7 @@ class Validator:
                     continue
 
                 # Run multiple forwards.
-                coroutines = [forward(self)]
-                await asyncio.gather(*coroutines)
+                await forward(self)
 
                 # Check if stop has been requested
                 if self.should_exit.is_set():

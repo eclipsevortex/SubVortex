@@ -14,18 +14,29 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import json
 import time
 import random
 import asyncio
+import string
 import traceback
-import bittensor.core.chain_data as btccd
+import websockets
 import bittensor.core.subtensor as btcs
-import bittensor.core.settings as btcse
 import bittensor.utils.btlogging as btul
+from itertools import cycle
+from websockets.sync.client import connect, ClientConnection
 from typing import Dict
 from collections import Counter
+from websockets.exceptions import (
+    ConnectionClosed,
+    InvalidURI,
+    InvalidHandshake,
+    WebSocketException,
+)
 
-from subvortex.core.constants import DEFAULT_PROCESS_TIME
+from async_substrate_interface.utils import hex_to_bytes
+from async_substrate_interface.types import ScaleObj
+
 from subvortex.core.protocol import Synapse
 from subvortex.validator.neuron.src.miner import Miner
 from subvortex.validator.neuron.src.synapse import send_scope
@@ -71,8 +82,103 @@ VALIDATOR_PROPERTIES = [
     "last_update",
 ]
 
+id_cycle = cycle(range(1, 999))
 
-def create_subtensor_challenge(subtensor: btcs.Subtensor):
+rng = random.Random()
+
+
+def get_next_id() -> str:
+    """
+    Generates a pseudo-random ID by returning the next int of a range from 1-998 prepended with
+    two random ascii characters.
+    """
+    random_letters = "".join(rng.choices(string.ascii_letters, k=2))
+    return f"{random_letters}{next(id_cycle)}"
+
+
+def get_runtime_call_definition(
+    substrate: btcs.SubstrateInterface, api: str, method: str
+):
+    try:
+
+        metadata_v15_value = substrate.runtime.metadata_v15.value()
+        apis = {entry["name"]: entry for entry in metadata_v15_value["apis"]}
+        api_entry = apis[api]
+        methods = {entry["name"]: entry for entry in api_entry["methods"]}
+        return methods[method]
+
+    except KeyError:
+        raise ValueError(f"Runtime API Call '{api}.{method}' not found in registry")
+
+
+def encode(substrate: btcs.SubstrateInterface, runtime_call_def, params={}):
+    param_data = b""
+
+    for idx, param in enumerate(runtime_call_def["inputs"]):
+        param_type_string = f"scale_info::{param['ty']}"
+        if isinstance(params, list):
+            param_data += substrate._encode_scale(param_type_string, params[idx])
+        else:
+            if param["name"] not in params:
+                raise ValueError(f"Runtime Call param '{param['name']}' is missing")
+
+            param_data += substrate._encode_scale(
+                param_type_string, params[param["name"]]
+            )
+
+    return param_data
+
+
+def decode(substrate: btcs.SubstrateInterface, result):
+    """
+    Decode the response from NeuronInfoRuntimeApi_get_neuron_lite call
+    Based on sync_substrate.py decoding patterns
+    """
+    try:
+        # Convert hex result to bytes (similar to sync_substrate pattern)
+        result_bytes = hex_to_bytes(result)
+
+        # Get the runtime metadata for the current subtensor version
+        metadata = substrate.runtime.metadata_v15.value()
+
+        # Find the NeuronInfoRuntimeApi definition
+        apis = {entry["name"]: entry for entry in metadata["apis"]}
+        if "NeuronInfoRuntimeApi" not in apis:
+            raise ValueError("NeuronInfoRuntimeApi not found in runtime metadata")
+
+        api_entry = apis["NeuronInfoRuntimeApi"]
+
+        # Find the get_neuron_lite method
+        method_def = None
+        for method in api_entry["methods"]:
+            if method["name"] == "get_neuron_lite":
+                method_def = method
+                break
+
+        if not method_def:
+            raise ValueError("get_neuron_lite method not found")
+
+        # Get the output type from method definition
+        output_type_id = method_def["output"]
+        output_type_string = f"scale_info::{output_type_id}"
+
+        # Decode using substrate's scale decoder (similar to sync_substrate._decode_scale)
+        decoded_obj = substrate.decode_scale(output_type_string, result_bytes)
+
+        # Convert to dictionary format (similar to sync_substrate result processing)
+        if hasattr(decoded_obj, "value"):
+            result_dict = decoded_obj.value
+        else:
+            result_dict = decoded_obj
+
+        return result_dict
+
+    except Exception as e:
+        btul.logging.error(f"Failed to decode neuron response: {e}")
+        raise ValueError(f"Decoding failed: {str(e)}")
+
+
+async def create_subtensor_challenge(subtensor: btcs.Subtensor):
     """
     Create the challenge that the miner subtensor will have to execute
     """
@@ -87,6 +193,9 @@ def create_subtensor_challenge(subtensor: btcs.Subtensor):
             current_block - LITE_NODE_BLOCK_UPPER_LIMIT,
         )
         btul.logging.trace(f"Block chosen: {block}")
+
+        # Get the hash of the block
+        block_hash = subtensor.get_block_hash(block=block)
 
         # Be sure we select a subnet that at least one neuron
         subnet_to_exclude = []
@@ -114,23 +223,51 @@ def create_subtensor_challenge(subtensor: btcs.Subtensor):
         properties = (
             MINER_PROPERTIES if neuron.axon_info.is_serving else VALIDATOR_PROPERTIES
         )
+
+        # Get the runtime call definition
         property_index = random.randint(0, len(properties) - 1)
-        neuron_property = properties[property_index]
-        btul.logging.trace(f"Property chosen: {neuron_property}")
+        property_name = properties[property_index]
+        btul.logging.trace(f"Property chosen: {property_name}")
+
+        # Get the runtime call definition
+        runtime_call_def = get_runtime_call_definition(
+            substrate=subtensor.substrate,
+            api="NeuronInfoRuntimeApi",
+            method="get_neuron_lite",
+        )
+
+        # Encode the parameters
+        params = encode(
+            substrate=subtensor.substrate,
+            runtime_call_def=runtime_call_def,
+            params=[subnet_uid, neuron_uid],
+        )
+        params = params.hex()
+
+        # Sent the request
+        response = subtensor.substrate.rpc_request(
+            method="state_call",
+            params=[f"NeuronInfoRuntimeApi_get_neuron_lite", params, block_hash],
+        )
+
+        # Decode the result
+        result = decode(substrate=subtensor.substrate, result=response.get("result"))
 
         # Get the property value
-        neuron_value = getattr(neuron, neuron_property)
+        propert_value = result.get(property_name)
 
-        return (block, subnet_uid, neuron_uid, neuron_property, neuron_value)
+        return (block_hash, params, property_name, propert_value)
+
     except Exception as err:
         btul.logging.warning(f"Could not create the challenge: {err}")
         btul.logging.warning(traceback.format_exc())
-        return None
+
+    return None
 
 
 async def challenge_miner(self, miner: Miner):
     """
-    Challenge the miner by pinging it
+    Challenge the miner by pinging it within 5 seconds
     """
     verified = False
     reason = None
@@ -151,6 +288,7 @@ async def challenge_miner(self, miner: Miner):
         reason = status_message
 
         return (verified, reason, None)
+
     except Exception as ex:
         reason = "Unexpected exception"
         details = str(ex)
@@ -158,87 +296,179 @@ async def challenge_miner(self, miner: Miner):
     return (verified, reason, details)
 
 
-def challenge_subtensor(miner: Miner, challenge):
+def challenge_subtensor(
+    miner: Miner, challenge, substrate: btcs.SubstrateInterface, max_retries=3
+):
     """
     Challenge the subtensor by requesting the value of a property of a specific neuron in a specific subnet at a certain block
     """
-    substrate = None
     verified = False
     reason = None
     details = None
     process_time = None
 
-    try:
-        # Get the details of the challenge
-        block, netuid, uid, neuron_property, expected_value = challenge
-
-        # Attempt to connect to the subtensor
+    # Retry logic for geographic connectivity issues
+    ws: ClientConnection = None
+    for attempt in range(max_retries):
         try:
-            # Create the substrate
-            substrate = btcs.SubstrateInterface(
-                ss58_format=btcse.SS58_FORMAT,
-                use_remote_preset=True,
-                type_registry=btcse.TYPE_REGISTRY,
-                url=f"ws://{miner.ip}:9944",
+            # Get the details of the challenge
+            block_hash, params, property_name, property_value = challenge
+
+            # Add small delay between retries
+            if attempt > 0:
+                btul.logging.trace(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] Retry attempt {attempt + 1}/{max_retries}"
+                )
+
+            try:
+                # Increase connection timeout for international connections
+                ws = (
+                    connect(
+                        f"ws://{miner.ip}:9944",
+                        max_size=2**32,
+                    )
+                    if not ws or ws.close_code
+                    else ws
+                )
+
+            except InvalidURI as ex:
+                # Invalid URI - don't retry, fail immediately
+                reason = f"Invalid WebSocket URI ws://{miner.ip}:9944"
+                details = str(ex)
+                break
+
+            except (
+                asyncio.TimeoutError,
+                OSError,
+                InvalidHandshake,
+                WebSocketException,
+            ) as ex:
+                # These are connection errors - let retry logic handle them
+                raise ex
+
+            # Set start time
+            start_time = time.time()
+
+            # Prepare data payload
+            item_id = get_next_id()
+            data = json.dumps(
+                {
+                    "id": item_id,
+                    "jsonrpc": "2.0",
+                    "method": "state_call",
+                    "params": [
+                        "NeuronInfoRuntimeApi_get_neuron_lite",
+                        params,
+                        block_hash,
+                    ],
+                }
             )
+
+            try:
+                # Send request
+                ws.send(data)
+
+            except ConnectionClosed as ex:
+                # Connection error - let retry logic handle
+                btul.logging.trace(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] WebSocket closed during send: {ex}"
+                )
+                raise ex
+
+            try:
+                # Receive response with timeout for international connections
+                response = ws.recv(decode=False, timeout=60.0)
+
+            except asyncio.TimeoutError as ex:
+                btul.logging.trace(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] WebSocket receive timeout: {ex}"
+                )
+                raise ex
+
+            except ConnectionClosed as ex:
+                # Connection error - let retry logic handle
+                btul.logging.trace(
+                    f"[{CHALLENGE_NAME}][{miner.uid}] WebSocket closed during receive: {ex}"
+                )
+                raise ex
+
+            # Calculate process time
+            process_time = time.time() - start_time
+
+            # Load the response
+            try:
+                response = json.loads(response)
+
+            except json.JSONDecodeError as ex:
+                reason = "Received malformed JSON response"
+                details = str(ex)
+                break
+
+            if "id" not in response:
+                reason = "Response ID is missing"
+                details = ""
+                break
+
+            if "error" in response:
+                reason = f"Error in response: {response['error'].get('message', 'Unknown error')}"
+                details = ""
+                break
+
+            if "result" not in response:
+                reason = "Response does not contain a 'result' field"
+                details = ""
+                break
+
+            if response["id"] != item_id:
+                reason = f"Response ID mismatch: expected '{item_id}', got '{response['id']}'"
+                details = ""
+                break
+
+            # Decode result
+            result = decode(substrate=substrate, result=response["result"])
+
+            # Get the property value
+            value = result.get(property_name)
+
+            # Verify the challenge
+            verified = str(property_value) == str(value)
+
+            # Log total process time breakdown
+            total_time = time.time() - start_time
+            btul.logging.trace(
+                f"[{CHALLENGE_NAME}][{miner.uid}] Total challenge time: {total_time:.2f}s"
+            )
+
+            # Success - break retry loop
+            break
+
+        except (ConnectionClosed, WebSocketException, asyncio.TimeoutError) as ex:
+            # These are retryable errors - continue to next attempt
+            reason = f"Connection error on attempt {attempt + 1}/{max_retries}"
+            details = str(ex)
+            btul.logging.trace(f"[{CHALLENGE_NAME}][{miner.uid}] {reason}: {details}")
+
+            if attempt == max_retries - 1:  # Last attempt
+                reason = f"WebSocket connection failed after {max_retries} retries: {str(ex)}"
+                break
 
         except Exception as ex:
-            reason = "Failed to connect to Subtensor node at the given IP."
-            return (verified, reason, str(ex), process_time)
+            # Non-retryable error - break immediately
+            reason = "Unexpected exception"
+            details = str(ex)
+            break
 
-        # Set the socket timeout
-        substrate.ws.socket.settimeout(DEFAULT_PROCESS_TIME)
-
-        # Start the timer
-        start_time = time.time()
-
-        # Execute the challenge
-        try:
-            # Get the block hash
-            block_hash = substrate.get_block_hash(block)
-
-            # Get the neuron lite details
-            result = substrate.runtime_call(
-                "NeuronInfoRuntimeApi", "get_neuron_lite", [netuid, uid], block_hash
-            )
-
-            # Convert to a neuron entity
-            neuron = btccd.NeuronInfoLite.from_dict(result.value)
-        except KeyError as ex:
-            reason = "Invalid netuid or uid provided."
-            return (verified, reason, str(ex), process_time)
-        except ValueError as ex:
-            reason = "Invalid or unavailable block number."
-            return (verified, reason, str(ex), process_time)
-        except (Exception, BaseException) as ex:
-            reason = "Failed to retrieve neuron details."
-            return (verified, reason, str(ex), process_time)
-
-        # Access the specified property
-        try:
-            miner_value = getattr(neuron, neuron_property)
-        except AttributeError as ex:
-            reason = "Property not found in the neuron."
-            return (verified, reason, str(ex), process_time)
-
-        # Compute the process time
-        process_time = time.time() - start_time
-
-        # Verify the challenge
-        verified = expected_value == miner_value
-
-    except Exception as ex:
-        reason = "Unexpected exception"
-        details = str(ex)
-
-    finally:
-        if substrate:
-            substrate.close()
+        finally:
+            if ws:
+                ws.close()
+                ws = None
 
     return (verified, reason, details, process_time)
 
 
-async def handle_challenge(self, uid: int, challenge):
+async def handle_challenge(
+    self, uid: int, challenge, substrate: btcs.SubstrateInterface
+):
     btul.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Challenging...")
 
     # Get the miner
@@ -256,8 +486,11 @@ async def handle_challenge(self, uid: int, challenge):
     if miner_verified:
         btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Miner verified")
     else:
+        message = (
+            ", ".join(filter(None, [miner_reason, miner_details])) or "Unknown reason"
+        )
         btul.logging.warning(
-            f"[{CHALLENGE_NAME}][{miner.uid}] Miner not verified - {miner_reason}"
+            f"[{CHALLENGE_NAME}][{miner.uid}] Miner not verified - {message}"
         )
 
     # Challenge Subtensor if the miner is verified
@@ -266,14 +499,18 @@ async def handle_challenge(self, uid: int, challenge):
         # Challenge Subtensor - Process time + check the challenge
         btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging subtensor")
         subtensor_verified, subtensor_reason, subtensor_details, subtensor_time = (
-            challenge_subtensor(miner, challenge)
+            challenge_subtensor(miner, challenge, substrate)
         )
         if subtensor_verified:
             btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
             process_time = subtensor_time
         else:
+            message = (
+                ", ".join(filter(None, [subtensor_reason, subtensor_details]))
+                or "Unknown reason"
+            )
             btul.logging.warning(
-                f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor not verified - {subtensor_reason}"
+                f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor not verified - {message}"
             )
 
     # Flag the miner as verified or not
@@ -303,12 +540,12 @@ async def challenge_data(self, block: int):
     btul.logging.debug(f"[{CHALLENGE_NAME}] Step starting")
 
     # Create the challenge
-    challenge = create_subtensor_challenge(self.subtensor)
+    challenge = await create_subtensor_challenge(self.subtensor)
     if not challenge:
         return
 
     btul.logging.debug(
-        f"[{CHALLENGE_NAME}] Challenge created - Block: {challenge[0]}, Netuid: {challenge[1]}, Uid: {challenge[2]}: Property: {challenge[3]}, Value: {challenge[4]}"
+        f"[{CHALLENGE_NAME}] Challenge created - Block: {challenge[0]}, Params: {challenge[1]}, Name: {challenge[2]}, Value: {challenge[3]}"
     )
 
     # Select the miners
@@ -331,9 +568,13 @@ async def challenge_data(self, block: int):
     details = []
     for uid in uids:
         # Send the challenge to the miner
-        tasks.append(asyncio.create_task(handle_challenge(self, uid, challenge)))
-        results = await asyncio.gather(*tasks)
-        reasons, details = zip(*results)
+        tasks.append(
+            asyncio.create_task(
+                handle_challenge(self, uid, challenge, self.subtensor.substrate)
+            )
+        )
+    results = await asyncio.gather(*tasks)
+    reasons, details = zip(*results)
 
     btul.logging.info(f"[{CHALLENGE_NAME}] Starting evaluation")
 

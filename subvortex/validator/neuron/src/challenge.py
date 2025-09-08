@@ -34,6 +34,9 @@ from websockets.exceptions import (
     WebSocketException,
 )
 
+from async_substrate_interface.utils import hex_to_bytes
+from async_substrate_interface.types import ScaleObj
+
 from subvortex.core.protocol import Synapse
 from subvortex.validator.neuron.src.miner import Miner
 from subvortex.validator.neuron.src.synapse import send_scope
@@ -126,6 +129,55 @@ def encode(substrate: btcs.SubstrateInterface, runtime_call_def, params={}):
     return param_data
 
 
+def decode(substrate: btcs.SubstrateInterface, result):
+    """
+    Decode the response from NeuronInfoRuntimeApi_get_neuron_lite call
+    Based on sync_substrate.py decoding patterns
+    """
+    try:
+        # Convert hex result to bytes (similar to sync_substrate pattern)
+        result_bytes = hex_to_bytes(result)
+
+        # Get the runtime metadata for the current subtensor version
+        metadata = substrate.runtime.metadata_v15.value()
+
+        # Find the NeuronInfoRuntimeApi definition
+        apis = {entry["name"]: entry for entry in metadata["apis"]}
+        if "NeuronInfoRuntimeApi" not in apis:
+            raise ValueError("NeuronInfoRuntimeApi not found in runtime metadata")
+
+        api_entry = apis["NeuronInfoRuntimeApi"]
+
+        # Find the get_neuron_lite method
+        method_def = None
+        for method in api_entry["methods"]:
+            if method["name"] == "get_neuron_lite":
+                method_def = method
+                break
+
+        if not method_def:
+            raise ValueError("get_neuron_lite method not found")
+
+        # Get the output type from method definition
+        output_type_id = method_def["output"]
+        output_type_string = f"scale_info::{output_type_id}"
+
+        # Decode using substrate's scale decoder (similar to sync_substrate._decode_scale)
+        decoded_obj = substrate.decode_scale(output_type_string, result_bytes)
+
+        # Convert to dictionary format (similar to sync_substrate result processing)
+        if hasattr(decoded_obj, "value"):
+            result_dict = decoded_obj.value
+        else:
+            result_dict = decoded_obj
+
+        return result_dict
+
+    except Exception as e:
+        btul.logging.error(f"Failed to decode neuron response: {e}")
+        raise ValueError(f"Decoding failed: {str(e)}")
+
+
 async def create_subtensor_challenge(subtensor: btcs.Subtensor):
     """
     Create the challenge that the miner subtensor will have to execute
@@ -167,6 +219,16 @@ async def create_subtensor_challenge(subtensor: btcs.Subtensor):
         neuron_uid = neuron.uid
         btul.logging.trace(f"Neuron chosen: {neuron_uid}")
 
+        # Select the property
+        properties = (
+            MINER_PROPERTIES if neuron.axon_info.is_serving else VALIDATOR_PROPERTIES
+        )
+
+        # Get the runtime call definition
+        property_index = random.randint(0, len(properties) - 1)
+        property_name = properties[property_index]
+        btul.logging.trace(f"Property chosen: {property_name}")
+
         # Get the runtime call definition
         runtime_call_def = get_runtime_call_definition(
             substrate=subtensor.substrate,
@@ -191,11 +253,24 @@ async def create_subtensor_challenge(subtensor: btcs.Subtensor):
         # Get the result
         value = response.get("result")
 
-        return (
-            block_hash,
-            params,
-            value,
-        )
+        # Decode the result
+        try:
+            result = decode(substrate=subtensor.substrate, result=response.get("result"))
+        except Exception as ex:
+            btul.logging.error(f"Failed to decode challenge creation result: {ex}")
+            return None
+
+        # Get the property value
+        try:
+            property_value = result.get(property_name)
+            if property_value is None:
+                btul.logging.error(f"Property '{property_name}' not found in result. Available: {list(result.keys())}")
+                return None
+        except Exception as ex:
+            btul.logging.error(f"Failed to extract property '{property_name}': {ex}")
+            return None
+
+        return (block_hash, params, value, property_name, property_value, result)
 
     except Exception as err:
         btul.logging.warning(f"Could not create the challenge: {err}")
@@ -235,7 +310,9 @@ async def challenge_miner(self, miner: Miner):
     return (verified, reason, details)
 
 
-def challenge_subtensor(miner: Miner, challenge, max_retries=3):
+def challenge_subtensor(
+    miner: Miner, challenge, substrate: btcs.SubstrateInterface, max_retries=3
+):
     """
     Challenge the subtensor by requesting the value of a property of a specific neuron in a specific subnet at a certain block
     """
@@ -249,7 +326,9 @@ def challenge_subtensor(miner: Miner, challenge, max_retries=3):
     for attempt in range(max_retries):
         try:
             # Get the details of the challenge
-            block_hash, params, value = challenge
+            block_hash, params, value, property_name, property_value, final_value = (
+                challenge
+            )
 
             # Add small delay between retries
             if attempt > 0:
@@ -300,7 +379,7 @@ def challenge_subtensor(miner: Miner, challenge, max_retries=3):
                     ],
                 }
             )
-
+           
             try:
                 # Send request
                 ws.send(data)
@@ -356,13 +435,19 @@ def challenge_subtensor(miner: Miner, challenge, max_retries=3):
                 details = ""
                 break
 
-            if response['id'] != item_id:
+            if response["id"] != item_id:
                 reason = f"Response ID mismatch: expected '{item_id}', got '{response['id']}'"
                 details = ""
                 break
 
+            # Decode result
+            result = decode(substrate=substrate, result=response["result"])
+
+            # Get the property value
+            value = result.get(property_name)
+
             # Verify the challenge
-            verified = response["result"] == value
+            verified = str(property_value) == str(value)
 
             # Log total process time breakdown
             total_time = time.time() - start_time
@@ -397,7 +482,9 @@ def challenge_subtensor(miner: Miner, challenge, max_retries=3):
     return (verified, reason, details, process_time)
 
 
-async def handle_challenge(self, uid: int, challenge):
+async def handle_challenge(
+    self, uid: int, challenge, substrate: btcs.SubstrateInterface
+):
     btul.logging.debug(f"[{CHALLENGE_NAME}][{uid}] Challenging...")
 
     # Get the miner
@@ -428,7 +515,7 @@ async def handle_challenge(self, uid: int, challenge):
         # Challenge Subtensor - Process time + check the challenge
         btul.logging.debug(f"[{CHALLENGE_NAME}][{miner.uid}] Challenging subtensor")
         subtensor_verified, subtensor_reason, subtensor_details, subtensor_time = (
-            challenge_subtensor(miner, challenge)
+            challenge_subtensor(miner, challenge, substrate)
         )
         if subtensor_verified:
             btul.logging.success(f"[{CHALLENGE_NAME}][{miner.uid}] Subtensor verified")
@@ -497,7 +584,11 @@ async def challenge_data(self, block: int):
     details = []
     for uid in uids:
         # Send the challenge to the miner
-        tasks.append(asyncio.create_task(handle_challenge(self, uid, challenge)))
+        tasks.append(
+            asyncio.create_task(
+                handle_challenge(self, uid, challenge, self.subtensor.substrate)
+            )
+        )
     results = await asyncio.gather(*tasks)
     reasons, details = zip(*results)
 
